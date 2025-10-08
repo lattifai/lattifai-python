@@ -1,0 +1,39 @@
+name: windows
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore: '**.md'
+  pull_request:
+    branches: [ main ]
+    paths-ignore: '**.md'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - run: pip install numpy scipy pytest
+
+      - name: Install package with dependencies
+        run: pip install -e .
+
+      - name: Run basic tests
+        run: |
+          python tests/test_basic.py
+          python -c "import lattifai; print('Import successful')"

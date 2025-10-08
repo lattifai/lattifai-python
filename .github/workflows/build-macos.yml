@@ -1,0 +1,42 @@
+name: macos
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore: '**.md'
+  pull_request:
+    branches: [ main ]
+    paths-ignore: '**.md'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        OS: [macos-14, macos-15]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+
+    runs-on: ${{ matrix.OS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - run: brew install libomp
+
+      - run: pip install numpy scipy pytest
+
+      - name: Install package with dependencies
+        run: pip install -e .
+        env:
+          OpenMP_ROOT: /opt/homebrew/opt/libomp
+
+      - name: Run basic tests
+        run: |
+          python tests/test_basic.py
+          python -c "import lattifai; print('Import successful')"

@@ -1,0 +1,51 @@
+name: Coverage
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore: '**.md'
+  pull_request:
+    branches: [ main ]
+    paths-ignore: '**.md'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'  # Use a stable version for coverage
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get -y update
+          sudo apt-get install --no-install-recommends -y build-essential pybind11-dev
+          python -m pip install --upgrade pip setuptools pytest pytest-cov coverage numpy scipy
+
+      - name: Build (Python)
+        run: |
+          pip install -e .
+
+      - name: Test import and basic functionality
+        run: |
+          python tests/test_basic.py
+          # Generate coverage report using coverage module directly
+          coverage run tests/test_basic.py
+          coverage xml
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4.0.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: koide3/small_gicp
+          files: build/coverage.info,coverage.xml
