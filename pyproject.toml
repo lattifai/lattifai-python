@@ -38,7 +38,9 @@ classifiers = [
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX :: Linux',
     'Operating System :: Microsoft :: Windows',
-    'Topic :: Scientific/Engineering :: Audio Video Processing',
+    'Topic :: Multimedia :: Sound/Audio',
+    'Topic :: Multimedia :: Video',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
 ]
 
 [project.urls]
