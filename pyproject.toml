@@ -17,10 +17,10 @@ maintainers = [
 requires-python = '>=3.9'
 
 dependencies = [
-    "httpx>=0.24.0",
+    "httpx",
     "python-dotenv",
-    "lhotse>=1.31.1",
-    "colorful>=0.5.7"
+    "lhotse>=1.26.0",
+    "colorful>=0.5.6"
 ]
 
 classifiers = [
