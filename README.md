@@ -1,5 +1,7 @@
 # LattifAI Python
 
+> ⚠️ **Under Active Development** - Official release scheduled for October 18, 2025
+
 [![PyPI version](https://badge.fury.io/py/lattifai.svg)](https://badge.fury.io/py/lattifai)
 
 The official Python library for the LattifAI API - Advanced forced alignment and subtitle generation powered by `Lattice-1-Alpha` model.
