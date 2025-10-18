@@ -1,7 +1,7 @@
 import re
 from typing import List, Optional, Union
 
-from dp.phonemizer import Phonemizer
+from dp.phonemizer import Phonemizer  # g2p-phonemizer
 from num2words import num2words
 
 LANGUAGE = 'omni'

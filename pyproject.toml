@@ -28,7 +28,7 @@ dependencies = [
     "tgt",
     "onnxruntime",
     "resampy",
-    "dp @ git+https://github.com/lifeiteng/DeepPhonemizer.git@dp",
+    "g2p-phonemizer>=0.1.1",
 ]
 
 classifiers = [
