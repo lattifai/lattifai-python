@@ -5,8 +5,9 @@ from typing import Any, BinaryIO, Dict, Tuple, Union
 
 import numpy as np
 import onnxruntime as ort
+import resampy
+import soundfile as sf
 import torch
-import torchaudio
 from lhotse import FbankConfig
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
@@ -58,11 +59,12 @@ class Lattice1AlphaWorker:
 
     def load_audio(self, audio: Union[Pathlike, BinaryIO]) -> Tuple[torch.Tensor, int]:
         # load audio
-        waveform, sample_rate = torchaudio.load(audio, channels_first=True)
-        if waveform.size(0) > 1:  # TODO: support choose channel
-            waveform = torch.mean(waveform, dim=0, keepdim=True)
+        waveform, sample_rate = sf.read(audio, always_2d=True, dtype='float32')
+        if waveform.shape[1] > 1:  # TODO: support choose channel
+            waveform = np.mean(waveform, axis=1, keepdims=True)
         if sample_rate != self.config['sample_rate']:
-            waveform = torchaudio.functional.resample(waveform, sample_rate, self.config['sample_rate'])
+            waveform = resampy.resample(waveform, sample_rate, self.config['sample_rate'], axis=0)
+        waveform = torch.from_numpy(waveform.T).to(self.device)  # (1, L)
         return waveform
 
     def alignment(

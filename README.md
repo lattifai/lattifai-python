@@ -375,7 +375,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Support
 
-- **Documentation**: [API Documentation](https://github.com/lattifai/lattifai-python/api.md)
+- **Documentation**: [API Documentation](https://github.com/lattifai/lattifai-python/README.md)
 - **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
 - **Changelog**: [CHANGELOG.md](https://github.com/lattifai/lattifai-python/CHANGELOG.md)
