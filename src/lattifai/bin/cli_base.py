@@ -8,6 +8,14 @@ def cli():
     """
     The shell entry point to Lattifai, a tool for audio data manipulation.
     """
+    # Load environment variables from .env file
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        pass  # dotenv is optional
+
     logging.basicConfig(
         format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
         level=logging.INFO,

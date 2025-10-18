@@ -17,8 +17,6 @@ class Lattice1AlphaWorker:
     """Worker for processing audio with LatticeGraph."""
 
     def __init__(self, model_path: Pathlike, device: str = 'cpu', num_threads: int = 8) -> None:
-        if device != 'cpu':
-            raise NotImplementedError(f'Only cpu is supported for now, got device={device}.')
         self.config = json.load(open(f'{model_path}/config.json'))
 
         # SessionOptions
@@ -29,8 +27,11 @@ class Lattice1AlphaWorker:
         sess_options.add_session_config_entry('session.intra_op.allow_spinning', '0')
 
         providers = []
-        if device.startswith('cuda') or ort.get_all_providers().count('CUDAExecutionProvider') > 0:
+        if device.startswith('cuda') and ort.get_all_providers().count('CUDAExecutionProvider') > 0:
             providers.append('CUDAExecutionProvider')
+        elif device.startswith('mps') and ort.get_all_providers().count('MPSExecutionProvider') > 0:
+            providers.append('MPSExecutionProvider')
+
         self.acoustic_ort = ort.InferenceSession(
             f'{model_path}/acoustic_opt.onnx',
             sess_options,
@@ -104,9 +105,14 @@ class Lattice1AlphaWorker:
         self.timings['decoding_graph'] += time.time() - _start
 
         _start = time.time()
+        if self.device.type == 'mps':
+            device = 'cpu'  # k2 does not support mps yet
+        else:
+            device = self.device
+
         results, labels = align_segments(
-            emission.to(self.device) * acoustic_scale,
-            decoding_graph.to(self.device),
+            emission.to(device) * acoustic_scale,
+            decoding_graph.to(device),
             torch.tensor([emission.shape[1]], dtype=torch.int32),
             search_beam=100,
             output_beam=40,

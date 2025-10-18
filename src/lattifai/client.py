@@ -25,7 +25,7 @@ class LattifAI(SyncAPIClient):
         *,
         api_key: Optional[str] = None,
         model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
-        device: str = 'cpu',
+        device: Optional[str] = None,
         base_url: Optional[str] = None,
         timeout: Union[float, int] = 60.0,
         max_retries: int = 2,
@@ -59,6 +59,16 @@ class LattifAI(SyncAPIClient):
             model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
         else:
             model_path = model_name_or_path
+
+        # device setup
+        if device is None:
+            import torch
+
+            device = 'cpu'
+            if torch.backends.mps.is_available():
+                device = 'mps'
+            elif torch.cuda.is_available():
+                device = 'cuda'
 
         self.tokenizer = LatticeTokenizer.from_pretrained(
             client_wrapper=self,
