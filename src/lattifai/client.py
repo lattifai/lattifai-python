@@ -24,8 +24,9 @@ class LattifAI(SyncAPIClient):
         self,
         *,
         api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
         device: str = 'cpu',
+        base_url: Optional[str] = None,
         timeout: Union[float, int] = 60.0,
         max_retries: int = 2,
         default_headers: Optional[Dict[str, str]] = None,
@@ -52,19 +53,16 @@ class LattifAI(SyncAPIClient):
         )
 
         # Initialize components
-        model_name_or_path = '/Users/feiteng/GEEK/OmniCaptions/HF_models/Lattice-1-Alpha'
-
         if not Path(model_name_or_path).exists():
-            from huggingface_hub import hf_hub_download
+            from huggingface_hub import snapshot_download
 
-            model_path = hf_hub_download(repo_id=model_name_or_path, repo_type='model')
+            model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
         else:
             model_path = model_name_or_path
 
         self.tokenizer = LatticeTokenizer.from_pretrained(
             client_wrapper=self,
-            model_path=f'{model_path}/words.bin',
-            g2p_model_path=f'{model_path}/g2p.bin' if Path(f'{model_path}/g2p.bin').exists() else None,
+            model_path=model_path,
             device=device,
         )
         self.worker = Lattice1AlphaWorker(model_path, device=device, num_threads=8)

@@ -33,22 +33,26 @@ class LatticeTokenizer:
     def from_pretrained(
         client_wrapper: SyncAPIClient,
         model_path: str,
-        g2p_model_path: Optional[str] = None,
         device: str = 'cpu',
         compressed: bool = True,
     ):
         """Load tokenizer from exported binary file"""
+        from pathlib import Path
+
+        words_model_path = f'{model_path}/words.bin'
         if compressed:
-            with gzip.open(model_path, 'rb') as f:
+            with gzip.open(words_model_path, 'rb') as f:
                 data = pickle.load(f)
         else:
-            with open(model_path, 'rb') as f:
+            with open(words_model_path, 'rb') as f:
                 data = pickle.load(f)
 
         tokenizer = LatticeTokenizer(client_wrapper=client_wrapper)
         tokenizer.words = data['words']
         tokenizer.dictionaries = defaultdict(list, data['dictionaries'])
         tokenizer.oov_word = data['oov_word']
+
+        g2p_model_path = f'{model_path}/g2p.bin' if Path(f'{model_path}/g2p.bin').exists() else None
         if g2p_model_path:
             tokenizer.g2p_model = G2Phonemizer(g2p_model_path, device=device)
         return tokenizer

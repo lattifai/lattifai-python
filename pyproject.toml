@@ -53,7 +53,14 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG'
 [project.scripts]
 lattifai = 'lattifai.bin:cli'
 lattifai-align = 'lattifai.bin.align:align'
+install-k2 = 'scripts.install_k2:install_k2'
 
+[tool.setuptools]
+packages = ["lattifai", "scripts"]
+
+[tool.setuptools.package-dir]
+lattifai = "src/lattifai"
+scripts = "scripts"
 
 [project.optional-dependencies]
 numpy = ['numpy']
@@ -66,7 +73,8 @@ all = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report=term-missing --durations=10"
+addopts = "--durations=10"
+testpaths = ["tests"]
 
 [tool.coverage.run]
 omit = [

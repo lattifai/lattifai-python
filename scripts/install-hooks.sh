@@ -24,15 +24,15 @@ cat > "$HOOKS_DIR/pre-commit" << 'EOF'
 # Git pre-commit hook to run isort and ruff
 
 echo "Running isort..."
-isort src/ tests/ --check-only --diff
+isort src/ tests/ scripts/ --check-only --diff
 ISORT_STATUS=$?
 
 echo "Running ruff check..."
-ruff check src/ tests/
+ruff check src/ tests/ scripts/
 RUFF_CHECK_STATUS=$?
 
 echo "Running ruff format check..."
-ruff format --check src/ tests/
+ruff format --check src/ tests/ scripts/
 RUFF_FORMAT_STATUS=$?
 
 # If any check failed, exit with error
@@ -41,9 +41,9 @@ if [ $ISORT_STATUS -ne 0 ] || [ $RUFF_CHECK_STATUS -ne 0 ] || [ $RUFF_FORMAT_STA
     echo "❌ Pre-commit checks failed!"
     echo ""
     echo "To fix automatically, run:"
-    echo "isort src/ tests/"
-    echo "ruff check --fix src/ tests/"
-    echo "ruff format src/ tests/"
+    echo "isort src/ tests/ scripts/"
+    echo "ruff check --fix src/ tests/ scripts/"
+    echo "ruff format src/ tests/ scripts/"
     echo ""
     echo "Or to bypass this check (not recommended), use: git commit --no-verify"
     exit 1

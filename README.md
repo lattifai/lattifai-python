@@ -1,8 +1,14 @@
 # LattifAI Python
 
-> ⚠️ **Under Active Development** - Official release scheduled for October 18, 2025
+<!-- <p align="center">
+  <a href="https://badge.fury.io/py/lattifai"><img src="https://badge.fury.io/py/lattifai.svg" alt="PyPI version"></a>
+</p> -->
 
 [![PyPI version](https://badge.fury.io/py/lattifai.svg)](https://badge.fury.io/py/lattifai)
+
+<p align="center">
+   &nbsp&nbsp 🖥️ <a href="https://github.com/lattifai/lattifai-python">GitHub</a> &nbsp&nbsp  | &nbsp&nbsp🤗 <a href="https://huggingface.co/Lattifai/Lattice-1-Alpha">Lattifai/Lattice-1-Alpha</a>&nbsp&nbsp | &nbsp&nbsp 📑 <a href="https://lattifai.com/blogs">Blog</a> &nbsp&nbsp |  &nbsp&nbsp <a href="https://discord.gg/gTZqdaBJ"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" style="vertical-align: middle;"></a>&nbsp&nbsp
+</p>
 
 The official Python library for the LattifAI API - Advanced forced alignment and subtitle generation powered by `Lattice-1-Alpha` model.
 
@@ -10,36 +16,17 @@ The official Python library for the LattifAI API - Advanced forced alignment and
 
 ```bash
 pip install lattifai
+
+install-k2  # Required: This step must be executed to install k2 dependencies
 ```
+
+> **⚠️ Important**: After installing `lattifai`, you **must** run `install-k2` to install the required k2 library. The library will not function properly without this step.
 
 ## GPU Support Status
 
-> **🚧 GPU Support Coming Soon**: CUDA/GPU acceleration is currently under active development. The current version supports CPU-only processing. GPU support will be available in an upcoming release, providing significant performance improvements for large audio files.
+> **🚧 GPU Support Coming Soon**: The current version supports CPU-only processing. NVIDIA GPU and Apple Silicon acceleration will be available in an upcoming release, providing significant performance improvements for large audio files.
 
 ## Quick Start
-
-### Python API
-
-```python
-import os
-from lattifai import LattifAI
-
-# Initialize client
-client = LattifAI(
-    api_key=os.environ.get("LATTIFAI_API_KEY"),  # Optional if set in environment
-    device='cpu',  # Currently only CPU is supported, GPU support coming soon
-)
-
-# Perform alignment
-result = client.alignment(
-    audio="path/to/audio.wav",
-    subtitle="path/to/subtitle.srt",  # or .txt, .vtt, .ass
-    format="srt",  # auto-detect if not specified
-    output_subtitle_path="output.srt"
-)
-
-print(f"Alignment complete! Output saved to: {result}")
-```
 
 ### Command Line Interface
 
@@ -52,9 +39,9 @@ The library provides powerful command-line tools for batch processing and automa
 lattifai-align input_audio.wav input_subtitle.srt output_aligned.srt
 
 # Specify input format explicitly
-lattifai-align -F srt input_audio.wav transcript.txt output.srt
+lattifai-align -F srt input_audio.wav transcript.srt output.srt
 
-# Auto-detect input format (default)
+# Auto-detect input/output format (default)
 lattifai-align input_audio.wav subtitle_file.vtt output.vtt
 ```
 
@@ -70,6 +57,31 @@ lattifai align input_audio.wav input_subtitle.srt output.srt
 # Subtitle format conversion
 lattifai subtitle convert input.srt output.vtt
 ```
+
+### Python API
+
+```python
+import os
+from lattifai import LattifAI
+
+# Initialize client
+client = LattifAI(
+    api_key=os.environ.get("LATTIFAI_API_KEY"),  # Optional if set in environment
+    model_name_or_path='Lattifai/Lattice-1-Alpha',
+    device='cpu',  # Currently only CPU is supported, GPU support coming soon
+)
+
+# Perform alignment
+result = client.alignment(
+    audio="path/to/audio.wav",
+    subtitle="path/to/subtitle.srt",  # or .txt, .vtt, .ass
+    format="srt",  # auto-detect if not specified
+    output_subtitle_path="output.srt"
+)
+
+print(f"Alignment complete! Output saved to: {result}")
+```
+
 
 #### Supported Input Formats
 
@@ -93,12 +105,11 @@ lattifai subtitle convert input.srt output.vtt
 ```python
 LattifAI(
     api_key: Optional[str] = None,           # API key (or set LATTIFAI_API_KEY env var)
-    base_url: Optional[str] = None,          # API base URL (or set LATTIFAI_BASE_URL env var)
     device: str = 'cpu',                     # Device for processing (currently only 'cpu' supported)
 )
 ```
 
-> **Note**: The `device` parameter currently only supports `'cpu'`. GPU support (`'cuda'`) is under active development and will be available in future releases.
+> **Note**: The `device` parameter currently only supports `'cpu'`. GPU support will be available in future releases.
 
 #### Methods
 
@@ -124,41 +135,11 @@ def alignment(
 **Returns:**
 - Path to output file (if `output_subtitle_path` specified) or alignment results
 
-**Example:**
-```python
-# Basic usage
-result = client.alignment("audio.wav", "subtitle.srt")
-
-# With explicit format and output path
-result = client.alignment(
-    audio="interview.mp3",
-    subtitle="transcript.txt",
-    format="txt",
-    output_subtitle_path="aligned_interview.srt"
-)
-```
-
-
 ## Configuration
 
 ### Environment Variables
 
 - `LATTIFAI_API_KEY`: Your LattifAI API key (required)
-- `LATTIFAI_BASE_URL`: Base URL for the API (default: `https://api.lattifai.com/v1`)
-
-### Device Configuration
-
-> **Note**: GPU/CUDA support is currently under development and will be available in a future release. Currently, only CPU processing is supported.
-
-The library is designed to support both CPU and GPU processing:
-
-```python
-# CPU processing (currently supported)
-client = LattifAI(device='cpu')
-
-# GPU processing (coming soon)
-# client = LattifAI(device='cuda')  # Will be available in future releases
-```
 
 ### Performance Tuning
 
@@ -166,11 +147,11 @@ For better performance with large files:
 
 ```python
 client = LattifAI(
-    device='cpu',         # Currently only CPU is supported
+    device='cpu',         # Currently only CPU is supported, cuda/mps will be supported in upcoming releases.
 )
 ```
 
-> **GPU Acceleration**: CUDA support is in active development and will significantly improve processing speed for large audio files. Expected in upcoming releases.
+> **GPU Acceleration**: CUDA and Apple Silicon(MPS) support is in active development and will significantly improve processing speed for large audio files. Expected in upcoming releases.
 
 ## Examples
 
@@ -270,7 +251,7 @@ except Exception as e:
 
 ## Model Information
 
-This library uses the **Lattice-1-Alpha** model for high-quality forced alignment and subtitle generation.
+This library uses the **[Lattice-1-Alpha](https://huggingface.co/Lattifai/Lattice-1-Alpha)** model for high-quality forced alignment and subtitle generation.
 
 ### Model Features
 - **High Accuracy**: State-of-the-art alignment precision
@@ -290,7 +271,7 @@ This library uses the **Lattice-1-Alpha** model for high-quality forced alignmen
 - **Core Dependencies**:
   - httpx (HTTP client)
   - lhotse (audio processing)
-  - colorful (colored output)
+  - k2 (audio computation)
   - python-dotenv (environment management)
   - click (command line interface)
 
@@ -327,21 +308,24 @@ To manually run these tools:
 
 ```bash
 # Sort imports
-isort src/ tests/
+isort src/ tests/ scripts/
 
 # Run linter
-ruff check src/ tests/
+ruff check src/ tests/ scripts/
 
 # Run formatter
-ruff format src/ tests/
+ruff format src/ tests/ scripts/
 
 # Fix issues automatically
-ruff check --fix src/ tests/
+ruff check --fix src/ tests/ scripts/
 ```
 
 ### Running Tests
 
 ```bash
+# Install test dependencies first
+pip install -e ".[test]"
+
 # Run all tests
 pytest
 
@@ -394,4 +378,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - **Documentation**: [API Documentation](https://github.com/lattifai/lattifai-python/api.md)
 - **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
-- **Changelog**: [CHANGELOG.md](https://github.com/lattifai/lattifai-python/CHANGELOG)
+- **Changelog**: [CHANGELOG.md](https://github.com/lattifai/lattifai-python/CHANGELOG.md)

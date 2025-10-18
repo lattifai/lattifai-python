@@ -74,3 +74,4 @@ MANIFEST
 .env
 .vscode/
 .github/*.md
+tests/data/SA1_*.*
