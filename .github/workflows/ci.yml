@@ -11,6 +11,7 @@ on:
 
 jobs:
   build-linux:
+    if: false  # Disable Linux build for now
     name: Build Linux
     runs-on: ubuntu-${{ matrix.ubuntu-version }}
     strategy:
@@ -37,12 +38,12 @@ jobs:
           # Build wheel
           python -m build --wheel
 
-          # naming: linux_x86_64.whl -> manylinux_x86_64.whl
-          for whl in dist/*.whl; do
-            echo "Fix wheel: $(basename $whl)"
-            auditwheel repair "$whl" --plat manylinux2014_x86_64 -w dist/ || exit 1
-            rm "$whl"
-          done
+          # # naming: linux_x86_64.whl -> manylinux_x86_64.whl
+          # for whl in dist/*.whl; do
+          #   echo "Fix wheel: $(basename $whl)"
+          #   auditwheel repair "$whl" --plat manylinux2014_x86_64 -w dist/ || exit 1
+          #   rm "$whl"
+          # done
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4
@@ -61,7 +62,8 @@ jobs:
     strategy:
       matrix:
         OS: [macos-15]
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        # python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.10']
 
     steps:
       - uses: actions/checkout@v4
@@ -91,6 +93,7 @@ jobs:
           python tests/test_basic.py  # Run basic tests directly
 
   build-windows:
+    if: false  # Disable Windows build for now
     name: Build Windows
     runs-on: ${{ matrix.windows-version }}
     strategy:

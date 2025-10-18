@@ -133,6 +133,3 @@ ensure_newline_before_comments = true
 skip_gitignore = true
 src_paths = ['src', 'tests']
 known_first_party = ['lattifai']
-
-[tool.setuptools]
-has-ext-modules = true

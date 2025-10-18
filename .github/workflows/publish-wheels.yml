@@ -98,7 +98,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          REPO="lattifai/lattifai-core"
+          REPO="lattifai/lattifai-python"
           RUN_ID="${{ github.event.inputs.ci_run_id }}"
           mkdir -p wheels
           # 获取所有 wheel artifact id 和 name

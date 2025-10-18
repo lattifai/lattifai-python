@@ -30,9 +30,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          sudo apt-get -y update
-          sudo apt-get install --no-install-recommends -y build-essential pybind11-dev
-          python -m pip install --upgrade pip setuptools pytest numpy scipy
+          python -m pip install --upgrade pip setuptools
 
       - name: Build and Test
         run: |
