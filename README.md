@@ -10,7 +10,7 @@
    &nbsp&nbsp 🖥️ <a href="https://github.com/lattifai/lattifai-python">GitHub</a> &nbsp&nbsp  | &nbsp&nbsp🤗 <a href="https://huggingface.co/Lattifai/Lattice-1-Alpha">Lattifai/Lattice-1-Alpha</a>&nbsp&nbsp | &nbsp&nbsp 📑 <a href="https://lattifai.com/blogs">Blog</a> &nbsp&nbsp |  &nbsp&nbsp <a href="https://discord.gg/gTZqdaBJ"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" style="vertical-align: middle;"></a>&nbsp&nbsp
 </p>
 
-The official Python library for the LattifAI API - Advanced forced alignment and subtitle generation powered by `Lattice-1-Alpha` model.
+The official Python library for the LattifAI API - Advanced forced alignment and subtitle generation powered by `[Lattifai/Lattice-1-Alpha](https://huggingface.co/Lattifai/Lattice-1-Alpha)` model.
 
 ## Installation
 
@@ -31,19 +31,6 @@ install-k2  # Required: This step must be executed to install k2 dependencies
 ### Command Line Interface
 
 The library provides powerful command-line tools for batch processing and automation.
-
-#### Basic Alignment
-
-```bash
-# Align audio with subtitle file
-lattifai-align input_audio.wav input_subtitle.srt output_aligned.srt
-
-# Specify input format explicitly
-lattifai-align -F srt input_audio.wav transcript.srt output.srt
-
-# Auto-detect input/output format (default)
-lattifai-align input_audio.wav subtitle_file.vtt output.vtt
-```
 
 #### Using the Main CLI
 
