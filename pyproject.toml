@@ -1,11 +1,12 @@
 [build-system]
-requires = ['setuptools>=45', 'wheel']
+requires = ['setuptools>=60', 'wheel']
 build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '0.1.0'
-description = "Uber's hierarchical hexagonal geospatial indexing system"
+version = '0.1.4'
+description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
+keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
 license = {file = 'LICENSE'}
 authors = [
@@ -29,8 +30,6 @@ classifiers = [
     'Intended Audience :: Developers',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: Apache Software License',
-    'Programming Language :: C',
-    'Programming Language :: Cython',
     'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
@@ -60,8 +59,10 @@ lattifai-align = 'lattifai.bin.align:align'
 numpy = ['numpy']
 test = ['pytest', 'pytest-cov', 'ruff', 'numpy']
 all = [
-    # 'lattifai_core==0.1.1',
-    "numpy"
+    "numpy",
+    "pytest",
+    "pytest-cov",
+    "ruff"
 ]
 
 [tool.pytest.ini_options]
@@ -132,3 +133,6 @@ ensure_newline_before_comments = true
 skip_gitignore = true
 src_paths = ['src', 'tests']
 known_first_party = ['lattifai']
+
+[tool.setuptools]
+has-ext-modules = true
