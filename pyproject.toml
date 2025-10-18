@@ -20,7 +20,8 @@ dependencies = [
     "httpx",
     "python-dotenv",
     "lhotse>=1.26.0",
-    "colorful>=0.5.6"
+    "colorful>=0.5.6",
+    "lattifai-core>=0.1.4",
 ]
 
 classifiers = [

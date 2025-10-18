@@ -1,0 +1,129 @@
+name: CI - Build and Test
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+    paths-ignore: '**.md'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-${{ matrix.ubuntu-version }}
+    strategy:
+      matrix:
+        ubuntu-version: [22.04]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools build wheel auditwheel
+
+      - name: Build platform-specific wheel
+        run: |
+          # Build wheel
+          python -m build --wheel
+
+          # naming: linux_x86_64.whl -> manylinux_x86_64.whl
+          for whl in dist/*.whl; do
+            echo "Fix wheel: $(basename $whl)"
+            auditwheel repair "$whl" --plat manylinux2014_x86_64 -w dist/ || exit 1
+            rm "$whl"
+          done
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-wheel-${{ matrix.ubuntu-version }}-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+      - name: Run basic tests
+        run: |
+          pip install dist/*.whl
+          python tests/test_basic.py  # Run basic tests directly
+
+  build-macos:
+    name: Build macOS
+    runs-on: ${{ matrix.OS }}
+    strategy:
+      matrix:
+        OS: [macos-15]
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools build wheel
+
+      - name: Build platform-specific wheel
+        run: |
+          python -m build --wheel
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-wheel-${{ matrix.OS }}-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+      - name: Run basic tests
+        run: |
+          pip install dist/*.whl
+          python tests/test_basic.py  # Run basic tests directly
+
+  build-windows:
+    name: Build Windows
+    runs-on: ${{ matrix.windows-version }}
+    strategy:
+      matrix:
+        windows-version: [windows-2022]  # Could add windows-2019 if needed
+        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools build wheel
+
+      - name: Build platform-specific wheel
+        run: |
+          # Build wheel
+          python -m build --wheel
+
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-wheel-${{ matrix.windows-version }}-py${{ matrix.python-version }}
+          path: dist/*.whl
+
+      - name: Run basic tests
+        run: |
+          pip install (Get-ChildItem dist/*.whl)
+          python tests/test_basic.py  # Run basic tests directly

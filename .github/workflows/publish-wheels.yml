@@ -1,0 +1,197 @@
+name: Publish Platform Wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: 'CI Workflow Run ID (find from Actions page)'
+        required: true
+        type: string
+      publish_to_pypi:
+        description: 'Publish to PyPI?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  download_and_publish_wheels:
+    name: Download CI wheels and publish
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.publish_to_pypi == 'true' && 'pypi' || 'testpypi' }}
+    permissions:
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Debug - Check CI run and available artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = ${{ github.event.inputs.ci_run_id }};
+            console.log(`🔍 Checking CI run: ${runId}`);
+
+            try {
+              // Get workflow run info
+              const run = await github.rest.actions.getWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId
+              });
+
+              console.log(`📋 Run details:`);
+              console.log(`  - Status: ${run.data.status}`);
+              console.log(`  - Conclusion: ${run.data.conclusion}`);
+              console.log(`  - Workflow: ${run.data.name}`);
+              console.log(`  - Branch: ${run.data.head_branch}`);
+              console.log(`  - Created: ${run.data.created_at}`);
+
+              // List all artifacts
+              const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId
+              });
+
+              // 按名称排序 artifacts
+              artifacts.data.artifacts.sort((a, b) => a.name.localeCompare(b.name));
+
+              console.log(`\n📦 Found ${artifacts.data.artifacts.length} total artifacts:`);
+              artifacts.data.artifacts.forEach(artifact => {
+                console.log(`  - Name: ${artifact.name}`);
+                if (artifact.archive_download_url) {
+                  console.log(`    Path: ${artifact.archive_download_url}`);
+                } else if (artifact.url) {
+                  console.log(`    Path: ${artifact.url}`);
+                } else if (artifact.path) {
+                  console.log(`    Path: ${artifact.path}`);
+                }
+                console.log(`    Size: ${artifact.size_in_bytes} bytes`);
+                console.log(`    Expired: ${artifact.expired}`);
+                console.log(`    Created: ${artifact.created_at}`);
+                console.log(`    Expires: ${artifact.expires_at}`);
+                console.log(`    ---`);
+              });
+
+              // Check for wheel-like artifacts
+              const wheelArtifacts = artifacts.data.artifacts.filter(a =>
+                a.name.includes('wheel') || a.name.includes('dist')
+              );
+              console.log(`\n🎯 Wheel-related artifacts: ${wheelArtifacts.length}`);
+              wheelArtifacts.forEach(artifact => {
+                console.log(`  ✓ ${artifact.name} (${artifact.expired ? 'EXPIRED' : 'Available'})`);
+              });
+
+            } catch (error) {
+              console.log(`❌ Error: ${error.message}`);
+              if (error.status === 404) {
+                console.log(`💡 Run ${runId} not found. Please check:`);
+                console.log(`   1. Is the run ID correct?`);
+                console.log(`   2. Is the run in this repository?`);
+                console.log(`   3. Do you have access to this run?`);
+              }
+            }
+
+      - name: Download all wheel artifacts from CI run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="lattifai/lattifai-core"
+          RUN_ID="${{ github.event.inputs.ci_run_id }}"
+          mkdir -p wheels
+          # 获取所有 wheel artifact id 和 name
+          gh api repos/$REPO/actions/runs/$RUN_ID/artifacts --jq '.artifacts[] | select(.name | test("linux-wheel-|macos-wheel-|windows-wheel-")) | [.id, .name] | @tsv' | while IFS=$'\t' read -r ARTIFACT_ID ARTIFACT_NAME; do
+            echo "Downloading $ARTIFACT_NAME (id: $ARTIFACT_ID)"
+            gh api repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip > "$ARTIFACT_NAME.zip"
+            unzip -d wheels "$ARTIFACT_NAME.zip"
+            rm "$ARTIFACT_NAME.zip"
+          done
+
+      - name: Organize wheels for publishing
+        run: |
+          mkdir -p dist
+
+          # Check what was actually downloaded
+          echo "🔍 Checking downloaded content:"
+          if [ -d "wheels/" ]; then
+            echo "✓ wheels/ directory exists"
+            echo "📂 Contents:"
+            find wheels/ -type f | head -20
+
+            # Try to find .whl files
+            whl_files=$(find wheels/ -name "*.whl" 2>/dev/null)
+            if [ -n "$whl_files" ]; then
+              echo "✓ Found .whl files:"
+              echo "$whl_files"
+              # Move all .whl files to dist directory
+              find wheels/ -name "*.whl" -exec cp {} dist/ \;
+            else
+              echo "❌ No .whl files found"
+              echo "📋 All files in wheels/:"
+              find wheels/ -type f
+            fi
+          else
+            echo "❌ wheels/ directory not created"
+            echo "📋 Current directory contents:"
+            ls -la
+            echo ""
+            echo "💡 This usually means no artifacts were downloaded"
+            echo "   Check the debug output above for the reason"
+            exit 1
+          fi
+
+          # Check if we got any wheels
+          if [ ! -f dist/*.whl ] 2>/dev/null; then
+            echo "❌ No wheels copied to dist/"
+            echo "🔍 Available files:"
+            find . -name "*.whl" 2>/dev/null || echo "  No .whl files found anywhere"
+            exit 1
+          fi
+
+          echo "📦 Platform wheels ready for publishing:"
+          ls -la dist/
+
+          echo ""
+          echo "🔍 Wheel details:"
+          for wheel in dist/*.whl; do
+            echo "  $(basename $wheel)"
+          done
+
+          echo ""
+          echo "📊 Platform distribution:"
+          ls dist/*.whl | sed 's/.*-\([^-]*\)\.whl/\1/' | sort | uniq -c
+
+      - name: Verify wheel compatibility
+        run: |
+          pip install --upgrade pip wheel
+
+          for wheel in dist/*.whl; do
+            echo "🔧 Checking wheel: $(basename $wheel)"
+            python -m wheel unpack "$wheel" --dest temp/
+            rm -rf temp/
+          done
+
+      - name: Publish wheels to PyPI
+        if: github.event.inputs.publish_to_pypi == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+
+      - name: Publish wheels to Test PyPI
+        if: github.event.inputs.publish_to_pypi == 'false'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          verbose: true
+
+      - name: Publication summary
+        run: |
+          target="${{ github.event.inputs.publish_to_pypi == 'true' && 'PyPI' || 'Test PyPI' }}"
+          echo "✅ Successfully published $(ls dist/*.whl | wc -l) platform wheels to $target"
+          echo ""
+          echo "🎯 Published wheels:"
+          for wheel in dist/*.whl; do
+            echo "  ✓ $(basename $wheel)"
+          done
