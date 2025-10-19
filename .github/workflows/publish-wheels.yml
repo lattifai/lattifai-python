@@ -105,7 +105,7 @@ jobs:
           gh api repos/$REPO/actions/runs/$RUN_ID/artifacts --jq '.artifacts[] | select(.name | test("linux-wheel-|macos-wheel-|windows-wheel-")) | [.id, .name] | @tsv' | while IFS=$'\t' read -r ARTIFACT_ID ARTIFACT_NAME; do
             echo "Downloading $ARTIFACT_NAME (id: $ARTIFACT_ID)"
             gh api repos/$REPO/actions/artifacts/$ARTIFACT_ID/zip > "$ARTIFACT_NAME.zip"
-            unzip -d wheels "$ARTIFACT_NAME.zip"
+            unzip -o -d wheels "$ARTIFACT_NAME.zip"
             rm "$ARTIFACT_NAME.zip"
           done
 
