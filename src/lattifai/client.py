@@ -11,7 +11,7 @@ from lhotse.utils import Pathlike
 
 from lattifai.base_client import AsyncAPIClient, LattifAIError, SyncAPIClient
 from lattifai.io import SubtitleFormat, SubtitleIO
-from lattifai.tokenizers import LatticeTokenizer
+from lattifai.tokenizer import LatticeTokenizer
 from lattifai.workers import Lattice1AlphaWorker
 
 load_dotenv()
@@ -87,6 +87,7 @@ class LattifAI(SyncAPIClient):
         audio: Pathlike,
         subtitle: Pathlike,
         format: Optional[SubtitleFormat] = None,
+        split_sentence: bool = False,
         output_subtitle_path: Optional[Pathlike] = None,
     ) -> str:
         """Perform alignment on audio and subtitle/text.
@@ -102,11 +103,11 @@ class LattifAI(SyncAPIClient):
         # step1: parse text or subtitles
         print(colorful.cyan(f'📖 Step 1: Reading subtitle file from {subtitle}'))
         supervisions = SubtitleIO.read(subtitle, format=format)
-        print(colorful.green(f'         ✓ Parsed {len(supervisions)} supervision segments'))
+        print(colorful.green(f'         ✓ Parsed {len(supervisions)} subtitle segments'))
 
         # step2: make lattice by call Lattifai API
         print(colorful.cyan('🔗 Step 2: Creating lattice graph from text'))
-        lattice_id, lattice_graph = self.tokenizer.tokenize(supervisions)
+        lattice_id, lattice_graph = self.tokenizer.tokenize(supervisions, split_sentence=split_sentence)
         print(colorful.green(f'         ✓ Generated lattice graph with ID: {lattice_id}'))
 
         # step3: align audio with text
@@ -138,4 +139,4 @@ if __name__ == '__main__':
         subtitle = 'tests/data/SA1.TXT'
         output = None
 
-    alignments = client.alignment(audio, subtitle, output_subtitle_path=output)
+    alignments = client.alignment(audio, subtitle, output_subtitle_path=output, split_sentence=True)

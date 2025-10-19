@@ -41,7 +41,35 @@ Usage: lattifai align [OPTIONS] INPUT_AUDIO_PATH INPUT_SUBTITLE_PATH OUTPUT_SUBT
 Options:
   -F, --input_format [srt|vtt|ass|txt|auto]  Input Subtitle format.
   -D, --device [cpu|cuda|mps]                Device to use for inference.
+  --split_sentence                           Smart sentence splitting based on punctuation semantics.
   --help                                     Show this message and exit.
+```
+
+#### Understanding --split_sentence
+
+The `--split_sentence` option performs intelligent sentence re-splitting based on punctuation and semantic boundaries. This is especially useful when processing subtitles that combine multiple semantic units in a single segment, such as:
+
+- **Mixed content**: Non-speech elements (e.g., `[APPLAUSE]`, `[MUSIC]`) followed by actual dialogue
+- **Natural punctuation boundaries**: Colons, periods, and other punctuation marks that indicate semantic breaks
+- **Concatenated phrases**: Multiple distinct utterances joined together without proper separation
+
+**Example transformations**:
+```
+Input:  "[APPLAUSE] >> MIRA MURATI: Thank you all"
+Output: ["[APPLAUSE]", ">> MIRA MURATI: Thank you all"]
+
+Input:  "[MUSIC] Welcome back. Today we discuss AI."
+Output: ["[MUSIC]", "Welcome back.", "Today we discuss AI."]
+```
+
+This feature helps improve alignment accuracy by:
+1. Respecting punctuation-based semantic boundaries
+2. Separating distinct utterances for more precise timing
+3. Maintaining semantic context for each independent phrase
+
+**Usage**:
+```bash
+lattifai align --split_sentence audio.wav subtitle.srt output.srt
 ```
 
 ### Python API
@@ -60,6 +88,7 @@ client = LattifAI(
 result = client.alignment(
     audio="audio.wav",
     subtitle="subtitle.srt",
+    split_sentence=False,
     output_subtitle_path="output.srt"
 )
 ```
@@ -85,12 +114,20 @@ LattifAI(
 
 ```python
 client.alignment(
-    audio: str,                    # Path to audio file
-    subtitle: str,                 # Path to subtitle/text file
-    format: Optional[str] = None,  # 'srt', 'vtt', 'ass', 'txt' (auto-detect if None)
+    audio: str,                           # Path to audio file
+    subtitle: str,                        # Path to subtitle/text file
+    format: Optional[str] = None,         # 'srt', 'vtt', 'ass', 'txt' (auto-detect if None)
+    split_sentence: bool = False,         # Smart sentence splitting based on punctuation semantics
     output_subtitle_path: Optional[str] = None
 ) -> str
 ```
+
+**Parameters**:
+- `audio`: Path to the audio file to be aligned
+- `subtitle`: Path to the subtitle or text file
+- `format`: Subtitle format ('srt', 'vtt', 'ass', 'txt'). Auto-detected if None
+- `split_sentence`: Enable intelligent sentence re-splitting (default: False). Set to True when subtitles combine multiple semantic units (non-speech elements + dialogue, or multiple sentences) that would benefit from separate timing alignment
+- `output_subtitle_path`: Output path for aligned subtitle (optional)
 
 ## Examples
 
@@ -102,6 +139,7 @@ client.alignment(
     audio="speech.wav",
     subtitle="transcript.txt",
     format="txt",
+    split_sentence=False,
     output_subtitle_path="output.srt"
 )
 ```

@@ -1,16 +1,18 @@
 import gzip
 import pickle
+import re
 from collections import defaultdict
 from itertools import chain
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 
 from lattifai.base_client import SyncAPIClient
 from lattifai.io import Supervision
-from lattifai.tokenizers.phonemizer import G2Phonemizer
+from lattifai.tokenizer.phonemizer import G2Phonemizer
 
 PUNCTUATION = '!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~'
+END_PUNCTUATION = '.!?"]。！？”】'
 PUNCTUATION_SPACE = PUNCTUATION + ' '
 STAR_TOKEN = '※'
 
@@ -28,6 +30,74 @@ class LatticeTokenizer:
         self.g2p_model: Any = None  # Placeholder for G2P model
         self.dictionaries = defaultdict(lambda: [])
         self.oov_word = '<unk>'
+        self.sentence_splitter = None
+        self.device = 'cpu'
+
+    def init_sentence_splitter(self):
+        if self.sentence_splitter is not None:
+            return
+
+        import onnxruntime as ort
+        from wtpsplit import SaT
+
+        providers = []
+        device = self.device
+        if device.startswith('cuda') and ort.get_all_providers().count('CUDAExecutionProvider') > 0:
+            providers.append('CUDAExecutionProvider')
+        elif device.startswith('mps') and ort.get_all_providers().count('MPSExecutionProvider') > 0:
+            providers.append('MPSExecutionProvider')
+
+        sat = SaT(
+            'sat-3l-sm',
+            ort_providers=providers + ['CPUExecutionProvider'],
+        )
+        self.sentence_splitter = sat
+
+    @staticmethod
+    def _resplit_special_sentence_types(sentence: str) -> List[str]:
+        """
+        Re-split special sentence types.
+
+        Examples:
+        '[APPLAUSE] &gt;&gt; MIRA MURATI:' -> ['[APPLAUSE]', '&gt;&gt; MIRA MURATI:']
+        '[MUSIC] &gt;&gt; SPEAKER:' -> ['[MUSIC]', '&gt;&gt; SPEAKER:']
+
+        Special handling patterns:
+        1. Separate special marks at the beginning (e.g., [APPLAUSE], [MUSIC], etc.) from subsequent speaker marks
+        2. Use speaker marks (&gt;&gt; or other separators) as split points
+
+        Args:
+            sentence: Input sentence string
+
+        Returns:
+            List of re-split sentences. If no special marks are found, returns the original sentence in a list
+        """
+        # Detect special mark patterns: [SOMETHING] &gt;&gt; SPEAKER:
+        # or other forms like [SOMETHING] SPEAKER:
+
+        # Pattern 1: [mark] HTML-encoded separator speaker:
+        pattern1 = r'^(\[[^\]]+\])\s+(&gt;&gt;|>>)\s+(.+)$'
+        match1 = re.match(pattern1, sentence.strip())
+        if match1:
+            special_mark = match1.group(1)
+            separator = match1.group(2)
+            speaker_part = match1.group(3)
+            return [special_mark, f'{separator} {speaker_part}']
+
+        # Pattern 2: [mark] speaker:
+        pattern2 = r'^(\[[^\]]+\])\s+([^:]+:)(.*)$'
+        match2 = re.match(pattern2, sentence.strip())
+        if match2:
+            special_mark = match2.group(1)
+            speaker_label = match2.group(2)
+            remaining = match2.group(3).strip()
+            if remaining:
+                return [special_mark, f'{speaker_label} {remaining}']
+            else:
+                return [special_mark, speaker_label]
+
+        # If no special pattern matches, return the original sentence
+        return [sentence]
 
     @staticmethod
     def from_pretrained(
@@ -56,6 +126,7 @@ class LatticeTokenizer:
         if g2p_model_path:
             tokenizer.g2p_model = G2Phonemizer(g2p_model_path, device=device)
 
+        tokenizer.device = device
         tokenizer.add_special_tokens()
         return tokenizer
 
@@ -107,7 +178,62 @@ class LatticeTokenizer:
 
         return {}
 
-    def tokenize(self, supervisions: List[Supervision]) -> Tuple[str, Dict[str, Any]]:
+    def split_sentences(self, supervisions: List[Supervision], strip_whitespace=True) -> List[str]:
+        texts, text_len, sidx = [], 0, 0
+        for s, supervision in enumerate(supervisions):
+            text_len += len(supervision.text)
+            if text_len >= 2000 or s == len(supervisions) - 1:
+                text = ' '.join([sup.text for sup in supervisions[sidx : s + 1]])
+                texts.append(text)
+                sidx = s + 1
+                text_len = 0
+        if sidx < len(supervisions):
+            text = ' '.join([sup.text for sup in supervisions[sidx:]])
+            texts.append(text)
+        sentences = self.sentence_splitter.split(texts, threshold=0.15, strip_whitespace=strip_whitespace)
+
+        supervisions, remainder = [], ''
+        for _sentences in sentences:
+            # Process and re-split special sentence types
+            processed_sentences = []
+            for s, _sentence in enumerate(_sentences):
+                if remainder:
+                    _sentence = remainder + _sentence
+                    remainder = ''
+
+                # Detect and split special sentence types: e.g., '[APPLAUSE] &gt;&gt; MIRA MURATI:' -> ['[APPLAUSE]', '&gt;&gt; MIRA MURATI:']  # noqa: E501
+                resplit_parts = self._resplit_special_sentence_types(_sentence)
+                if any(resplit_parts[-1].endswith(sp) for sp in [':', '：']):
+                    if s < len(_sentences) - 1:
+                        _sentences[s + 1] = resplit_parts[-1] + ' ' + _sentences[s + 1]
+                    else:  # last part
+                        remainder = resplit_parts[-1] + ' ' + remainder
+                    processed_sentences.extend(resplit_parts[:-1])
+                else:
+                    processed_sentences.extend(resplit_parts)
+
+            _sentences = processed_sentences
+
+            if remainder:
+                _sentences[0] = remainder + _sentences[0]
+                remainder = ''
+
+            if any(_sentences[-1].endswith(ep) for ep in END_PUNCTUATION):
+                supervisions.extend(Supervision(text=s) for s in _sentences)
+            else:
+                supervisions.extend(Supervision(text=s) for s in _sentences[:-1])
+                remainder += _sentences[-1] + ' '
+
+        if remainder.strip():
+            supervisions.append(Supervision(text=remainder.strip()))
+
+        return supervisions
+
+    def tokenize(self, supervisions: List[Supervision], split_sentence: bool = False) -> Tuple[str, Dict[str, Any]]:
+        if split_sentence:
+            self.init_sentence_splitter()
+            supervisions = self.split_sentences(supervisions)
+
         pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
         response = self.client_wrapper.post(
             'tokenize',
