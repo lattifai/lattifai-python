@@ -36,7 +36,7 @@ jobs:
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
         run: |
-          pip install install-k2
+          pip install install-k2>=0.0.4
           install-k2
           pip install -e .
           python tests/test_basic.py  # Run basic tests directly
