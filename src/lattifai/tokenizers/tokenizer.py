@@ -88,6 +88,8 @@ class LatticeTokenizer:
                     for pronuncation in _predictions:
                         if pronuncation and pronuncation not in self.dictionaries[_word]:
                             self.dictionaries[_word].append(pronuncation)
+                    if not self.dictionaries[_word]:
+                        self.dictionaries[_word] = self.dictionaries[self.oov_word]
 
             pronunciation_dictionaries: Dict[str, List[List[str]]] = {
                 w: self.dictionaries[w] for w in oov_words if self.dictionaries[w]
