@@ -55,7 +55,16 @@ class LatticeTokenizer:
         g2p_model_path = f'{model_path}/g2p.bin' if Path(f'{model_path}/g2p.bin').exists() else None
         if g2p_model_path:
             tokenizer.g2p_model = G2Phonemizer(g2p_model_path, device=device)
+
+        tokenizer.add_special_tokens()
         return tokenizer
+
+    def add_special_tokens(self):
+        tokenizer = self
+        for special_token in ['&gt;&gt;', '&gt;']:
+            if special_token not in tokenizer.dictionaries:
+                tokenizer.dictionaries[special_token] = tokenizer.dictionaries[tokenizer.oov_word]
+        return self
 
     def prenormalize(self, texts: List[str], language: Optional[str] = None) -> List[str]:
         if not self.g2p_model:

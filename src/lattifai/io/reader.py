@@ -58,13 +58,12 @@ class SubtitleReader(ABCMeta):
                 subs: pysubs2.SSAFile = pysubs2.load(subtitle, encoding='utf-8')  # auto detect format
 
         supervisions = []
-
         for event in subs.events:
             supervisions.append(
                 Supervision(
                     text=event.text,
                     # "start": event.start / 1000.0 if event.start is not None else None,
-                    # "duration": event.end / 1000.0 if event.end is not None else None,
+                    # "duration": (event.end - event.start) / 1000.0 if event.end is not None else None,
                     # }
                 )
             )
