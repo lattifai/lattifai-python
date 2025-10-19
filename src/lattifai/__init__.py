@@ -22,54 +22,19 @@ def _check_and_install_k2():
     """Check if k2 is installed and attempt to install it if not."""
     try:
         import k2
-
-        return True
     except ImportError:
-        pass
+        import subprocess
 
-    # k2 not found, try to install it
-    if os.environ.get('SKIP_K2_INSTALL'):
-        warnings.warn(
-            '\n' + '=' * 70 + '\n'
-            '  k2 is not installed and auto-installation is disabled.\n'
-            '  \n'
-            '  To use lattifai, please install k2 by running:\n'
-            '  \n'
-            '      install-k2\n'
-            '  \n' + '=' * 70,
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        return False
+        print('k2 is not installed. Attempting to install k2...')
+        try:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'install-k2'])
+            subprocess.check_call([sys.executable, '-m', 'install_k2'])
+            import k2  # Try importing again after installation
 
-    print('\n' + '=' * 70)
-    print('  k2 is not installed. Attempting to install it now...')
-    print('  This is a one-time setup and may take a few minutes.')
-    print('=' * 70 + '\n')
-
-    try:
-        # Import and run the installation script
-        from scripts.install_k2 import install_k2_main
-
-        install_k2_main(dry_run=False)
-
-        print('\n' + '=' * 70)
-        print('  k2 has been installed successfully!')
-        print('=' * 70 + '\n')
-        return True
-    except Exception as e:
-        warnings.warn(
-            '\n' + '=' * 70 + '\n'
-            f'  Failed to auto-install k2: {e}\n'
-            '  \n'
-            '  Please install k2 manually by running:\n'
-            '  \n'
-            '      install-k2\n'
-            '  \n' + '=' * 70,
-            RuntimeWarning,
-            stacklevel=2,
-        )
-        return False
+            print('k2 installed successfully.')
+        except Exception as e:
+            warnings.warn(f'Failed to install k2 automatically. Please install it manually. Error: {e}')
+    return True
 
 
 # Auto-install k2 on first import

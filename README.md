@@ -18,7 +18,7 @@ install-k2  # Install k2
 pip install lattifai
 ```
 
-> **⚠️ Important**: You must run `install-k2` before using the library.
+> **⚠️ Important**: You must run `install-k2` before using the lattifai library.
 
 ## Quick Start
 

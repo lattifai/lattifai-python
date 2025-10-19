@@ -50,13 +50,29 @@ class Lattice1AlphaWorker:
         _start = time.time()
         # audio -> features -> emission
         features = self.extractor(audio)  # (1, T, D)
-        ort_inputs = {
-            'features': features.cpu().numpy(),
-            'feature_lengths': np.array([features.size(1)], dtype=np.int64),
-        }
-        emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
+        if features.shape[1] > 6000:
+            features_list = torch.split(features, 6000, dim=1)
+            emissions = []
+            for features in features_list:
+                ort_inputs = {
+                    'features': features.cpu().numpy(),
+                    'feature_lengths': np.array([features.size(1)], dtype=np.int64),
+                }
+                emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
+                emissions.append(emission)
+            emission = torch.cat(
+                [torch.from_numpy(emission).to(self.device) for emission in emissions], dim=1
+            )  # (1, T, vocab_size)
+        else:
+            ort_inputs = {
+                'features': features.cpu().numpy(),
+                'feature_lengths': np.array([features.size(1)], dtype=np.int64),
+            }
+            emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
+            emission = torch.from_numpy(emission).to(self.device)
+
         self.timings['emission'] += time.time() - _start
-        return torch.from_numpy(emission).to(self.device)  # (1, T, vocab_size) torch
+        return emission  # (1, T, vocab_size) torch
 
     def load_audio(self, audio: Union[Pathlike, BinaryIO]) -> Tuple[torch.Tensor, int]:
         # load audio

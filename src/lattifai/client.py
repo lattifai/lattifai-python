@@ -127,13 +127,10 @@ if __name__ == '__main__':
     import sys
 
     if len(sys.argv) == 4:
-        pass
+        audio, subtitle, output = sys.argv[1:]
     else:
         audio = 'tests/data/SA1.wav'
-        text = 'tests/data/SA1.TXT'
+        subtitle = 'tests/data/SA1.TXT'
+        output = None
 
-    alignments = client.alignment(audio, text)
-    print(alignments)
-
-    alignments = client.alignment(audio, 'not paired texttttt', format='txt')
-    print(alignments)
+    alignments = client.alignment(audio, subtitle, output_subtitle_path=output)
