@@ -9,6 +9,7 @@ import resampy
 import soundfile as sf
 import torch
 from lhotse import FbankConfig
+from lhotse.audio import read_audio
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
 
@@ -76,13 +77,17 @@ class Lattice1AlphaWorker:
 
     def load_audio(self, audio: Union[Pathlike, BinaryIO]) -> Tuple[torch.Tensor, int]:
         # load audio
-        waveform, sample_rate = sf.read(audio, always_2d=True, dtype='float32')
-        if waveform.shape[1] > 1:  # TODO: support choose channel
-            waveform = np.mean(waveform, axis=1, keepdims=True)
+        waveform, sample_rate = read_audio(audio)  # numpy array
+        if len(waveform.shape) == 1:
+            waveform = waveform.reshape([1, -1])  # (1, L)
+        else:  # make sure channel first
+            if waveform.shape[0] > waveform.shape[1]:
+                waveform = waveform.transpose(0, 1)
+            # average multiple channels
+            waveform = np.mean(waveform, axis=0, keepdims=True)  # (1, L)
         if sample_rate != self.config['sample_rate']:
-            waveform = resampy.resample(waveform, sample_rate, self.config['sample_rate'], axis=0)
-        waveform = torch.from_numpy(waveform.T).to(self.device)  # (1, L)
-        return waveform
+            waveform = resampy.resample(waveform, sample_rate, self.config['sample_rate'], axis=1)
+        return torch.from_numpy(waveform).to(self.device)  # (1, L)
 
     def alignment(
         self, audio: Union[Union[Pathlike, BinaryIO], torch.tensor], lattice_graph: Tuple[str, int, float]
