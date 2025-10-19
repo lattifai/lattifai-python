@@ -27,7 +27,7 @@ class LattifAI(SyncAPIClient):
         model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
         device: Optional[str] = None,
         base_url: Optional[str] = None,
-        timeout: Union[float, int] = 60.0,
+        timeout: Union[float, int] = 120.0,
         max_retries: int = 2,
         default_headers: Optional[Dict[str, str]] = None,
     ) -> None:
@@ -55,8 +55,13 @@ class LattifAI(SyncAPIClient):
         # Initialize components
         if not Path(model_name_or_path).exists():
             from huggingface_hub import snapshot_download
+            from huggingface_hub.errors import LocalEntryNotFoundError
 
-            model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
+            try:
+                model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
+            except LocalEntryNotFoundError:
+                os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+                model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
         else:
             model_path = model_name_or_path
 
