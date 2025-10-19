@@ -12,7 +12,8 @@ Advanced forced alignment and subtitle generation powered by [Lattice-1-Alpha](h
 
 ```bash
 pip install install-k2
-install-k2  # Install k2 dependencies
+# The installation will automatically detect and use your already installed PyTorch version.
+install-k2  # Install k2
 
 pip install lattifai
 ```
