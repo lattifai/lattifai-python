@@ -33,6 +33,11 @@ jobs:
           python -m pip install --upgrade pip setuptools
 
       - name: Build and Test
+        env:
+          LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
         run: |
+          pip install install-k2
+          install-k2
           pip install -e .
           python tests/test_basic.py  # Run basic tests directly
+          bash tests/test_audio_formats.sh

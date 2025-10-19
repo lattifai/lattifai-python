@@ -5,8 +5,6 @@ Test the special sentence type re-splitting functionality
 
 import sys
 
-sys.path.insert(0, '/Users/feiteng/GEEK/OmniCaptions/lattifai-python/src')
-
 from lattifai.tokenizer.tokenizer import LatticeTokenizer
 
 

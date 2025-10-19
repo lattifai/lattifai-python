@@ -77,14 +77,52 @@ class Lattice1AlphaWorker:
 
     def load_audio(self, audio: Union[Pathlike, BinaryIO]) -> Tuple[torch.Tensor, int]:
         # load audio
-        waveform, sample_rate = read_audio(audio)  # numpy array
-        if len(waveform.shape) == 1:
-            waveform = waveform.reshape([1, -1])  # (1, L)
-        else:  # make sure channel first
-            if waveform.shape[0] > waveform.shape[1]:
-                waveform = waveform.transpose(0, 1)
-            # average multiple channels
-            waveform = np.mean(waveform, axis=0, keepdims=True)  # (1, L)
+        try:
+            waveform, sample_rate = read_audio(audio)  # numpy array
+            if len(waveform.shape) == 1:
+                waveform = waveform.reshape([1, -1])  # (1, L)
+            else:  # make sure channel first
+                if waveform.shape[0] > waveform.shape[1]:
+                    waveform = waveform.transpose(0, 1)
+                # average multiple channels
+                waveform = np.mean(waveform, axis=0, keepdims=True)  # (1, L)
+        except Exception:
+            # Fallback to PyAV for formats not supported by soundfile
+            import av
+
+            container = av.open(audio)
+            audio_stream = next((s for s in container.streams if s.type == 'audio'), None)
+
+            if audio_stream is None:
+                raise ValueError(f'No audio stream found in {audio}')
+
+            # Resample to target sample rate during decoding
+            audio_stream.codec_context.format = av.AudioFormat('flt')  # 32-bit float
+
+            frames = []
+            for frame in container.decode(audio_stream):
+                # Convert frame to numpy array
+                array = frame.to_ndarray()
+                # Ensure shape is (channels, samples)
+                if array.ndim == 1:
+                    array = array.reshape(1, -1)
+                elif array.ndim == 2 and array.shape[0] > array.shape[1]:
+                    array = array.T
+                frames.append(array)
+
+            container.close()
+
+            if not frames:
+                raise ValueError(f'No audio data found in {audio}')
+
+            # Concatenate all frames
+            waveform = np.concatenate(frames, axis=1)
+            # Average multiple channels to mono
+            if waveform.shape[0] > 1:
+                waveform = np.mean(waveform, axis=0, keepdims=True)
+
+            sample_rate = audio_stream.codec_context.sample_rate
+
         if sample_rate != self.config['sample_rate']:
             waveform = resampy.resample(waveform, sample_rate, self.config['sample_rate'], axis=1)
         return torch.from_numpy(waveform).to(self.device)  # (1, L)

@@ -1,4 +1,179 @@
-# Release Notes - LattifAI Python v0.2.2
+# Release Notes - LattifAI Python v0.2.4
+
+**Release Date:** October 19, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v0.2.4 expands media format support, enabling seamless subtitle alignment directly with video files without requiring separate audio extraction.
+
+---
+
+## ✨ New Features
+
+### Extended Audio & Video Format Support
+
+This release adds native support for popular video and audio container formats, streamlining the subtitle alignment workflow.
+
+#### Newly Added Formats in v0.2.4:
+
+**Audio Formats:**
+- WAV (Waveform Audio File Format)
+- MP3 (MPEG Audio Layer III)
+- M4A (MPEG-4 Audio)
+- AAC (Advanced Audio Coding)
+- FLAC (Free Lossless Audio Codec)
+- OGG (Ogg Vorbis)
+- OPUS (Opus Interactive Audio Codec)
+- AIFF (Audio Interchange File Format)
+
+**Video Formats:**
+- MP4 (MPEG-4 Part 14)
+- MKV (Matroska)
+- MOV (QuickTime Movie)
+- WEBM (WebM)
+- AVI (Audio Video Interleave)
+
+#### Key Benefits:
+
+- **Direct Video Processing**: Align subtitles with MP4 video files without pre-processing
+- **Automatic Audio Extraction**: Intelligent audio stream detection and extraction from video containers
+- **Broader Compatibility**: Support for various audio codecs within MP4/M4A containers
+- **Simplified Workflow**: Eliminate manual audio conversion steps
+
+#### Usage:
+
+**Command Line:**
+```bash
+# Align subtitles with MP4 video
+lattifai align video.mp4 subtitle.srt output.srt
+
+# Align subtitles with M4A audio
+lattifai align audio.m4a subtitle.srt output.srt
+```
+
+**Python API:**
+```python
+from lattifai import LattifAI
+
+client = LattifAI()
+
+# Process MP4 video file
+client.alignment(
+    audio="movie.mp4",
+    subtitle="movie.srt",
+    output_subtitle_path="movie_aligned.srt"
+)
+
+# Process M4A audio file
+client.alignment(
+    audio="podcast.m4a",
+    subtitle="podcast.srt",
+    output_subtitle_path="podcast_aligned.srt"
+)
+```
+
+---
+
+## 🔧 Technical Details
+
+### Audio Processing Pipeline
+
+The enhanced audio processing system now includes:
+
+1. **Format Detection**: Automatic identification of container format (WAV, MP3, MP4, M4A, etc.)
+2. **Stream Analysis**: Intelligent audio stream detection within video containers
+3. **Codec Support**: Compatibility with AAC, MP3, and other common audio codecs
+4. **Transparent Conversion**: Seamless internal processing regardless of input format
+
+### Codec Compatibility
+
+Supported audio codecs within MP4/M4A containers:
+- AAC (Advanced Audio Coding)
+- MP3 (MPEG Audio Layer III)
+- ALAC (Apple Lossless Audio Codec)
+- Other FFmpeg-supported codecs
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+### Fresh Installation:
+
+```bash
+pip install lattifai
+```
+
+---
+
+## 🐛 Bug Fixes
+
+- Improved error handling for corrupted or incomplete video files
+- Enhanced audio stream selection for multi-track videos
+
+---
+
+## 🔄 Backward Compatibility
+
+✅ **Fully Backward Compatible**
+- All existing WAV, MP3, and other audio format support retained
+- No breaking changes to existing API
+- Existing code requires no modifications
+
+---
+
+## 📚 Documentation
+
+For complete documentation, visit:
+- **Official Website**: https://lattifai.com
+- **GitHub Repository**: https://github.com/lattifai/lattifai-python
+- **API Reference**: https://api.lattifai.com/docs
+
+---
+
+## 🙏 Acknowledgments
+
+Thank you to our community for requesting enhanced video format support!
+
+---
+
+## 📝 Version Info
+
+- **Version**: 0.2.4
+- **Release Date**: October 19, 2025
+- **Python Support**: 3.9+
+- **Model**: Lattice-1-Alpha
+- **License**: Apache License 2.0
+
+---
+
+## 🔗 Related Links
+
+- [LattifAI Official Website](https://lattifai.com)
+- [GitHub Repository](https://github.com/lattifai/lattifai-python)
+- [HuggingFace Model](https://huggingface.co/Lattifai/Lattice-1-Alpha)
+- [Blog](https://lattifai.com/blogs)
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/gTZqdaBJ)
+
+---
+
+# Previous Release Notes
+
+## v0.2.2 - Smart Sentence Splitting
 
 **Release Date:** October 19, 2025
 

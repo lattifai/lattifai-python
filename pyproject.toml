@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '0.2.2'
+version = '0.2.4'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -30,6 +30,7 @@ dependencies = [
     "resampy",
     "g2p-phonemizer==0.1.1",
     "wtpsplit>=2.1.6",
+    "av"
 ]
 
 classifiers = [

@@ -14,6 +14,15 @@ We use [this changelog structure](http://keepachangelog.com/).
 
 None.
 
+## [0.2.4] - 2025-10-19
+
+### Added
+- Format support for: WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF (audio) and MP4, MKV, MOV, WEBM, AVI (video)
+
+### Improved
+- Audio format compatibility with expanded codec support
+
+
 ## [0.2.2] - 2025-10-19
 
 ### Added
