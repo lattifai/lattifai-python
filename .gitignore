@@ -75,3 +75,4 @@ MANIFEST
 .vscode/
 .github/*.md
 tests/data/SA1_*.*
+!SA1_24K.wav
