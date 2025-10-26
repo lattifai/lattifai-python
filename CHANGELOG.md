@@ -14,6 +14,13 @@ We use [this changelog structure](http://keepachangelog.com/).
 
 None.
 
+## [0.2.5] - 2025-10-26
+
+### Added
+- Comprehensive error handling system with clear error messages and support links
+- Error hierarchy with specific exception classes for different error types
+- Context information in error messages for better debugging
+
 ## [0.2.4] - 2025-10-19
 
 ### Added
