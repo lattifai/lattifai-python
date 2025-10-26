@@ -13,12 +13,23 @@ from lhotse.audio import read_audio
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
 
+from lattifai.errors import (
+    AlignmentError,
+    AudioFormatError,
+    AudioLoadError,
+    DependencyError,
+    ModelLoadError,
+)
+
 
 class Lattice1AlphaWorker:
     """Worker for processing audio with LatticeGraph."""
 
     def __init__(self, model_path: Pathlike, device: str = 'cpu', num_threads: int = 8) -> None:
-        self.config = json.load(open(f'{model_path}/config.json'))
+        try:
+            self.config = json.load(open(f'{model_path}/config.json'))
+        except Exception as e:
+            raise ModelLoadError(f'config from {model_path}', original_error=e)
 
         # SessionOptions
         sess_options = ort.SessionOptions()
@@ -33,15 +44,22 @@ class Lattice1AlphaWorker:
         elif device.startswith('mps') and ort.get_all_providers().count('MPSExecutionProvider') > 0:
             providers.append('MPSExecutionProvider')
 
-        self.acoustic_ort = ort.InferenceSession(
-            f'{model_path}/acoustic_opt.onnx',
-            sess_options,
-            providers=providers + ['CoreMLExecutionProvider', 'CPUExecutionProvider'],
-        )
-        config = FbankConfig(num_mel_bins=80, device=device, snip_edges=False)
-        config_dict = config.to_dict()
-        config_dict.pop('device')
-        self.extractor = Wav2LogFilterBank(**config_dict).to(device).eval()
+        try:
+            self.acoustic_ort = ort.InferenceSession(
+                f'{model_path}/acoustic_opt.onnx',
+                sess_options,
+                providers=providers + ['CoreMLExecutionProvider', 'CPUExecutionProvider'],
+            )
+        except Exception as e:
+            raise ModelLoadError(f'acoustic model from {model_path}', original_error=e)
+
+        try:
+            config = FbankConfig(num_mel_bins=80, device=device, snip_edges=False)
+            config_dict = config.to_dict()
+            config_dict.pop('device')
+            self.extractor = Wav2LogFilterBank(**config_dict).to(device).eval()
+        except Exception as e:
+            raise ModelLoadError(f'feature extractor for device {device}', original_error=e)
 
         self.device = torch.device(device)
         self.timings = defaultdict(lambda: 0.0)
@@ -86,45 +104,59 @@ class Lattice1AlphaWorker:
                     waveform = waveform.transpose(0, 1)
                 # average multiple channels
                 waveform = np.mean(waveform, axis=0, keepdims=True)  # (1, L)
-        except Exception:
+        except Exception as primary_error:
             # Fallback to PyAV for formats not supported by soundfile
-            import av
+            try:
+                import av
+            except ImportError:
+                raise DependencyError(
+                    'av (PyAV)', install_command='pip install av', context={'primary_error': str(primary_error)}
+                )
 
-            container = av.open(audio)
-            audio_stream = next((s for s in container.streams if s.type == 'audio'), None)
+            try:
+                container = av.open(audio)
+                audio_stream = next((s for s in container.streams if s.type == 'audio'), None)
 
-            if audio_stream is None:
-                raise ValueError(f'No audio stream found in {audio}')
+                if audio_stream is None:
+                    raise AudioFormatError(str(audio), 'No audio stream found in file')
 
-            # Resample to target sample rate during decoding
-            audio_stream.codec_context.format = av.AudioFormat('flt')  # 32-bit float
+                # Resample to target sample rate during decoding
+                audio_stream.codec_context.format = av.AudioFormat('flt')  # 32-bit float
 
-            frames = []
-            for frame in container.decode(audio_stream):
-                # Convert frame to numpy array
-                array = frame.to_ndarray()
-                # Ensure shape is (channels, samples)
-                if array.ndim == 1:
-                    array = array.reshape(1, -1)
-                elif array.ndim == 2 and array.shape[0] > array.shape[1]:
-                    array = array.T
-                frames.append(array)
+                frames = []
+                for frame in container.decode(audio_stream):
+                    # Convert frame to numpy array
+                    array = frame.to_ndarray()
+                    # Ensure shape is (channels, samples)
+                    if array.ndim == 1:
+                        array = array.reshape(1, -1)
+                    elif array.ndim == 2 and array.shape[0] > array.shape[1]:
+                        array = array.T
+                    frames.append(array)
 
-            container.close()
+                container.close()
 
-            if not frames:
-                raise ValueError(f'No audio data found in {audio}')
+                if not frames:
+                    raise AudioFormatError(str(audio), 'No audio data found in file')
 
-            # Concatenate all frames
-            waveform = np.concatenate(frames, axis=1)
-            # Average multiple channels to mono
-            if waveform.shape[0] > 1:
-                waveform = np.mean(waveform, axis=0, keepdims=True)
+                # Concatenate all frames
+                waveform = np.concatenate(frames, axis=1)
+                # Average multiple channels to mono
+                if waveform.shape[0] > 1:
+                    waveform = np.mean(waveform, axis=0, keepdims=True)
 
-            sample_rate = audio_stream.codec_context.sample_rate
+                sample_rate = audio_stream.codec_context.sample_rate
+            except Exception as e:
+                raise AudioLoadError(str(audio), original_error=e)
 
-        if sample_rate != self.config['sample_rate']:
-            waveform = resampy.resample(waveform, sample_rate, self.config['sample_rate'], axis=1)
+        try:
+            if sample_rate != self.config['sample_rate']:
+                waveform = resampy.resample(waveform, sample_rate, self.config['sample_rate'], axis=1)
+        except Exception:
+            raise AudioFormatError(
+                str(audio), f'Failed to resample from {sample_rate}Hz to {self.config["sample_rate"]}Hz'
+            )
+
         return torch.from_numpy(waveform).to(self.device)  # (1, L)
 
     def alignment(
@@ -138,6 +170,11 @@ class Lattice1AlphaWorker:
 
         Returns:
             Processed LatticeGraph
+
+        Raises:
+            AudioLoadError: If audio cannot be loaded
+            DependencyError: If required dependencies are missing
+            AlignmentError: If alignment process fails
         """
         # load audio
         if isinstance(audio, torch.Tensor):
@@ -146,21 +183,41 @@ class Lattice1AlphaWorker:
             waveform = self.load_audio(audio)  # (1, L)
 
         _start = time.time()
-        emission = self.emission(waveform.to(self.device))  # (1, T, vocab_size)
+        try:
+            emission = self.emission(waveform.to(self.device))  # (1, T, vocab_size)
+        except Exception as e:
+            raise AlignmentError(
+                'Failed to compute acoustic features from audio',
+                audio_path=str(audio) if not isinstance(audio, torch.Tensor) else 'tensor',
+                context={'original_error': str(e)},
+            )
         self.timings['emission'] += time.time() - _start
 
-        import k2
-        from lattifai_core.lattice.decode import align_segments
+        try:
+            import k2
+        except ImportError:
+            raise DependencyError('k2', install_command='pip install install-k2 && python -m install_k2')
+
+        try:
+            from lattifai_core.lattice.decode import align_segments
+        except ImportError:
+            raise DependencyError('lattifai_core', install_command='Contact support for lattifai_core installation')
 
         lattice_graph_str, final_state, acoustic_scale = lattice_graph
 
         _start = time.time()
-        # graph
-        decoding_graph = k2.Fsa.from_str(lattice_graph_str, acceptor=False)
-        decoding_graph.requires_grad_(False)
-        decoding_graph = k2.arc_sort(decoding_graph)
-        decoding_graph.skip_id = int(final_state)
-        decoding_graph.return_id = int(final_state + 1)
+        try:
+            # graph
+            decoding_graph = k2.Fsa.from_str(lattice_graph_str, acceptor=False)
+            decoding_graph.requires_grad_(False)
+            decoding_graph = k2.arc_sort(decoding_graph)
+            decoding_graph.skip_id = int(final_state)
+            decoding_graph.return_id = int(final_state + 1)
+        except Exception as e:
+            raise AlignmentError(
+                'Failed to create decoding graph from lattice',
+                context={'original_error': str(e), 'lattice_graph_length': len(lattice_graph_str)},
+            )
         self.timings['decoding_graph'] += time.time() - _start
 
         _start = time.time()
@@ -169,17 +226,24 @@ class Lattice1AlphaWorker:
         else:
             device = self.device
 
-        results, labels = align_segments(
-            emission.to(device) * acoustic_scale,
-            decoding_graph.to(device),
-            torch.tensor([emission.shape[1]], dtype=torch.int32),
-            search_beam=100,
-            output_beam=40,
-            min_active_states=200,
-            max_active_states=10000,
-            subsampling_factor=1,
-            reject_low_confidence=False,
-        )
+        try:
+            results, labels = align_segments(
+                emission.to(device) * acoustic_scale,
+                decoding_graph.to(device),
+                torch.tensor([emission.shape[1]], dtype=torch.int32),
+                search_beam=100,
+                output_beam=40,
+                min_active_states=200,
+                max_active_states=10000,
+                subsampling_factor=1,
+                reject_low_confidence=False,
+            )
+        except Exception as e:
+            raise AlignmentError(
+                'Failed to perform forced alignment',
+                audio_path=str(audio) if not isinstance(audio, torch.Tensor) else 'tensor',
+                context={'original_error': str(e), 'emission_shape': list(emission.shape), 'device': str(device)},
+            )
         self.timings['align_segments'] += time.time() - _start
 
         channel = 0

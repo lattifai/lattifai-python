@@ -271,6 +271,8 @@ class LatticeTokenizer:
         if response.status_code != 200:
             raise Exception(f'Failed to detokenize lattice: {response.text}')
         result = response.json()
+        if not result.get('success'):
+            return Exception('Failed to detokenize the alignment results.')
         # if return_details:
         #     raise NotImplementedError("return_details is not implemented yet")
         return [Supervision.from_dict(s) for s in result['supervisions']]

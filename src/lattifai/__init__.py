@@ -2,7 +2,21 @@ import os
 import sys
 import warnings
 
-from .base_client import LattifAIError
+from .errors import (
+    AlignmentError,
+    APIError,
+    AudioFormatError,
+    AudioLoadError,
+    AudioProcessingError,
+    ConfigurationError,
+    DependencyError,
+    LatticeDecodingError,
+    LatticeEncodingError,
+    LattifAIError,
+    ModelLoadError,
+    SubtitleParseError,
+    SubtitleProcessingError,
+)
 from .io import SubtitleIO
 
 try:
@@ -53,6 +67,18 @@ def __getattr__(name):
 __all__ = [
     'LattifAI',  # noqa: F822
     'LattifAIError',
+    'AudioProcessingError',
+    'AudioLoadError',
+    'AudioFormatError',
+    'SubtitleProcessingError',
+    'SubtitleParseError',
+    'AlignmentError',
+    'LatticeEncodingError',
+    'LatticeDecodingError',
+    'ModelLoadError',
+    'DependencyError',
+    'APIError',
+    'ConfigurationError',
     'SubtitleIO',
     '__version__',
 ]
