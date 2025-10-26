@@ -6,11 +6,8 @@ from typing import Any, Awaitable, Callable, Dict, Optional, Union  # noqa: F401
 
 import httpx
 
-
-class LattifAIError(Exception):
-    """Base exception for LattifAI errors."""
-
-    pass
+# Import from errors module for consistency
+from .errors import APIError, ConfigurationError, LattifAIError
 
 
 class BaseAPIClient(ABC):
@@ -28,7 +25,7 @@ class BaseAPIClient(ABC):
         if api_key is None:
             api_key = os.environ.get('LATTIFAI_API_KEY')
         if api_key is None:
-            raise LattifAIError(
+            raise ConfigurationError(
                 'The api_key client option must be set either by passing api_key to the client '
                 'or by setting the LATTIFAI_API_KEY environment variable'
             )

@@ -9,7 +9,17 @@ import colorful
 from dotenv import load_dotenv
 from lhotse.utils import Pathlike
 
-from lattifai.base_client import AsyncAPIClient, LattifAIError, SyncAPIClient
+from lattifai.base_client import AsyncAPIClient, SyncAPIClient
+from lattifai.errors import (
+    AlignmentError,
+    ConfigurationError,
+    LatticeDecodingError,
+    LatticeEncodingError,
+    LattifAIError,
+    ModelLoadError,
+    SubtitleProcessingError,
+    handle_exception,
+)
 from lattifai.io import SubtitleFormat, SubtitleIO
 from lattifai.tokenizer import LatticeTokenizer
 from lattifai.workers import Lattice1AlphaWorker
@@ -34,7 +44,7 @@ class LattifAI(SyncAPIClient):
         if api_key is None:
             api_key = os.environ.get('LATTIFAI_API_KEY')
         if api_key is None:
-            raise LattifAIError(
+            raise ConfigurationError(
                 'The api_key client option must be set either by passing api_key to the client '
                 'or by setting the LATTIFAI_API_KEY environment variable'
             )
@@ -60,8 +70,13 @@ class LattifAI(SyncAPIClient):
             try:
                 model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
             except LocalEntryNotFoundError:
-                os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-                model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
+                try:
+                    os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
+                    model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
+                except Exception as e:
+                    raise ModelLoadError(model_name_or_path, original_error=e)
+            except Exception as e:
+                raise ModelLoadError(model_name_or_path, original_error=e)
         else:
             model_path = model_name_or_path
 
@@ -75,12 +90,19 @@ class LattifAI(SyncAPIClient):
             elif torch.cuda.is_available():
                 device = 'cuda'
 
-        self.tokenizer = LatticeTokenizer.from_pretrained(
-            client_wrapper=self,
-            model_path=model_path,
-            device=device,
-        )
-        self.worker = Lattice1AlphaWorker(model_path, device=device, num_threads=8)
+        try:
+            self.tokenizer = LatticeTokenizer.from_pretrained(
+                client_wrapper=self,
+                model_path=model_path,
+                device=device,
+            )
+        except Exception as e:
+            raise ModelLoadError(f'tokenizer from {model_path}', original_error=e)
+
+        try:
+            self.worker = Lattice1AlphaWorker(model_path, device=device, num_threads=8)
+        except Exception as e:
+            raise ModelLoadError(f'worker from {model_path}', original_error=e)
 
     def alignment(
         self,
@@ -95,37 +117,88 @@ class LattifAI(SyncAPIClient):
         Args:
             audio: Audio file path
             subtitle: Subtitle/Text to align with audio
-            export_format: Output format (srt, vtt, ass, txt)
+            format: Output format (srt, vtt, ass, txt)
+            split_sentence: Whether to split sentences during processing
+            output_subtitle_path: Path to save output file
 
         Returns:
             Aligned subtitles in specified format
+
+        Raises:
+            SubtitleProcessingError: If subtitle file cannot be parsed
+            LatticeEncodingError: If lattice graph generation fails
+            AlignmentError: If audio alignment fails
+            LatticeDecodingError: If lattice decoding fails
         """
-        # step1: parse text or subtitles
-        print(colorful.cyan(f'📖 Step 1: Reading subtitle file from {subtitle}'))
-        supervisions = SubtitleIO.read(subtitle, format=format)
-        print(colorful.green(f'         ✓ Parsed {len(supervisions)} subtitle segments'))
+        try:
+            # step1: parse text or subtitles
+            print(colorful.cyan(f'📖 Step 1: Reading subtitle file from {subtitle}'))
+            try:
+                supervisions = SubtitleIO.read(subtitle, format=format)
+                print(colorful.green(f'         ✓ Parsed {len(supervisions)} subtitle segments'))
+            except Exception as e:
+                raise SubtitleProcessingError(
+                    f'Failed to parse subtitle file: {subtitle}',
+                    subtitle_path=str(subtitle),
+                    context={'original_error': str(e)},
+                )
 
-        # step2: make lattice by call Lattifai API
-        print(colorful.cyan('🔗 Step 2: Creating lattice graph from text'))
-        lattice_id, lattice_graph = self.tokenizer.tokenize(supervisions, split_sentence=split_sentence)
-        print(colorful.green(f'         ✓ Generated lattice graph with ID: {lattice_id}'))
+            # step2: make lattice by call Lattifai API
+            print(colorful.cyan('🔗 Step 2: Creating lattice graph from text'))
+            try:
+                lattice_id, lattice_graph = self.tokenizer.tokenize(supervisions, split_sentence=split_sentence)
+                print(colorful.green(f'         ✓ Generated lattice graph with ID: {lattice_id}'))
+            except Exception as e:
+                text_content = ' '.join([sup.text for sup in supervisions]) if supervisions else ''
+                raise LatticeEncodingError(text_content, original_error=e)
 
-        # step3: align audio with text
-        print(colorful.cyan(f'🎵 Step 3: Performing alignment on audio file: {audio}'))
-        lattice_results = self.worker.alignment(audio, lattice_graph)
-        print(colorful.green('         ✓ Alignment completed successfully'))
+            # step3: align audio with text
+            print(colorful.cyan(f'🎵 Step 3: Performing alignment on audio file: {audio}'))
+            try:
+                lattice_results = self.worker.alignment(audio, lattice_graph)
+                print(colorful.green('         ✓ Alignment completed successfully'))
+            except Exception as e:
+                raise AlignmentError(
+                    f'Audio alignment failed for {audio}',
+                    audio_path=str(audio),
+                    subtitle_path=str(subtitle),
+                    context={'original_error': str(e)},
+                )
 
-        # step4: decode the lattice paths
-        print(colorful.cyan('🔍 Step 4: Decoding lattice paths to final alignments'))
-        alignments = self.tokenizer.detokenize(lattice_id, lattice_results)
-        print(colorful.green(f'         ✓ Decoded {len(alignments)} aligned segments'))
+            # step4: decode the lattice paths
+            print(colorful.cyan('🔍 Step 4: Decoding lattice paths to final alignments'))
+            try:
+                alignments = self.tokenizer.detokenize(lattice_id, lattice_results)
+                print(colorful.green(f'         ✓ Decoded {len(alignments)} aligned segments'))
+            except Exception as e:
+                print(colorful.red('         x Failed to decode lattice alignment results'))
+                raise LatticeDecodingError(lattice_id, original_error=e)
 
-        # step5: export alignments to target format
-        if output_subtitle_path:
-            SubtitleIO.write(alignments, output_path=output_subtitle_path)
-            print(colorful.green(f'🎉🎉🎉🎉🎉 Subtitle file written to: {output_subtitle_path}'))
+            # step5: export alignments to target format
+            if output_subtitle_path:
+                try:
+                    SubtitleIO.write(alignments, output_path=output_subtitle_path)
+                    print(colorful.green(f'🎉🎉🎉🎉🎉 Subtitle file written to: {output_subtitle_path}'))
+                except Exception as e:
+                    raise SubtitleProcessingError(
+                        f'Failed to write output file: {output_subtitle_path}',
+                        subtitle_path=str(output_subtitle_path),
+                        context={'original_error': str(e)},
+                    )
 
-        return output_subtitle_path or alignments
+            return output_subtitle_path or alignments
+
+        except (SubtitleProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
+            # Re-raise our specific errors as-is
+            raise
+        except Exception as e:
+            # Catch any unexpected errors and wrap them
+            raise AlignmentError(
+                'Unexpected error during alignment process',
+                audio_path=str(audio),
+                subtitle_path=str(subtitle),
+                context={'original_error': str(e), 'error_type': e.__class__.__name__},
+            )
 
 
 if __name__ == '__main__':
