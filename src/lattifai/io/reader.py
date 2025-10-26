@@ -30,16 +30,27 @@ class SubtitleReader(ABCMeta):
         elif format:
             format = format.lower()
 
-        if format == 'txt' or subtitle[-4:].lower() == '.txt':
+        if format == 'gemini':
+            from .gemini_reader import GeminiReader
+
+            supervisions = GeminiReader.extract_for_alignment(subtitle)
+        elif format == 'txt' or (format == 'auto' and subtitle[-4:].lower() == '.txt'):
             if not Path(str(subtitle)).exists():  # str
                 lines = [line.strip() for line in subtitle.split('\n')]
             else:  # file
                 lines = [line.strip() for line in open(subtitle).readlines()]
-            examples = [Supervision(text=line) for line in lines if line]
+            supervisions = [Supervision(text=line) for line in lines if line]
         else:
-            examples = cls._parse_subtitle(subtitle, format=format)
+            try:
+                supervisions = cls._parse_subtitle(subtitle, format=format)
+            except Exception as e:
+                del e
+                print(f"Failed to parse subtitle with format {format}, trying 'gemini' parser.")
+                from .gemini_reader import GeminiReader
 
-        return examples
+                supervisions = GeminiReader.extract_for_alignment(subtitle)
+
+        return supervisions
 
     @classmethod
     def _parse_subtitle(cls, subtitle: Pathlike, format: Optional[SubtitleFormat]) -> List[Supervision]:
@@ -62,9 +73,8 @@ class SubtitleReader(ABCMeta):
             supervisions.append(
                 Supervision(
                     text=event.text,
-                    # "start": event.start / 1000.0 if event.start is not None else None,
-                    # "duration": (event.end - event.start) / 1000.0 if event.end is not None else None,
-                    # }
+                    start=event.start / 1000.0 if event.start is not None else None,
+                    duration=(event.end - event.start) / 1000.0 if event.end is not None else None,
                 )
             )
         return supervisions

@@ -9,7 +9,7 @@ from lattifai.bin.cli_base import cli
 @click.option(
     '-F',
     '--input_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'txt', 'auto'], case_sensitive=False),
+    type=click.Choice(['srt', 'vtt', 'ass', 'txt', 'auto', 'gemini'], case_sensitive=False),
     default='auto',
     help='Input Subtitle format.',
 )
