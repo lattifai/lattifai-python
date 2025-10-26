@@ -100,7 +100,7 @@ For complete documentation, visit:
 
 - **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
-- **Discord**: [Join our community](https://discord.gg/gTZqdaBJ)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
 
 ---
 
@@ -275,7 +275,7 @@ Thank you to our community for requesting enhanced video format support!
 
 - **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
-- **Discord**: [Join our community](https://discord.gg/gTZqdaBJ)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
 
 ---
 
@@ -455,7 +455,7 @@ This release improves subtitle alignment accuracy by respecting natural language
 
 - **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
-- **Discord**: [Join our community](https://discord.gg/gTZqdaBJ)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
 
 ---
 
