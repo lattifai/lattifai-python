@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 
 from lattifai.base_client import SyncAPIClient
+from lattifai.errors import LatticeDecodingError
 from lattifai.io import Supervision
 from lattifai.tokenizer.phonemizer import G2Phonemizer
 
@@ -268,8 +269,16 @@ class LatticeTokenizer:
                 'destroy_lattice': True,
             },
         )
+        if response.status_code == 422:
+            raise LatticeDecodingError(
+                lattice_id,
+                original_error=Exception(
+                    'Reason: 1) The audio and text do not match well 2) the audio may be singing.'
+                ),
+            )
         if response.status_code != 200:
             raise Exception(f'Failed to detokenize lattice: {response.text}')
+
         result = response.json()
         if not result.get('success'):
             return Exception('Failed to detokenize the alignment results.')

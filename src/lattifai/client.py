@@ -170,6 +170,9 @@ class LattifAI(SyncAPIClient):
             try:
                 alignments = self.tokenizer.detokenize(lattice_id, lattice_results)
                 print(colorful.green(f'         ✓ Decoded {len(alignments)} aligned segments'))
+            except LatticeDecodingError as e:
+                print(colorful.red('         x Failed to decode lattice alignment results'))
+                raise e
             except Exception as e:
                 print(colorful.red('         x Failed to decode lattice alignment results'))
                 raise LatticeDecodingError(lattice_id, original_error=e)
