@@ -16,26 +16,45 @@ from lattifai.bin.cli_base import cli
 
 @cli.command()
 @click.option('--youtube', '--yt', is_flag=True, help='Process YouTube URL through agentic workflow')
-@click.option('--gemini-api-key', type=str, help='Gemini API key for transcription (overrides GEMINI_API_KEY env var)')
+@click.option(
+    '--gemini-api-key',
+    '--gemini_api_key',
+    type=str,
+    help='Gemini API key for transcription (overrides GEMINI_API_KEY env var)',
+)
 @click.option(
     '--video-format',
+    '--video_format',
     type=click.Choice(['mp4', 'webm', 'mkv'], case_sensitive=False),
     default='mp4',
     help='Video format for YouTube download (default: mp4)',
 )
 @click.option(
     '--output-formats',
+    '--output_formats',
     type=str,
     default='srt',
     help='Comma-separated list of output subtitle formats (default: srt). Options: srt,vtt,ass,txt',
 )
 @click.option(
     '--output-dir',
+    '--output_dir',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
     help='Output directory for generated files (default: current directory)',
 )
 @click.option(
-    '--max-retries', type=int, default=0, help='Maximum number of retries for failed steps (default: 0 - no retries)'
+    '--max-retries',
+    '--max_retries',
+    type=int,
+    default=0,
+    help='Maximum number of retries for failed steps (default: 0 - no retries)',
+)
+@click.option(
+    '--split-sentence',
+    '--split_sentence',
+    is_flag=True,
+    default=False,
+    help='Re-segment subtitles by semantics.',
 )
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
 @click.option('--force', '-f', is_flag=True, help='Force overwrite existing files without confirmation')
@@ -48,6 +67,7 @@ def agent(
     output_formats: str = 'srt',
     output_dir: Optional[str] = None,
     max_retries: int = 0,
+    split_sentence: bool = False,
     verbose: bool = False,
     force: bool = False,
 ):
@@ -103,6 +123,7 @@ def agent(
                 output_formats=format_list,
                 output_dir=output_dir,
                 max_retries=max_retries,
+                split_sentence=split_sentence,
                 force_overwrite=force,
             )
         )
@@ -126,6 +147,7 @@ async def _run_youtube_workflow(
     output_formats: List[str],
     output_dir: str,
     max_retries: int,
+    split_sentence: bool = False,
     force_overwrite: bool = False,
 ):
     """Run the YouTube processing workflow"""
@@ -139,14 +161,15 @@ async def _run_youtube_workflow(
     click.echo()
 
     # Import the workflow agent
-    from lattifai.workflows import YouTubeAlignmentAgent
+    from lattifai.workflows import YouTubeSubtitleAgent
 
     # Initialize agent
-    agent = YouTubeAlignmentAgent(
+    agent = YouTubeSubtitleAgent(
         gemini_api_key=api_key,
         video_format=video_format,
         output_formats=output_formats,
         max_retries=max_retries,
+        split_sentence=split_sentence,
         force_overwrite=force_overwrite,
     )
 
@@ -232,8 +255,9 @@ if __name__ == '__main__':
             api_key=os.getenv('GEMINI_API_KEY', ''),
             video_format='mp4',
             output_formats=['ass'],
-            output_dir='~/Downloads/lattifai_openai4o',
+            output_dir='~/Downloads/lattifai_openai4o_debug',
             max_retries=1,
+            split_sentence=False,
             force_overwrite=False,
         )
     )

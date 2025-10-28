@@ -8,6 +8,7 @@ from lattifai.bin.cli_base import cli
 @cli.command()
 @click.option(
     '-F',
+    '--input-format',
     '--input_format',
     type=click.Choice(['srt', 'vtt', 'ass', 'txt', 'auto', 'gemini'], case_sensitive=False),
     default='auto',
@@ -21,10 +22,16 @@ from lattifai.bin.cli_base import cli
     help='Device to use for inference.',
 )
 @click.option(
-    '-M', '--model_name_or_path', type=str, default='Lattifai/Lattice-1-Alpha', help='Lattifai model name or path'
+    '-M',
+    '--model-name-or-path',
+    '--model_name_or_path',
+    type=str,
+    default='Lattifai/Lattice-1-Alpha',
+    help='Lattifai model name or path',
 )
 @click.option(
     '-S',
+    '--split-sentence',
     '--split_sentence',
     is_flag=True,
     default=False,

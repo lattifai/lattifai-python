@@ -187,7 +187,7 @@ class FileExistenceManager:
         Prompt user for confirmation for a specific file type
 
         Args:
-            file_type: Type of file ('audio', 'video', 'subtitle', 'transcript')
+            file_type: Type of file ('audio', 'video', 'subtitle', 'gemini')
             files: List of existing files of this type
             operation: Type of operation (e.g., "download", "generate")
 
@@ -202,10 +202,11 @@ class FileExistenceManager:
             'audio': ('📱', 'Audio'),
             'video': ('🎬', 'Video'),
             'subtitle': ('📝', 'Subtitle'),
-            'transcript': ('📄', 'Transcript'),
+            'gemini': ('📄', 'Gemini'),
         }
 
         emoji, label = type_info.get(file_type, ('📄', file_type.capitalize()))
+        del emoji  # Unused variable
 
         # Header with warning color
         print(f'\n{colorful.bold_yellow(f"⚠️  Existing {label} files found:")}')

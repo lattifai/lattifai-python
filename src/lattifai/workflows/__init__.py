@@ -8,17 +8,15 @@ of multimedia content through intelligent agent-based pipelines.
 # Import transcript processing functionality
 from lattifai.io import GeminiReader, GeminiWriter
 
-from .agent import YouTubeAlignmentAgent
+from .agents import YouTubeSubtitleAgent
 from .base import WorkflowAgent, WorkflowResult, WorkflowStep
 from .file_manager import FileExistenceManager, VideoFileManager
-from .youtube import YouTubeWorkflow
 
 __all__ = [
     'WorkflowAgent',
     'WorkflowStep',
     'WorkflowResult',
-    'YouTubeAlignmentAgent',
-    'YouTubeWorkflow',
+    'YouTubeSubtitleAgent',
     'FileExistenceManager',
     'VideoFileManager',
     'GeminiReader',

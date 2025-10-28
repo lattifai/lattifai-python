@@ -15,7 +15,7 @@ def test_imports():
     print('🧪 Testing imports...')
 
     try:
-        from lattifai.workflows import YouTubeAlignmentAgent, YouTubeWorkflow
+        from lattifai.workflows import YouTubeSubtitleAgent, YouTubeWorkflow
         from lattifai.workflows.base import WorkflowAgent, WorkflowResult, WorkflowStep
         from lattifai.workflows.gemini import GeminiTranscriber
         from lattifai.workflows.youtube import YouTubeDownloader
@@ -82,11 +82,11 @@ def test_workflow_setup():
     print('\n🧪 Testing workflow setup...')
 
     try:
-        from lattifai.workflows import YouTubeAlignmentAgent
+        from lattifai.workflows import YouTubeSubtitleAgent
 
         # Test agent creation with dummy API key
         try:
-            agent = YouTubeAlignmentAgent(
+            agent = YouTubeSubtitleAgent(
                 gemini_api_key='test_key', audio_format='mp3', output_formats=['srt'], max_retries=1
             )
 

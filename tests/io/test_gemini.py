@@ -8,10 +8,6 @@ import pytest
 from lattifai.io import GeminiReader, GeminiWriter, TranscriptSegment
 from lattifai.io.supervision import Supervision
 
-TranscriptReader = GeminiReader  # backward compatibility in tests
-TranscriptWriter = GeminiWriter  # backward compatibility in tests
-
-
 # Sample transcript content for testing
 SAMPLE_TRANSCRIPT = """## OpenAI Spring Update: GPT-4o
 
@@ -66,16 +62,16 @@ we can make freely available and broadly available to everyone and we're always 
 
 
 class TestGeminiReader:
-    """Tests for GeminiReader class (formerly TranscriptReader)."""
+    """Tests for GeminiReader class (formerly GeminiReader)."""
 
     def test_read_all_segments(self, tmp_path):
         """Test reading all segments including events and sections."""
         # Create temp file
-        transcript_file = tmp_path / 'test_transcript.txt'
+        transcript_file = tmp_path / 'test_gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Read all segments
-        segments = TranscriptReader.read(transcript_file, include_events=True, include_sections=True)
+        segments = GeminiReader.read(transcript_file, include_events=True, include_sections=True)
 
         # Should have sections, events, and dialogue
         assert len(segments) > 0
@@ -88,11 +84,11 @@ class TestGeminiReader:
 
     def test_read_dialogue_only(self, tmp_path):
         """Test reading only dialogue segments."""
-        transcript_file = tmp_path / 'test_transcript.txt'
+        transcript_file = tmp_path / 'test_gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Read dialogue only
-        segments = TranscriptReader.read(transcript_file, include_events=False, include_sections=False)
+        segments = GeminiReader.read(transcript_file, include_events=False, include_sections=False)
 
         # Should only have dialogue
         types = {seg.segment_type for seg in segments}
@@ -100,21 +96,21 @@ class TestGeminiReader:
 
     def test_parse_timestamp(self):
         """Test timestamp parsing."""
-        timestamp = TranscriptReader.parse_timestamp('00', '00', '13')
+        timestamp = GeminiReader.parse_timestamp('00', '00', '13')
         assert timestamp == 13.0
 
-        timestamp = TranscriptReader.parse_timestamp('00', '01', '01')
+        timestamp = GeminiReader.parse_timestamp('00', '01', '01')
         assert timestamp == 61.0
 
-        timestamp = TranscriptReader.parse_timestamp('01', '00', '00')
+        timestamp = GeminiReader.parse_timestamp('01', '00', '00')
         assert timestamp == 3600.0
 
     def test_speaker_extrevent(self, tmp_path):
         """Test speaker name extrevent."""
-        transcript_file = tmp_path / 'test_transcript.txt'
+        transcript_file = tmp_path / 'test_gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
-        segments = TranscriptReader.read(transcript_file)
+        segments = GeminiReader.read(transcript_file)
 
         # Find dialogue segments with speaker
         dialogue_with_speaker = [s for s in segments if s.speaker is not None]
@@ -126,10 +122,10 @@ class TestGeminiReader:
 
     def test_section_tracking(self, tmp_path):
         """Test section title tracking."""
-        transcript_file = tmp_path / 'test_transcript.txt'
+        transcript_file = tmp_path / 'test_gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
-        segments = TranscriptReader.read(transcript_file, include_events=True, include_sections=True)
+        segments = GeminiReader.read(transcript_file, include_events=True, include_sections=True)
 
         # Segments should have section information
         sections = {s.section for s in segments if s.section is not None}
@@ -138,11 +134,11 @@ class TestGeminiReader:
 
     def test_extract_for_alignment(self, tmp_path):
         """Test extracting supervisions for alignment."""
-        transcript_file = tmp_path / 'test_transcript.txt'
+        transcript_file = tmp_path / 'test_gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Extract for alignment
-        supervisions = TranscriptReader.extract_for_alignment(transcript_file, merge_consecutive=False)
+        supervisions = GeminiReader.extract_for_alignment(transcript_file, merge_consecutive=False)
 
         # Should return Supervision objects
         assert len(supervisions) > 0
@@ -156,14 +152,14 @@ class TestGeminiReader:
 
     def test_extract_with_merge(self, tmp_path):
         """Test extracting with consecutive segment merging."""
-        transcript_file = tmp_path / 'test_transcript.txt'
+        transcript_file = tmp_path / 'test_gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Extract without merge
-        sups_no_merge = TranscriptReader.extract_for_alignment(transcript_file, merge_consecutive=False)
+        sups_no_merge = GeminiReader.extract_for_alignment(transcript_file, merge_consecutive=False)
 
         # Extract with merge
-        sups_with_merge = TranscriptReader.extract_for_alignment(transcript_file, merge_consecutive=True)
+        sups_with_merge = GeminiReader.extract_for_alignment(transcript_file, merge_consecutive=True)
 
         # Merged should have fewer or equal segments
         assert len(sups_with_merge) <= len(sups_no_merge)
@@ -174,11 +170,11 @@ class TestYouTubeGeminiReader:
 
     def test_read_youtube_format(self, tmp_path):
         """Test reading YouTube format transcript with link timestamps."""
-        transcript_file = tmp_path / 'youtube_transcript.txt'
+        transcript_file = tmp_path / 'youtube_gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # Read all segments
-        segments = TranscriptReader.read(transcript_file, include_events=True, include_sections=True)
+        segments = GeminiReader.read(transcript_file, include_events=True, include_sections=True)
 
         # Should have sections and dialogue
         assert len(segments) > 0
@@ -191,21 +187,21 @@ class TestYouTubeGeminiReader:
     def test_youtube_timestamp_parsing(self):
         """Test YouTube timestamp parsing from URL format."""
         # Test seconds parsing
-        timestamp = TranscriptReader.parse_timestamp('12')
+        timestamp = GeminiReader.parse_timestamp('12')
         assert timestamp == 12.0
 
-        timestamp = TranscriptReader.parse_timestamp('63')
+        timestamp = GeminiReader.parse_timestamp('63')
         assert timestamp == 63.0
 
-        timestamp = TranscriptReader.parse_timestamp('3661')
+        timestamp = GeminiReader.parse_timestamp('3661')
         assert timestamp == 3661.0
 
     def test_youtube_section_headers(self, tmp_path):
         """Test YouTube format section headers."""
-        transcript_file = tmp_path / 'youtube_transcript.txt'
+        transcript_file = tmp_path / 'youtube_gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
-        segments = TranscriptReader.read(transcript_file, include_sections=True)
+        segments = GeminiReader.read(transcript_file, include_sections=True)
 
         # Find section headers
         section_headers = [s for s in segments if s.segment_type == 'section_header']
@@ -218,10 +214,10 @@ class TestYouTubeGeminiReader:
 
     def test_youtube_speaker_dialogue(self, tmp_path):
         """Test YouTube format speaker dialogue parsing."""
-        transcript_file = tmp_path / 'youtube_transcript.txt'
+        transcript_file = tmp_path / 'youtube_gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
-        segments = TranscriptReader.read(transcript_file)
+        segments = GeminiReader.read(transcript_file)
 
         # Find dialogue segments with speaker
         dialogue_with_speaker = [s for s in segments if s.speaker is not None]
@@ -238,11 +234,11 @@ class TestYouTubeGeminiReader:
 
     def test_youtube_extract_for_alignment(self, tmp_path):
         """Test extracting YouTube format for alignment."""
-        transcript_file = tmp_path / 'youtube_transcript.txt'
+        transcript_file = tmp_path / 'youtube_gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # Extract for alignment
-        supervisions = TranscriptReader.extract_for_alignment(transcript_file, merge_consecutive=False)
+        supervisions = GeminiReader.extract_for_alignment(transcript_file, merge_consecutive=False)
 
         # Should return Supervision objects
         assert len(supervisions) > 0
@@ -256,29 +252,29 @@ class TestYouTubeGeminiReader:
 
     def test_youtube_with_merge(self, tmp_path):
         """Test YouTube format with consecutive segment merging."""
-        transcript_file = tmp_path / 'youtube_transcript.txt'
+        transcript_file = tmp_path / 'youtube_gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # Extract without merge
-        sups_no_merge = TranscriptReader.extract_for_alignment(transcript_file, merge_consecutive=False)
+        sups_no_merge = GeminiReader.extract_for_alignment(transcript_file, merge_consecutive=False)
 
         # Extract with merge
-        sups_with_merge = TranscriptReader.extract_for_alignment(transcript_file, merge_consecutive=True)
+        sups_with_merge = GeminiReader.extract_for_alignment(transcript_file, merge_consecutive=True)
 
         # Merged should have fewer or equal segments
         assert len(sups_with_merge) <= len(sups_no_merge)
 
 
 class TestGeminiWriter:
-    """Tests for GeminiWriter class (formerly TranscriptWriter)."""
+    """Tests for GeminiWriter class (formerly GeminiWriter)."""
 
     def test_format_timestamp(self):
         """Test timestamp formatting."""
         # Test various timestamps
-        assert TranscriptWriter.format_timestamp(13.0) == '[00:00:13]'
-        assert TranscriptWriter.format_timestamp(61.0) == '[00:01:01]'
-        assert TranscriptWriter.format_timestamp(3661.0) == '[01:01:01]'
-        assert TranscriptWriter.format_timestamp(0.0) == '[00:00:00]'
+        assert GeminiWriter.format_timestamp(13.0) == '[00:00:13]'
+        assert GeminiWriter.format_timestamp(61.0) == '[00:01:01]'
+        assert GeminiWriter.format_timestamp(3661.0) == '[01:01:01]'
+        assert GeminiWriter.format_timestamp(0.0) == '[00:00:00]'
 
     def test_update_timestamps(self, tmp_path):
         """Test updating transcript with new timestamps."""
@@ -287,7 +283,7 @@ class TestGeminiWriter:
         original_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Extract supervisions
-        supervisions = TranscriptReader.extract_for_alignment(original_file)
+        supervisions = GeminiReader.extract_for_alignment(original_file)
 
         # Modify timestamps slightly (simulate alignment)
         aligned_supervisions = []
@@ -302,7 +298,7 @@ class TestGeminiWriter:
 
         # Update timestamps
         output_file = tmp_path / 'updated.txt'
-        TranscriptWriter.update_timestamps(original_file, aligned_supervisions, output_file)
+        GeminiWriter.update_timestamps(original_file, aligned_supervisions, output_file)
 
         # Check output file exists
         assert output_file.exists()
@@ -318,7 +314,7 @@ class TestGeminiWriter:
         original_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Extract and create aligned supervisions
-        supervisions = TranscriptReader.extract_for_alignment(original_file)
+        supervisions = GeminiReader.extract_for_alignment(original_file)
 
         # Add word-level alignment
         for sup in supervisions:
@@ -337,7 +333,7 @@ class TestGeminiWriter:
 
         # Write aligned transcript
         output_file = tmp_path / 'aligned.txt'
-        TranscriptWriter.write_aligned_transcript(supervisions, output_file, include_word_timestamps=True)
+        GeminiWriter.write_aligned_transcript(supervisions, output_file, include_word_timestamps=True)
 
         # Check output
         assert output_file.exists()
@@ -350,10 +346,10 @@ class TestGeminiWriter:
         original_file = tmp_path / 'original.txt'
         original_file.write_text(SAMPLE_TRANSCRIPT)
 
-        supervisions = TranscriptReader.extract_for_alignment(original_file)
+        supervisions = GeminiReader.extract_for_alignment(original_file)
 
         output_file = tmp_path / 'aligned_no_words.txt'
-        TranscriptWriter.write_aligned_transcript(supervisions, output_file, include_word_timestamps=False)
+        GeminiWriter.write_aligned_transcript(supervisions, output_file, include_word_timestamps=False)
 
         assert output_file.exists()
         content = output_file.read_text()
@@ -398,11 +394,11 @@ class TestIntegration:
     def test_full_workflow(self, tmp_path):
         """Test complete read -> align -> write workflow."""
         # 1. Create transcript
-        transcript_file = tmp_path / 'transcript.txt'
+        transcript_file = tmp_path / 'gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # 2. Extract for alignment
-        supervisions = TranscriptReader.extract_for_alignment(transcript_file)
+        supervisions = GeminiReader.extract_for_alignment(transcript_file)
         assert len(supervisions) > 0
 
         # 3. Simulate alignment (add small corrections)
@@ -432,13 +428,13 @@ class TestIntegration:
             aligned_supervisions.append(aligned_sup)
 
         # 4. Write updated transcript
-        updated_file = tmp_path / 'updated_transcript.txt'
-        TranscriptWriter.update_timestamps(transcript_file, aligned_supervisions, updated_file)
+        updated_file = tmp_path / 'updated_gemini.md'
+        GeminiWriter.update_timestamps(transcript_file, aligned_supervisions, updated_file)
         assert updated_file.exists()
 
         # 5. Write simplified aligned transcript
         simple_file = tmp_path / 'simple_aligned.txt'
-        TranscriptWriter.write_aligned_transcript(aligned_supervisions, simple_file, include_word_timestamps=True)
+        GeminiWriter.write_aligned_transcript(aligned_supervisions, simple_file, include_word_timestamps=True)
         assert simple_file.exists()
 
         # Verify content
@@ -449,11 +445,11 @@ class TestIntegration:
     def test_youtube_workflow(self, tmp_path):
         """Test complete workflow with YouTube format transcript."""
         # 1. Create YouTube format transcript
-        transcript_file = tmp_path / 'youtube_transcript.txt'
+        transcript_file = tmp_path / 'youtube_gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # 2. Extract for alignment
-        supervisions = TranscriptReader.extract_for_alignment(transcript_file)
+        supervisions = GeminiReader.extract_for_alignment(transcript_file)
         assert len(supervisions) > 0
 
         # 3. Simulate alignment (add small corrections)
@@ -483,13 +479,13 @@ class TestIntegration:
             aligned_supervisions.append(aligned_sup)
 
         # 4. Write updated transcript
-        updated_file = tmp_path / 'updated_youtube_transcript.txt'
-        TranscriptWriter.update_timestamps(transcript_file, aligned_supervisions, updated_file)
+        updated_file = tmp_path / 'updated_youtube_gemini.md'
+        GeminiWriter.update_timestamps(transcript_file, aligned_supervisions, updated_file)
         assert updated_file.exists()
 
         # 5. Write simplified aligned transcript
         simple_file = tmp_path / 'simple_youtube_aligned.txt'
-        TranscriptWriter.write_aligned_transcript(aligned_supervisions, simple_file, include_word_timestamps=True)
+        GeminiWriter.write_aligned_transcript(aligned_supervisions, simple_file, include_word_timestamps=True)
         assert simple_file.exists()
 
         # Verify content
@@ -502,12 +498,12 @@ class TestIntegration:
         # Test original format
         original_file = tmp_path / 'original.txt'
         original_file.write_text(SAMPLE_TRANSCRIPT)
-        original_sups = TranscriptReader.extract_for_alignment(original_file)
+        original_sups = GeminiReader.extract_for_alignment(original_file)
 
         # Test YouTube format
         youtube_file = tmp_path / 'youtube.txt'
         youtube_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
-        youtube_sups = TranscriptReader.extract_for_alignment(youtube_file)
+        youtube_sups = GeminiReader.extract_for_alignment(youtube_file)
 
         # Both should work and return supervisions
         assert len(original_sups) > 0

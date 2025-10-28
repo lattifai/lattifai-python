@@ -1,5 +1,5 @@
 """
-YouTube downloader module using yt-dlp
+YouTube downloader module using yt-dlp and Agent
 """
 
 import asyncio
@@ -11,8 +11,11 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .base import setup_workflow_logger
+from ..client import LattifAI
+from ..io import GeminiReader, GeminiWriter
+from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
 from .file_manager import VideoFileManager
+from .gemini import GeminiTranscriber
 
 
 class YouTubeDownloader:
@@ -379,9 +382,9 @@ class YouTubeDownloader:
 
             # Find the downloaded transcript file
             transcript_patterns = [
-                f'{video_id}_transcript*.vtt',
-                f'{video_id}_transcript*.srt',
-                f'{video_id}_transcript*.txt',
+                # f'{video_id}_transcript*.vtt',
+                # f'{video_id}_transcript*.srt',
+                f'{video_id}_transcript*.md',
             ]
 
             for pattern in transcript_patterns:
@@ -442,56 +445,315 @@ class YouTubeDownloader:
             shutil.copy2(subtitle_file, output_file)
 
 
-class YouTubeWorkflow:
-    """High-level YouTube workflow orchestrator"""
+class YouTubeSubtitleAgent(WorkflowAgent):
+    """Agent for YouTube URL to aligned subtitles workflow"""
 
-    def __init__(self, audio_format: str = 'mp3'):
-        self.downloader = YouTubeDownloader(audio_format=audio_format)
-        self.logger = setup_workflow_logger('youtube')
-
-    async def process_url(
+    def __init__(
         self,
-        url: str,
-        output_dir: Optional[str] = None,
-        download_video: bool = False,
-        download_transcript: bool = True,
+        gemini_api_key: Optional[str] = None,
+        video_format: str = 'mp4',
+        output_formats: List[str] = None,
+        max_retries: int = 0,
+        split_sentence: bool = False,
+        output_dir: Optional[Path] = None,
         force_overwrite: bool = False,
-    ) -> Dict[str, Any]:
-        """
-        Process YouTube URL to extract metadata and download media
+    ):
+        super().__init__('YouTube Subtitle Agent', max_retries)
 
-        Args:
-            url: YouTube URL
-            output_dir: Output directory
-            download_video: Whether to download video in addition to audio
-            download_transcript: Whether to download transcript/subtitles
-            force_overwrite: Skip user confirmation and overwrite existing files
+        # Configuration
+        self.gemini_api_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
+        self.video_format = video_format
+        self.output_formats = output_formats or ['srt']
+        self.split_sentence = split_sentence
+        self.output_dir = output_dir or Path(tempfile.gettempdir())
+        self.force_overwrite = force_overwrite
 
-        Returns:
-            Dictionary with metadata and file paths
-        """
-        self.logger.info(f'🚀 Processing YouTube URL: {url}')
+        # Initialize components
+        self.downloader = YouTubeDownloader(audio_format='mp3')  # Keep for backward compatibility
+        self.transcriber = GeminiTranscriber(api_key=self.gemini_api_key)
+        self.aligner = LattifAI()
+
+        # Validate configuration
+        if not self.gemini_api_key:
+            raise ValueError(
+                'Gemini API key is required. Set GEMINI_API_KEY environment variable or pass gemini_api_key parameter.'
+            )
+
+    def define_steps(self) -> List[WorkflowStep]:
+        """Define the workflow steps"""
+        return [
+            WorkflowStep(
+                name='Process YouTube URL', description='Extract video info and download video', required=True
+            ),
+            WorkflowStep(
+                name='Transcribe Media',
+                description='Generate transcript from video using Gemini 2.5 Pro',
+                required=True,
+            ),
+            WorkflowStep(
+                name='Align Transcript', description='Align transcript with video using LattifAI', required=True
+            ),
+            WorkflowStep(
+                name='Export Results', description='Export aligned subtitles in specified formats', required=True
+            ),
+        ]
+
+    async def execute_step(self, step: WorkflowStep, context: Dict[str, Any]) -> Any:
+        """Execute a single workflow step"""
+
+        if step.name == 'Process YouTube URL':
+            return await self._process_youtube_url(context)
+
+        elif step.name == 'Transcribe Media':
+            return await self._transcribe_media(context)
+
+        elif step.name == 'Align Transcript':
+            return await self._align_transcript(context)
+
+        elif step.name == 'Export Results':
+            return await self._export_results(context)
+
+        else:
+            raise ValueError(f'Unknown step: {step.name}')
+
+    async def _process_youtube_url(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Step 1: Process YouTube URL and download video"""
+        url = context.get('url')
+        if not url:
+            raise ValueError('YouTube URL is required')
+
+        self.logger.info(f'🎥 Processing YouTube URL: {url}')
+
+        # Download video (no conversion needed for Gemini)
+        video_path = await self.downloader.download_video(
+            url=url, output_dir=self.output_dir, video_format=self.video_format, force_overwrite=self.force_overwrite
+        )
 
         # Get video metadata
         metadata = await self.downloader.get_video_info(url)
 
-        # Download audio
-        audio_path = await self.downloader.download_audio(url, output_dir, force_overwrite=force_overwrite)
+        result = {'url': url, 'video_path': video_path, 'metadata': metadata, 'video_format': self.video_format}
 
-        result = {'url': url, 'metadata': metadata, 'audio_path': audio_path}
-
-        # Download video if requested
-        if download_video:
-            video_path = await self.downloader.download_video(url, output_dir, force_overwrite=force_overwrite)
-            result['video_path'] = video_path
-
-        # Download transcript if requested
-        if download_transcript:
-            transcript_path = await self.downloader.download_transcript(
-                url, output_dir, force_overwrite=force_overwrite
-            )
-            if transcript_path:
-                result['transcript_path'] = transcript_path
-
-        self.logger.info('✅ YouTube processing completed')
+        self.logger.info(f'✅ Video downloaded: {video_path}')
         return result
+
+    async def _transcribe_media(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Step 2: Transcribe video using Gemini 2.5 Pro"""
+        url = context.get('url')
+        video_path = context.get('process_youtube_url_result', {}).get('video_path')
+
+        if not url or not video_path:
+            raise ValueError('URL and video path not found in context')
+
+        video_id = self.downloader.extract_video_id(url)
+
+        # Download subtitle if available
+        self.logger.info('📥 Checking for existing subtitles...')
+
+        # Check for existing transcript files
+        existing_transcripts = self.downloader.file_manager.check_existing_media_files(
+            video_id, str(self.output_dir), transcript_formats=['md', 'vtt', 'srt', 'vtt', 'ass']
+        )
+
+        # Prompt user if transcript exists and force_overwrite is not set
+        if existing_transcripts['transcript'] and not self.force_overwrite:
+            from .file_manager import FileExistenceManager
+
+            user_choice = FileExistenceManager.prompt_file_type_confirmation(
+                file_type='gemini', files=existing_transcripts['transcript'], operation='transcription'
+            )
+
+            if user_choice == 'cancel':
+                raise RuntimeError('Transcription cancelled by user')
+            elif user_choice == 'use':
+                # Use existing transcript
+                existing_path = Path(existing_transcripts['transcript'][0])
+                self.logger.info(f'🔁 Using existing transcript: {existing_path}')
+
+                if existing_path.suffix != '.md':
+                    raise NotImplementedError()
+                    # transcript_path = self.output_dir / f'{video_id}_gemini.md'
+                    # if transcript_path != existing_path:
+                    #     self.logger.info('🧹 Converting transcript to plain text format')
+                    #     self.downloader._convert_subtitle_to_text(existing_path, transcript_path)
+                else:
+                    transcript_path = existing_path
+
+                transcript = Path(transcript_path).read_text(encoding='utf-8')
+                return {'transcript': transcript, 'transcript_path': str(transcript_path)}
+            # If user_choice == 'overwrite', continue to transcription below
+
+        self.logger.info('🎤 Transcribing URL with Gemini 2.5 Pro...')
+
+        transcript = await self.transcriber.transcribe_url(url)
+
+        # Save transcript to temporary file
+        transcript_path = self.output_dir / f'{video_id}_gemini.md'
+        with open(transcript_path, 'w', encoding='utf-8') as f:
+            f.write(transcript)
+
+        result = {'transcript': transcript, 'transcript_path': str(transcript_path)}
+
+        self.logger.info(f'✅   Transcript generated: {len(transcript)} characters')
+        return result
+
+    async def _align_transcript(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Step 3: Align transcript with video using LattifAI"""
+        video_path = context.get('process_youtube_url_result', {}).get('video_path')
+        transcript_path = context.get('transcribe_media_result', {}).get('transcript_path')
+
+        if not video_path or not transcript_path:
+            raise ValueError('Video path and transcript path are required')
+
+        self.logger.info('🎯 Aligning transcript with video...')
+
+        transcript_path_obj = Path(transcript_path)
+
+        # Step 1: Detect transcript format using GeminiReader
+        try:
+            segments = GeminiReader.read(transcript_path_obj, include_events=True, include_sections=True)
+            is_gemini_format = any(seg.speaker for seg in segments) or any(
+                seg.segment_type == 'section_header' for seg in segments
+            )
+        except Exception as e:
+            self.logger.warning(f'Failed to parse transcript, assuming plain text format: {e}')
+            is_gemini_format = False
+
+        self.logger.info(f'📄 Transcript format: {"Gemini" if is_gemini_format else "Plain text"}')
+
+        alignment_text_path = transcript_path
+        original_transcript_path = transcript_path
+
+        # Step 2: Extract dialogue text for alignment if Gemini format
+        if is_gemini_format:
+            self.logger.info('🎭 Extracting texts from Gemini format transcript...')
+
+            # Extract dialogue segments using GeminiReader
+            supervisions = GeminiReader.extract_for_alignment(
+                transcript_path_obj, merge_consecutive=False, min_duration=0.1
+            )
+
+            # Create dialogue-only text file for alignment
+            dialogue_texts = [sup.text for sup in supervisions]
+            dialogue_content = '\n'.join(dialogue_texts)
+
+            # Save dialogue text to temporary file
+            dialogue_path = transcript_path_obj.parent / f'{transcript_path_obj.stem}_text_for_align.txt'
+            dialogue_path.write_text(dialogue_content, encoding='utf-8')
+            alignment_text_path = str(dialogue_path)
+
+            self.logger.info(f'💬 Extracted {len(supervisions)} segments for alignment')
+            self.logger.info(f'📝 Text saved: {dialogue_path}')
+        else:
+            self.logger.info('📝 Using plain text transcript directly for alignment')
+
+        # Create temporary output file
+        output_path = Path(self.output_dir) / f'{Path(video_path).stem}_aligned.ass'
+
+        # Step 3: Perform alignment with LattifAI using extracted/original text
+        aligned_result = self.aligner.alignment(
+            audio=video_path,
+            subtitle=alignment_text_path,  # Use dialogue text for YouTube format, original for plain text
+            format='txt',
+            split_sentence=self.split_sentence,
+            output_subtitle_path=output_path,
+        )
+
+        result = {
+            'aligned_path': output_path,
+            'alignment_result': aligned_result,
+            'original_transcript_path': original_transcript_path,
+            'is_gemini_format': is_gemini_format,
+            'alignment_text_path': alignment_text_path,
+        }
+
+        self.logger.info('✅ Alignment completed')
+        return result
+
+    async def _export_results(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Step 4: Export results in specified formats and update transcript file"""
+        align_result = context.get('align_transcript_result', {})
+        aligned_path = align_result.get('aligned_path')
+        original_transcript_path = align_result.get('original_transcript_path')
+        is_gemini_format = align_result.get('is_gemini_format', False)
+        metadata = context.get('process_youtube_url_result', {}).get('metadata', {})
+
+        if not aligned_path:
+            raise ValueError('Aligned subtitle path not found')
+
+        self.logger.info(f'📤 Exporting results in formats: {self.output_formats}')
+
+        # Read aligned subtitles
+        from ..io import SubtitleIO
+
+        supervisions = SubtitleIO.read(aligned_path, format='ass')
+        exported_files = {}
+
+        # Update original transcript file with aligned timestamps if YouTube format
+        if is_gemini_format and original_transcript_path:
+            self.logger.info('📝 Updating original transcript with aligned timestamps...')
+
+            try:
+                # Generate updated transcript file path
+                original_path = Path(original_transcript_path)
+                updated_transcript_path = original_path.parent / f'{original_path.stem}_aligned.md'
+
+                # Update timestamps in original transcript
+                GeminiWriter.update_timestamps(
+                    original_transcript=original_transcript_path,
+                    aligned_supervisions=supervisions,
+                    output_path=str(updated_transcript_path),
+                )
+
+                exported_files['updated_transcript'] = str(updated_transcript_path)
+                self.logger.info(f'✅ Updated transcript: {updated_transcript_path}')
+
+            except Exception as e:
+                self.logger.warning(f'⚠️  Failed to update transcript timestamps: {e}')
+
+        # Export to requested subtitle formats
+        for format_name in self.output_formats:
+            output_path = str(aligned_path).replace('_aligned.ass', f'_lattifai.{format_name}')
+            SubtitleIO.write(supervisions, output_path=output_path)
+            exported_files[format_name] = output_path
+            self.logger.info(f'✅ Exported {format_name.upper()}: {output_path}')
+
+        result = {
+            'exported_files': exported_files,
+            'metadata': metadata,
+            'subtitle_count': len(supervisions),
+            'is_gemini_format': is_gemini_format,
+            'original_transcript_path': original_transcript_path,
+        }
+
+        return result
+
+    async def process_youtube_url(
+        self, url: str, output_dir: Optional[str] = None, output_formats: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Main entry point for processing a YouTube URL
+
+        Args:
+            url: YouTube URL to process
+            output_dir: Directory to save output files (optional)
+            output_formats: List of output formats (optional, uses instance default)
+
+        Returns:
+            Dictionary containing results and exported file paths
+        """
+        if output_formats:
+            self.output_formats = output_formats
+
+        if output_dir:
+            expanded_dir = Path(output_dir).expanduser()
+            expanded_dir.mkdir(parents=True, exist_ok=True)
+            self.output_dir = expanded_dir
+
+        # Execute the workflow
+        result = await self.execute(url=url)
+
+        if result.is_success:
+            return result.data.get('export_results_result', {})
+        else:
+            raise Exception(f'Workflow failed: {result.error}')
