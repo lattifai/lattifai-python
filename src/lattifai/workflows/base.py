@@ -20,7 +20,7 @@ def setup_workflow_logger(name: str) -> logging.Logger:
     if not logger.handlers:
         handler = logging.StreamHandler()
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)-17s - %(levelname)-8s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
+            '%(asctime)s - %(name)+17s.py:%(lineno)-4d - %(levelname)-8s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)

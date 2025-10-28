@@ -309,17 +309,18 @@ class YouTubeDownloader:
             self.logger.error(f'Failed to download video: {e.stderr}')
             raise RuntimeError(f'Failed to download video: {e.stderr}')
 
-    async def download_transcript(
-        self, url: str, output_dir: str, force_overwrite: bool = False, transcript_format: str = 'txt'
+    async def download_subtitles(
+        self, url: str, output_dir: str, force_overwrite: bool = False, subtitle_lang: Optional[str] = None
     ) -> Optional[str]:
         """
-        Download video transcript/subtitles using yt-dlp
+        Download video subtitles using yt-dlp
 
         Args:
             url: YouTube URL
             output_dir: Output directory
             force_overwrite: Skip user confirmation and overwrite existing files
-            transcript_format: Format for transcript (txt, vtt, srt)
+            subtitle_lang: Specific subtitle language/track to download (e.g., 'en')
+                          If None, downloads all available subtitles
 
         Returns:
             Path to downloaded transcript file or None if not available
@@ -331,45 +332,54 @@ class YouTubeDownloader:
 
         # Extract video ID and check for existing transcript files
         video_id = self.extract_video_id(url)
-        existing_files = self.file_manager.check_existing_media_files(
-            video_id, str(target_dir), transcript_formats=[transcript_format, 'txt', 'vtt', 'srt']
-        )
+        if not force_overwrite:
+            existing_files = self.file_manager.check_existing_media_files(
+                video_id, str(target_dir), transcript_formats=['vtt', 'srt']
+            )
 
-        # Handle existing transcript files
-        if existing_files['transcript'] and not force_overwrite:
-            if self.file_manager.is_interactive_mode():
-                user_choice = self.file_manager.prompt_user_confirmation(
-                    {'transcript': existing_files['transcript']}, 'transcript download'
-                )
+            # Handle existing transcript files
+            if existing_files['transcript'] and not force_overwrite:
+                if self.file_manager.is_interactive_mode():
+                    user_choice = self.file_manager.prompt_user_confirmation(
+                        {'transcript': existing_files['transcript']}, 'transcript download'
+                    )
 
-                if user_choice == 'use':
+                    if user_choice == 'use':
+                        transcript_file = Path(existing_files['transcript'][0])
+                        self.logger.info(f'✅ Using existing transcript file: {transcript_file}')
+                        return str(transcript_file)
+                    elif user_choice == 'cancel':
+                        raise RuntimeError('Transcript download cancelled by user')
+                    # For 'overwrite', continue with download
+                else:
                     transcript_file = Path(existing_files['transcript'][0])
-                    self.logger.info(f'✅ Using existing transcript file: {transcript_file}')
+                    self.logger.info(f'🔍 Found existing transcript: {transcript_file}')
                     return str(transcript_file)
-                elif user_choice == 'cancel':
-                    raise RuntimeError('Transcript download cancelled by user')
-                # For 'overwrite', continue with download
-            else:
-                transcript_file = Path(existing_files['transcript'][0])
-                self.logger.info(f'🔍 Found existing transcript: {transcript_file}')
-                return str(transcript_file)
 
-        self.logger.info(f'📄 Downloading transcript for: {url}')
+        self.logger.info(f'📄 Downloading subtitle for: {url}')
+        if subtitle_lang:
+            self.logger.info(f'🎯 Targeting specific subtitle track: {subtitle_lang}')
 
-        output_template = str(target_dir / f'{video_id}_transcript.%(ext)s')
+        output_template = str(target_dir / f'{video_id}.%(ext)s')
 
-        # Configure yt-dlp options for transcript download
+        # Configure yt-dlp options for subtitle download
         ytdlp_options = [
             'yt-dlp',
-            '--write-auto-sub',  # Download automatic subtitles
-            '--write-sub',  # Download manual subtitles if available
             '--skip-download',  # Don't download video/audio
             '--output',
             output_template,
             '--sub-format',
-            'vtt/srt/best',  # Prefer vtt or srt format
-            url,
+            'best',  # Prefer best available format
         ]
+
+        # Add subtitle language selection if specified
+        if subtitle_lang:
+            ytdlp_options.extend(['--write-sub', '--write-auto-sub', '--sub-langs', f'{subtitle_lang}.*'])
+        else:
+            # Download only manual subtitles (not auto-generated) in English to avoid rate limiting
+            ytdlp_options.extend(['--write-sub', '--write-auto-sub'])
+
+        ytdlp_options.append(url)
 
         try:
             # Run in thread pool to avoid blocking
@@ -381,34 +391,26 @@ class YouTubeDownloader:
             self.logger.info(f'yt-dlp transcript output: {result.stdout.strip()}')
 
             # Find the downloaded transcript file
-            transcript_patterns = [
-                # f'{video_id}_transcript*.vtt',
-                # f'{video_id}_transcript*.srt',
-                f'{video_id}_transcript*.md',
+            subtitle_patterns = [
+                f'{video_id}.*vtt',
+                f'{video_id}.*srt',
             ]
 
-            for pattern in transcript_patterns:
-                transcript_files = list(target_dir.glob(pattern))
-                if transcript_files:
-                    # Convert to desired format if needed
-                    transcript_file = transcript_files[0]
+            subtitle_files = []
+            for pattern in subtitle_patterns:
+                _subtitle_files = list(target_dir.glob(pattern))
+                for subtitle_file in _subtitle_files:
+                    self.logger.info(f'📄 Downloaded subtitle: {subtitle_file}')
+                subtitle_files.extend(_subtitle_files)
 
-                    if transcript_format == 'txt' and transcript_file.suffix != '.txt':
-                        # Convert to plain text
-                        txt_file = target_dir / f'{video_id}_transcript.txt'
-                        self._convert_subtitle_to_text(transcript_file, txt_file)
-                        transcript_file = txt_file
-
-                    self.logger.info(f'📄 Downloaded transcript: {transcript_file}')
-                    return str(transcript_file)
-
-            self.logger.warning('No transcript available for this video')
-            return None
+            if not subtitle_files:
+                self.logger.warning('No subtitle available for this video')
+            return subtitle_files
 
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.strip() if e.stderr else str(e)
             if 'No automatic or manual subtitles found' in error_msg:
-                self.logger.warning('No transcript/subtitles available for this video')
+                self.logger.warning('No subtitles available for this video')
                 return None
             else:
                 self.logger.error(f'Failed to download transcript: {error_msg}')
@@ -443,6 +445,81 @@ class YouTubeDownloader:
             import shutil
 
             shutil.copy2(subtitle_file, output_file)
+
+    async def list_available_subtitles(self, url: str) -> List[Dict[str, Any]]:
+        """
+        List all available subtitle tracks for a YouTube video
+
+        Args:
+            url: YouTube URL
+
+        Returns:
+            List of subtitle track information dictionaries
+        """
+        self.logger.info(f'📋 Listing available subtitles for: {url}')
+
+        cmd = ['yt-dlp', '--list-subs', '--no-download', url]
+
+        try:
+            # Run in thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
+            )
+
+            # Parse the subtitle list output
+            subtitle_info = []
+            lines = result.stdout.strip().split('\n')
+
+            # Look for the subtitle section (not automatic captions)
+            in_subtitle_section = False
+            for line in lines:
+                if 'Available subtitles for' in line:
+                    in_subtitle_section = True
+                    continue
+                elif 'Available automatic captions for' in line:
+                    in_subtitle_section = False
+                    continue
+                elif in_subtitle_section and line.strip():
+                    # Skip header lines
+                    if 'Language' in line and 'Name' in line and 'Formats' in line:
+                        continue
+
+                    # Parse subtitle information
+                    # Format: "Language Name Formats" where formats are comma-separated
+                    # Example: "en-uYU-mmqFLq8 English - CC1    vtt, srt, ttml, srv3, srv2, srv1, json3"
+
+                    if line.strip() and not line.startswith('['):
+                        # Split by multiple spaces to separate language, name, and formats
+                        import re
+
+                        parts = re.split(r'\s{2,}', line.strip())
+
+                        if len(parts) >= 2:
+                            # First part is language, last part is formats
+                            language_and_name = parts[0]
+                            formats_str = parts[-1]
+
+                            # Split language and name - language is first word
+                            lang_name_parts = language_and_name.split(' ', 1)
+                            language = lang_name_parts[0]
+                            name = lang_name_parts[1] if len(lang_name_parts) > 1 else ''
+
+                            # If there are more than 2 parts, middle parts are also part of name
+                            if len(parts) > 2:
+                                name = ' '.join([name] + parts[1:-1]).strip()
+
+                            # Parse formats - they are comma-separated
+                            formats = [f.strip() for f in formats_str.split(',') if f.strip()]
+
+                            subtitle_info.append({'language': language, 'name': name, 'formats': formats})
+
+            self.logger.info(f'✅ Found {len(subtitle_info)} subtitle tracks')
+            return subtitle_info
+
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f'Failed to list subtitles: {e.stderr}')
+            raise RuntimeError(f'Failed to list subtitles: {e.stderr}')
 
 
 class YouTubeSubtitleAgent(WorkflowAgent):
