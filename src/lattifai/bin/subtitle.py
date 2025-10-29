@@ -29,10 +29,17 @@ def convert(
     """
     Convert subtitle file to another format.
     """
-    import pysubs2
+    if str(output_subtitle_path).lower().endswith('.TextGrid'.lower()):
+        from lattifai.io import SubtitleIO
 
-    subtitle = pysubs2.load(input_subtitle_path)
-    subtitle.save(output_subtitle_path)
+        alignments = SubtitleIO.read(input_subtitle_path)
+        SubtitleIO.write(alignments, output_subtitle_path)
+    else:
+        import pysubs2
+
+        subtitle = pysubs2.load(input_subtitle_path)
+
+        subtitle.save(output_subtitle_path)
 
 
 @subtitle.command()

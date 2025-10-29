@@ -125,18 +125,22 @@ class LattifAI(SyncAPIClient):
             SubtitleIO.write(alignments, output_path=output_subtitle_path)
             print(colorful.green(f'🎉🎉🎉🎉🎉 Subtitle file written to: {output_subtitle_path}'))
 
-        return output_subtitle_path or alignments
+        return (alignments, output_subtitle_path)
 
 
 if __name__ == '__main__':
     client = LattifAI()
     import sys
 
-    if len(sys.argv) == 4:
-        audio, subtitle, output = sys.argv[1:]
+    if len(sys.argv) == 5:
+        audio, subtitle, output, split_sentence = sys.argv[1:]
+        split_sentence = split_sentence.lower() in ('true', '1', 'yes')
     else:
         audio = 'tests/data/SA1.wav'
         subtitle = 'tests/data/SA1.TXT'
         output = None
+        split_sentence = False
 
-    alignments = client.alignment(audio, subtitle, output_subtitle_path=output, split_sentence=True)
+    (alignments, output_subtitle_path) = client.alignment(
+        audio, subtitle, output_subtitle_path=output, split_sentence=split_sentence
+    )
