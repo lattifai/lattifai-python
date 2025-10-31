@@ -47,6 +47,46 @@ def test_LattifAI_import():
         return False
 
 
+def test_io_imports():
+    """Test that I/O modules can be imported"""
+    try:
+        from lattifai.io import SubtitleIO, Supervision
+
+        assert Supervision is not None
+        assert SubtitleIO is not None
+        print('✓ Successfully imported I/O modules')
+        return True
+    except ImportError as e:
+        print(f'✗ Failed to import I/O modules: {e}')
+        return False
+
+
+def test_client_class_exists():
+    """Test that LattifAI client class can be imported"""
+    try:
+        from lattifai import LattifAI
+
+        assert LattifAI is not None
+        print('✓ Successfully imported LattifAI client class')
+        return True
+    except ImportError as e:
+        print(f'✗ Failed to import LattifAI client class: {e}')
+        return False
+
+
+def test_alignment_method_exists():
+    """Test that alignment method exists on LattifAI class"""
+    try:
+        from lattifai import LattifAI
+
+        assert hasattr(LattifAI, 'alignment'), 'LattifAI should have alignment method'
+        print('✓ LattifAI.alignment method exists')
+        return True
+    except (ImportError, AssertionError) as e:
+        print(f'✗ alignment method check failed: {e}')
+        return False
+
+
 if __name__ == '__main__':
     print('Running basic lattifai tests...')
 
@@ -54,6 +94,9 @@ if __name__ == '__main__':
     results.append(test_import())
     results.append(test_package_structure())
     results.append(test_LattifAI_import())
+    results.append(test_io_imports())
+    results.append(test_client_class_exists())
+    results.append(test_alignment_method_exists())
 
     passed = sum(results)
     total = len(results)

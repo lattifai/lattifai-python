@@ -1,3 +1,3 @@
-from .tokenizer import LatticeTokenizer
+from .tokenizer import AsyncLatticeTokenizer, LatticeTokenizer
 
-__all__ = ['LatticeTokenizer']
+__all__ = ['LatticeTokenizer', 'AsyncLatticeTokenizer']

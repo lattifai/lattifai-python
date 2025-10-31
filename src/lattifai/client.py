@@ -1,9 +1,9 @@
 """LattifAI client implementation."""
 
+import asyncio
 import logging
 import os
-from pathlib import Path
-from typing import Any, Awaitable, BinaryIO, Callable, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import colorful
 from dotenv import load_dotenv
@@ -16,13 +16,12 @@ from lattifai.errors import (
     LatticeDecodingError,
     LatticeEncodingError,
     LattifAIError,
-    ModelLoadError,
     SubtitleProcessingError,
     handle_exception,
 )
 from lattifai.io import SubtitleFormat, SubtitleIO, Supervision
-from lattifai.tokenizer import LatticeTokenizer
-from lattifai.workers import Lattice1AlphaWorker
+from lattifai.tokenizer import AsyncLatticeTokenizer
+from lattifai.utils import _load_tokenizer, _load_worker, _resolve_model_path, _select_device
 
 load_dotenv()
 
@@ -62,47 +61,12 @@ class LattifAI(SyncAPIClient):
             default_headers=default_headers,
         )
 
-        # Initialize components
-        if not Path(model_name_or_path).exists():
-            from huggingface_hub import snapshot_download
-            from huggingface_hub.errors import LocalEntryNotFoundError
+        model_path = _resolve_model_path(model_name_or_path)
+        device = _select_device(device)
 
-            try:
-                model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
-            except LocalEntryNotFoundError:
-                try:
-                    os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-                    model_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
-                except Exception as e:
-                    raise ModelLoadError(model_name_or_path, original_error=e)
-            except Exception as e:
-                raise ModelLoadError(model_name_or_path, original_error=e)
-        else:
-            model_path = model_name_or_path
-
-        # device setup
-        if device is None:
-            import torch
-
-            device = 'cpu'
-            if torch.backends.mps.is_available():
-                device = 'mps'
-            elif torch.cuda.is_available():
-                device = 'cuda'
-
-        try:
-            self.tokenizer = LatticeTokenizer.from_pretrained(
-                client_wrapper=self,
-                model_path=model_path,
-                device=device,
-            )
-        except Exception as e:
-            raise ModelLoadError(f'tokenizer from {model_path}', original_error=e)
-
-        try:
-            self.worker = Lattice1AlphaWorker(model_path, device=device, num_threads=8)
-        except Exception as e:
-            raise ModelLoadError(f'worker from {model_path}', original_error=e)
+        self.tokenizer = _load_tokenizer(self, model_path, device)
+        self.worker = _load_worker(model_path, device)
+        self.device = device
 
     def alignment(
         self,
@@ -197,6 +161,126 @@ class LattifAI(SyncAPIClient):
             raise
         except Exception as e:
             # Catch any unexpected errors and wrap them
+            raise AlignmentError(
+                'Unexpected error during alignment process',
+                audio_path=str(audio),
+                subtitle_path=str(subtitle),
+                context={'original_error': str(e), 'error_type': e.__class__.__name__},
+            )
+
+
+class AsyncLattifAI(AsyncAPIClient):
+    """Asynchronous LattifAI client."""
+
+    def __init__(
+        self,
+        *,
+        api_key: Optional[str] = None,
+        model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
+        device: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: Union[float, int] = 120.0,
+        max_retries: int = 2,
+        default_headers: Optional[Dict[str, str]] = None,
+    ) -> None:
+        if api_key is None:
+            api_key = os.environ.get('LATTIFAI_API_KEY')
+        if api_key is None:
+            raise ConfigurationError(
+                'The api_key client option must be set either by passing api_key to the client '
+                'or by setting the LATTIFAI_API_KEY environment variable'
+            )
+
+        if base_url is None:
+            base_url = os.environ.get('LATTIFAI_BASE_URL')
+        if not base_url:
+            base_url = 'https://api.lattifai.com/v1'
+
+        super().__init__(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            default_headers=default_headers,
+        )
+
+        model_path = _resolve_model_path(model_name_or_path)
+        device = _select_device(device)
+
+        self.tokenizer = _load_tokenizer(self, model_path, device, tokenizer_cls=AsyncLatticeTokenizer)
+        self.worker = _load_worker(model_path, device)
+        self.device = device
+
+    async def alignment(
+        self,
+        audio: Pathlike,
+        subtitle: Pathlike,
+        format: Optional[SubtitleFormat] = None,
+        split_sentence: bool = False,
+        output_subtitle_path: Optional[Pathlike] = None,
+    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
+        try:
+            print(colorful.cyan(f'📖 Step 1: Reading subtitle file from {subtitle}'))
+            try:
+                supervisions = await asyncio.to_thread(SubtitleIO.read, subtitle, format=format)
+                print(colorful.green(f'         ✓ Parsed {len(supervisions)} subtitle segments'))
+            except Exception as e:
+                raise SubtitleProcessingError(
+                    f'Failed to parse subtitle file: {subtitle}',
+                    subtitle_path=str(subtitle),
+                    context={'original_error': str(e)},
+                )
+
+            print(colorful.cyan('🔗 Step 2: Creating lattice graph from text'))
+            try:
+                lattice_id, lattice_graph = await self.tokenizer.tokenize(
+                    supervisions,
+                    split_sentence=split_sentence,
+                )
+                print(colorful.green(f'         ✓ Generated lattice graph with ID: {lattice_id}'))
+            except Exception as e:
+                text_content = ' '.join([sup.text for sup in supervisions]) if supervisions else ''
+                raise LatticeEncodingError(text_content, original_error=e)
+
+            print(colorful.cyan(f'🎵 Step 3: Performing alignment on audio file: {audio}'))
+            try:
+                lattice_results = await asyncio.to_thread(self.worker.alignment, audio, lattice_graph)
+                print(colorful.green('         ✓ Alignment completed successfully'))
+            except Exception as e:
+                raise AlignmentError(
+                    f'Audio alignment failed for {audio}',
+                    audio_path=str(audio),
+                    subtitle_path=str(subtitle),
+                    context={'original_error': str(e)},
+                )
+
+            print(colorful.cyan('🔍 Step 4: Decoding lattice paths to final alignments'))
+            try:
+                alignments = await self.tokenizer.detokenize(lattice_id, lattice_results)
+                print(colorful.green(f'         ✓ Decoded {len(alignments)} aligned segments'))
+            except LatticeDecodingError as e:
+                print(colorful.red('         x Failed to decode lattice alignment results'))
+                raise e
+            except Exception as e:
+                print(colorful.red('         x Failed to decode lattice alignment results'))
+                raise LatticeDecodingError(lattice_id, original_error=e)
+
+            if output_subtitle_path:
+                try:
+                    await asyncio.to_thread(SubtitleIO.write, alignments, output_subtitle_path)
+                    print(colorful.green(f'🎉🎉🎉🎉🎉 Subtitle file written to: {output_subtitle_path}'))
+                except Exception as e:
+                    raise SubtitleProcessingError(
+                        f'Failed to write output file: {output_subtitle_path}',
+                        subtitle_path=str(output_subtitle_path),
+                        context={'original_error': str(e)},
+                    )
+
+            return (alignments, output_subtitle_path)
+
+        except (SubtitleProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
+            raise
+        except Exception as e:
             raise AlignmentError(
                 'Unexpected error during alignment process',
                 audio_path=str(audio),

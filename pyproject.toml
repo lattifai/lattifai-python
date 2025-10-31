@@ -75,11 +75,12 @@ lattifai = "src/lattifai"
 
 [project.optional-dependencies]
 numpy = ['numpy']
-test = ['pytest', 'pytest-cov', 'ruff', 'numpy']
+test = ['pytest', 'pytest-cov', 'pytest-asyncio', 'ruff', 'numpy']
 all = [
     "numpy",
     "pytest",
     "pytest-cov",
+    "pytest-asyncio",
     "ruff"
 ]
 

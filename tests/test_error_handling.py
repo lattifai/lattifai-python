@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Add the src directory to Python path for testing
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from lattifai.errors import (
     AlignmentError,

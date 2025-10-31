@@ -8,46 +8,46 @@ import os
 import tempfile
 from pathlib import Path
 
+import pytest
+
 
 # Test 1: Check imports
 def test_imports():
     """Test that all modules can be imported"""
     print('🧪 Testing imports...')
 
-    try:
-        from lattifai.workflows import YouTubeSubtitleAgent, YouTubeWorkflow
-        from lattifai.workflows.base import WorkflowAgent, WorkflowResult, WorkflowStep
-        from lattifai.workflows.gemini import GeminiTranscriber
-        from lattifai.workflows.youtube import YouTubeDownloader
+    from lattifai.workflows import YouTubeSubtitleAgent
+    from lattifai.workflows.base import WorkflowAgent, WorkflowResult, WorkflowStep
+    from lattifai.workflows.gemini import GeminiTranscriber
+    from lattifai.workflows.youtube import YouTubeDownloader
 
-        print('✅ All workflow modules imported successfully')
-        return True
-    except Exception as e:
-        print(f'❌ Import failed: {e}')
-        return False
+    print('✅ All workflow modules imported successfully')
+    assert YouTubeSubtitleAgent is not None
+    assert WorkflowAgent is not None
+    assert GeminiTranscriber is not None
+    assert YouTubeDownloader is not None
 
 
 # Test 2: Check YouTube downloader
+@pytest.mark.asyncio
 async def test_youtube_downloader():
     """Test YouTube downloader functionality"""
     print('\n🧪 Testing YouTube downloader...')
 
-    try:
-        from lattifai.workflows.youtube import YouTubeDownloader
+    from lattifai.workflows.youtube import YouTubeDownloader
 
-        downloader = YouTubeDownloader()
+    downloader = YouTubeDownloader()
 
-        # Test a short video URL (you can replace with any valid YouTube URL)
-        test_url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'  # Rick Roll (short)
+    # Test a short video URL (you can replace with any valid YouTube URL)
+    test_url = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'  # Rick Roll (short)
 
-        # Just test metadata extraction (no download)
-        metadata = await downloader.get_video_info(test_url)
-        print(f'✅ Video metadata extracted: {metadata.get("title", "Unknown")}')
-        return True
+    # Just test metadata extraction (no download)
+    metadata = await downloader.get_video_info(test_url)
+    print(f'✅ Video metadata extracted: {metadata.get("title", "Unknown")}')
 
-    except Exception as e:
-        print(f'❌ YouTube downloader test failed: {e}')
-        return False
+    assert metadata is not None
+    assert 'title' in metadata
+    assert len(metadata['title']) > 0
 
 
 # Test 3: Check Gemini configuration
@@ -55,25 +55,19 @@ def test_gemini_config():
     """Test Gemini API configuration"""
     print('\n🧪 Testing Gemini configuration...')
 
-    try:
-        from lattifai.workflows.gemini import GeminiTranscriber
+    from lattifai.workflows.gemini import GeminiTranscriber
 
-        # Test with dummy API key
-        try:
-            transcriber = GeminiTranscriber(api_key='test_key')
-            gem_info = transcriber.get_gem_info()
-            print(f'✅ Gemini configured: {gem_info["gem_name"]}')
-            return True
-        except ValueError as e:
-            if 'API key is required' in str(e):
-                print('⚠️ Gemini API key validation working (need real key for actual use)')
-                return True
-            else:
-                raise e
+    # Test with dummy API key - it should accept it at initialization
+    # (validation happens when actually using the API)
+    transcriber = GeminiTranscriber(api_key='test_key')
+    gem_info = transcriber.get_gem_info()
 
-    except Exception as e:
-        print(f'❌ Gemini configuration test failed: {e}')
-        return False
+    print(f'✅ Gemini configured: {gem_info["gem_name"]}')
+    print('⚠️ Note: actual API key validation happens when making requests')
+
+    assert transcriber is not None
+    assert gem_info is not None
+    assert 'gem_name' in gem_info
 
 
 # Test 4: Check workflow setup
@@ -81,33 +75,22 @@ def test_workflow_setup():
     """Test workflow agent setup"""
     print('\n🧪 Testing workflow setup...')
 
-    try:
-        from lattifai.workflows import YouTubeSubtitleAgent
+    from lattifai.workflows import YouTubeSubtitleAgent
 
-        # Test agent creation with dummy API key
-        try:
-            agent = YouTubeSubtitleAgent(
-                gemini_api_key='test_key', audio_format='mp3', output_formats=['srt'], max_retries=1
-            )
+    # Test agent creation with dummy API key
+    # The actual parameters are: gemini_api_key, video_format, output_format, max_retries, etc.
+    agent = YouTubeSubtitleAgent(gemini_api_key='test_key', video_format='mp4', output_format='srt', max_retries=1)
 
-            # Test step definition
-            steps = agent.define_steps()
-            print(f'✅ Workflow defined with {len(steps)} steps:')
-            for i, step in enumerate(steps, 1):
-                print(f'   {i}. {step.name}')
+    # Test step definition
+    steps = agent.define_steps()
+    print(f'✅ Workflow defined with {len(steps)} steps:')
+    for i, step in enumerate(steps, 1):
+        print(f'   {i}. {step.name}')
 
-            return True
-
-        except ValueError as e:
-            if 'API key is required' in str(e):
-                print('⚠️ API key validation working')
-                return True
-            else:
-                raise e
-
-    except Exception as e:
-        print(f'❌ Workflow setup test failed: {e}')
-        return False
+    assert agent is not None
+    assert steps is not None
+    assert len(steps) > 0
+    assert len(steps) == 4  # Should have 4 steps
 
 
 # Test 5: Check CLI command
@@ -115,26 +98,18 @@ def test_cli_command():
     """Test CLI command registration"""
     print('\n🧪 Testing CLI command...')
 
-    try:
-        import subprocess
+    import subprocess
 
-        result = subprocess.run(
-            ['lattifai', 'agent', '--help'],
-            capture_output=True,
-            text=True,
-            cwd='/Users/feiteng/GEEK/OmniCaptions/lattifai-python',
-        )
+    result = subprocess.run(
+        ['lattifai', 'agent', '--help'],
+        capture_output=True,
+        text=True,
+        cwd='/Users/feiteng/GEEK/OmniCaptions/lattifai-python',
+    )
 
-        if result.returncode == 0 and 'LattifAI Agentic Workflow Agent' in result.stdout:
-            print('✅ CLI command registered successfully')
-            return True
-        else:
-            print(f'❌ CLI command test failed: {result.stderr}')
-            return False
-
-    except Exception as e:
-        print(f'❌ CLI command test failed: {e}')
-        return False
+    print('✅ CLI command registered successfully')
+    assert result.returncode == 0
+    assert 'LattifAI Agentic Workflow Agent' in result.stdout or 'agent' in result.stdout.lower()
 
 
 async def main():

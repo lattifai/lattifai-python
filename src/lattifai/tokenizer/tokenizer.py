@@ -1,13 +1,12 @@
 import gzip
+import inspect
 import pickle
 import re
 from collections import defaultdict
-from itertools import chain
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import torch
 
-from lattifai.base_client import SyncAPIClient
 from lattifai.errors import LatticeDecodingError
 from lattifai.io import Supervision
 from lattifai.tokenizer.phonemizer import G2Phonemizer
@@ -22,10 +21,13 @@ GROUPING_SEPARATOR = '✹'
 MAXIMUM_WORD_LENGTH = 40
 
 
+TokenizerT = TypeVar('TokenizerT', bound='LatticeTokenizer')
+
+
 class LatticeTokenizer:
     """Tokenizer for converting Lhotse Cut to LatticeGraph."""
 
-    def __init__(self, client_wrapper: SyncAPIClient):
+    def __init__(self, client_wrapper: Any):
         self.client_wrapper = client_wrapper
         self.words: List[str] = []
         self.g2p_model: Any = None  # Placeholder for G2P model
@@ -100,13 +102,14 @@ class LatticeTokenizer:
         # If no special pattern matches, return the original sentence
         return [sentence]
 
-    @staticmethod
+    @classmethod
     def from_pretrained(
-        client_wrapper: SyncAPIClient,
+        cls: Type[TokenizerT],
+        client_wrapper: Any,
         model_path: str,
         device: str = 'cpu',
         compressed: bool = True,
-    ):
+    ) -> TokenizerT:
         """Load tokenizer from exported binary file"""
         from pathlib import Path
 
@@ -118,7 +121,7 @@ class LatticeTokenizer:
             with open(words_model_path, 'rb') as f:
                 data = pickle.load(f)
 
-        tokenizer = LatticeTokenizer(client_wrapper=client_wrapper)
+        tokenizer = cls(client_wrapper=client_wrapper)
         tokenizer.words = data['words']
         tokenizer.dictionaries = defaultdict(list, data['dictionaries'])
         tokenizer.oov_word = data['oov_word']
@@ -320,6 +323,68 @@ class LatticeTokenizer:
             return Exception('Failed to detokenize the alignment results.')
         # if return_details:
         #     raise NotImplementedError("return_details is not implemented yet")
+        return [Supervision.from_dict(s) for s in result['supervisions']]
+
+
+class AsyncLatticeTokenizer(LatticeTokenizer):
+    async def _post_async(self, endpoint: str, **kwargs):
+        response = self.client_wrapper.post(endpoint, **kwargs)
+        if inspect.isawaitable(response):
+            return await response
+        return response
+
+    async def tokenize(
+        self, supervisions: List[Supervision], split_sentence: bool = False
+    ) -> Tuple[str, Dict[str, Any]]:
+        if split_sentence:
+            self.init_sentence_splitter()
+            supervisions = self.split_sentences(supervisions)
+
+        pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
+        response = await self._post_async(
+            'tokenize',
+            json={
+                'supervisions': [s.to_dict() for s in supervisions],
+                'pronunciation_dictionaries': pronunciation_dictionaries,
+            },
+        )
+        if response.status_code != 200:
+            raise Exception(f'Failed to tokenize texts: {response.text}')
+        result = response.json()
+        lattice_id = result['id']
+        return lattice_id, (result['lattice_graph'], result['final_state'], result.get('acoustic_scale', 1.0))
+
+    async def detokenize(
+        self,
+        lattice_id: str,
+        lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
+    ) -> List[Supervision]:
+        emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
+        response = await self._post_async(
+            'detokenize',
+            json={
+                'lattice_id': lattice_id,
+                'frame_shift': frame_shift,
+                'results': [t.to_dict() for t in results[0]],
+                'labels': labels[0],
+                'offset': offset,
+                'channel': channel,
+                'destroy_lattice': True,
+            },
+        )
+        if response.status_code == 422:
+            raise LatticeDecodingError(
+                lattice_id,
+                original_error=Exception(
+                    'Reason: 1) The audio and text do not match well 2) the audio may be singing.'
+                ),
+            )
+        if response.status_code != 200:
+            raise Exception(f'Failed to detokenize lattice: {response.text}')
+
+        result = response.json()
+        if not result.get('success'):
+            return Exception('Failed to detokenize the alignment results.')
         return [Supervision.from_dict(s) for s in result['supervisions']]
 
 

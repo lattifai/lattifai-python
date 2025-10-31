@@ -77,21 +77,35 @@ lattifai align --split_sentence audio.wav subtitle.srt output.srt
 ```python
 from lattifai import LattifAI
 
-# Initialize client
-client = LattifAI(
-    api_key=None,  # Or set LATTIFAI_API_KEY environment variable
-    model_name_or_path='Lattifai/Lattice-1-Alpha',
-    device='cpu',  # 'cpu', 'cuda', or 'mps'
-)
-
-# Perform alignment
+client = LattifAI()  # api_key will be read from LATTIFAI_API_KEY if not provided
 alignments, output_path = client.alignment(
     audio="audio.wav",
     subtitle="subtitle.srt",
-    split_sentence=False,
-    output_subtitle_path="output.srt"
+    output_subtitle_path="output.srt",
 )
 ```
+
+Need to run inside an async application? Use the drop-in asynchronous client:
+
+```python
+import asyncio
+from lattifai import AsyncLattifAI
+
+
+async def main():
+    async with AsyncLattifAI() as client:
+        alignments, output_path = await client.alignment(
+            audio="audio.wav",
+            subtitle="subtitle.srt",
+            split_sentence=False,
+            output_subtitle_path="output.srt",
+        )
+
+
+asyncio.run(main())
+```
+
+Both clients return a list of `Supervision` segments with timing information and, if provided, the path where the aligned subtitle was written.
 
 ## Supported Formats
 
@@ -100,15 +114,27 @@ alignments, output_path = client.alignment(
 
 ## API Reference
 
-### LattifAI
+### LattifAI (sync)
 
 ```python
 LattifAI(
     api_key: Optional[str] = None,
     model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
-    device: str = 'cpu'  # 'cpu', 'cuda', or 'mps'
+    device: str = 'cpu',  # 'cpu', 'cuda', or 'mps'
 )
 ```
+
+### AsyncLattifAI (async)
+
+```python
+AsyncLattifAI(
+    api_key: Optional[str] = None,
+    model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
+    device: str = 'cpu',
+)
+```
+
+Use `async with AsyncLattifAI() as client:` or call `await client.close()` when you are done to release the underlying HTTP session.
 
 ### alignment()
 
@@ -119,7 +145,7 @@ client.alignment(
     format: Optional[str] = None,         # 'srt', 'vtt', 'ass', 'txt' (auto-detect if None)
     split_sentence: bool = False,         # Smart sentence splitting based on punctuation semantics
     output_subtitle_path: Optional[str] = None
-) -> Tuple[List[Supervision], Optional[str]]
+) -> Tuple[List[Supervision], Optional[str]]  # await client.alignment(...) for AsyncLattifAI
 ```
 
 **Parameters**:
