@@ -79,13 +79,13 @@ from lattifai import LattifAI
 
 # Initialize client
 client = LattifAI(
-    api_key: Optional[str] = None,
+    api_key=None,  # Or set LATTIFAI_API_KEY environment variable
     model_name_or_path='Lattifai/Lattice-1-Alpha',
     device='cpu',  # 'cpu', 'cuda', or 'mps'
 )
 
 # Perform alignment
-result = client.alignment(
+alignments, output_path = client.alignment(
     audio="audio.wav",
     subtitle="subtitle.srt",
     split_sentence=False,
@@ -119,7 +119,7 @@ client.alignment(
     format: Optional[str] = None,         # 'srt', 'vtt', 'ass', 'txt' (auto-detect if None)
     split_sentence: bool = False,         # Smart sentence splitting based on punctuation semantics
     output_subtitle_path: Optional[str] = None
-) -> str
+) -> Tuple[List[Supervision], Optional[str]]
 ```
 
 **Parameters**:
@@ -129,13 +129,20 @@ client.alignment(
 - `split_sentence`: Enable intelligent sentence re-splitting (default: False). Set to True when subtitles combine multiple semantic units (non-speech elements + dialogue, or multiple sentences) that would benefit from separate timing alignment
 - `output_subtitle_path`: Output path for aligned subtitle (optional)
 
+**Returns**:
+- A tuple containing:
+  - `alignments`: List of aligned `Supervision` objects with timing information
+  - `output_subtitle_path`: Path where the subtitle was written (if `output_subtitle_path` was provided)
+
 ## Examples
 
 ### Basic Text Alignment
 
 ```python
+from lattifai import LattifAI
+
 client = LattifAI()
-client.alignment(
+alignments, output_path = client.alignment(
     audio="speech.wav",
     subtitle="transcript.txt",
     format="txt",
@@ -148,6 +155,7 @@ client.alignment(
 
 ```python
 from pathlib import Path
+from lattifai import LattifAI
 
 client = LattifAI()
 audio_dir = Path("audio_files")
@@ -157,7 +165,7 @@ output_dir = Path("aligned")
 for audio in audio_dir.glob("*.wav"):
     subtitle = subtitle_dir / f"{audio.stem}.srt"
     if subtitle.exists():
-        client.alignment(
+        alignments, output_path = client.alignment(
             audio=audio,
             subtitle=subtitle,
             output_subtitle_path=output_dir / f"{audio.stem}_aligned.srt"
@@ -167,6 +175,8 @@ for audio in audio_dir.glob("*.wav"):
 ### GPU Acceleration
 
 ```python
+from lattifai import LattifAI
+
 # NVIDIA GPU
 client = LattifAI(device='cuda')
 

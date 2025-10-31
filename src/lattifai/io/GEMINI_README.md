@@ -36,7 +36,7 @@ Thank you for being here today. [00:00:19]
 from lattifai.io import GeminiReader
 
 segments = GeminiReader.read(
-	'transcript.txt',
+	'videoid_gemini.md',
 	include_events=True,
 	include_sections=True,
 )
@@ -49,7 +49,7 @@ for seg in segments:
 ```python
 from lattifai.io import GeminiReader
 supervisions = GeminiReader.extract_for_alignment(
-	'transcript.txt',
+	'videoid_gemini.md',
 	merge_consecutive=False,
 	min_duration=0.1,
 )
@@ -58,8 +58,15 @@ supervisions = GeminiReader.extract_for_alignment(
 ### 3. Perform Forced Alignment
 
 ```python
-from lattifai import align
-aligned = align(audio='video.wav', supervisions=supervisions, language='en')
+from lattifai import LattifAI
+
+client = LattifAI()
+aligned, output_path = client.alignment(
+    audio='video.wav',
+    subtitle='videoid_gemini.md',
+    format='gemini',
+    output_subtitle_path='aligned.srt'
+)
 ```
 
 ### 4. Update Original Transcript
@@ -67,7 +74,7 @@ aligned = align(audio='video.wav', supervisions=supervisions, language='en')
 ```python
 from lattifai.io import GeminiWriter
 GeminiWriter.update_timestamps(
-	original_transcript='transcript.txt',
+	original_transcript='videoid_gemini.md',
 	aligned_supervisions=aligned,
 	output_path='transcript_aligned.txt'
 )

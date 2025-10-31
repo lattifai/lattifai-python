@@ -60,14 +60,14 @@ from lattifai import LattifAI
 client = LattifAI()
 
 # Process MP4 video file
-client.alignment(
+alignments, output_path = client.alignment(
     audio="movie.mp4",
     subtitle="movie.srt",
     output_subtitle_path="movie_aligned.srt"
 )
 
 # Process M4A audio file
-client.alignment(
+alignments, output_path = client.alignment(
     audio="podcast.m4a",
     subtitle="podcast.srt",
     output_subtitle_path="podcast_aligned.srt"
@@ -207,8 +207,10 @@ lattifai align --split_sentence audio.wav subtitle.srt output.srt
 
 **Python API:**
 ```python
+from lattifai import LattifAI
+
 client = LattifAI()
-client.alignment(
+alignments, output_path = client.alignment(
     audio="content.wav",
     subtitle="content.srt",
     split_sentence=True,

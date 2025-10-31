@@ -3,14 +3,14 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Awaitable, BinaryIO, Callable, Dict, Optional, Union
+from typing import Any, Awaitable, BinaryIO, Callable, Dict, List, Optional, Tuple, Union
 
 import colorful
 from dotenv import load_dotenv
 from lhotse.utils import Pathlike
 
 from lattifai.base_client import AsyncAPIClient, LattifAIError, SyncAPIClient
-from lattifai.io import SubtitleFormat, SubtitleIO
+from lattifai.io import SubtitleFormat, SubtitleIO, Supervision
 from lattifai.tokenizer import LatticeTokenizer
 from lattifai.workers import Lattice1AlphaWorker
 
@@ -89,16 +89,20 @@ class LattifAI(SyncAPIClient):
         format: Optional[SubtitleFormat] = None,
         split_sentence: bool = False,
         output_subtitle_path: Optional[Pathlike] = None,
-    ) -> str:
+    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
         """Perform alignment on audio and subtitle/text.
 
         Args:
             audio: Audio file path
             subtitle: Subtitle/Text to align with audio
-            export_format: Output format (srt, vtt, ass, txt)
+            format: Input subtitle format (srt, vtt, ass, txt). Auto-detected if None
+            split_sentence: Enable intelligent sentence re-splitting based on punctuation semantics
+            output_subtitle_path: Output path for aligned subtitle (optional)
 
         Returns:
-            Aligned subtitles in specified format
+            Tuple containing:
+                - List of aligned Supervision objects with timing information
+                - Output subtitle path (if output_subtitle_path was provided)
         """
         # step1: parse text or subtitles
         print(colorful.cyan(f'📖 Step 1: Reading subtitle file from {subtitle}'))
