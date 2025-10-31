@@ -1,4 +1,112 @@
-# Release Notes - LattifAI Python v0.2.4
+# Release Notes - LattifAI Python v0.2.5
+
+**Release Date:** October 26, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v0.2.5 introduces a comprehensive error handling system with clear error messages and improved user experience.
+
+---
+
+## ✨ New Features
+
+### Enhanced Error Handling System
+
+This release adds a robust error handling framework with specific exception types and helpful error messages.
+
+#### Key Improvements:
+
+- **Clear Error Messages**: Detailed, actionable error descriptions with context
+- **Error Hierarchy**: Specific exception classes for different error types
+- **Support Links**: Direct links to GitHub issues and Discord community in error messages
+- **Context Information**: Relevant debugging details included with each error
+
+#### Error Types:
+
+- `AudioLoadError`: Issues loading audio files
+- `SubtitleParseError`: Problems parsing subtitle files
+- `AlignmentError`: Alignment process failures
+- `ModelLoadError`: Model loading issues
+- `DependencyError`: Missing dependency detection
+- `ConfigurationError`: Setup and configuration problems
+
+#### Usage:
+
+```python
+from lattifai import LattifAI
+from lattifai.errors import AudioLoadError, ConfigurationError
+
+try:
+    client = LattifAI()
+    result = client.alignment("audio.wav", "subtitle.srt")
+except AudioLoadError as e:
+    print(f"Audio loading failed: {e}")
+except ConfigurationError as e:
+    print(f"Configuration issue: {e}")
+```
+
+---
+
+## 🔧 Technical Details
+
+- Error classes with context information for debugging
+- Automatic inclusion of support links in error messages
+- Comprehensive error hierarchy covering all major use cases
+- Documentation in ERROR_HANDLING.md
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+---
+
+## 🔄 Backward Compatibility
+
+✅ **Fully Backward Compatible**
+- All existing functionality preserved
+- New error handling enhances existing behavior
+- No breaking changes to API
+
+---
+
+## 📚 Documentation
+
+For complete documentation, visit:
+- **Official Website**: https://lattifai.com
+- **GitHub Repository**: https://github.com/lattifai/lattifai-python
+- **Error Handling Guide**: ERROR_HANDLING.md
+
+---
+
+## 📝 Version Info
+
+- **Version**: 0.2.5
+- **Release Date**: October 26, 2025
+- **Python Support**: 3.9+
+- **Model**: Lattice-1-Alpha
+- **License**: Apache License 2.0
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
+
+---
+
+# Previous Release Notes
+
+## v0.2.4 - Extended Media Format Support
 
 **Release Date:** October 19, 2025
 
@@ -167,7 +275,7 @@ Thank you to our community for requesting enhanced video format support!
 
 - **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
-- **Discord**: [Join our community](https://discord.gg/gTZqdaBJ)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
 
 ---
 
@@ -349,7 +457,7 @@ This release improves subtitle alignment accuracy by respecting natural language
 
 - **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
-- **Discord**: [Join our community](https://discord.gg/gTZqdaBJ)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
 
 ---
 
