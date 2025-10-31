@@ -179,53 +179,89 @@ class LatticeTokenizer:
         return {}
 
     def split_sentences(self, supervisions: List[Supervision], strip_whitespace=True) -> List[str]:
+        """Split supervisions into sentences using the sentence splitter.
+
+        Carefull about speaker changes.
+        """
         texts, text_len, sidx = [], 0, 0
+        speakers = []
         for s, supervision in enumerate(supervisions):
             text_len += len(supervision.text)
-            if text_len >= 2000 or s == len(supervisions) - 1:
-                text = ' '.join([sup.text for sup in supervisions[sidx : s + 1]])
-                texts.append(text)
-                sidx = s + 1
-                text_len = 0
-        if sidx < len(supervisions):
-            text = ' '.join([sup.text for sup in supervisions[sidx:]])
-            texts.append(text)
+            if supervision.speaker:
+                speakers.append(supervision.speaker)
+                if sidx < s:
+                    text = ' '.join([sup.text for sup in supervisions[sidx:s]])
+                    texts.append(text)
+                    sidx = s
+                    text_len = len(supervision.text)
+            else:
+                if text_len >= 2000 or s == len(supervisions) - 1:
+                    if len(speakers) < len(texts) + 1:
+                        speakers.append(None)
+                    text = ' '.join([sup.text for sup in supervisions[sidx : s + 1]])
+                    texts.append(text)
+                    sidx = s + 1
+                    text_len = 0
+
+        assert len(speakers) == len(texts), f'len(speakers)={len(speakers)} != len(texts)={len(texts)}'
         sentences = self.sentence_splitter.split(texts, threshold=0.15, strip_whitespace=strip_whitespace)
 
         supervisions, remainder = [], ''
-        for _sentences in sentences:
+        for k, (_speaker, _sentences) in enumerate(zip(speakers, sentences)):
+            # Prepend remainder from previous iteration to the first sentence
+            if _sentences and remainder:
+                _sentences[0] = remainder + _sentences[0]
+                remainder = ''
+
+            if not _sentences:
+                continue
+
             # Process and re-split special sentence types
             processed_sentences = []
             for s, _sentence in enumerate(_sentences):
                 if remainder:
                     _sentence = remainder + _sentence
                     remainder = ''
-
                 # Detect and split special sentence types: e.g., '[APPLAUSE] &gt;&gt; MIRA MURATI:' -> ['[APPLAUSE]', '&gt;&gt; MIRA MURATI:']  # noqa: E501
                 resplit_parts = self._resplit_special_sentence_types(_sentence)
                 if any(resplit_parts[-1].endswith(sp) for sp in [':', '：']):
                     if s < len(_sentences) - 1:
                         _sentences[s + 1] = resplit_parts[-1] + ' ' + _sentences[s + 1]
                     else:  # last part
-                        remainder = resplit_parts[-1] + ' ' + remainder
+                        remainder = resplit_parts[-1] + ' '
                     processed_sentences.extend(resplit_parts[:-1])
                 else:
                     processed_sentences.extend(resplit_parts)
-
             _sentences = processed_sentences
 
-            if remainder:
-                _sentences[0] = remainder + _sentences[0]
-                remainder = ''
-
             if any(_sentences[-1].endswith(ep) for ep in END_PUNCTUATION):
-                supervisions.extend(Supervision(text=s) for s in _sentences)
+                supervisions.extend(
+                    Supervision(text=text, speaker=(_speaker if s == 0 else None)) for s, text in enumerate(_sentences)
+                )
+                _speaker = None  # reset speaker after use
             else:
-                supervisions.extend(Supervision(text=s) for s in _sentences[:-1])
-                remainder += _sentences[-1] + ' '
+                supervisions.extend(
+                    Supervision(text=text, speaker=(_speaker if s == 0 else None))
+                    for s, text in enumerate(_sentences[:-1])
+                )
+                remainder = _sentences[-1] + ' ' + remainder
+                if k < len(speakers) - 1 and speakers[k + 1] is not None:  # next speaker is set
+                    supervisions.append(
+                        Supervision(text=remainder.strip(), speaker=_speaker if len(_sentences) == 1 else None)
+                    )
+                    remainder = ''
+                elif len(_sentences) == 1:
+                    if k == len(speakers) - 1:
+                        pass  # keep _speaker for the last supervision
+                    else:
+                        assert speakers[k + 1] is None
+                        speakers[k + 1] = _speaker
+                else:
+                    assert len(_sentences) > 1
+                    _speaker = None  # reset speaker if sentence not ended
 
         if remainder.strip():
-            supervisions.append(Supervision(text=remainder.strip()))
+            supervisions.append(Supervision(text=remainder.strip(), speaker=_speaker))
 
         return supervisions
 

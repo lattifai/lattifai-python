@@ -33,7 +33,7 @@ class GeminiReader:
     # Regex patterns for parsing (supports both [HH:MM:SS] and [MM:SS] formats)
     TIMESTAMP_PATTERN = re.compile(r'\[(\d{1,2}):(\d{2}):(\d{2})\]|\[(\d{1,2}):(\d{2})\]')
     SECTION_HEADER_PATTERN = re.compile(r'^##\s*\[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.+)$')
-    SPEAKER_PATTERN = re.compile(r'^\*\*(.+?):\*\*\s*(.+)$')
+    SPEAKER_PATTERN = re.compile(r'^\*\*(.+?[:：])\*\*\s*(.+)$')
     EVENT_PATTERN = re.compile(r'^\[([^\]]+)\]\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$')
     INLINE_TIMESTAMP_PATTERN = re.compile(r'^(.+?)\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$')
 
@@ -308,6 +308,7 @@ class GeminiReader:
                     start=segment.timestamp,
                     duration=max(duration, min_duration),
                     id=f'segment_{i:05d}',
+                    speaker=segment.speaker,
                 )
             )
 

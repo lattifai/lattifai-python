@@ -22,51 +22,13 @@ class FileExistenceManager:
 
     FILE_TYPE_INFO = {
         'media': ('🎬', 'Media'),
-        'audio': ('📱', 'Audio'),
-        'video': ('🎬', 'Video'),
+        # 'audio': ('📱', 'Audio'),
+        # 'video': ('🎬', 'Video'),
         'subtitle': ('📝', 'Subtitle'),
     }
 
     @staticmethod
-    def check_existing_files(video_id: str, output_dir: str, media_format: str = 'mp3') -> Dict[str, List[str]]:
-        """
-        Check for existing media and subtitle files for a given video ID
-
-        Args:
-            video_id: Video ID (e.g., YouTube video ID)
-            output_dir: Output directory to check
-            media_format: Media format to check for
-
-        Returns:
-            Dictionary with 'media' and 'subtitle' keys containing lists of existing files
-        """
-        output_path = Path(output_dir).expanduser()
-        existing_files = {'media': [], 'subtitle': []}
-
-        if not output_path.exists():
-            return existing_files
-
-        # Check for media files (audio)
-        media_extensions = [media_format, 'mp3', 'wav', 'm4a', 'aac']
-        checked_extensions = set()  # Avoid duplicates
-        for ext in media_extensions:
-            if ext not in checked_extensions:
-                media_file = output_path / f'{video_id}.{ext}'
-                if media_file.exists():
-                    existing_files['media'].append(str(media_file))
-                checked_extensions.add(ext)
-
-        # Check for subtitle files
-        subtitle_extensions = ['srt', 'vtt', 'ass', 'txt']
-        for ext in subtitle_extensions:
-            subtitle_file = output_path / f'{video_id}.{ext}'
-            if subtitle_file.exists():
-                existing_files['subtitle'].append(str(subtitle_file))
-
-        return existing_files
-
-    @staticmethod
-    def check_existing_media_files(
+    def check_existing_files(
         video_id: str,
         output_dir: str,
         media_formats: List[str] = None,
@@ -92,7 +54,7 @@ class FileExistenceManager:
 
         # Default formats - combine audio and video formats
         media_formats = media_formats or ['mp3', 'wav', 'm4a', 'aac', 'opus', 'mp4', 'webm', 'mkv', 'avi']
-        subtitle_formats = subtitle_formats or ['srt', 'vtt', 'ass', 'txt', 'md']
+        subtitle_formats = subtitle_formats or ['md', 'srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt']
 
         # Check for media files (audio and video)
         for ext in set(media_formats):  # Remove duplicates
@@ -113,6 +75,12 @@ class FileExistenceManager:
                 file_path = str(sub_file)
                 if file_path not in existing_files['subtitle']:
                     existing_files['subtitle'].append(file_path)
+
+        if 'md' in subtitle_formats:
+            # Gemini-specific pattern: {video_id}_gemini.md
+            gemini_subtitle_file = output_path / f'{video_id}_gemini.md'
+            if gemini_subtitle_file.exists():
+                existing_files['subtitle'].append(str(gemini_subtitle_file))
 
         return existing_files
 
@@ -834,21 +802,7 @@ class VideoFileManager:
         # Could be extended to support platform-specific naming conventions
         return f'{video_id}.{extension}'
 
-    def check_existing_files(self, video_id: str, output_dir: str, media_format: str = 'mp3') -> Dict[str, List[str]]:
-        """
-        Check for existing files using the platform-agnostic file manager
-
-        Args:
-            video_id: Video ID
-            output_dir: Output directory
-            media_format: Primary media format to check
-
-        Returns:
-            Dictionary of existing files
-        """
-        return self.file_manager.check_existing_files(video_id, output_dir, media_format)
-
-    def check_existing_media_files(
+    def check_existing_files(
         self,
         video_id: str,
         output_dir: str,
@@ -867,7 +821,7 @@ class VideoFileManager:
         Returns:
             Dictionary of existing files
         """
-        return self.file_manager.check_existing_media_files(video_id, output_dir, media_formats, subtitle_formats)
+        return self.file_manager.check_existing_files(video_id, output_dir, media_formats, subtitle_formats)
 
     def prompt_user_confirmation(self, existing_files: Dict[str, List[str]], operation: str = 'download') -> str:
         """

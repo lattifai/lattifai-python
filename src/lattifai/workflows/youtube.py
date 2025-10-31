@@ -373,7 +373,7 @@ class YouTubeDownloader:
         # Extract video ID and check for existing subtitle files
         video_id = self.extract_video_id(url)
         if not force_overwrite:
-            existing_files = self.file_manager.check_existing_media_files(
+            existing_files = self.file_manager.check_existing_files(
                 video_id, str(target_dir), subtitle_formats=['vtt', 'srt']
             )
 
@@ -666,10 +666,19 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         self.logger.info('📥 Checking for existing subtitles...')
 
         # Check for existing subtitle files (all formats including Gemini transcripts)
-        existing_files = self.downloader.file_manager.check_existing_media_files(
+        existing_files = self.downloader.file_manager.check_existing_files(
             video_id,
             str(self.output_dir),
-            subtitle_formats=['md', 'vtt', 'srt', 'ass'],  # Check all subtitle formats including Markdown
+            subtitle_formats=[
+                'md',
+                'srt',
+                'vtt',
+                'ass',
+                'ssa',
+                'sub',
+                'sbv',
+                'txt',
+            ],  # Check all subtitle formats including Markdown
         )
 
         # Prompt user if subtitle exists and force_overwrite is not set
@@ -678,7 +687,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
             # Let user choose which subtitle file to use
             subtitle_choice = FileExistenceManager.prompt_file_selection(
-                file_type='subtitle file', files=existing_files['subtitle'], operation='transcribe'
+                file_type='subtitle', files=existing_files['subtitle'], operation='transcribe'
             )
 
             if subtitle_choice == 'cancel':
@@ -715,24 +724,15 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         self.logger.info('🎯 Aligning subtitle with video...')
 
-        # Detect transcript format using GeminiReader
         if subtitle_path.endswith('_gemini.md'):
-            # segments = GeminiReader.read(subtitle_path, include_events=True, include_sections=True)
-            # supervisions = GeminiReader.extract_for_alignment(
-            #     subtitle_path, merge_consecutive=False, min_duration=0.1
-            # )
             is_gemini_format = True
         else:
-            # segments = SubtitleIO.read(subtitle_path, format='auto')
             is_gemini_format = False
-
         subtitle_path = Path(subtitle_path)
 
         self.logger.info(f'📄 Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
 
         original_subtitle_path = subtitle_path
-
-        # Create temporary output file
         output_path = Path(self.output_dir) / f'{Path(media_path).stem}_aligned.ass'
 
         # Perform alignment with LattifAI using extracted/original text
@@ -771,13 +771,14 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         exported_files = {}
 
         # Update original transcript file with aligned timestamps if YouTube format
-        if is_gemini_format and original_subtitle_path:
+        if is_gemini_format:
+            assert Path(original_subtitle_path).exists(), 'Original subtitle path not found'
             self.logger.info('📝 Updating original transcript with aligned timestamps...')
 
             try:
                 # Generate updated transcript file path
                 original_path = Path(original_subtitle_path)
-                updated_subtitle_path = original_path.parent / f'{original_path.stem}_aligned.md'
+                updated_subtitle_path = original_path.parent / f'{original_path.stem}_LattifAI.md'
 
                 # Update timestamps in original transcript
                 GeminiWriter.update_timestamps(
@@ -792,8 +793,18 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             except Exception as e:
                 self.logger.warning(f'⚠️  Failed to update transcript timestamps: {e}')
 
+        # Restore speaker information for Gemini format
+        if is_gemini_format and original_subtitle_path:
+            self.logger.info('👥 Restoring speaker information to subtitles...')
+            try:
+                supervisions = self._restore_speaker_info(original_subtitle_path, supervisions)
+            except Exception as e:
+                self.logger.warning(f'⚠️  Failed to restore speaker info: {e}')
+
         # Export to requested subtitle format
-        output_path = str(aligned_path).replace('_aligned.ass', f'_lattifai.{self.output_format}')
+        output_path = str(aligned_path).replace(
+            '_aligned.ass', f'{"_gemini" if is_gemini_format else ""}_LattifAI.{self.output_format}'
+        )
         SubtitleIO.write(supervisions, output_path=output_path)
         exported_files[self.output_format] = output_path
         self.logger.info(f'✅ Exported {self.output_format.upper()}: {output_path}')
@@ -807,6 +818,58 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         }
 
         return result
+
+    def _restore_speaker_info(self, original_subtitle_path: str, supervisions: List) -> List:
+        """
+        Restore speaker information from original Gemini markdown to aligned subtitles.
+
+        This method matches aligned subtitles with the original transcript segments
+        based on text content and adds speaker labels to the subtitle text.
+
+        Args:
+            original_subtitle_path: Path to original Gemini markdown file
+            supervisions: List of aligned supervision segments
+
+        Returns:
+            Updated list of supervisions with speaker information in text
+        """
+
+        # Read original transcript with speaker information
+        original_segments = GeminiReader.read(original_subtitle_path, include_events=False, include_sections=False)
+
+        # Create a mapping of text to speaker
+        text_to_speaker = {}
+        for segment in original_segments:
+            if segment.speaker and segment.text:
+                # Normalize text for matching (remove extra spaces, lowercase)
+                normalized_text = ' '.join(segment.text.split()).lower()
+                text_to_speaker[normalized_text] = segment.speaker
+
+        # Update supervisions with speaker information
+        updated_supervisions = []
+        for sup in supervisions:
+            if sup.text:
+                # Try to find matching speaker
+                normalized_text = ' '.join(sup.text.split()).lower()
+
+                # Exact match
+                speaker = text_to_speaker.get(normalized_text)
+
+                # If no exact match, try partial match (text might have been split/merged)
+                if not speaker:
+                    for orig_text, orig_speaker in text_to_speaker.items():
+                        if normalized_text in orig_text or orig_text in normalized_text:
+                            speaker = orig_speaker
+                            break
+
+                # Add speaker label to text if found
+                if speaker:
+                    # Format: "Speaker: text"
+                    sup.text = f'{speaker}: {sup.text}'
+
+            updated_supervisions.append(sup)
+
+        return updated_supervisions
 
     async def process_youtube_url(
         self, url: str, output_dir: Optional[str] = None, output_format: Optional[str] = None
