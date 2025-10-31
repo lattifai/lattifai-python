@@ -144,5 +144,5 @@ class GeminiTranscriber:
             'gem_name': 'Audio Transcription Gem',
             'gem_url': self.GEM_URL,
             'model': 'Gemini 2.5 Pro',
-            'description': 'Specialized Gem for audio content transcription',
+            'description': 'Specialized Gem for media content transcribe',
         }

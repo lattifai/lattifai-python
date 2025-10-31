@@ -23,11 +23,14 @@ from lattifai.bin.cli_base import cli
     help='Gemini API key for transcription (overrides GEMINI_API_KEY env var).',
 )
 @click.option(
-    '--video-format',
-    '--video_format',
-    type=click.Choice(['mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'mpeg', 'mpg', '3gp'], case_sensitive=False),
+    '--media-format',
+    '--media_format',
+    type=click.Choice(
+        ['mp3', 'wav', 'm4a', 'aac', 'opus', 'mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'mpeg', 'mpg', '3gp'],
+        case_sensitive=False,
+    ),
     default='mp4',
-    help='Video format for YouTube download.',
+    help='Media format for YouTube download (audio or video).',
 )
 @click.option(
     '--output-format',
@@ -63,7 +66,7 @@ def agent(
     youtube: bool,
     url: str,
     gemini_api_key: Optional[str] = None,
-    video_format: str = 'mp4',
+    media_format: str = 'mp4',
     output_format: str = 'srt',
     output_dir: Optional[str] = None,
     max_retries: int = 0,
@@ -110,7 +113,7 @@ def agent(
             _run_youtube_workflow(
                 url=url,
                 api_key=api_key,
-                video_format=video_format,
+                media_format=media_format,
                 output_format=output_format,
                 output_dir=output_dir,
                 max_retries=max_retries,
@@ -134,7 +137,7 @@ def agent(
 async def _run_youtube_workflow(
     url: str,
     api_key: str,
-    video_format: str,
+    media_format: str,
     output_format: str,
     output_dir: str,
     max_retries: int,
@@ -143,9 +146,13 @@ async def _run_youtube_workflow(
 ):
     """Run the YouTube processing workflow"""
 
+    # Determine if format is audio or video
+    is_audio_format = media_format.lower() in ['mp3', 'wav', 'm4a', 'aac', 'opus']
+    format_type = 'Audio' if is_audio_format else 'Video'
+
     click.echo(colorful.cyan('🚀 LattifAI Agentic Workflow - YouTube Processing'))
     click.echo(f'📺      YouTube URL: {url}')
-    click.echo(f'       Video format: {video_format}')
+    click.echo(f'🎬     Media format: {media_format} ({format_type})')
     click.echo(f'📝    Output format: {output_format}')
     click.echo(f'📁 Output directory: {output_dir}')
     click.echo(f'🔄      Max retries: {max_retries}')
@@ -157,7 +164,7 @@ async def _run_youtube_workflow(
     # Initialize agent
     agent = YouTubeSubtitleAgent(
         gemini_api_key=api_key,
-        video_format=video_format,
+        video_format=media_format,  # YouTubeSubtitleAgent still uses video_format parameter
         output_format=output_format,
         max_retries=max_retries,
         split_sentence=split_sentence,
@@ -230,3 +237,18 @@ def check_dependencies():
 # Check dependencies when module is imported
 if not check_dependencies():
     pass  # Don't exit on import, let the command handle it
+
+
+if __name__ == '__main__':
+    asyncio.run(
+        _run_youtube_workflow(
+            url='https://www.youtube.com/watch?v=DQacCB9tDaw',
+            api_key=None,
+            media_format='mp4',
+            output_format='TextGrid',
+            output_dir='~/Downloads/lattifai_openai4o_debug',
+            max_retries=0,
+            split_sentence=True,
+            force_overwrite=False,
+        )
+    )

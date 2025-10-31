@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..client import LattifAI
-from ..io import GeminiReader, GeminiWriter
+from ..io import GeminiReader, GeminiWriter, SubtitleIO
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
 from .file_manager import VideoFileManager
 from .gemini import GeminiTranscriber
@@ -21,8 +21,8 @@ from .gemini import GeminiTranscriber
 class YouTubeDownloader:
     """YouTube video/audio downloader using yt-dlp"""
 
-    def __init__(self, audio_format: str = 'mp3'):
-        self.audio_format = audio_format
+    def __init__(self, media_format: str = 'mp3'):
+        self.media_format = media_format
         self.logger = setup_workflow_logger('youtube')
         self.file_manager = VideoFileManager(platform='youtube')
 
@@ -104,11 +104,51 @@ class YouTubeDownloader:
             self.logger.error(f'Failed to parse video metadata: {e}')
             raise RuntimeError(f'Failed to parse video metadata: {e}')
 
+    async def download_media(
+        self,
+        url: str,
+        output_dir: Optional[str] = None,
+        media_format: Optional[str] = None,
+        force_overwrite: bool = False,
+    ) -> str:
+        """
+        Download media (audio or video) from YouTube URL based on format
+
+        This is a unified method that automatically selects between audio and video
+        download based on the media format extension.
+
+        Args:
+            url: YouTube URL
+            output_dir: Output directory (default: temp directory)
+            media_format: Media format - audio (mp3, wav, m4a, aac, opus, ogg, flac)
+                         or video (mp4, webm, mkv, avi, etc.) (default: instance format)
+            force_overwrite: Skip user confirmation and overwrite existing files
+
+        Returns:
+            Path to downloaded media file
+        """
+        media_format = media_format or self.media_format
+
+        # Determine if format is audio or video
+        audio_formats = ['mp3', 'wav', 'm4a', 'aac', 'opus', 'ogg', 'flac']
+        is_audio = media_format.lower() in audio_formats
+
+        if is_audio:
+            self.logger.info(f'🎵 Detected audio format: {media_format}')
+            return await self.download_audio(
+                url=url, output_dir=output_dir, media_format=media_format, force_overwrite=force_overwrite
+            )
+        else:
+            self.logger.info(f'🎬 Detected video format: {media_format}')
+            return await self.download_video(
+                url=url, output_dir=output_dir, video_format=media_format, force_overwrite=force_overwrite
+            )
+
     async def download_audio(
         self,
         url: str,
         output_dir: Optional[str] = None,
-        audio_format: Optional[str] = None,
+        media_format: Optional[str] = None,
         force_overwrite: bool = False,
     ) -> str:
         """
@@ -117,43 +157,43 @@ class YouTubeDownloader:
         Args:
             url: YouTube URL
             output_dir: Output directory (default: temp directory)
-            audio_format: Audio format (default: instance format)
+            media_format: Media format (default: instance format)
             force_overwrite: Skip user confirmation and overwrite existing files
 
         Returns:
             Path to downloaded audio file
         """
         target_dir = Path(output_dir or tempfile.gettempdir()).expanduser()
-        audio_format = audio_format or self.audio_format
+        media_format = media_format or self.media_format
 
         self.logger.info(f'🎵 Downloading audio from: {url}')
         self.logger.info(f'📁       Output directory: {target_dir}')
-        self.logger.info(f'🎶           Audio format: {audio_format}')
+        self.logger.info(f'🎶           Media format: {media_format}')
 
         # Create output directory if it doesn't exist
         target_dir.mkdir(parents=True, exist_ok=True)
 
         # Extract video ID and check for existing files
         video_id = self.extract_video_id(url)
-        existing_files = self.file_manager.check_existing_files(video_id, str(target_dir), audio_format)
+        existing_files = self.file_manager.check_existing_files(video_id, str(target_dir), media_format)
 
         # Handle existing files
-        if existing_files['audio'] and not force_overwrite:
+        if existing_files['media'] and not force_overwrite:
             if self.file_manager.is_interactive_mode():
                 user_choice = self.file_manager.prompt_user_confirmation(
-                    {'audio': existing_files['audio']}, 'audio download'
+                    {'media': existing_files['media']}, 'media download'
                 )
 
                 if user_choice == 'use':
-                    self.logger.info(f'✅ Using existing audio file: {existing_files["audio"][0]}')
-                    return existing_files['audio'][0]
+                    self.logger.info(f'✅ Using existing media file: {existing_files["media"][0]}')
+                    return existing_files['media'][0]
                 elif user_choice == 'cancel':
-                    raise RuntimeError('Audio download cancelled by user')
+                    raise RuntimeError('Media download cancelled by user')
                 # For 'overwrite', continue with download
             else:
                 # Non-interactive mode: use existing file
-                self.logger.info(f'✅ Using existing audio file: {existing_files["audio"][0]}')
-                return existing_files['audio'][0]
+                self.logger.info(f'✅ Using existing media file: {existing_files["media"][0]}')
+                return existing_files['media'][0]
 
         # Generate output filename template
         output_template = str(target_dir / f'{video_id}.%(ext)s')
@@ -162,7 +202,7 @@ class YouTubeDownloader:
             'yt-dlp',
             '--extract-audio',
             '--audio-format',
-            audio_format,
+            media_format,
             '--audio-quality',
             '0',  # Best quality
             '--output',
@@ -199,7 +239,7 @@ class YouTubeDownloader:
                         return str(file_path)
 
             # Fallback: search for audio files in output directory
-            audio_extensions = [audio_format, 'mp3', 'wav', 'm4a', 'aac']
+            audio_extensions = [media_format, 'mp3', 'wav', 'm4a', 'aac']
             for ext in audio_extensions:
                 pattern = f'*.{ext}'
                 files = list(target_dir.glob(pattern))
@@ -246,17 +286,17 @@ class YouTubeDownloader:
         # Handle existing files
         if video_file.exists() and not force_overwrite:
             if self.file_manager.is_interactive_mode():
-                user_choice = self.file_manager.prompt_user_confirmation({'video': [str(video_file)]}, 'video download')
+                user_choice = self.file_manager.prompt_user_confirmation({'media': [str(video_file)]}, 'media download')
 
                 if user_choice == 'use':
-                    self.logger.info(f'✅ Using existing video file: {video_file}')
+                    self.logger.info(f'✅ Using existing media file: {video_file}')
                     return str(video_file)
                 elif user_choice == 'cancel':
-                    raise RuntimeError('Video download cancelled by user')
+                    raise RuntimeError('Media download cancelled by user')
                 # For 'overwrite', continue with download
             else:
                 # Non-interactive mode: use existing file
-                self.logger.info(f'✅ Using existing video file: {video_file}')
+                self.logger.info(f'✅ Using existing media file: {video_file}')
                 return str(video_file)
 
         # Generate output filename template
@@ -330,31 +370,31 @@ class YouTubeDownloader:
         # Create output directory if it doesn't exist
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        # Extract video ID and check for existing transcript files
+        # Extract video ID and check for existing subtitle files
         video_id = self.extract_video_id(url)
         if not force_overwrite:
             existing_files = self.file_manager.check_existing_media_files(
-                video_id, str(target_dir), transcript_formats=['vtt', 'srt']
+                video_id, str(target_dir), subtitle_formats=['vtt', 'srt']
             )
 
-            # Handle existing transcript files
-            if existing_files['transcript'] and not force_overwrite:
+            # Handle existing subtitle files
+            if existing_files['subtitle'] and not force_overwrite:
                 if self.file_manager.is_interactive_mode():
                     user_choice = self.file_manager.prompt_user_confirmation(
-                        {'transcript': existing_files['transcript']}, 'transcript download'
+                        {'subtitle': existing_files['subtitle']}, 'subtitle download'
                     )
 
                     if user_choice == 'use':
-                        transcript_file = Path(existing_files['transcript'][0])
-                        self.logger.info(f'✅ Using existing transcript file: {transcript_file}')
-                        return str(transcript_file)
+                        subtitle_file = Path(existing_files['subtitle'][0])
+                        self.logger.info(f'✅ Using existing subtitle file: {subtitle_file}')
+                        return str(subtitle_file)
                     elif user_choice == 'cancel':
-                        raise RuntimeError('Transcript download cancelled by user')
+                        raise RuntimeError('Subtitle download cancelled by user')
                     # For 'overwrite', continue with download
                 else:
-                    transcript_file = Path(existing_files['transcript'][0])
-                    self.logger.info(f'🔍 Found existing transcript: {transcript_file}')
-                    return str(transcript_file)
+                    subtitle_file = Path(existing_files['subtitle'][0])
+                    self.logger.info(f'🔍 Found existing subtitle: {subtitle_file}')
+                    return str(subtitle_file)
 
         self.logger.info(f'📄 Downloading subtitle for: {url}')
         if subtitle_lang:
@@ -546,7 +586,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         self.force_overwrite = force_overwrite
 
         # Initialize components
-        self.downloader = YouTubeDownloader(audio_format='mp3')  # Keep for backward compatibility
+        self.downloader = YouTubeDownloader(media_format='mp3')  # Keep for backward compatibility
         self.transcriber = GeminiTranscriber(api_key=self.gemini_api_key)
         self.aligner = LattifAI()
 
@@ -560,16 +600,14 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         """Define the workflow steps"""
         return [
             WorkflowStep(
-                name='Process YouTube URL', description='Extract video info and download video', required=True
+                name='Process YouTube URL', description='Extract video info and download video/audio', required=True
             ),
             WorkflowStep(
                 name='Transcribe Media',
-                description='Generate transcript from video using Gemini 2.5 Pro',
+                description='Download subtitle if available or transcribe the media file',
                 required=True,
             ),
-            WorkflowStep(
-                name='Align Transcript', description='Align transcript with video using LattifAI', required=True
-            ),
+            WorkflowStep(name='Align Subtitle', description='Align Subtitle with media using LattifAI', required=True),
             WorkflowStep(
                 name='Export Results', description='Export aligned subtitles in specified formats', required=True
             ),
@@ -584,8 +622,8 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         elif step.name == 'Transcribe Media':
             return await self._transcribe_media(context)
 
-        elif step.name == 'Align Transcript':
-            return await self._align_transcript(context)
+        elif step.name == 'Align Subtitle':
+            return await self._align_subtitle(context)
 
         elif step.name == 'Export Results':
             return await self._export_results(context)
@@ -627,131 +665,100 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # Download subtitle if available
         self.logger.info('📥 Checking for existing subtitles...')
 
-        # Check for existing transcript files
-        existing_transcripts = self.downloader.file_manager.check_existing_media_files(
-            video_id, str(self.output_dir), transcript_formats=['md', 'vtt', 'srt', 'vtt', 'ass']
+        # Check for existing subtitle files (all formats including Gemini transcripts)
+        existing_files = self.downloader.file_manager.check_existing_media_files(
+            video_id,
+            str(self.output_dir),
+            subtitle_formats=['md', 'vtt', 'srt', 'ass'],  # Check all subtitle formats including Markdown
         )
 
-        # Prompt user if transcript exists and force_overwrite is not set
-        if existing_transcripts['transcript'] and not self.force_overwrite:
+        # Prompt user if subtitle exists and force_overwrite is not set
+        if existing_files['subtitle'] and not self.force_overwrite:
             from .file_manager import FileExistenceManager
 
-            user_choice = FileExistenceManager.prompt_file_type_confirmation(
-                file_type='gemini', files=existing_transcripts['transcript'], operation='transcription'
+            # Let user choose which subtitle file to use
+            subtitle_choice = FileExistenceManager.prompt_file_selection(
+                file_type='subtitle file', files=existing_files['subtitle'], operation='transcribe'
             )
 
-            if user_choice == 'cancel':
+            if subtitle_choice == 'cancel':
                 raise RuntimeError('Transcription cancelled by user')
-            elif user_choice == 'use':
-                # Use existing transcript
-                existing_path = Path(existing_transcripts['transcript'][0])
-                self.logger.info(f'🔁 Using existing transcript: {existing_path}')
+            elif subtitle_choice == 'overwrite':
+                # Continue to transcription below
+                pass
+            elif subtitle_choice:  # User selected a specific file
+                # Use selected subtitle
+                subtitle_path = Path(subtitle_choice)
+                self.logger.info(f'🔁 Using existing subtitle: {subtitle_path}')
 
-                if existing_path.suffix != '.md':
-                    raise NotImplementedError()
-                    # transcript_path = self.output_dir / f'{video_id}_gemini.md'
-                    # if transcript_path != existing_path:
-                    #     self.logger.info('🧹 Converting transcript to plain text format')
-                    #     self.downloader._convert_subtitle_to_text(existing_path, transcript_path)
-                else:
-                    transcript_path = existing_path
-
-                transcript = Path(transcript_path).read_text(encoding='utf-8')
-                return {'transcript': transcript, 'transcript_path': str(transcript_path)}
+                return {'subtitle_path': str(subtitle_path)}
             # If user_choice == 'overwrite', continue to transcription below
 
+        # TODO: support other Transcriber options
         self.logger.info('🎤 Transcribing URL with Gemini 2.5 Pro...')
-
         transcript = await self.transcriber.transcribe_url(url)
-
-        # Save transcript to temporary file
-        transcript_path = self.output_dir / f'{video_id}_gemini.md'
-        with open(transcript_path, 'w', encoding='utf-8') as f:
+        subtitle_path = self.output_dir / f'{video_id}_gemini.md'
+        with open(subtitle_path, 'w', encoding='utf-8') as f:
             f.write(transcript)
-
-        result = {'transcript': transcript, 'transcript_path': str(transcript_path)}
-
+        result = {'subtitle_path': str(subtitle_path)}
         self.logger.info(f'✅   Transcript generated: {len(transcript)} characters')
         return result
 
-    async def _align_transcript(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _align_subtitle(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Step 3: Align transcript with video using LattifAI"""
-        video_path = context.get('process_youtube_url_result', {}).get('video_path')
-        transcript_path = context.get('transcribe_media_result', {}).get('transcript_path')
+        result = context['process_youtube_url_result']
+        media_path = result.get('video_path', result.get('audio_path'))
+        subtitle_path = context.get('transcribe_media_result', {}).get('subtitle_path')
 
-        if not video_path or not transcript_path:
-            raise ValueError('Video path and transcript path are required')
+        if not media_path or not subtitle_path:
+            raise ValueError('Video path and subtitle path are required')
 
-        self.logger.info('🎯 Aligning transcript with video...')
+        self.logger.info('🎯 Aligning subtitle with video...')
 
-        transcript_path_obj = Path(transcript_path)
-
-        # Step 1: Detect transcript format using GeminiReader
-        try:
-            segments = GeminiReader.read(transcript_path_obj, include_events=True, include_sections=True)
-            is_gemini_format = any(seg.speaker for seg in segments) or any(
-                seg.segment_type == 'section_header' for seg in segments
-            )
-        except Exception as e:
-            self.logger.warning(f'Failed to parse transcript, assuming plain text format: {e}')
+        # Detect transcript format using GeminiReader
+        if subtitle_path.endswith('_gemini.md'):
+            # segments = GeminiReader.read(subtitle_path, include_events=True, include_sections=True)
+            # supervisions = GeminiReader.extract_for_alignment(
+            #     subtitle_path, merge_consecutive=False, min_duration=0.1
+            # )
+            is_gemini_format = True
+        else:
+            # segments = SubtitleIO.read(subtitle_path, format='auto')
             is_gemini_format = False
 
-        self.logger.info(f'📄 Transcript format: {"Gemini" if is_gemini_format else "Plain text"}')
+        subtitle_path = Path(subtitle_path)
 
-        alignment_text_path = transcript_path
-        original_transcript_path = transcript_path
+        self.logger.info(f'📄 Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
 
-        # Step 2: Extract dialogue text for alignment if Gemini format
-        if is_gemini_format:
-            self.logger.info('🎭 Extracting texts from Gemini format transcript...')
-
-            # Extract dialogue segments using GeminiReader
-            supervisions = GeminiReader.extract_for_alignment(
-                transcript_path_obj, merge_consecutive=False, min_duration=0.1
-            )
-
-            # Create dialogue-only text file for alignment
-            dialogue_texts = [sup.text for sup in supervisions]
-            dialogue_content = '\n'.join(dialogue_texts)
-
-            # Save dialogue text to temporary file
-            dialogue_path = transcript_path_obj.parent / f'{transcript_path_obj.stem}_text_for_align.txt'
-            dialogue_path.write_text(dialogue_content, encoding='utf-8')
-            alignment_text_path = str(dialogue_path)
-
-            self.logger.info(f'💬 Extracted {len(supervisions)} segments for alignment')
-            self.logger.info(f'📝 Text saved: {dialogue_path}')
-        else:
-            self.logger.info('📝 Using plain text transcript directly for alignment')
+        original_subtitle_path = subtitle_path
 
         # Create temporary output file
-        output_path = Path(self.output_dir) / f'{Path(video_path).stem}_aligned.ass'
+        output_path = Path(self.output_dir) / f'{Path(media_path).stem}_aligned.ass'
 
-        # Step 3: Perform alignment with LattifAI using extracted/original text
+        # Perform alignment with LattifAI using extracted/original text
         aligned_result = self.aligner.alignment(
-            audio=video_path,
-            subtitle=alignment_text_path,  # Use dialogue text for YouTube format, original for plain text
-            format='txt',
+            audio=media_path,
+            subtitle=str(subtitle_path),  # Use dialogue text for YouTube format, original for plain text
+            format='gemini' if is_gemini_format else 'auto',
             split_sentence=self.split_sentence,
-            output_subtitle_path=output_path,
+            output_subtitle_path=str(output_path),
         )
 
         result = {
             'aligned_path': output_path,
             'alignment_result': aligned_result,
-            'original_transcript_path': original_transcript_path,
+            'original_subtitle_path': original_subtitle_path,
             'is_gemini_format': is_gemini_format,
-            'alignment_text_path': alignment_text_path,
         }
 
         self.logger.info('✅ Alignment completed')
         return result
 
     async def _export_results(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 4: Export results in specified format and update transcript file"""
-        align_result = context.get('align_transcript_result', {})
+        """Step 4: Export results in specified format and update subtitle file"""
+        align_result = context.get('align_subtitle_result', {})
         aligned_path = align_result.get('aligned_path')
-        original_transcript_path = align_result.get('original_transcript_path')
+        original_subtitle_path = align_result.get('original_subtitle_path')
         is_gemini_format = align_result.get('is_gemini_format', False)
         metadata = context.get('process_youtube_url_result', {}).get('metadata', {})
 
@@ -760,30 +767,27 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         self.logger.info(f'📤 Exporting results in format: {self.output_format}')
 
-        # Read aligned subtitles
-        from ..io import SubtitleIO
-
         supervisions = SubtitleIO.read(aligned_path, format='ass')
         exported_files = {}
 
         # Update original transcript file with aligned timestamps if YouTube format
-        if is_gemini_format and original_transcript_path:
+        if is_gemini_format and original_subtitle_path:
             self.logger.info('📝 Updating original transcript with aligned timestamps...')
 
             try:
                 # Generate updated transcript file path
-                original_path = Path(original_transcript_path)
-                updated_transcript_path = original_path.parent / f'{original_path.stem}_aligned.md'
+                original_path = Path(original_subtitle_path)
+                updated_subtitle_path = original_path.parent / f'{original_path.stem}_aligned.md'
 
                 # Update timestamps in original transcript
                 GeminiWriter.update_timestamps(
-                    original_transcript=original_transcript_path,
+                    original_transcript=original_subtitle_path,
                     aligned_supervisions=supervisions,
-                    output_path=str(updated_transcript_path),
+                    output_path=str(updated_subtitle_path),
                 )
 
-                exported_files['updated_transcript'] = str(updated_transcript_path)
-                self.logger.info(f'✅ Updated transcript: {updated_transcript_path}')
+                exported_files['updated_transcript'] = str(updated_subtitle_path)
+                self.logger.info(f'✅ Updated transcript: {updated_subtitle_path}')
 
             except Exception as e:
                 self.logger.warning(f'⚠️  Failed to update transcript timestamps: {e}')
@@ -799,7 +803,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             'metadata': metadata,
             'subtitle_count': len(supervisions),
             'is_gemini_format': is_gemini_format,
-            'original_transcript_path': original_transcript_path,
+            'original_subtitle_path': original_subtitle_path,
         }
 
         return result

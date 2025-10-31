@@ -32,6 +32,7 @@ dependencies = [
     "wtpsplit>=2.1.6",
     "av",
     # agentic workflow dependencies
+    "questionary>=2.0",
     "yt-dlp",
     "pycryptodome",
     "google-genai"
