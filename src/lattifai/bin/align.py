@@ -15,9 +15,9 @@ from lattifai.workflows.youtube import YouTubeDownloader
     '-F',
     '--input-format',
     '--input_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'txt', 'auto', 'gemini'], case_sensitive=False),
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'auto', 'gemini'], case_sensitive=False),
     default='auto',
-    help='Input Subtitle format.',
+    help='Input subtitle format.',
 )
 @click.option(
     '-S',
@@ -26,6 +26,21 @@ from lattifai.workflows.youtube import YouTubeDownloader
     is_flag=True,
     default=False,
     help='Re-segment subtitles by semantics.',
+)
+@click.option(
+    '-D',
+    '--device',
+    type=click.Choice(['cpu', 'cuda', 'mps'], case_sensitive=False),
+    default='cpu',
+    help='Device to use for inference.',
+)
+@click.option(
+    '-M',
+    '--model-name-or-path',
+    '--model_name_or_path',
+    type=str,
+    default='Lattifai/Lattice-1-Alpha',
+    help='Model name or path for alignment.',
 )
 @click.option(
     '--api-key',
@@ -51,9 +66,9 @@ def align(
     input_subtitle_path: Pathlike,
     output_subtitle_path: Pathlike,
     input_format: str = 'auto',
+    split_sentence: bool = False,
     device: str = 'cpu',
     model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
-    split_sentence: bool = False,
     api_key: str = None,
 ):
     """
@@ -76,7 +91,7 @@ def align(
     '--audio_format',
     type=str,
     default='mp3',
-    help='Audio format (e.g. mp3, wav, m4a, etc.)',
+    help='Audio format (e.g., mp3, wav, m4a).',
 )
 @click.option(
     '-S',
@@ -92,7 +107,7 @@ def align(
     '--output_dir',
     type=click.Path(file_okay=False, dir_okay=True, writable=True),
     default='.',
-    help='Output directory, default is current folder',
+    help='Output directory (default: current directory).',
 )
 @click.option(
     '-D',
@@ -107,7 +122,7 @@ def align(
     '--model_name_or_path',
     type=str,
     default='Lattifai/Lattice-1-Alpha',
-    help='Lattifai model name or path',
+    help='Model name or path for alignment.',
 )
 @click.option(
     '--api-key',
@@ -117,12 +132,12 @@ def align(
     help='API key for LattifAI.',
 )
 @click.option(
-    '--output-formats',
-    '--output_formats',
-    multiple=True,
-    type=click.Choice(['srt', 'vtt', 'ass', 'txt'], case_sensitive=False),
-    default=['vtt'],
-    help='Subtitle output formats (can specify multiple, e.g. --output-formats srt --output-formats vtt)',
+    '-F',
+    '--output-format',
+    '--output_format',
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt'], case_sensitive=False),
+    default='vtt',
+    help='Subtitle output format.',
 )
 @click.argument(
     'yt_url',
@@ -136,7 +151,7 @@ def youtube(
     device: str = 'cpu',
     model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
     api_key: str = None,
-    output_formats: tuple = ('vtt',),
+    output_format: str = 'vtt',
 ):
     """
     Download audio and subtitles from YouTube for further alignment.
@@ -159,15 +174,11 @@ def youtube(
     if not subtitle_paths or len(subtitle_paths) == 0:
         raise RuntimeError('No subtitle file was downloaded')
 
-    output_subtitle_path = f'{output_dir}/{video_id}.{output_formats[0]}'
-    (alignments, _) = client.alignment(
+    output_subtitle_path = f'{output_dir}/{video_id}.{output_format}'
+    client.alignment(
         audio_path,
         subtitle_paths[0],
-        format=output_formats[0],
+        format=output_format,
         split_sentence=split_sentence,
         output_subtitle_path=output_subtitle_path,
     )
-
-    for fmt in output_formats[1:]:
-        output_subtitle_path = f'{output_dir}/{video_id}.{fmt}'
-        SubtitleIO.write(alignments, output_path=output_subtitle_path)

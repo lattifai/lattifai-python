@@ -15,39 +15,39 @@ from lattifai.bin.cli_base import cli
 
 
 @cli.command()
-@click.option('--youtube', '--yt', is_flag=True, help='Process YouTube URL through agentic workflow')
+@click.option('--youtube', '--yt', is_flag=True, help='Process YouTube URL through agentic workflow.')
 @click.option(
     '--gemini-api-key',
     '--gemini_api_key',
     type=str,
-    help='Gemini API key for transcription (overrides GEMINI_API_KEY env var)',
+    help='Gemini API key for transcription (overrides GEMINI_API_KEY env var).',
 )
 @click.option(
     '--video-format',
     '--video_format',
-    type=click.Choice(['mp4', 'webm', 'mkv'], case_sensitive=False),
+    type=click.Choice(['mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'mpeg', 'mpg', '3gp'], case_sensitive=False),
     default='mp4',
-    help='Video format for YouTube download (default: mp4)',
+    help='Video format for YouTube download.',
 )
 @click.option(
-    '--output-formats',
-    '--output_formats',
-    type=str,
+    '--output-format',
+    '--output_format',
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt'], case_sensitive=False),
     default='srt',
-    help='Comma-separated list of output subtitle formats (default: srt). Options: srt,vtt,ass,txt',
+    help='Subtitle output format.',
 )
 @click.option(
     '--output-dir',
     '--output_dir',
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
-    help='Output directory for generated files (default: current directory)',
+    help='Output directory for generated files (default: current directory).',
 )
 @click.option(
     '--max-retries',
     '--max_retries',
     type=int,
     default=0,
-    help='Maximum number of retries for failed steps (default: 0 - no retries)',
+    help='Maximum number of retries for failed steps.',
 )
 @click.option(
     '--split-sentence',
@@ -56,15 +56,15 @@ from lattifai.bin.cli_base import cli
     default=False,
     help='Re-segment subtitles by semantics.',
 )
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging')
-@click.option('--force', '-f', is_flag=True, help='Force overwrite existing files without confirmation')
+@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging.')
+@click.option('--force', '-f', is_flag=True, help='Force overwrite existing files without confirmation.')
 @click.argument('url', type=str, required=True)
 def agent(
     youtube: bool,
     url: str,
     gemini_api_key: Optional[str] = None,
     video_format: str = 'mp4',
-    output_formats: str = 'srt',
+    output_format: str = 'srt',
     output_dir: Optional[str] = None,
     max_retries: int = 0,
     split_sentence: bool = False,
@@ -90,15 +90,6 @@ def agent(
     log_level = logging.DEBUG if verbose else logging.INFO
     logging.basicConfig(level=log_level, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    # Parse output formats
-    format_list = [fmt.strip().lower() for fmt in output_formats.split(',')]
-    valid_formats = ['srt', 'vtt', 'ass', 'txt']
-
-    for fmt in format_list:
-        if fmt not in valid_formats:
-            click.echo(colorful.red(f'❌ Invalid output format: {fmt}. Valid formats: {", ".join(valid_formats)}'))
-            return
-
     # Set default output directory
     if not output_dir:
         output_dir = os.getcwd()
@@ -120,7 +111,7 @@ def agent(
                 url=url,
                 api_key=api_key,
                 video_format=video_format,
-                output_formats=format_list,
+                output_format=output_format,
                 output_dir=output_dir,
                 max_retries=max_retries,
                 split_sentence=split_sentence,
@@ -144,7 +135,7 @@ async def _run_youtube_workflow(
     url: str,
     api_key: str,
     video_format: str,
-    output_formats: List[str],
+    output_format: str,
     output_dir: str,
     max_retries: int,
     split_sentence: bool = False,
@@ -155,7 +146,7 @@ async def _run_youtube_workflow(
     click.echo(colorful.cyan('🚀 LattifAI Agentic Workflow - YouTube Processing'))
     click.echo(f'📺      YouTube URL: {url}')
     click.echo(f'       Video format: {video_format}')
-    click.echo(f'📝   Output formats: {", ".join(output_formats)}')
+    click.echo(f'📝    Output format: {output_format}')
     click.echo(f'📁 Output directory: {output_dir}')
     click.echo(f'🔄      Max retries: {max_retries}')
     click.echo()
@@ -167,14 +158,14 @@ async def _run_youtube_workflow(
     agent = YouTubeSubtitleAgent(
         gemini_api_key=api_key,
         video_format=video_format,
-        output_formats=output_formats,
+        output_format=output_format,
         max_retries=max_retries,
         split_sentence=split_sentence,
         force_overwrite=force_overwrite,
     )
 
     # Process the URL
-    result = await agent.process_youtube_url(url=url, output_dir=output_dir, output_formats=output_formats)
+    result = await agent.process_youtube_url(url=url, output_dir=output_dir, output_format=output_format)
 
     # Display results
     click.echo(colorful.bold_white_on_green('🎉 Workflow completed successfully!'))
@@ -239,25 +230,3 @@ def check_dependencies():
 # Check dependencies when module is imported
 if not check_dependencies():
     pass  # Don't exit on import, let the command handle it
-
-
-if __name__ == '__main__':
-    import os
-
-    from dotenv import load_dotenv
-
-    load_dotenv()
-    from pathlib import Path
-
-    asyncio.run(
-        _run_youtube_workflow(
-            url='https://www.youtube.com/watch?v=DQacCB9tDaw',
-            api_key=os.getenv('GEMINI_API_KEY', ''),
-            video_format='mp4',
-            output_formats=['ass'],
-            output_dir='~/Downloads/lattifai_openai4o_debug',
-            max_retries=1,
-            split_sentence=False,
-            force_overwrite=False,
-        )
-    )

@@ -529,7 +529,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         self,
         gemini_api_key: Optional[str] = None,
         video_format: str = 'mp4',
-        output_formats: List[str] = None,
+        output_format: str = 'srt',
         max_retries: int = 0,
         split_sentence: bool = False,
         output_dir: Optional[Path] = None,
@@ -540,7 +540,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # Configuration
         self.gemini_api_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
         self.video_format = video_format
-        self.output_formats = output_formats or ['srt']
+        self.output_format = output_format
         self.split_sentence = split_sentence
         self.output_dir = output_dir or Path(tempfile.gettempdir())
         self.force_overwrite = force_overwrite
@@ -748,7 +748,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         return result
 
     async def _export_results(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 4: Export results in specified formats and update transcript file"""
+        """Step 4: Export results in specified format and update transcript file"""
         align_result = context.get('align_transcript_result', {})
         aligned_path = align_result.get('aligned_path')
         original_transcript_path = align_result.get('original_transcript_path')
@@ -758,7 +758,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         if not aligned_path:
             raise ValueError('Aligned subtitle path not found')
 
-        self.logger.info(f'📤 Exporting results in formats: {self.output_formats}')
+        self.logger.info(f'📤 Exporting results in format: {self.output_format}')
 
         # Read aligned subtitles
         from ..io import SubtitleIO
@@ -788,12 +788,11 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             except Exception as e:
                 self.logger.warning(f'⚠️  Failed to update transcript timestamps: {e}')
 
-        # Export to requested subtitle formats
-        for format_name in self.output_formats:
-            output_path = str(aligned_path).replace('_aligned.ass', f'_lattifai.{format_name}')
-            SubtitleIO.write(supervisions, output_path=output_path)
-            exported_files[format_name] = output_path
-            self.logger.info(f'✅ Exported {format_name.upper()}: {output_path}')
+        # Export to requested subtitle format
+        output_path = str(aligned_path).replace('_aligned.ass', f'_lattifai.{self.output_format}')
+        SubtitleIO.write(supervisions, output_path=output_path)
+        exported_files[self.output_format] = output_path
+        self.logger.info(f'✅ Exported {self.output_format.upper()}: {output_path}')
 
         result = {
             'exported_files': exported_files,
@@ -806,7 +805,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         return result
 
     async def process_youtube_url(
-        self, url: str, output_dir: Optional[str] = None, output_formats: Optional[List[str]] = None
+        self, url: str, output_dir: Optional[str] = None, output_format: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Main entry point for processing a YouTube URL
@@ -814,13 +813,13 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         Args:
             url: YouTube URL to process
             output_dir: Directory to save output files (optional)
-            output_formats: List of output formats (optional, uses instance default)
+            output_format: Output format (optional, uses instance default)
 
         Returns:
             Dictionary containing results and exported file paths
         """
-        if output_formats:
-            self.output_formats = output_formats
+        if output_format:
+            self.output_format = output_format
 
         if output_dir:
             expanded_dir = Path(output_dir).expanduser()

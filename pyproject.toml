@@ -64,7 +64,6 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 
 [project.scripts]
 lattifai = 'lattifai.bin:cli'
-lattifai-align = 'lattifai.bin.align:align'
 install-k2 = 'scripts.install_k2:install_k2'
 
 [tool.setuptools]

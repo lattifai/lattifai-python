@@ -9,7 +9,7 @@ from lattifai.bin.cli_base import cli
 
 @cli.group()
 def subtitle():
-    """Group of commands used to convert subtitle format."""
+    """Commands for subtitle format conversion and management."""
     pass
 
 
@@ -50,9 +50,17 @@ def convert(
     '-o',
     type=click.Path(file_okay=False, dir_okay=True),
     default='.',
-    help='Output directory for downloaded subtitle files (default: current directory)',
+    help='Output directory for downloaded subtitle files (default: current directory).',
 )
-@click.option('--force-overwrite', '-F', '-f', is_flag=True, help='Overwrite existing files without prompting')
+@click.option(
+    '--output-format',
+    '--output_format',
+    '-f',
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'best'], case_sensitive=False),
+    default='best',
+    help='Preferred subtitle format to download (default: best available).',
+)
+@click.option('--force-overwrite', '-F', is_flag=True, help='Overwrite existing files without prompting.')
 @click.option(
     '--lang',
     '-l',
@@ -60,18 +68,19 @@ def convert(
     '--subtitle-lang',
     '--subtitle_lang',
     type=str,
-    help='Specific subtitle language/track to download (e.g., "en"). If not specified, downloads all available subtitles.',  # noqa
+    help='Specific subtitle language/track to download (e.g., "en").',
 )
 def download(
     url: str,
     output_dir: str,
+    output_format: str,
     force_overwrite: bool,
     lang: str,
 ):
     """
     Download subtitles from YouTube URL using yt-dlp.
 
-    URL should be a valid YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID)
+    URL should be a valid YouTube URL (e.g., https://www.youtube.com/watch?v=VIDEO_ID).
     """
     # Import here to avoid circular imports and keep startup fast
     from lattifai.workflows.youtube import YouTubeDownloader
@@ -90,6 +99,7 @@ def download(
 
     click.echo(f'Downloading subtitles from: {url}')
     click.echo(f'          Output directory: {output_path}')
+    click.echo(f'         Preferred format: {output_format}')
     if lang:
         click.echo(f'       Subtitle language: {lang}')
     else:
