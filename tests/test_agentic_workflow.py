@@ -75,11 +75,18 @@ def test_workflow_setup():
     """Test workflow agent setup"""
     print('\n🧪 Testing workflow setup...')
 
+    from unittest.mock import MagicMock
+
     from lattifai.workflows import YouTubeSubtitleAgent
 
-    # Test agent creation with dummy API key
-    # The actual parameters are: gemini_api_key, video_format, output_format, max_retries, etc.
-    agent = YouTubeSubtitleAgent(gemini_api_key='test_key', video_format='mp4', output_format='srt', max_retries=1)
+    # Test agent creation with mock components
+    mock_downloader = MagicMock()
+    mock_transcriber = MagicMock()
+    mock_aligner = MagicMock()
+
+    agent = YouTubeSubtitleAgent(
+        downloader=mock_downloader, transcriber=mock_transcriber, aligner=mock_aligner, max_retries=1
+    )
 
     # Test step definition
     steps = agent.define_steps()

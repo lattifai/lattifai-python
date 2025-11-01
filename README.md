@@ -11,14 +11,28 @@ Advanced forced alignment and subtitle generation powered by [Lattice-1-Alpha](h
 ## Installation
 
 ```bash
-pip install "install-k2>=0.0.6"
+pip install install-k2
 # The installation will automatically detect and use your already installed PyTorch version(up to 2.8).
 install-k2  # Install k2
 
 pip install lattifai
 ```
-
 > **⚠️ Important**: You must run `install-k2` before using the lattifai library.
+```
+> install-k2 --help
+usage: install-k2 [-h] [--system {linux,darwin,windows}] [--dry-run] [--torch-version TORCH_VERSION]
+
+Auto-install the latest k2 wheel for your environment.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --system {linux,darwin,windows}
+                        Override OS detection. Valid values: linux, darwin (macOS), windows. Default: auto-detect
+  --dry-run             Show what would be installed without making changes.
+  --torch-version TORCH_VERSION
+                        Specify torch version (e.g., 2.8.0). If not specified, will auto-detect or use latest available.
+```
+
 
 ## Quick Start
 

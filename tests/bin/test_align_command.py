@@ -134,7 +134,7 @@ class TestAlignCommand:
         result = cli_runner.invoke(align, ['--help'])
 
         assert result.exit_code == 0
-        assert 'Command used to align audio with subtitles' in result.output
+        assert 'Command used to align media(audio/video) with subtitles' in result.output
         assert '--subtitle-format' in result.output
         assert '--device' in result.output
         assert '--split-sentence' in result.output

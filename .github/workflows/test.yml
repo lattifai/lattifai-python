@@ -40,7 +40,7 @@ jobs:
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
         run: |
-          pip install install-k2>=0.0.6
+          pip install install-k2>=0.1.0
           install-k2
           pip install -e ".[test]"  # Install with test dependencies including pytest-asyncio
           python tests/test_basic.py  # Run basic tests

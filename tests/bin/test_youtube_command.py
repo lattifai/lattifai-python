@@ -26,7 +26,7 @@ class TestYoutubeCommand:
     )
     def test_youtube_output_formats(self, cli_runner, tmp_path, output_format):
         """Test youtube command with different output formats"""
-        with patch('lattifai.bin.align.YouTubeDownloader') as mock_downloader:
+        with patch('lattifai.workflows.youtube.YouTubeDownloader') as mock_downloader:
             with patch('lattifai.bin.align.LattifAI') as mock_aligner:
                 # Mock the downloader - use AsyncMock for async methods
                 mock_instance = MagicMock()
@@ -151,9 +151,9 @@ class TestYoutubeCommand:
         result = cli_runner.invoke(cli, ['youtube', '--help'])
 
         assert result.exit_code == 0
-        assert 'Download audio and subtitles from YouTube' in result.output
+        assert 'Download media and subtitles from YouTube' in result.output
         assert '--output-format' in result.output
-        assert '--audio-format' in result.output
+        assert '--media-format' in result.output
         assert '--device' in result.output
         assert '--split-sentence' in result.output
         assert '--model-name-or-path' in result.output

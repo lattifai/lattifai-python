@@ -64,7 +64,7 @@ class TestCLIIntegration:
         # Test agent output formats
         result = cli_runner.invoke(cli, ['agent', '--help'])
         assert '--output-format' in result.output
-        assert '--video-format' in result.output
+        assert '--media-format' in result.output
 
         # Test subtitle download formats
         result = cli_runner.invoke(cli, ['subtitle', 'download', '--help'])
@@ -124,7 +124,7 @@ class TestCLIIntegration:
         assert '--output-dir' in result.output
 
     def test_no_json_csv_tsv_formats(self, cli_runner):
-        """Test that json, csv, tsv formats are removed"""
+        """Test that csv and tsv formats are not in output formats (json is allowed)"""
         commands_to_check = [
             ['align', '--help'],
             ['youtube', '--help'],
@@ -133,15 +133,12 @@ class TestCLIIntegration:
 
         for command_args in commands_to_check:
             result = cli_runner.invoke(cli, command_args)
-            # These formats should not appear in output format choices
-            output_lower = result.output.lower()
-            del output_lower
             # Check that they're not in the choice list (but might appear in other text)
             # We look for the pattern [srt|vtt|...] to ensure they're not in choices
             if '--output-format' in result.output:
-                # Ensure json, csv, tsv are not in the format choices
+                # Ensure csv, tsv are not in the format choices (json is allowed for programmatic access)
                 format_section = result.output[result.output.find('--output-format') :]
                 format_section = format_section[: format_section.find('\n', 200)]
-                assert 'json' not in format_section or 'json3' in format_section  # json3 might be elsewhere
+                # JSON is allowed for programmatic use cases
                 assert 'csv' not in format_section
                 assert 'tsv' not in format_section
