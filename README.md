@@ -50,15 +50,14 @@ The library provides two equivalent commands: `lai` (recommended for convenience
 ```bash
 # Align audio with subtitle (using lai command)
 lai align audio.wav subtitle.srt output.srt
-
 # Or use the full command
 lattifai align audio.wav subtitle.srt output.srt
 
-# Process YouTube videos with intelligent workflow
-lai agent --youtube https://www.youtube.com/watch?v=VIDEO_ID
-
 # Download and align YouTube content directly
 lai youtube https://www.youtube.com/watch?v=VIDEO_ID
+
+# Process YouTube videos with intelligent workflow (equivalent to lai youtube)
+lai agent --youtube https://www.youtube.com/watch?v=VIDEO_ID
 
 # Convert subtitle format
 lai subtitle convert input.srt output.vtt
@@ -176,7 +175,8 @@ Options:
 ```
 
 **When to use `lai agent` vs `lai youtube`**:
-- **Use `lai agent`**: For production workflows, batch processing, advanced error handling, and when you need retry logic
+- Both `lai agent --youtube URL` and `lai youtube URL` provide the same core functionality for downloading and aligning YouTube content
+- **Use `lai agent --youtube`**: For production workflows, batch processing, advanced error handling, and when you need retry logic
 - **Use `lai youtube`**: For quick one-off downloads and alignment with minimal overhead
 
 #### Understanding --split_sentence
