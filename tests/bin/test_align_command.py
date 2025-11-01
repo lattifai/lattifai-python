@@ -33,13 +33,13 @@ class TestAlignCommand:
         ['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'auto', 'gemini'],
     )
     def test_align_input_formats(self, cli_runner, sample_audio_file, sample_subtitle_file, tmp_path, input_format):
-        """Test align command with different input formats"""
+        """Test align command with different subtitle formats"""
         output_file = tmp_path / f'output_{input_format}.srt'
 
         result = cli_runner.invoke(
             align,
             [
-                '--input-format',
+                '--subtitle-format',
                 input_format,
                 '--device',
                 'cpu',
@@ -135,7 +135,7 @@ class TestAlignCommand:
 
         assert result.exit_code == 0
         assert 'Command used to align audio with subtitles' in result.output
-        assert '--input-format' in result.output
+        assert '--subtitle-format' in result.output
         assert '--device' in result.output
         assert '--split-sentence' in result.output
         assert '--model-name-or-path' in result.output

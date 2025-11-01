@@ -13,8 +13,8 @@ from lattifai.workflows.youtube import YouTubeDownloader
 @cli.command()
 @click.option(
     '-F',
-    '--input-format',
-    '--input_format',
+    '--subtitle_format',
+    '--subtitle-format',
     type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'auto', 'gemini'], case_sensitive=False),
     default='auto',
     help='Input subtitle format.',
@@ -26,6 +26,14 @@ from lattifai.workflows.youtube import YouTubeDownloader
     is_flag=True,
     default=False,
     help='Re-segment subtitles by semantics.',
+)
+@click.option(
+    '-W',
+    '--word-level',
+    '--word_level',
+    is_flag=True,
+    default=False,
+    help='Include word-level alignment timestamps in output (for JSON, TextGrid, and subtitle formats).',
 )
 @click.option(
     '-D',
@@ -62,24 +70,26 @@ from lattifai.workflows.youtube import YouTubeDownloader
     type=click.Path(allow_dash=True),
 )
 def align(
-    input_audio_path: Pathlike,
+    input_media_path: Pathlike,
     input_subtitle_path: Pathlike,
     output_subtitle_path: Pathlike,
     input_format: str = 'auto',
     split_sentence: bool = False,
+    word_level: bool = False,
     device: str = 'cpu',
     model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
     api_key: str = None,
 ):
     """
-    Command used to align audio with subtitles
+    Command used to align media(audio/video) with subtitles
     """
     client = LattifAI(model_name_or_path=model_name_or_path, device=device, api_key=api_key)
     client.alignment(
-        input_audio_path,
+        input_media_path,
         input_subtitle_path,
         format=input_format.lower(),
         split_sentence=split_sentence,
+        return_details=word_level,
         output_subtitle_path=output_subtitle_path,
     )
 
@@ -121,6 +131,14 @@ def align(
     help='Re-segment subtitles by semantics.',
 )
 @click.option(
+    '-W',
+    '--word-level',
+    '--word_level',
+    is_flag=True,
+    default=False,
+    help='Include word-level alignment timestamps in output (for JSON, TextGrid, and subtitle formats).',
+)
+@click.option(
     '-O',
     '--output-dir',
     '--output_dir',
@@ -154,7 +172,7 @@ def align(
     '-F',
     '--output-format',
     '--output_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'TextGrid'], case_sensitive=False),
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'TextGrid', 'json'], case_sensitive=False),
     default='vtt',
     help='Subtitle output format.',
 )
@@ -166,6 +184,7 @@ def youtube(
     yt_url: str,
     media_format: str = 'mp3',
     split_sentence: bool = False,
+    word_level: bool = False,
     output_dir: str = '.',
     device: str = 'cpu',
     model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
@@ -212,5 +231,6 @@ def youtube(
         subtitle_path,
         format='auto',  # Auto-detect input subtitle format
         split_sentence=split_sentence,
+        return_details=word_level,
         output_subtitle_path=output_subtitle_path,
     )

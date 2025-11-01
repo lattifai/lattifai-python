@@ -293,7 +293,7 @@ class LatticeTokenizer:
         lattice_id: str,
         lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
         # return_supervisions: bool = True,
-        # return_details: bool = False,
+        return_details: bool = False,
     ) -> List[Supervision]:
         emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
         response = self.client_wrapper.post(
@@ -305,6 +305,7 @@ class LatticeTokenizer:
                 'labels': labels[0],
                 'offset': offset,
                 'channel': channel,
+                'return_details': return_details,
                 'destroy_lattice': True,
             },
         )
@@ -321,9 +322,27 @@ class LatticeTokenizer:
         result = response.json()
         if not result.get('success'):
             return Exception('Failed to detokenize the alignment results.')
-        # if return_details:
-        #     raise NotImplementedError("return_details is not implemented yet")
-        return [Supervision.from_dict(s) for s in result['supervisions']]
+
+        supervisions = [Supervision.from_dict(s) for s in result['supervisions']]
+
+        if return_details:  # add emission confidence scores
+            # confidence
+            tokens = torch.tensor(labels[0], dtype=torch.int64, device=emission.device)
+            for supervision in supervisions:
+                start_frame = int(supervision.start / frame_shift)
+                end_frame = int(supervision.end / frame_shift)
+                probabilities = emission[0, start_frame:end_frame].softmax(dim=-1)
+                aligned = probabilities[range(0, end_frame - start_frame), tokens[start_frame:end_frame]]
+                diffprobs = (probabilities.max(dim=-1).values - aligned).cpu()
+                supervision.score = round(1.0 - diffprobs.mean().item(), ndigits=4)
+                if hasattr(supervision, 'alignment') and supervision.alignment:
+                    words = supervision.alignment.get('word', [])
+                    for w, item in enumerate(words):
+                        start = int(item.start / frame_shift) - start_frame
+                        end = int(item.end / frame_shift) - start_frame
+                        words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean().item(), ndigits=4))
+
+        return supervisions
 
 
 class AsyncLatticeTokenizer(LatticeTokenizer):

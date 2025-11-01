@@ -35,7 +35,7 @@ from lattifai.bin.cli_base import cli
 @click.option(
     '--output-format',
     '--output_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'TextGrid'], case_sensitive=False),
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'TextGrid', 'json'], case_sensitive=False),
     default='srt',
     help='Subtitle output format.',
 )
@@ -59,6 +59,13 @@ from lattifai.bin.cli_base import cli
     default=False,
     help='Re-segment subtitles by semantics.',
 )
+@click.option(
+    '--word-level',
+    '--word_level',
+    is_flag=True,
+    default=False,
+    help='Include word-level alignment timestamps in output (for JSON, TextGrid, and subtitle formats).',
+)
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging.')
 @click.option('--force', '-f', is_flag=True, help='Force overwrite existing files without confirmation.')
 @click.argument('url', type=str, required=True)
@@ -71,6 +78,7 @@ def agent(
     output_dir: Optional[str] = None,
     max_retries: int = 0,
     split_sentence: bool = False,
+    word_level: bool = False,
     verbose: bool = False,
     force: bool = False,
 ):
@@ -118,6 +126,7 @@ def agent(
                 output_dir=output_dir,
                 max_retries=max_retries,
                 split_sentence=split_sentence,
+                word_level=word_level,
                 force_overwrite=force,
             )
         )
@@ -142,6 +151,7 @@ async def _run_youtube_workflow(
     output_dir: str,
     max_retries: int,
     split_sentence: bool = False,
+    word_level: bool = False,
     force_overwrite: bool = False,
 ):
     """Run the YouTube processing workflow"""
@@ -168,6 +178,7 @@ async def _run_youtube_workflow(
         output_format=output_format,
         max_retries=max_retries,
         split_sentence=split_sentence,
+        word_level=word_level,
         force_overwrite=force_overwrite,
     )
 

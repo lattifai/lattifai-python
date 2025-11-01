@@ -6,45 +6,6 @@ from typing import List, Optional, Tuple, Union
 
 import pytest
 
-# Provide lightweight stubs so we can import lattifai without heavy dependencies.
-if 'lhotse' not in sys.modules:
-    lhotse_module = types.ModuleType('lhotse')
-    supervision_module = types.ModuleType('lhotse.supervision')
-    utils_module = types.ModuleType('lhotse.utils')
-
-    @dataclass
-    class SupervisionSegment:
-        id: str = ''
-        recording_id: str = ''
-        start: float = 0.0
-        duration: float = 0.0
-        channel: Union[int, List[int]] = 0
-        text: Optional[str] = None
-        speaker: Optional[str] = None
-
-        def to_dict(self) -> dict:
-            return {
-                'id': self.id,
-                'recording_id': self.recording_id,
-                'start': self.start,
-                'duration': self.duration,
-                'channel': self.channel,
-                'text': self.text,
-                'speaker': self.speaker,
-            }
-
-    supervision_module.SupervisionSegment = SupervisionSegment
-    utils_module.Pathlike = str
-    utils_module.Seconds = float
-
-    lhotse_module.supervision = supervision_module
-    lhotse_module.utils = utils_module
-
-    sys.modules['lhotse'] = lhotse_module
-    sys.modules['lhotse.supervision'] = supervision_module
-    sys.modules['lhotse.utils'] = utils_module
-
-
 if 'k2' not in sys.modules:
     sys.modules['k2'] = types.ModuleType('k2')
 

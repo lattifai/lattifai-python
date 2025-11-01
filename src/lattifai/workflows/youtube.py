@@ -557,6 +557,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         output_format: str = 'srt',
         max_retries: int = 0,
         split_sentence: bool = False,
+        word_level: bool = False,
         output_dir: Optional[Path] = None,
         force_overwrite: bool = False,
     ):
@@ -567,6 +568,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         self.video_format = video_format
         self.output_format = output_format
         self.split_sentence = split_sentence
+        self.word_level = word_level
         self.output_dir = output_dir or Path(tempfile.gettempdir())
         self.force_overwrite = force_overwrite
 
@@ -724,6 +726,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             subtitle=str(subtitle_path),  # Use dialogue text for YouTube format, original for plain text
             format='gemini' if is_gemini_format else 'auto',
             split_sentence=self.split_sentence,
+            return_details=self.word_level,
             output_subtitle_path=str(output_path),
         )
 

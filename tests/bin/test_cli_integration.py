@@ -37,9 +37,9 @@ class TestCLIIntegration:
 
     def test_all_format_options_are_valid(self, cli_runner):
         """Test that all format options are properly defined"""
-        # Test align input formats
+        # Test align subtitle formats
         result = cli_runner.invoke(cli, ['align', '--help'])
-        assert '--input-format' in result.output
+        assert '--subtitle-format' in result.output
         assert 'srt' in result.output
         assert 'vtt' in result.output
         assert 'ass' in result.output

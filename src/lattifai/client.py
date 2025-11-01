@@ -74,6 +74,7 @@ class LattifAI(SyncAPIClient):
         subtitle: Pathlike,
         format: Optional[SubtitleFormat] = None,
         split_sentence: bool = False,
+        return_details: bool = False,
         output_subtitle_path: Optional[Pathlike] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
         """Perform alignment on audio and subtitle/text.
@@ -83,6 +84,7 @@ class LattifAI(SyncAPIClient):
             subtitle: Subtitle/Text to align with audio
             format: Input subtitle format (srt, vtt, ass, txt). Auto-detected if None
             split_sentence: Enable intelligent sentence re-splitting based on punctuation semantics
+            return_details: Return word-level alignment details in Supervision.alignment field
             output_subtitle_path: Output path for aligned subtitle (optional)
 
         Returns:
@@ -110,7 +112,7 @@ class LattifAI(SyncAPIClient):
                 )
 
             # step2: make lattice by call Lattifai API
-            print(colorful.cyan('🔗 Step 2: Creating lattice graph from text'))
+            print(colorful.cyan('🔗 Step 2: Creating lattice graph from segments'))
             try:
                 lattice_id, lattice_graph = self.tokenizer.tokenize(supervisions, split_sentence=split_sentence)
                 print(colorful.green(f'         ✓ Generated lattice graph with ID: {lattice_id}'))
@@ -134,7 +136,7 @@ class LattifAI(SyncAPIClient):
             # step4: decode lattice results to aligned segments
             print(colorful.cyan('🎯 Step 4: Decoding lattice results to aligned segments'))
             try:
-                alignments = self.tokenizer.detokenize(lattice_id, lattice_results)
+                alignments = self.tokenizer.detokenize(lattice_id, lattice_results, return_details=return_details)
                 print(colorful.green(f'         ✓ Successfully aligned {len(alignments)} segments'))
             except LatticeDecodingError as e:
                 print(colorful.red('         x Failed to decode lattice alignment results'))
@@ -217,6 +219,7 @@ class AsyncLattifAI(AsyncAPIClient):
         subtitle: Pathlike,
         format: Optional[SubtitleFormat] = None,
         split_sentence: bool = False,
+        return_details: bool = False,
         output_subtitle_path: Optional[Pathlike] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
         try:
@@ -231,7 +234,7 @@ class AsyncLattifAI(AsyncAPIClient):
                     context={'original_error': str(e)},
                 )
 
-            print(colorful.cyan('🔗 Step 2: Creating lattice graph from text'))
+            print(colorful.cyan('🔗 Step 2: Creating lattice graph from segments'))
             try:
                 lattice_id, lattice_graph = await self.tokenizer.tokenize(
                     supervisions,
@@ -256,7 +259,7 @@ class AsyncLattifAI(AsyncAPIClient):
 
             print(colorful.cyan('🎯 Step 4: Decoding lattice results to aligned segments'))
             try:
-                alignments = await self.tokenizer.detokenize(lattice_id, lattice_results)
+                alignments = await self.tokenizer.detokenize(lattice_id, lattice_results, return_details=return_details)
                 print(colorful.green(f'         ✓ Successfully aligned {len(alignments)} segments'))
             except LatticeDecodingError as e:
                 print(colorful.red('         x Failed to decode lattice alignment results'))
@@ -303,5 +306,5 @@ if __name__ == '__main__':
         split_sentence = False
 
     (alignments, output_subtitle_path) = client.alignment(
-        audio, subtitle, output_subtitle_path=output, split_sentence=split_sentence
+        audio, subtitle, output_subtitle_path=output, split_sentence=split_sentence, return_details=True
     )
