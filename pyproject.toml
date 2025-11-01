@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '0.2.5'
+version = '0.4.0'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -18,7 +18,7 @@ maintainers = [
 requires-python = '>=3.9'
 
 dependencies = [
-    "lattifai-core>=0.2.0",
+    "lattifai-core>=0.2.1",
     "httpx",
     "python-dotenv",
     "lhotse>=1.26.0",
@@ -30,7 +30,12 @@ dependencies = [
     "resampy",
     "g2p-phonemizer==0.1.1",
     "wtpsplit>=2.1.6",
-    "av"
+    "av",
+    # agentic workflow dependencies
+    "questionary>=2.0",
+    "yt-dlp",
+    "pycryptodome",
+    "google-genai"
 ]
 
 classifiers = [
@@ -43,6 +48,7 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX :: Linux',
     'Operating System :: Microsoft :: Windows',
@@ -60,8 +66,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 
 [project.scripts]
 lattifai = 'lattifai.bin:cli'
-lattifai-align = 'lattifai.bin.align:align'
-install-k2 = 'scripts.install_k2:install_k2'
+lai = 'lattifai.bin:cli'
 
 [tool.setuptools]
 packages = ["lattifai", "lattifai.io", "lattifai.tokenizer", "lattifai.workers", "lattifai.bin", "scripts"]
@@ -71,11 +76,12 @@ lattifai = "src/lattifai"
 
 [project.optional-dependencies]
 numpy = ['numpy']
-test = ['pytest', 'pytest-cov', 'ruff', 'numpy']
+test = ['pytest', 'pytest-cov', 'pytest-asyncio', 'ruff', 'numpy']
 all = [
     "numpy",
     "pytest",
     "pytest-cov",
+    "pytest-asyncio",
     "ruff"
 ]
 

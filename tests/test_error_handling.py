@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 # Add the src directory to Python path for testing
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from lattifai.errors import (
     AlignmentError,
@@ -32,8 +32,10 @@ def test_basic_error_functionality():
         raise LattifAIError('Test base error', error_code='TEST_001')
     except LattifAIError as e:
         print(f'✓ LattifAIError caught: {e.error_code}')
-        assert 'github.com' in str(e)
-        assert 'discord.gg' in str(e)
+        # Support info is in get_support_info(), not in __str__
+        support_info = e.get_support_info()
+        assert 'github.com' in support_info
+        assert 'discord.gg' in support_info
 
     # Test specific error types
     try:
@@ -80,20 +82,20 @@ def test_support_info():
     print('🧪 Testing support information...')
 
     error = LattifAIError('Test error with support info')
-    error_str = str(error)
+    support_info = error.get_support_info()
 
     # Check for GitHub issue link
-    assert 'github.com' in error_str, 'GitHub link not found in error message'
-    assert 'issues' in error_str, 'Issues link not found in error message'
+    assert 'github.com' in support_info, 'GitHub link not found in support info'
+    assert 'issues' in support_info, 'Issues link not found in support info'
 
     # Check for Discord link
-    assert 'discord.gg/vzmTzzZgNu' in error_str, 'Discord link not found in error message'
+    assert 'discord.gg/vzmTzzZgNu' in support_info, 'Discord link not found in support info'
 
     # Check for guidance text
-    assert 'audio file format' in error_str, 'Audio format guidance not found'
-    assert 'text/subtitle content' in error_str, 'Text content guidance not found'
+    assert 'audio file format' in support_info, 'Audio format guidance not found'
+    assert 'text/subtitle content' in support_info, 'Text content guidance not found'
 
-    print('✓ Support information included in error messages')
+    print('✓ Support information included in get_support_info()')
     print('✅ Support information tests passed!\n')
 
 

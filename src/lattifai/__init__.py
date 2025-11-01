@@ -61,11 +61,16 @@ def __getattr__(name):
         from .client import LattifAI
 
         return LattifAI
+    if name == 'AsyncLattifAI':
+        from .client import AsyncLattifAI
+
+        return AsyncLattifAI
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 __all__ = [
     'LattifAI',  # noqa: F822
+    'AsyncLattifAI',  # noqa: F822
     'LattifAIError',
     'AudioProcessingError',
     'AudioLoadError',

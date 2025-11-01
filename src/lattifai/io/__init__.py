@@ -2,11 +2,31 @@ from typing import List, Optional
 
 from lhotse.utils import Pathlike
 
+from .gemini_reader import GeminiReader, GeminiSegment
+from .gemini_writer import GeminiWriter
 from .reader import SubtitleFormat, SubtitleReader
 from .supervision import Supervision
+from .utils import (
+    ALL_SUBTITLE_FORMATS,
+    INPUT_SUBTITLE_FORMATS,
+    OUTPUT_SUBTITLE_FORMATS,
+    SUBTITLE_FORMATS,
+)
 from .writer import SubtitleWriter
 
-__all__ = ['SubtitleReader', 'SubtitleWriter', 'SubtitleIO', 'Supervision']
+__all__ = [
+    'SubtitleReader',
+    'SubtitleWriter',
+    'SubtitleIO',
+    'Supervision',
+    'GeminiReader',
+    'GeminiWriter',
+    'GeminiSegment',
+    'SUBTITLE_FORMATS',
+    'INPUT_SUBTITLE_FORMATS',
+    'OUTPUT_SUBTITLE_FORMATS',
+    'ALL_SUBTITLE_FORMATS',
+]
 
 
 class SubtitleIO:

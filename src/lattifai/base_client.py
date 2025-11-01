@@ -113,3 +113,14 @@ class AsyncAPIClient(BaseAPIClient):
     ) -> httpx.Response:
         """Make an HTTP request."""
         return await self._client.request(method=method, url=url, json=json, files=files, **kwargs)
+
+    async def post(
+        self,
+        api_endpoint: str,
+        *,
+        json: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ) -> httpx.Response:
+        """Make a POST request to the specified API endpoint."""
+        return await self._request('POST', api_endpoint, json=json, files=files, **kwargs)

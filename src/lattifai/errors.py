@@ -1,10 +1,25 @@
 """Error handling and exception classes for LattifAI SDK."""
 
-import sys
 import traceback
 from typing import Any, Dict, Optional
 
 import colorful
+
+# Error help messages
+LATTICE_DECODING_FAILURE_HELP = (
+    'Failed to decode lattice alignment. Possible reasons:\n\n'
+    '1) Audio and text content mismatch:\n'
+    '   - The transcript/subtitle does not accurately match the audio content\n'
+    '   - Text may be from a different version or section of the audio\n'
+    '   ⚠️  Note: Gemini transcription may occasionally skip large segments of audio, causing alignment failures.\n'
+    '       We will detect and fix this issue in the next version.\n\n'
+    '2) Unsupported audio type:\n'
+    '   - Singing is not yet supported, this will be optimized in future versions\n\n'
+    '💡 Troubleshooting tips:\n'
+    '   • Verify the transcript matches the audio by listening to a few segments\n'
+    '   • For YouTube videos, manually check if auto-generated transcript are accurate\n'
+    '       • Consider using a different transcription source if Gemini results are incomplete'
+)
 
 
 class LattifAIError(Exception):
@@ -26,7 +41,7 @@ class LattifAIError(Exception):
     def get_support_info(self) -> str:
         """Get support information for users."""
         return (
-            f'\n\n{colorful.green("🔧 Need help? Here are two ways to get support:")}\n'
+            f'\n{colorful.green("🔧 Need help? Here are two ways to get support:")}\n'
             f'   1. 📝 Create a GitHub issue: {colorful.green("https://github.com/lattifai/lattifai-python/issues")}\n'
             '      Please include:\n'
             '      - Your audio file format and duration\n'
@@ -36,13 +51,21 @@ class LattifAIError(Exception):
             '      Our team and community can help you troubleshoot\n'
         )
 
-    def __str__(self) -> str:
-        """Return formatted error message with support information."""
+    def get_message(self) -> str:
+        """Return formatted error message without support information."""
         base_message = f'{colorful.red(f"[{self.error_code}] {self.message}")}'
         if self.context:
             context_str = f'\n{colorful.yellow("Context:")} ' + ', '.join(f'{k}={v}' for k, v in self.context.items())
             base_message += context_str
-        return base_message + self.get_support_info()
+        return base_message
+
+    def __str__(self) -> str:
+        """Return formatted error message without support information.
+
+        Note: Support info should be displayed explicitly at the CLI level,
+        not automatically appended to avoid duplication when errors are re-raised.
+        """
+        return self.get_message()
 
 
 class AudioProcessingError(LattifAIError):
@@ -142,13 +165,28 @@ class LatticeDecodingError(AlignmentError):
 
     def __init__(self, lattice_id: str, original_error: Optional[Exception] = None, **kwargs):
         message = f'Failed to decode lattice alignment results for lattice ID: {colorful.red(lattice_id)}'
-        if original_error:
+
+        # Don't duplicate the help message if it's already in original_error
+        if original_error and str(original_error) != LATTICE_DECODING_FAILURE_HELP:
             message += f' - {colorful.red(str(original_error))}'
 
         context = kwargs.get('context', {})
-        context.update({'lattice_id': lattice_id, 'original_error': str(original_error) if original_error else None})
+        # Don't store the entire help message in context to avoid duplication
+        if original_error and str(original_error) != LATTICE_DECODING_FAILURE_HELP:
+            context['original_error'] = str(original_error)
+        context['lattice_id'] = lattice_id
         kwargs['context'] = context
         super().__init__(message, **kwargs)
+
+    def get_message(self) -> str:
+        """Return formatted error message with help text."""
+        base_message = f'{colorful.red(f"[{self.error_code}]")} {self.message}'
+        if self.context and self.context.get('lattice_id'):
+            # Only show essential context (lattice_id), not the duplicated help message
+            base_message += f'\n{colorful.yellow("Lattice ID:")} {self.context["lattice_id"]}'
+        # Append help message once at the end
+        base_message += f'\n\n{colorful.yellow(LATTICE_DECODING_FAILURE_HELP)}'
+        return base_message
 
 
 class ModelLoadError(LattifAIError):
