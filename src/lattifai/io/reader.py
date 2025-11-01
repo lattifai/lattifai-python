@@ -4,6 +4,7 @@ from typing import List, Literal, Optional, Union
 
 from lhotse.utils import Pathlike
 
+from .parser import parse_speaker_text
 from .supervision import Supervision
 
 SubtitleFormat = Literal['txt', 'srt', 'vtt', 'ass', 'auto']
@@ -72,9 +73,11 @@ class SubtitleReader(ABCMeta):
 
         supervisions = []
         for event in subs.events:
+            speaker, text = parse_speaker_text(event.text)
             supervisions.append(
                 Supervision(
-                    text=event.text.replace('\\N', ' '),
+                    text=text,
+                    speaker=speaker,
                     start=event.start / 1000.0 if event.start is not None else None,
                     duration=(event.end - event.start) / 1000.0 if event.end is not None else None,
                 )

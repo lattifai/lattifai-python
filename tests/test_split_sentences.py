@@ -219,3 +219,27 @@ def test_split_sentences_retains_speaker_for_final_remainder():
     result = tokenizer.split_sentences(supervisions)
 
     assert texts_and_speakers(result) == [('Closing thought that trails', 'Alice')]
+
+
+def test_split_sentences_text_integrity():
+    from pathlib import Path
+
+    subtitle_file = Path('~/Downloads/lattifai_youtube_google/eIUqw3_YcCI.en.vtt').expanduser()
+    subtitle_file = Path('~/Downloads/lattifai_youtube_google/7nv1snJRCEI.en.vtt').expanduser()
+    if not subtitle_file.exists():
+        pytest.skip('Subtitle file not found, skipping integrity test.')
+        return
+
+    from lattifai.io import SubtitleIO
+    from lattifai.utils import _resolve_model_path
+
+    model_path = _resolve_model_path('Lattifai/Lattice-1-Alpha')
+    tokenizer = LatticeTokenizer.from_pretrained(None, model_path, device='cpu')
+
+    supervisions = SubtitleIO.read(subtitle_file)
+    tokenizer.init_sentence_splitter()
+    splits = tokenizer.split_sentences(supervisions)
+
+    origin_text = ''.join([sup.text for sup in supervisions]).replace(' ', '')
+    split_text = ''.join([sup.text for sup in splits]).replace(' ', '')
+    assert origin_text == split_text, 'Text integrity check failed after sentence splitting.'

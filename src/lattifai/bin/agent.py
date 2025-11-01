@@ -210,7 +210,7 @@ async def _run_youtube_workflow(
     click.echo()
 
     # Import workflow components
-    from lattifai import AsyncLattifAI
+    from lattifai.client import AsyncLattifAI
     from lattifai.workflows import YouTubeSubtitleAgent
     from lattifai.workflows.gemini import GeminiTranscriber
     from lattifai.workflows.youtube import YouTubeDownloader
@@ -309,12 +309,13 @@ if __name__ == '__main__':
 
     asyncio.run(
         _run_youtube_workflow(
+            # url='https://www.youtube.com/watch?v=7nv1snJRCEI',
             url='https://www.youtube.com/watch?v=DQacCB9tDaw',
             lattifai_api_key=os.getenv('LATTIFAI_API_KEY'),
             gemini_api_key=os.getenv('GEMINI_API_KEY', ''),
-            device='cpu',
+            device='mps',
             model_name_or_path='Lattifai/Lattice-1-Alpha',
-            media_format='mp4',
+            media_format='mp3',
             output_format='TextGrid',
             output_dir='~/Downloads/lattifai_youtube',
             max_retries=0,

@@ -192,12 +192,15 @@ class LatticeTokenizer:
         for s, supervision in enumerate(supervisions):
             text_len += len(supervision.text)
             if supervision.speaker:
-                speakers.append(supervision.speaker)
                 if sidx < s:
+                    if len(speakers) < len(texts) + 1:
+                        speakers.append(None)
                     text = ' '.join([sup.text for sup in supervisions[sidx:s]])
                     texts.append(text)
                     sidx = s
                     text_len = len(supervision.text)
+                speakers.append(supervision.speaker)
+
             else:
                 if text_len >= 2000 or s == len(supervisions) - 1:
                     if len(speakers) < len(texts) + 1:
@@ -228,7 +231,7 @@ class LatticeTokenizer:
                     remainder = ''
                 # Detect and split special sentence types: e.g., '[APPLAUSE] &gt;&gt; MIRA MURATI:' -> ['[APPLAUSE]', '&gt;&gt; MIRA MURATI:']  # noqa: E501
                 resplit_parts = self._resplit_special_sentence_types(_sentence)
-                if any(resplit_parts[-1].endswith(sp) for sp in [':', '：']):
+                if any(resplit_parts[-1].endswith(sp) for sp in [':', '：', ']']):
                     if s < len(_sentences) - 1:
                         _sentences[s + 1] = resplit_parts[-1] + ' ' + _sentences[s + 1]
                     else:  # last part
@@ -237,6 +240,12 @@ class LatticeTokenizer:
                 else:
                     processed_sentences.extend(resplit_parts)
             _sentences = processed_sentences
+
+            if not _sentences:
+                if remainder:
+                    _sentences, remainder = [remainder.strip()], ''
+                else:
+                    continue
 
             if any(_sentences[-1].endswith(ep) for ep in END_PUNCTUATION):
                 supervisions.extend(
