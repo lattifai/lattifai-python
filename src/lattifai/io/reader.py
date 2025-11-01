@@ -74,7 +74,7 @@ class SubtitleReader(ABCMeta):
         for event in subs.events:
             supervisions.append(
                 Supervision(
-                    text=event.text,
+                    text=event.text.replace('\\N', ' '),
                     start=event.start / 1000.0 if event.start is not None else None,
                     duration=(event.end - event.start) / 1000.0 if event.end is not None else None,
                 )

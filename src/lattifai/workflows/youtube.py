@@ -492,36 +492,6 @@ class YouTubeDownloader:
                 self.logger.error(f'Failed to download transcript: {error_msg}')
                 raise RuntimeError(f'Failed to download transcript: {error_msg}')
 
-    def _convert_subtitle_to_text(self, subtitle_file: Path, output_file: Path) -> None:
-        """Convert subtitle file (vtt/srt) to plain text"""
-        try:
-            content = subtitle_file.read_text(encoding='utf-8')
-
-            # Remove VTT/SRT formatting and extract text
-            lines = []
-            for line in content.split('\n'):
-                line = line.strip()
-                # Skip timestamps, numbers, and empty lines
-                if not line or line.isdigit() or '-->' in line or line.startswith('WEBVTT'):
-                    continue
-                # Remove HTML-like tags
-                import re
-
-                line = re.sub(r'<[^>]*>', '', line)
-                if line:
-                    lines.append(line)
-
-            # Write cleaned text
-            output_file.write_text('\n'.join(lines), encoding='utf-8')
-            self.logger.info(f'✅ Converted to text format: {output_file}')
-
-        except Exception as e:
-            self.logger.error(f'Failed to convert subtitle to text: {e}')
-            # Fallback: just copy the file
-            import shutil
-
-            shutil.copy2(subtitle_file, output_file)
-
     async def list_available_subtitles(self, url: str) -> List[Dict[str, Any]]:
         """
         List all available subtitle tracks for a YouTube video
@@ -688,6 +658,23 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             force_overwrite=force_overwrite,
         )
 
+        # Try to download subtitles if available
+        subtitle_path = None
+        try:
+            subtitle_path = await self.downloader.download_subtitles(
+                url=url,
+                output_dir=str(output_dir),
+                force_overwrite=force_overwrite,
+                enable_gemini_option=bool(self.transcriber.api_key),
+            )
+            if subtitle_path:
+                self.logger.info(f'✅ Subtitle downloaded: {subtitle_path}')
+            else:
+                self.logger.info('ℹ️  No subtitles available for this video')
+        except Exception as e:
+            self.logger.warning(f'⚠️  Failed to download subtitles: {e}')
+            # Continue without subtitles - will transcribe later if needed
+
         # Get video metadata
         metadata = await self.downloader.get_video_info(url)
 
@@ -699,25 +686,32 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             'video_format': media_format,
             'output_dir': output_dir,
             'force_overwrite': force_overwrite,
+            'downloaded_subtitle_path': subtitle_path,  # Store downloaded subtitle path
         }
 
         self.logger.info(f'✅ Media downloaded: {media_path}')
         return result
 
     async def _transcribe_media(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 2: Transcribe video using Gemini 2.5 Pro"""
+        """Step 2: Transcribe video using Gemini 2.5 Pro or use downloaded subtitle"""
         url = context.get('url')
         result = context.get('process_youtube_url_result', {})
         video_path = result.get('video_path')
         output_dir = result.get('output_dir')
         force_overwrite = result.get('force_overwrite', False)
+        downloaded_subtitle_path = result.get('downloaded_subtitle_path')
 
         if not url or not video_path:
             raise ValueError('URL and video path not found in context')
 
         video_id = self.downloader.extract_video_id(url)
 
-        # Download subtitle if available
+        # If subtitle was already downloaded in step 1 and user selected it, use it directly
+        if downloaded_subtitle_path and downloaded_subtitle_path != 'gemini':
+            self.logger.info(f'📥 Using subtitle downloaded in previous step: {downloaded_subtitle_path}')
+            return {'subtitle_path': downloaded_subtitle_path}
+
+        # Check for existing subtitles if subtitle was not downloaded yet
         self.logger.info('📥 Checking for existing subtitles...')
 
         # Check for existing subtitle files (all formats including Gemini transcripts)
@@ -745,11 +739,15 @@ class YouTubeSubtitleAgent(WorkflowAgent):
                 # Continue to transcription below
                 # For 'gemini', user explicitly chose to transcribe with Gemini
                 pass
-            elif subtitle_choice:  # User selected a specific file
+            elif subtitle_choice == 'use':
+                # User chose to use existing subtitle files (use first one)
+                subtitle_path = Path(existing_files['subtitle'][0])
+                self.logger.info(f'🔁 Using existing subtitle: {subtitle_path}')
+                return {'subtitle_path': str(subtitle_path)}
+            elif subtitle_choice:  # User selected a specific file path
                 # Use selected subtitle
                 subtitle_path = Path(subtitle_choice)
                 self.logger.info(f'🔁 Using existing subtitle: {subtitle_path}')
-
                 return {'subtitle_path': str(subtitle_path)}
             # If user_choice == 'overwrite' or 'gemini', continue to transcription below
 
