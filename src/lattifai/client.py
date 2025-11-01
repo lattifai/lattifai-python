@@ -118,11 +118,11 @@ class LattifAI(SyncAPIClient):
                 text_content = ' '.join([sup.text for sup in supervisions]) if supervisions else ''
                 raise LatticeEncodingError(text_content, original_error=e)
 
-            # step3: align audio with text
-            print(colorful.cyan(f'🎵 Step 3: Performing alignment on audio file: {audio}'))
+            # step3: search lattice graph with audio
+            print(colorful.cyan(f'🔍 Step 3: Searching lattice graph with audio: {audio}'))
             try:
                 lattice_results = self.worker.alignment(audio, lattice_graph)
-                print(colorful.green('         ✓ Alignment completed successfully'))
+                print(colorful.green('         ✓ Lattice search completed successfully'))
             except Exception as e:
                 raise AlignmentError(
                     f'Audio alignment failed for {audio}',
@@ -131,11 +131,11 @@ class LattifAI(SyncAPIClient):
                     context={'original_error': str(e)},
                 )
 
-            # step4: decode the lattice paths
-            print(colorful.cyan('🔍 Step 4: Decoding lattice paths to final alignments'))
+            # step4: decode lattice results to aligned segments
+            print(colorful.cyan('🎯 Step 4: Decoding lattice results to aligned segments'))
             try:
                 alignments = self.tokenizer.detokenize(lattice_id, lattice_results)
-                print(colorful.green(f'         ✓ Decoded {len(alignments)} aligned segments'))
+                print(colorful.green(f'         ✓ Successfully aligned {len(alignments)} segments'))
             except LatticeDecodingError as e:
                 print(colorful.red('         x Failed to decode lattice alignment results'))
                 raise e
@@ -242,10 +242,10 @@ class AsyncLattifAI(AsyncAPIClient):
                 text_content = ' '.join([sup.text for sup in supervisions]) if supervisions else ''
                 raise LatticeEncodingError(text_content, original_error=e)
 
-            print(colorful.cyan(f'🎵 Step 3: Performing alignment on audio file: {audio}'))
+            print(colorful.cyan(f'🔍 Step 3: Searching lattice graph with audio: {audio}'))
             try:
                 lattice_results = await asyncio.to_thread(self.worker.alignment, audio, lattice_graph)
-                print(colorful.green('         ✓ Alignment completed successfully'))
+                print(colorful.green('         ✓ Lattice search completed successfully'))
             except Exception as e:
                 raise AlignmentError(
                     f'Audio alignment failed for {audio}',
@@ -254,10 +254,10 @@ class AsyncLattifAI(AsyncAPIClient):
                     context={'original_error': str(e)},
                 )
 
-            print(colorful.cyan('🔍 Step 4: Decoding lattice paths to final alignments'))
+            print(colorful.cyan('🎯 Step 4: Decoding lattice results to aligned segments'))
             try:
                 alignments = await self.tokenizer.detokenize(lattice_id, lattice_results)
-                print(colorful.green(f'         ✓ Decoded {len(alignments)} aligned segments'))
+                print(colorful.green(f'         ✓ Successfully aligned {len(alignments)} segments'))
             except LatticeDecodingError as e:
                 print(colorful.red('         x Failed to decode lattice alignment results'))
                 raise e
