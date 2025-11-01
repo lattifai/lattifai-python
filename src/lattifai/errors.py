@@ -26,7 +26,7 @@ class LattifAIError(Exception):
     def get_support_info(self) -> str:
         """Get support information for users."""
         return (
-            f'\n\n{colorful.green("🔧 Need help? Here are two ways to get support:")}\n'
+            f'\n{colorful.green("🔧 Need help? Here are two ways to get support:")}\n'
             f'   1. 📝 Create a GitHub issue: {colorful.green("https://github.com/lattifai/lattifai-python/issues")}\n'
             '      Please include:\n'
             '      - Your audio file format and duration\n'
@@ -36,13 +36,21 @@ class LattifAIError(Exception):
             '      Our team and community can help you troubleshoot\n'
         )
 
-    def __str__(self) -> str:
-        """Return formatted error message with support information."""
+    def get_message(self) -> str:
+        """Return formatted error message without support information."""
         base_message = f'{colorful.red(f"[{self.error_code}] {self.message}")}'
         if self.context:
             context_str = f'\n{colorful.yellow("Context:")} ' + ', '.join(f'{k}={v}' for k, v in self.context.items())
             base_message += context_str
-        return base_message + self.get_support_info()
+        return base_message
+
+    def __str__(self) -> str:
+        """Return formatted error message without support information.
+
+        Note: Support info should be displayed explicitly at the CLI level,
+        not automatically appended to avoid duplication when errors are re-raised.
+        """
+        return self.get_message()
 
 
 class AudioProcessingError(LattifAIError):

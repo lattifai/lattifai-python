@@ -14,7 +14,14 @@ from .prompts import get_prompt_loader
 
 
 class GeminiTranscriber:
-    """Gemini 2.5 Pro audio transcription using the specified Gem"""
+    """Gemini 2.5 Pro audio transcription using the specified Gem
+
+    Configuration (in __init__):
+        - api_key: Gemini API key (required)
+
+    Runtime parameters (in __call__):
+        - youtube_url: YouTube URL to transcribe
+    """
 
     # The specific Gem URL provided by the user
     GEM_URL = 'https://gemini.google.com/gem/1870ly7xvW2hU_umtv-LedGsjywT0sQiN'
@@ -26,6 +33,10 @@ class GeminiTranscriber:
 
         if not self.api_key:
             raise ValueError('Gemini API key is required')
+
+    async def __call__(self, youtube_url: str) -> str:
+        """Main entry point for transcription"""
+        return await self.transcribe_url(youtube_url)
 
     async def transcribe_url(self, youtube_url: str) -> str:
         """

@@ -18,10 +18,31 @@ from lattifai.io import OUTPUT_SUBTITLE_FORMATS
 @cli.command()
 @click.option('--youtube', '--yt', is_flag=True, help='Process YouTube URL through agentic workflow.')
 @click.option(
+    '--api-key',
+    '--api_key',
+    type=str,
+    help='LattifAI API key for alignment (overrides LATTIFAI_API_KEY env var).',
+)
+@click.option(
     '--gemini-api-key',
     '--gemini_api_key',
     type=str,
     help='Gemini API key for transcription (overrides GEMINI_API_KEY env var).',
+)
+@click.option(
+    '-D',
+    '--device',
+    type=click.Choice(['cpu', 'cuda', 'mps'], case_sensitive=False),
+    default='cpu',
+    help='Device to use for inference.',
+)
+@click.option(
+    '-M',
+    '--model-name-or-path',
+    '--model_name_or_path',
+    type=str,
+    default='Lattifai/Lattice-1-Alpha',
+    help='Model name or path for alignment.',
 )
 @click.option(
     '--media-format',
@@ -74,7 +95,10 @@ from lattifai.io import OUTPUT_SUBTITLE_FORMATS
 def agent(
     youtube: bool,
     url: str,
+    api_key: Optional[str] = None,
     gemini_api_key: Optional[str] = None,
+    device: str = 'cpu',
+    model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
     media_format: str = 'mp4',
     output_format: str = 'srt',
     output_dir: Optional[str] = None,
@@ -107,9 +131,11 @@ def agent(
     if not output_dir:
         output_dir = os.getcwd()
 
-    # Get Gemini API key
-    api_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
-    if not api_key:
+    # Get API keys
+    lattifai_api_key = api_key or os.getenv('LATTIFAI_API_KEY')
+    gemini_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
+
+    if not gemini_key:
         click.echo(
             colorful.red(
                 '❌ Gemini API key is required. Set GEMINI_API_KEY environment variable or use --gemini-api-key option.'
@@ -122,7 +148,10 @@ def agent(
         asyncio.run(
             _run_youtube_workflow(
                 url=url,
-                api_key=api_key,
+                lattifai_api_key=lattifai_api_key,
+                gemini_api_key=gemini_key,
+                device=device,
+                model_name_or_path=model_name_or_path,
                 media_format=media_format,
                 output_format=output_format,
                 output_dir=output_dir,
@@ -137,7 +166,21 @@ def agent(
         click.echo(colorful.yellow('\n⚠️ Process interrupted by user'))
         sys.exit(1)
     except Exception as e:
-        click.echo(colorful.red(f'❌ Workflow failed: {str(e)}'))
+        from lattifai.errors import LattifAIError
+
+        # Extract error message without support info (to avoid duplication)
+        if isinstance(e, LattifAIError):
+            # Get just the core error message
+            error_msg = f'[{e.error_code}] {e.message}'
+            if e.context:
+                context_str = ', '.join(f'{k}={v}' for k, v in e.context.items())
+                error_msg += f'\nContext: {context_str}'
+            click.echo(colorful.red(f'❌ Workflow failed: {error_msg}'))
+            # Show support info once at the end
+            click.echo(e.get_support_info())
+        else:
+            click.echo(colorful.red(f'❌ Workflow failed: {str(e)}'))
+
         if verbose:
             import traceback
 
@@ -147,7 +190,10 @@ def agent(
 
 async def _run_youtube_workflow(
     url: str,
-    api_key: str,
+    lattifai_api_key: Optional[str],
+    gemini_api_key: str,
+    device: str,
+    model_name_or_path: str,
     media_format: str,
     output_format: str,
     output_dir: str,
@@ -158,34 +204,43 @@ async def _run_youtube_workflow(
 ):
     """Run the YouTube processing workflow"""
 
-    # Determine if format is audio or video
-    is_audio_format = media_format.lower() in ['mp3', 'wav', 'm4a', 'aac', 'opus']
-    format_type = 'Audio' if is_audio_format else 'Video'
-
     click.echo(colorful.cyan('🚀 LattifAI Agentic Workflow - YouTube Processing'))
     click.echo(f'📺      YouTube URL: {url}')
-    click.echo(f'🎬     Media format: {media_format} ({format_type})')
+    click.echo(f'🎬     Media format: {media_format}')
     click.echo(f'📝    Output format: {output_format}')
     click.echo(f'📁 Output directory: {output_dir}')
     click.echo(f'🔄      Max retries: {max_retries}')
     click.echo()
 
-    # Import the workflow agent
+    # Import workflow components
+    from lattifai import AsyncLattifAI
     from lattifai.workflows import YouTubeSubtitleAgent
+    from lattifai.workflows.gemini import GeminiTranscriber
+    from lattifai.workflows.youtube import YouTubeDownloader
 
-    # Initialize agent
+    # Initialize components with their configuration (only persistent config, not runtime params)
+    downloader = YouTubeDownloader()
+    transcriber = GeminiTranscriber(api_key=gemini_api_key)
+    aligner = AsyncLattifAI(model_name_or_path=model_name_or_path, device=device, api_key=lattifai_api_key)
+
+    # Initialize agent with components
     agent = YouTubeSubtitleAgent(
-        gemini_api_key=api_key,
-        video_format=media_format,  # YouTubeSubtitleAgent still uses video_format parameter
-        output_format=output_format,
+        downloader=downloader,
+        transcriber=transcriber,
+        aligner=aligner,
         max_retries=max_retries,
-        split_sentence=split_sentence,
-        word_level=word_level,
-        force_overwrite=force_overwrite,
     )
 
     # Process the URL
-    result = await agent.process_youtube_url(url=url, output_dir=output_dir, output_format=output_format)
+    result = await agent.process_youtube_url(
+        url=url,
+        output_dir=output_dir,
+        media_format=media_format,
+        force_overwrite=force_overwrite,
+        output_format=output_format,
+        split_sentence=split_sentence,
+        word_level=word_level,
+    )
 
     # Display results
     click.echo(colorful.bold_white_on_green('🎉 Workflow completed successfully!'))

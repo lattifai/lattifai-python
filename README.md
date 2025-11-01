@@ -33,11 +33,26 @@ lai align audio.wav subtitle.srt output.srt
 # Or use the full command
 lattifai align audio.wav subtitle.srt output.srt
 
+# Process YouTube videos with intelligent workflow
+lai agent --youtube https://www.youtube.com/watch?v=VIDEO_ID
+
+# Download and align YouTube content directly
+lai youtube https://www.youtube.com/watch?v=VIDEO_ID
+
 # Convert subtitle format
 lai subtitle convert input.srt output.vtt
 ```
 
 > **💡 Tip**: Use `lai` for faster typing in your daily workflow!
+
+#### Command Quick Reference
+
+| Command | Use Case | Best For |
+|---------|----------|----------|
+| `lai align` | Align existing audio + subtitle files | Local files, custom workflows |
+| `lai youtube` | Download & align YouTube content | Quick one-off YouTube processing |
+| `lai agent` | Intelligent YouTube workflow with retries | Production, batch jobs, automation |
+| `lai subtitle` | Convert subtitle formats | Format conversion only |
 
 #### lai align options
 ```
@@ -55,6 +70,91 @@ Options:
   --api_key TEXT                                                    API key for LattifAI.
   --help                                                            Show this message and exit.
 ```
+
+#### lai youtube command
+
+Download and align YouTube videos in one step. Automatically downloads media, fetches subtitles (or uses Gemini transcription if unavailable), and performs forced alignment.
+
+```bash
+# Basic usage
+lai youtube https://www.youtube.com/watch?v=VIDEO_ID
+
+# Common options: audio format, sentence splitting, word-level, GPU
+lai youtube --media-format mp3 --split-sentence --word-level --device mps \
+  --output-dir ./output --output-format srt https://www.youtube.com/watch?v=VIDEO_ID
+
+# Use Gemini for transcription fallback
+lai youtube --gemini-api-key YOUR_KEY https://www.youtube.com/watch?v=VIDEO_ID
+```
+
+**Options**:
+```
+> lai youtube --help
+Usage: lattifai youtube [OPTIONS] YT_URL
+
+  Download media and subtitles from YouTube for further alignment.
+
+Options:
+  -M, --media-format [mp3|wav|m4a|aac|flac|ogg|opus|aiff|mp4|webm|mkv|avi|mov]  Media format for YouTube download.
+  -S, --split-sentence                                                           Re-segment subtitles by semantics.
+  -W, --word-level                                                               Include word-level alignment timestamps.
+  -O, --output-dir PATH                                                          Output directory (default: current directory).
+  -D, --device [cpu|cuda|mps]                                                    Device to use for inference.
+  -M, --model-name-or-path TEXT                                                  Model name or path for alignment.
+  --api-key TEXT                                                                 API key for LattifAI.
+  --gemini-api-key TEXT                                                          Gemini API key for transcription fallback.
+  -F, --output-format [srt|vtt|ass|ssa|sub|sbv|txt|json|TextGrid]              Subtitle output format.
+  --help                                                                         Show this message and exit.
+```
+
+#### lai agent command
+
+**Intelligent Agentic Workflow** - Process YouTube videos through an advanced multi-step workflow with automatic retries, smart file management, and comprehensive error handling.
+
+```bash
+# Basic usage
+lai agent --youtube https://www.youtube.com/watch?v=VIDEO_ID
+
+# Production workflow with retries, verbose logging, and force overwrite
+lai agent --youtube --media-format mp4 --output-format TextGrid \
+  --split-sentence --word-level --device mps --max-retries 2 --verbose --force \
+  --output-dir ./outputs https://www.youtube.com/watch?v=VIDEO_ID
+```
+
+**Key Features**:
+- **🔄 Automatic Retry Logic**: Configurable retry mechanism for failed steps
+- **📁 Smart File Management**: Detects existing files and prompts for action
+- **🎯 Intelligent Workflow**: Multi-step pipeline with dependency management
+- **🛡️ Error Recovery**: Graceful handling of failures with detailed logging
+- **📊 Rich Output**: Comprehensive results with metadata and file paths
+- **⚡ Async Processing**: Efficient parallel execution of independent tasks
+
+**Options**:
+```
+> lai agent --help
+Usage: lattifai agent [OPTIONS] URL
+
+  LattifAI Agentic Workflow Agent
+
+  Process multimedia content through intelligent agent-based pipelines.
+
+Options:
+  --youtube, --yt                                          Process YouTube URL through agentic workflow.
+  --gemini-api-key TEXT                                    Gemini API key for transcription.
+  --media-format [mp3|wav|m4a|aac|opus|mp4|webm|mkv|...]  Media format for YouTube download.
+  --output-format [srt|vtt|ass|ssa|sub|sbv|txt|json|...]  Subtitle output format.
+  --output-dir PATH                                        Output directory (default: current directory).
+  --max-retries INTEGER                                    Maximum retries for failed steps.
+  -S, --split-sentence                                     Re-segment subtitles by semantics.
+  --word-level                                             Include word-level alignment timestamps.
+  --verbose, -v                                            Enable verbose logging.
+  --force, -f                                              Force overwrite without confirmation.
+  --help                                                   Show this message and exit.
+```
+
+**When to use `lai agent` vs `lai youtube`**:
+- **Use `lai agent`**: For production workflows, batch processing, advanced error handling, and when you need retry logic
+- **Use `lai youtube`**: For quick one-off downloads and alignment with minimal overhead
 
 #### Understanding --split_sentence
 
@@ -90,28 +190,189 @@ The `--word_level` option enables word-level alignment, providing precise timing
 **Key features**:
 - **Individual word timestamps**: Each word gets its own start and end time
 - **Format-specific output**:
-  - **JSON**: Full alignment details stored in `alignment.word` field of each segment
+  - **JSON (Recommended)**: Full alignment details stored in `alignment.word` field of each segment, preserving all word-level timing information in a structured format
   - **TextGrid**: Separate "words" tier alongside the "utterances" tier for linguistic analysis
   - **TXT**: Each word on a separate line with timestamp range: `[start-end] word`
   - **Standard subtitle formats** (SRT, VTT, ASS, etc.): Each word becomes a separate subtitle event
+
+> **💡 Recommended**: Use JSON format (`output.json`) to preserve complete word-level alignment data. Other formats may lose some structural information.
 
 **Example output formats**:
 
 **JSON format** (with word-level details):
 ```json
 [
-  {
-    "id": "segment-001",
-    "start": 0.5,
-    "end": 2.3,
-    "text": "Hello world",
-    "alignment": {
-      "word": [
-        {"start": 0.5, "end": 1.2, "symbol": "Hello"},
-        {"start": 1.2, "end": 2.3, "symbol": "world"}
+{
+  "id": "6",
+  "recording_id": "",
+  "start": 24.52,
+  "duration": 9.1,
+  "channel": 0,
+  "text": "We will start with why it is so important to us to have a product that we can make truly available and broadly available to everyone.",
+  "custom": {
+    "score": 0.8754
+  },
+  "alignment": {
+    "word": [
+      [
+        "We",
+        24.6,
+        0.14,
+        1.0
+      ],
+      [
+        "will",
+        24.74,
+        0.14,
+        1.0
+      ],
+      [
+        "start",
+        24.88,
+        0.46,
+        0.771
+      ],
+      [
+        "with",
+        25.34,
+        0.28,
+        0.9538
+      ],
+      [
+        "why",
+        26.2,
+        0.36,
+        1.0
+      ],
+      [
+        "it",
+        26.56,
+        0.14,
+        0.9726
+      ],
+      [
+        "is",
+        26.74,
+        0.02,
+        0.6245
+      ],
+      [
+        "so",
+        26.76,
+        0.16,
+        0.6615
+      ],
+      [
+        "important",
+        26.92,
+        0.54,
+        0.9257
+      ],
+      [
+        "to",
+        27.5,
+        0.1,
+        1.0
+      ],
+      [
+        "us",
+        27.6,
+        0.34,
+        0.7955
+      ],
+      [
+        "to",
+        28.04,
+        0.08,
+        0.8545
+      ],
+      [
+        "have",
+        28.16,
+        0.46,
+        0.9994
+      ],
+      [
+        "a",
+        28.76,
+        0.06,
+        1.0
+      ],
+      [
+        "product",
+        28.82,
+        0.56,
+        0.9975
+      ],
+      [
+        "that",
+        29.38,
+        0.08,
+        0.5602
+      ],
+      [
+        "we",
+        29.46,
+        0.16,
+        0.7017
+      ],
+      [
+        "can",
+        29.62,
+        0.22,
+        1.0
+      ],
+      [
+        "make",
+        29.84,
+        0.32,
+        0.9643
+      ],
+      [
+        "truly",
+        30.42,
+        0.32,
+        0.6737
+      ],
+      [
+        "available",
+        30.74,
+        0.6,
+        0.9349
+      ],
+      [
+        "and",
+        31.4,
+        0.2,
+        0.4114
+      ],
+      [
+        "broadly",
+        31.6,
+        0.44,
+        0.6726
+      ],
+      [
+        "available",
+        32.04,
+        0.58,
+        0.9108
+      ],
+      [
+        "to",
+        32.72,
+        0.06,
+        1.0
+      ],
+      [
+        "everyone.",
+        32.78,
+        0.64,
+        0.7886
       ]
-    }
+    ]
   }
+}
 ]
 ```
 
@@ -130,10 +391,10 @@ Two tiers created:
 
 **Use cases**:
 - **Linguistic analysis**: Study pronunciation patterns, speech timing, and prosody
+- **Accessibility**: Create more granular captions for hearing-impaired users
+- **Video/Audio editing**: Enable precise word-level subtitle synchronization
 - **Karaoke applications**: Highlight individual words as they are spoken
 - **Language learning**: Provide precise word boundaries for pronunciation practice
-- **Accessibility**: Create more granular captions for hearing-impaired users
-- **Video editing**: Enable precise word-level subtitle synchronization
 
 **Usage**:
 ```bash
@@ -323,6 +584,44 @@ client = LattifAI(device='mps')
 
 # CLI
 lai align --device mps audio.wav subtitle.srt output.srt
+```
+
+### YouTube Processing with Agent Workflow
+
+```python
+import asyncio
+from lattifai.workflows import YouTubeSubtitleAgent
+
+async def process_youtube():
+    # Initialize agent with configuration
+    agent = YouTubeSubtitleAgent(
+        gemini_api_key="your-gemini-api-key",
+        video_format="mp4",  # or "mp3", "wav", etc.
+        output_format="srt",
+        max_retries=2,
+        split_sentence=True,
+        word_level=True,
+        force_overwrite=False
+    )
+
+    # Process YouTube URL
+    result = await agent.process_youtube_url(
+        url="https://www.youtube.com/watch?v=VIDEO_ID",
+        output_dir="./output",
+        output_format="srt"
+    )
+
+    # Access results
+    print(f"Title: {result['metadata']['title']}")
+    print(f"Duration: {result['metadata']['duration']} seconds")
+    print(f"Subtitle count: {result['subtitle_count']}")
+
+    # Access generated files
+    for format_name, file_path in result['exported_files'].items():
+        print(f"{format_name.upper()}: {file_path}")
+
+# Run the async workflow
+asyncio.run(process_youtube())
 ```
 
 ## Configuration

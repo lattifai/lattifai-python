@@ -19,13 +19,20 @@ from .gemini import GeminiTranscriber
 
 
 class YouTubeDownloader:
-    """YouTube video/audio downloader using yt-dlp"""
+    """YouTube video/audio downloader using yt-dlp
 
-    def __init__(self, media_format: str = 'mp3', gemini_api_key: Optional[str] = None):
-        self.media_format = media_format
-        self.gemini_api_key = gemini_api_key
+    Configuration (in __init__):
+        - None (stateless downloader)
+
+    Runtime parameters (in __call__ or methods):
+        - url: YouTube URL to download
+        - output_dir: Where to save files
+        - media_format: Format to download (mp3, mp4, etc.)
+        - force_overwrite: Whether to overwrite existing files
+    """
+
+    def __init__(self):
         self.logger = setup_workflow_logger('youtube')
-
         # Check if yt-dlp is available
         self._check_ytdlp()
 
@@ -328,7 +335,12 @@ class YouTubeDownloader:
         )
 
     async def download_subtitles(
-        self, url: str, output_dir: str, force_overwrite: bool = False, subtitle_lang: Optional[str] = None
+        self,
+        url: str,
+        output_dir: str,
+        force_overwrite: bool = False,
+        subtitle_lang: Optional[str] = None,
+        enable_gemini_option: bool = False,
     ) -> Optional[str]:
         """
         Download video subtitles using yt-dlp
@@ -339,6 +351,7 @@ class YouTubeDownloader:
             force_overwrite: Skip user confirmation and overwrite existing files
             subtitle_lang: Specific subtitle language/track to download (e.g., 'en')
                           If None, downloads all available subtitles
+            enable_gemini_option: Whether to show Gemini transcription as an option in interactive mode
 
         Returns:
             Path to downloaded transcript file or None if not available
@@ -445,13 +458,12 @@ class YouTubeDownloader:
             # Multiple subtitle files found, let user choose
             if FileExistenceManager.is_interactive_mode():
                 self.logger.info(f'📋 Found {len(subtitle_files)} subtitle files')
-                # Enable Gemini option if API key is available
-                has_gemini_key = bool(self.gemini_api_key or os.getenv('GEMINI_API_KEY'))
+                # Use the enable_gemini_option parameter passed by caller
                 subtitle_choice = FileExistenceManager.prompt_file_selection(
                     file_type='subtitle',
                     files=[str(f) for f in subtitle_files],
                     operation='use',
-                    enable_gemini=has_gemini_key,
+                    enable_gemini=enable_gemini_option,
                 )
 
                 if subtitle_choice == 'cancel':
@@ -588,40 +600,35 @@ class YouTubeDownloader:
 
 
 class YouTubeSubtitleAgent(WorkflowAgent):
-    """Agent for YouTube URL to aligned subtitles workflow"""
+    """Agent for YouTube URL to aligned subtitles workflow
+
+    Configuration (in __init__):
+        - downloader, transcriber, aligner: Component instances (dependency injection)
+        - max_retries: Max retry attempts for workflow steps
+
+    Runtime parameters (in __call__ or process_youtube_url):
+        - url: YouTube URL to process
+        - output_dir: Where to save files
+        - media_format: Video/audio format (mp3, mp4, etc.)
+        - force_overwrite: Whether to overwrite existing files
+        - output_format: Subtitle output format (srt, vtt, etc.)
+        - split_sentence: Re-segment subtitles semantically
+        - word_level: Include word-level timestamps
+    """
 
     def __init__(
         self,
-        gemini_api_key: Optional[str] = None,
-        video_format: str = 'mp4',
-        output_format: str = 'srt',
+        downloader: YouTubeDownloader,
+        transcriber: GeminiTranscriber,
+        aligner: AsyncLattifAI,
         max_retries: int = 0,
-        split_sentence: bool = False,
-        word_level: bool = False,
-        output_dir: Optional[Path] = None,
-        force_overwrite: bool = False,
     ):
         super().__init__('YouTube Subtitle Agent', max_retries)
 
-        # Configuration
-        self.gemini_api_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
-        self.video_format = video_format
-        self.output_format = output_format
-        self.split_sentence = split_sentence
-        self.word_level = word_level
-        self.output_dir = output_dir or Path(tempfile.gettempdir())
-        self.force_overwrite = force_overwrite
-
-        # Initialize components
-        self.downloader = YouTubeDownloader(media_format='mp3')  # Keep for backward compatibility
-        self.transcriber = GeminiTranscriber(api_key=self.gemini_api_key)
-        self.aligner = AsyncLattifAI()
-
-        # Validate configuration
-        if not self.gemini_api_key:
-            raise ValueError(
-                'Gemini API key is required. Set GEMINI_API_KEY environment variable or pass gemini_api_key parameter.'
-            )
+        # Components (injected)
+        self.downloader = downloader
+        self.transcriber = transcriber
+        self.aligner = aligner
 
     def define_steps(self) -> List[WorkflowStep]:
         """Define the workflow steps"""
@@ -664,17 +671,35 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         if not url:
             raise ValueError('YouTube URL is required')
 
-        self.logger.info(f'🎥 Processing YouTube URL: {url}')
+        output_dir = context.get('output_dir') or tempfile.gettempdir()
+        output_dir = Path(output_dir).expanduser()
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Download video (no conversion needed for Gemini)
+        media_format = context.get('media_format', 'mp4')
+        force_overwrite = context.get('force_overwrite', False)
+
+        self.logger.info(f'🎥 Processing YouTube URL: {url}')
+        self.logger.info(f'📦 Media format: {media_format}')
+
+        # Download video with runtime parameters
         video_path = await self.downloader.download_video(
-            url=url, output_dir=self.output_dir, video_format=self.video_format, force_overwrite=self.force_overwrite
+            url=url,
+            output_dir=str(output_dir),
+            video_format=media_format,
+            force_overwrite=force_overwrite,
         )
 
         # Get video metadata
         metadata = await self.downloader.get_video_info(url)
 
-        result = {'url': url, 'video_path': video_path, 'metadata': metadata, 'video_format': self.video_format}
+        result = {
+            'url': url,
+            'video_path': video_path,
+            'metadata': metadata,
+            'video_format': media_format,
+            'output_dir': output_dir,
+            'force_overwrite': force_overwrite,
+        }
 
         self.logger.info(f'✅ Video downloaded: {video_path}')
         return result
@@ -682,7 +707,10 @@ class YouTubeSubtitleAgent(WorkflowAgent):
     async def _transcribe_media(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Step 2: Transcribe video using Gemini 2.5 Pro"""
         url = context.get('url')
-        video_path = context.get('process_youtube_url_result', {}).get('video_path')
+        result = context.get('process_youtube_url_result', {})
+        video_path = result.get('video_path')
+        output_dir = result.get('output_dir')
+        force_overwrite = result.get('force_overwrite', False)
 
         if not url or not video_path:
             raise ValueError('URL and video path not found in context')
@@ -695,15 +723,15 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # Check for existing subtitle files (all formats including Gemini transcripts)
         existing_files = FileExistenceManager.check_existing_files(
             video_id,
-            str(self.output_dir),
+            str(output_dir),
             subtitle_formats=SUBTITLE_FORMATS,  # Check all subtitle formats including Markdown
         )
 
         # Prompt user if subtitle exists and force_overwrite is not set
-        if existing_files['subtitle'] and not self.force_overwrite:
+        if existing_files['subtitle'] and not force_overwrite:
             # Let user choose which subtitle file to use
-            # Enable Gemini option if API key is available
-            has_gemini_key = bool(self.gemini_api_key)
+            # Enable Gemini option if API key is available (check transcriber's api_key)
+            has_gemini_key = bool(self.transcriber.api_key)
             subtitle_choice = FileExistenceManager.prompt_file_selection(
                 file_type='subtitle',
                 files=existing_files['subtitle'],
@@ -728,7 +756,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # TODO: support other Transcriber options
         self.logger.info('✨ Transcribing URL with Gemini 2.5 Pro...')
         transcript = await self.transcriber.transcribe_url(url)
-        subtitle_path = self.output_dir / f'{video_id}_Gemini.md'
+        subtitle_path = output_dir / f'{video_id}_Gemini.md'
         with open(subtitle_path, 'w', encoding='utf-8') as f:
             f.write(transcript)
         result = {'subtitle_path': str(subtitle_path)}
@@ -755,15 +783,18 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         self.logger.info(f'� Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
 
         original_subtitle_path = subtitle_path
-        output_path = Path(self.output_dir) / f'{Path(media_path).stem}_aligned.ass'
+        output_dir = result.get('output_dir')
+        split_sentence = context.get('split_sentence', False)
+        word_level = context.get('word_level', False)
+        output_path = output_dir / f'{Path(media_path).stem}_aligned.ass'
 
-        # Perform alignment with LattifAI using extracted/original text
+        # Perform alignment with LattifAI (split_sentence and word_level passed as function parameters)
         aligned_result = await self.aligner.alignment(
             audio=media_path,
             subtitle=str(subtitle_path),  # Use dialogue text for YouTube format, original for plain text
             format='gemini' if is_gemini_format else 'auto',
-            split_sentence=self.split_sentence,
-            return_details=self.word_level,
+            split_sentence=split_sentence,
+            return_details=word_level,
             output_subtitle_path=str(output_path),
         )
 
@@ -788,7 +819,8 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         if not aligned_path:
             raise ValueError('Aligned subtitle path not found')
 
-        self.logger.info(f'📤 Exporting results in format: {self.output_format}')
+        output_format = context.get('output_format', 'srt')
+        self.logger.info(f'📤 Exporting results in format: {output_format}')
 
         supervisions = SubtitleIO.read(aligned_path, format='ass')
         exported_files = {}
@@ -818,11 +850,11 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         # Export to requested subtitle format
         output_path = str(aligned_path).replace(
-            '_aligned.ass', f'{"_Gemini" if is_gemini_format else ""}_LattifAI.{self.output_format}'
+            '_aligned.ass', f'{"_Gemini" if is_gemini_format else ""}_LattifAI.{output_format}'
         )
         SubtitleIO.write(supervisions, output_path=output_path)
-        exported_files[self.output_format] = output_path
-        self.logger.info(f'✅ Exported {self.output_format.upper()}: {output_path}')
+        exported_files[output_format] = output_path
+        self.logger.info(f'✅ Exported {output_format.upper()}: {output_path}')
 
         result = {
             'exported_files': exported_files,
@@ -834,30 +866,62 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         return result
 
+    async def __call__(
+        self,
+        url: str,
+        output_dir: Optional[str] = None,
+        media_format: str = 'mp4',
+        force_overwrite: bool = False,
+        output_format: str = 'srt',
+        split_sentence: bool = False,
+        word_level: bool = False,
+    ) -> Dict[str, Any]:
+        """Main entry point - callable interface"""
+        return await self.process_youtube_url(
+            url=url,
+            output_dir=output_dir,
+            media_format=media_format,
+            force_overwrite=force_overwrite,
+            output_format=output_format,
+            split_sentence=split_sentence,
+            word_level=word_level,
+        )
+
     async def process_youtube_url(
-        self, url: str, output_dir: Optional[str] = None, output_format: Optional[str] = None
+        self,
+        url: str,
+        output_dir: Optional[str] = None,
+        media_format: str = 'mp4',
+        force_overwrite: bool = False,
+        output_format: str = 'srt',
+        split_sentence: bool = False,
+        word_level: bool = False,
     ) -> Dict[str, Any]:
         """
         Main entry point for processing a YouTube URL
 
         Args:
             url: YouTube URL to process
-            output_dir: Directory to save output files (optional)
-            output_format: Output format (optional, uses instance default)
+            output_dir: Directory to save output files
+            media_format: Media format for download (mp3, mp4, etc.)
+            force_overwrite: Force overwrite existing files
+            output_format: Subtitle output format (srt, vtt, ass, etc.)
+            split_sentence: Re-segment subtitles by semantics
+            word_level: Include word-level alignment timestamps
 
         Returns:
             Dictionary containing results and exported file paths
         """
-        if output_format:
-            self.output_format = output_format
-
-        if output_dir:
-            expanded_dir = Path(output_dir).expanduser()
-            expanded_dir.mkdir(parents=True, exist_ok=True)
-            self.output_dir = expanded_dir
-
-        # Execute the workflow
-        result = await self.execute(url=url)
+        # Execute the workflow with parameters
+        result = await self.execute(
+            url=url,
+            output_dir=output_dir,
+            media_format=media_format,
+            force_overwrite=force_overwrite,
+            output_format=output_format,
+            split_sentence=split_sentence,
+            word_level=word_level,
+        )
 
         if result.is_success:
             return result.data.get('export_results_result', {})
