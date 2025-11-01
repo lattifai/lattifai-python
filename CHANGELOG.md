@@ -14,7 +14,7 @@ We use [this changelog structure](http://keepachangelog.com/).
 
 None.
 
-## [0.2.8] - 2025-11-01
+## [0.4.0] - 2025-11-01
 
 ### Added
 - **Shorthand CLI Command**: Introduced `lai` as a convenient alias for `lattifai` command

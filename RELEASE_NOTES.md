@@ -1,4 +1,4 @@
-# Release Notes - LattifAI Python v0.2.8
+# Release Notes - LattifAI Python v0.4.0
 
 **Release Date:** November 1, 2025
 
@@ -6,7 +6,7 @@
 
 ## 🎉 Overview
 
-LattifAI Python v0.2.8 introduces two major enhancements:
+LattifAI Python v0.4.0 introduces two major enhancements:
 
 1. **`lai` Command**: A convenient shorthand alias for `lattifai`, making the CLI faster and easier to use in your daily workflow.
 
@@ -59,7 +59,7 @@ lai align audio.wav subtitle.srt output.srt
 lai subtitle convert input.srt output.vtt
 
 # Use advanced options
-lai align --split_sentence --word_level audio.wav subtitle.srt output.json
+lai align --split_sentence audio.wav subtitle.srt output.json
 
 # GPU acceleration
 lai align --device cuda audio.wav subtitle.srt output.srt
@@ -362,7 +362,7 @@ For complete documentation, visit:
 
 ## 📝 Version Info
 
-- **Version**: 0.2.8
+- **Version**: 0.4.0
 - **Release Date**: November 1, 2025
 - **Python Support**: 3.9+
 - **Model**: Lattice-1-Alpha
