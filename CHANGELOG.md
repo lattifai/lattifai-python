@@ -14,6 +14,22 @@ We use [this changelog structure](http://keepachangelog.com/).
 
 None.
 
+## [0.4.1] - 2025-11-02
+
+### Fixed
+- Text parsing issue where newline characters in subtitle text were not properly cleaned up
+- Subtitle text now automatically replaces newline characters with spaces for improved readability
+- Enhanced text parser robustness for handling edge cases and special characters
+
+### Improved
+- Python 3.9 compatibility with type hint adjustments
+- README documentation for clarity on YouTube processing commands
+- Project branding with logo asset
+
+### Changed
+- Bumped `lattifai-core` dependency to `>=0.2.1` for better stability
+- Removed outdated demo file (`demos/demo_agentic_workflow.py`)
+
 ## [0.4.0] - 2025-11-01
 
 ### Added

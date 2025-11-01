@@ -1,3 +1,87 @@
+````markdown
+# Release Notes - LattifAI Python v0.4.1
+
+**Release Date:** November 2, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v0.4.1 is a patch release that focuses on bug fixes, text parsing improvements, and documentation enhancements.
+
+---
+
+## 🐛 Bug Fixes
+
+### Text Parsing Improvements
+
+This release includes critical fixes to subtitle text parsing and processing:
+
+- **Newline Character Handling**: Fixed issue where newline characters in subtitle text were not properly cleaned up
+  - Subtitle text now automatically replaces newline characters with spaces for better readability
+  - Improves text formatting consistency across different subtitle formats
+
+- **Text Parsing Robustness**: Enhanced parser to handle edge cases in subtitle text extraction
+  - Better handling of malformed subtitle entries
+  - Improved tokenization for special characters and formatting
+
+### YouTube Workflow Improvements
+
+- **Command Clarity**: Updated README documentation for clearer YouTube processing command examples
+- **Agent Configuration**: Refined agent command options for better user experience
+
+---
+
+## 📚 Documentation Updates
+
+- Added logo asset to project branding
+- Enhanced README with additional badges for better project visibility
+- Clarified YouTube processing commands and workflow examples
+- Removed outdated demo file for cleaner repository structure
+
+---
+
+## 🔧 Technical Improvements
+
+### Dependency Updates
+
+- **lattifai-core**: Bumped minimum version to `>=0.2.1` for better stability and feature compatibility
+- Improved Python 3.9 compatibility with type hint adjustments
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+lai --version
+# or
+lattifai --version
+```
+
+---
+
+## 📝 Version Info
+
+- **Version**: 0.4.1
+- **Release Date**: November 2, 2025
+- **Python Support**: 3.9-3.13
+- **Model**: Lattice-1-Alpha
+- **License**: Apache License 2.0
+
+---
+
+# Previous Release Notes
+
+## v0.4.0 - Shorthand Command & Agentic Workflows
+
 # Release Notes - LattifAI Python v0.4.0
 
 **Release Date:** November 1, 2025
