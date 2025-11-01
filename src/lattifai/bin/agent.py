@@ -308,15 +308,20 @@ if not check_dependencies():
 
 
 if __name__ == '__main__':
+    import os
+
     asyncio.run(
         _run_youtube_workflow(
             url='https://www.youtube.com/watch?v=DQacCB9tDaw',
-            api_key=None,
+            lattifai_api_key=os.getenv('LATTIFAI_API_KEY'),
+            gemini_api_key=os.getenv('GEMINI_API_KEY', ''),
+            device='cpu',
             media_format='mp4',
             output_format='TextGrid',
             output_dir='~/Downloads/lattifai_openai4o_debug',
             max_retries=0,
             split_sentence=True,
+            word_level=False,
             force_overwrite=False,
         )
     )

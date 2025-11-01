@@ -321,7 +321,7 @@ class LatticeTokenizer:
 
         result = response.json()
         if not result.get('success'):
-            return Exception('Failed to detokenize the alignment results.')
+            raise Exception('Failed to detokenize the alignment results.')
 
         alignments = [Supervision.from_dict(s) for s in result['supervisions']]
 

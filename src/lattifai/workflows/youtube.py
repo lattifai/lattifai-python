@@ -395,7 +395,7 @@ class YouTubeDownloader:
                     self.logger.info(f'🔍 Found existing subtitle: {subtitle_file}')
                     return str(subtitle_file)
 
-        self.logger.info(f'� Downloading subtitle for: {url}')
+        self.logger.info(f'📥 Downloading subtitle for: {url}')
         if subtitle_lang:
             self.logger.info(f'🎯 Targeting specific subtitle track: {subtitle_lang}')
 
@@ -681,11 +681,11 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         self.logger.info(f'🎥 Processing YouTube URL: {url}')
         self.logger.info(f'📦 Media format: {media_format}')
 
-        # Download video with runtime parameters
-        video_path = await self.downloader.download_video(
+        # Download media (audio or video) with runtime parameters
+        media_path = await self.downloader.download_media(
             url=url,
             output_dir=str(output_dir),
-            video_format=media_format,
+            media_format=media_format,
             force_overwrite=force_overwrite,
         )
 
@@ -694,14 +694,15 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         result = {
             'url': url,
-            'video_path': video_path,
+            'video_path': media_path,  # Keep 'video_path' key for backward compatibility
+            'audio_path': media_path,  # Also add 'audio_path' for clarity
             'metadata': metadata,
             'video_format': media_format,
             'output_dir': output_dir,
             'force_overwrite': force_overwrite,
         }
 
-        self.logger.info(f'✅ Video downloaded: {video_path}')
+        self.logger.info(f'✅ Media downloaded: {media_path}')
         return result
 
     async def _transcribe_media(self, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -780,7 +781,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             is_gemini_format = False
         subtitle_path = Path(subtitle_path)
 
-        self.logger.info(f'� Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
+        self.logger.info(f'📄 Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
 
         original_subtitle_path = subtitle_path
         output_dir = result.get('output_dir')

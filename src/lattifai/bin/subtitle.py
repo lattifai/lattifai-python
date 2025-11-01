@@ -133,7 +133,10 @@ def download(
     result = asyncio.run(download_subtitles())
 
     if result:
-        click.echo(f'📄 Subtitle file saved to: {[str(f) for f in result]}')
+        if result == 'gemini':
+            click.echo('✨ Gemini transcription selected (use the agent command to transcribe)')
+        else:
+            click.echo(f'📄 Subtitle file saved to: {result}')
 
 
 @subtitle.command()

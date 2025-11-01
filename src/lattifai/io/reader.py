@@ -34,11 +34,13 @@ class SubtitleReader(ABCMeta):
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(subtitle)
-        elif format == 'txt' or (format == 'auto' and subtitle[-4:].lower() == '.txt'):
+        elif format == 'txt' or (format == 'auto' and str(subtitle)[-4:].lower() == '.txt'):
             if not Path(str(subtitle)).exists():  # str
-                lines = [line.strip() for line in subtitle.split('\n')]
+                lines = [line.strip() for line in str(subtitle).split('\n')]
             else:  # file
-                lines = [line.strip() for line in open(subtitle).readlines()]
+                path_str = str(subtitle)
+                with open(path_str, encoding='utf-8') as f:
+                    lines = [line.strip() for line in f.readlines()]
             supervisions = [Supervision(text=line) for line in lines if line]
         else:
             try:
