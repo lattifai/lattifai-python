@@ -6,6 +6,15 @@ from typing import Any, Dict, Optional
 
 import colorful
 
+# Error help messages
+LATTICE_DECODING_FAILURE_HELP = (
+    'Failed to decode lattice alignment. Possible reasons: '
+    '1) The audio and text content do not match well enough for accurate alignment. '
+    '2) The audio is singing audio, which is not supported yet but will be optimized in future versions. '
+    '3) The audio quality may be poor or contain significant background noise. '
+    'Please verify that the transcript/subtitle matches the audio content.'
+)
+
 
 class LattifAIError(Exception):
     """Base exception for LattifAI errors."""

@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import torch
 
-from lattifai.errors import LatticeDecodingError
+from lattifai.errors import LATTICE_DECODING_FAILURE_HELP, LatticeDecodingError
 from lattifai.io import Supervision
 from lattifai.tokenizer.phonemizer import G2Phonemizer
 
@@ -316,9 +316,7 @@ class LatticeTokenizer:
         if response.status_code == 422:
             raise LatticeDecodingError(
                 lattice_id,
-                original_error=Exception(
-                    'Reason: 1) The audio and text do not match well 2) the audio may be singing.'
-                ),
+                original_error=Exception(LATTICE_DECODING_FAILURE_HELP),
             )
         if response.status_code != 200:
             raise Exception(f'Failed to detokenize lattice: {response.text}')
@@ -394,9 +392,7 @@ class AsyncLatticeTokenizer(LatticeTokenizer):
         if response.status_code == 422:
             raise LatticeDecodingError(
                 lattice_id,
-                original_error=Exception(
-                    'Reason: 1) The audio and text do not match well 2) the audio may be singing.'
-                ),
+                original_error=Exception(LATTICE_DECODING_FAILURE_HELP),
             )
         if response.status_code != 200:
             raise Exception(f'Failed to detokenize lattice: {response.text}')
