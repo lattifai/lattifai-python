@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..client import AsyncLattifAI
-from ..io import GeminiReader, GeminiWriter, SubtitleIO
+from ..io import SUBTITLE_FORMATS, GeminiReader, GeminiWriter, SubtitleIO
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
 from .file_manager import FileExistenceManager
 from .gemini import GeminiTranscriber
@@ -351,7 +351,7 @@ class YouTubeDownloader:
         video_id = self.extract_video_id(url)
         if not force_overwrite:
             existing_files = FileExistenceManager.check_existing_files(
-                video_id, str(target_dir), subtitle_formats=['vtt', 'srt']
+                video_id, str(target_dir), subtitle_formats=SUBTITLE_FORMATS
             )
 
             # Handle existing subtitle files
@@ -419,18 +419,48 @@ class YouTubeDownloader:
             subtitle_patterns = [
                 f'{video_id}.*vtt',
                 f'{video_id}.*srt',
+                f'{video_id}.*sub',
+                f'{video_id}.*sbv',
+                f'{video_id}.*ssa',
+                f'{video_id}.*ass',
             ]
 
             subtitle_files = []
             for pattern in subtitle_patterns:
                 _subtitle_files = list(target_dir.glob(pattern))
                 for subtitle_file in _subtitle_files:
-                    self.logger.info(f'� Downloaded subtitle: {subtitle_file}')
+                    self.logger.info(f'📥 Downloaded subtitle: {subtitle_file}')
                 subtitle_files.extend(_subtitle_files)
 
             if not subtitle_files:
                 self.logger.warning('No subtitle available for this video')
-            return subtitle_files
+                return None
+
+            # If only one subtitle file, return it directly
+            if len(subtitle_files) == 1:
+                self.logger.info(f'✅ Using subtitle: {subtitle_files[0]}')
+                return str(subtitle_files[0])
+
+            # Multiple subtitle files found, let user choose
+            if FileExistenceManager.is_interactive_mode():
+                self.logger.info(f'📋 Found {len(subtitle_files)} subtitle files')
+                subtitle_choice = FileExistenceManager.prompt_file_selection(
+                    file_type='subtitle', files=[str(f) for f in subtitle_files], operation='use'
+                )
+
+                if subtitle_choice == 'cancel':
+                    raise RuntimeError('Subtitle selection cancelled by user')
+                elif subtitle_choice:
+                    self.logger.info(f'✅ Selected subtitle: {subtitle_choice}')
+                    return subtitle_choice
+                else:
+                    # Fallback to first file
+                    self.logger.info(f'✅ Using first subtitle: {subtitle_files[0]}')
+                    return str(subtitle_files[0])
+            else:
+                # Non-interactive mode: use first file
+                self.logger.info(f'✅ Using first subtitle: {subtitle_files[0]}')
+                return str(subtitle_files[0])
 
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.strip() if e.stderr else str(e)
@@ -656,16 +686,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         existing_files = FileExistenceManager.check_existing_files(
             video_id,
             str(self.output_dir),
-            subtitle_formats=[
-                'md',
-                'srt',
-                'vtt',
-                'ass',
-                'ssa',
-                'sub',
-                'sbv',
-                'txt',
-            ],  # Check all subtitle formats including Markdown
+            subtitle_formats=SUBTITLE_FORMATS,  # Check all subtitle formats including Markdown
         )
 
         # Prompt user if subtitle exists and force_overwrite is not set

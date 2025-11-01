@@ -6,7 +6,7 @@ from lhotse.utils import Pathlike
 
 from lattifai import LattifAI
 from lattifai.bin.cli_base import cli
-from lattifai.io import SubtitleIO
+from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS, SubtitleIO
 from lattifai.workflows.youtube import YouTubeDownloader
 
 
@@ -15,7 +15,7 @@ from lattifai.workflows.youtube import YouTubeDownloader
     '-F',
     '--subtitle_format',
     '--subtitle-format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'auto', 'gemini'], case_sensitive=False),
+    type=click.Choice(INPUT_SUBTITLE_FORMATS, case_sensitive=False),
     default='auto',
     help='Input subtitle format.',
 )
@@ -172,7 +172,7 @@ def align(
     '-F',
     '--output-format',
     '--output_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'TextGrid', 'json'], case_sensitive=False),
+    type=click.Choice(OUTPUT_SUBTITLE_FORMATS, case_sensitive=False),
     default='vtt',
     help='Subtitle output format.',
 )

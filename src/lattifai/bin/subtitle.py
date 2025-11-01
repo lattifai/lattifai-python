@@ -5,6 +5,7 @@ import click
 from lhotse.utils import Pathlike
 
 from lattifai.bin.cli_base import cli
+from lattifai.io import SUBTITLE_FORMATS
 
 
 @cli.group()
@@ -56,7 +57,7 @@ def convert(
     '--output-format',
     '--output_format',
     '-f',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'best'], case_sensitive=False),
+    type=click.Choice(SUBTITLE_FORMATS + ['best'], case_sensitive=False),
     default='best',
     help='Preferred subtitle format to download (default: best available).',
 )
