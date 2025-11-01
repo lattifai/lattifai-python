@@ -779,14 +779,6 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             except Exception as e:
                 self.logger.warning(f'⚠️  Failed to update transcript timestamps: {e}')
 
-        # Restore speaker information for Gemini format
-        if is_gemini_format and original_subtitle_path:
-            self.logger.info('👥 Restoring speaker information to subtitles...')
-            try:
-                supervisions = self._restore_speaker_info(original_subtitle_path, supervisions)
-            except Exception as e:
-                self.logger.warning(f'⚠️  Failed to restore speaker info: {e}')
-
         # Export to requested subtitle format
         output_path = str(aligned_path).replace(
             '_aligned.ass', f'{"_gemini" if is_gemini_format else ""}_LattifAI.{self.output_format}'
@@ -804,58 +796,6 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         }
 
         return result
-
-    def _restore_speaker_info(self, original_subtitle_path: str, supervisions: List) -> List:
-        """
-        Restore speaker information from original Gemini markdown to aligned subtitles.
-
-        This method matches aligned subtitles with the original transcript segments
-        based on text content and adds speaker labels to the subtitle text.
-
-        Args:
-            original_subtitle_path: Path to original Gemini markdown file
-            supervisions: List of aligned supervision segments
-
-        Returns:
-            Updated list of supervisions with speaker information in text
-        """
-
-        # Read original transcript with speaker information
-        original_segments = GeminiReader.read(original_subtitle_path, include_events=False, include_sections=False)
-
-        # Create a mapping of text to speaker
-        text_to_speaker = {}
-        for segment in original_segments:
-            if segment.speaker and segment.text:
-                # Normalize text for matching (remove extra spaces, lowercase)
-                normalized_text = ' '.join(segment.text.split()).lower()
-                text_to_speaker[normalized_text] = segment.speaker
-
-        # Update supervisions with speaker information
-        updated_supervisions = []
-        for sup in supervisions:
-            if sup.text:
-                # Try to find matching speaker
-                normalized_text = ' '.join(sup.text.split()).lower()
-
-                # Exact match
-                speaker = text_to_speaker.get(normalized_text)
-
-                # If no exact match, try partial match (text might have been split/merged)
-                if not speaker:
-                    for orig_text, orig_speaker in text_to_speaker.items():
-                        if normalized_text in orig_text or orig_text in normalized_text:
-                            speaker = orig_speaker
-                            break
-
-                # Add speaker label to text if found
-                if speaker:
-                    # Format: "Speaker: text"
-                    sup.text = f'{speaker}: {sup.text}'
-
-            updated_supervisions.append(sup)
-
-        return updated_supervisions
 
     async def process_youtube_url(
         self, url: str, output_dir: Optional[str] = None, output_format: Optional[str] = None

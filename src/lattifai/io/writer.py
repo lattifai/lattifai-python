@@ -9,12 +9,6 @@ from lhotse.utils import Pathlike
 from .reader import Supervision
 
 
-def s_to_timestamp(seconds: float) -> str:
-    """Convert seconds to HH:MM:SS.mmm format."""
-    ms = pysubs2.make_time(s=seconds)
-    return pysubs2.time.ms_to_str(ms)
-
-
 class SubtitleWriter(ABCMeta):
     """Class for writing subtitle files with optional word-level alignment."""
 
@@ -28,7 +22,8 @@ class SubtitleWriter(ABCMeta):
                         for item in word_items:
                             f.write(f'[{item.start:.2f}-{item.end:.2f}] {item.symbol}\n')
                     else:
-                        f.write(f'[{sup.start:.2f}-{sup.end:.2f}] {sup.text}\n')
+                        text = f'{sup.speaker} {sup.text}' if sup.speaker is not None else sup.text
+                        f.write(f'[{sup.start:.2f}-{sup.end:.2f}] {text}\n')
 
         elif str(output_path)[-5:].lower() == '.json':
             with open(output_path, 'w', encoding='utf-8') as f:
@@ -44,7 +39,10 @@ class SubtitleWriter(ABCMeta):
             tg = TextGrid()
             supervisions, words = [], []
             for supervision in sorted(alignments, key=lambda x: x.start):
-                supervisions.append(Interval(supervision.start, supervision.end, supervision.text or ''))
+                text = (
+                    f'{supervision.speaker} {supervision.text}' if supervision.speaker is not None else supervision.text
+                )
+                supervisions.append(Interval(supervision.start, supervision.end, text or ''))
                 # Extract word-level alignment using helper function
                 word_items = parse_alignment_from_supervision(supervision)
                 if word_items:
@@ -66,9 +64,8 @@ class SubtitleWriter(ABCMeta):
                             pysubs2.SSAEvent(start=int(word.start * 1000), end=int(word.end * 1000), text=word.symbol)
                         )
                 else:
-                    subs.append(
-                        pysubs2.SSAEvent(start=int(sup.start * 1000), end=int(sup.end * 1000), text=sup.text or '')
-                    )
+                    text = f'{sup.speaker} {sup.text}' if sup.speaker is not None else sup.text
+                    subs.append(pysubs2.SSAEvent(start=int(sup.start * 1000), end=int(sup.end * 1000), text=text or ''))
             subs.save(output_path)
 
         return output_path

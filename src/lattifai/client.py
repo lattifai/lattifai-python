@@ -136,7 +136,9 @@ class LattifAI(SyncAPIClient):
             # step4: decode lattice results to aligned segments
             print(colorful.cyan('🎯 Step 4: Decoding lattice results to aligned segments'))
             try:
-                alignments = self.tokenizer.detokenize(lattice_id, lattice_results, return_details=return_details)
+                alignments = self.tokenizer.detokenize(
+                    lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
+                )
                 print(colorful.green(f'         ✓ Successfully aligned {len(alignments)} segments'))
             except LatticeDecodingError as e:
                 print(colorful.red('         x Failed to decode lattice alignment results'))
@@ -259,7 +261,9 @@ class AsyncLattifAI(AsyncAPIClient):
 
             print(colorful.cyan('🎯 Step 4: Decoding lattice results to aligned segments'))
             try:
-                alignments = await self.tokenizer.detokenize(lattice_id, lattice_results, return_details=return_details)
+                alignments = await self.tokenizer.detokenize(
+                    lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
+                )
                 print(colorful.green(f'         ✓ Successfully aligned {len(alignments)} segments'))
             except LatticeDecodingError as e:
                 print(colorful.red('         x Failed to decode lattice alignment results'))

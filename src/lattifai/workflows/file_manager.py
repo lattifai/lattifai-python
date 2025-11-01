@@ -492,7 +492,11 @@ class FileExistenceManager:
             cancel_prefix = ' '
         print(f'{cancel_prefix} {cancel_line}')
 
-        print('Use ↑/↓ to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort.')
+        print(
+            'Use '
+            + colorful.bold_black_on_cyan('↑/↓')
+            + ' to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort.'
+        )
 
     @staticmethod
     def _refresh_combined_file_menu(
@@ -551,7 +555,11 @@ class FileExistenceManager:
         print(f'{cancel_prefix} {cancel_line}')
 
         sys.stdout.write(clear_line)
-        print('Use ↑/↓ to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort.')
+        print(
+            'Use '
+            + colorful.bold_black_on_cyan('↑/↓')
+            + ' to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort.'
+        )
         sys.stdout.flush()
 
     @staticmethod
@@ -670,7 +678,7 @@ class FileExistenceManager:
                 prefix = ' '
                 suffix = label
             print(f'{prefix} {suffix}')
-        print('Use ↑/↓ to move, Enter to confirm, or press a number to choose.')
+        print('Use ' + colorful.bold_black_on_cyan('↑/↓') + ' to move, Enter to confirm, or press a number to choose.')
 
     @staticmethod
     def _refresh_menu(
@@ -696,7 +704,7 @@ class FileExistenceManager:
                 suffix = label
             print(f'{prefix} {suffix}')
         sys.stdout.write(clear_line)
-        print('Use ↑/↓ to move, Enter to confirm, or press a number to choose.')
+        print('Use ' + colorful.bold_black_on_cyan('↑/↓') + ' to move, Enter to confirm, or press a number to choose.')
         sys.stdout.flush()
 
     @staticmethod

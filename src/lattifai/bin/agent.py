@@ -53,6 +53,7 @@ from lattifai.bin.cli_base import cli
     help='Maximum number of retries for failed steps.',
 )
 @click.option(
+    '-S',
     '--split-sentence',
     '--split_sentence',
     is_flag=True,

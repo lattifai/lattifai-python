@@ -292,7 +292,7 @@ class LatticeTokenizer:
         self,
         lattice_id: str,
         lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
-        # return_supervisions: bool = True,
+        supervisions: List[Supervision],
         return_details: bool = False,
     ) -> List[Supervision]:
         emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
@@ -323,26 +323,15 @@ class LatticeTokenizer:
         if not result.get('success'):
             return Exception('Failed to detokenize the alignment results.')
 
-        supervisions = [Supervision.from_dict(s) for s in result['supervisions']]
+        alignments = [Supervision.from_dict(s) for s in result['supervisions']]
 
-        if return_details:  # add emission confidence scores
-            # confidence
-            tokens = torch.tensor(labels[0], dtype=torch.int64, device=emission.device)
-            for supervision in supervisions:
-                start_frame = int(supervision.start / frame_shift)
-                end_frame = int(supervision.end / frame_shift)
-                probabilities = emission[0, start_frame:end_frame].softmax(dim=-1)
-                aligned = probabilities[range(0, end_frame - start_frame), tokens[start_frame:end_frame]]
-                diffprobs = (probabilities.max(dim=-1).values - aligned).cpu()
-                supervision.score = round(1.0 - diffprobs.mean().item(), ndigits=4)
-                if hasattr(supervision, 'alignment') and supervision.alignment:
-                    words = supervision.alignment.get('word', [])
-                    for w, item in enumerate(words):
-                        start = int(item.start / frame_shift) - start_frame
-                        end = int(item.end / frame_shift) - start_frame
-                        words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean().item(), ndigits=4))
+        if return_details:
+            # Add emission confidence scores for segments and word-level alignments
+            _add_confidence_scores(alignments, emission, labels[0], frame_shift)
 
-        return supervisions
+        alignments = _update_alignments_speaker(supervisions, alignments)
+
+        return alignments
 
 
 class AsyncLatticeTokenizer(LatticeTokenizer):
@@ -377,6 +366,8 @@ class AsyncLatticeTokenizer(LatticeTokenizer):
         self,
         lattice_id: str,
         lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
+        supervisions: List[Supervision],
+        return_details: bool = False,
     ) -> List[Supervision]:
         emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
         response = await self._post_async(
@@ -388,6 +379,7 @@ class AsyncLatticeTokenizer(LatticeTokenizer):
                 'labels': labels[0],
                 'offset': offset,
                 'channel': channel,
+                'return_details': return_details,
                 'destroy_lattice': True,
             },
         )
@@ -404,12 +396,66 @@ class AsyncLatticeTokenizer(LatticeTokenizer):
         result = response.json()
         if not result.get('success'):
             return Exception('Failed to detokenize the alignment results.')
-        return [Supervision.from_dict(s) for s in result['supervisions']]
+
+        alignments = [Supervision.from_dict(s) for s in result['supervisions']]
+
+        if return_details:
+            # Add emission confidence scores for segments and word-level alignments
+            _add_confidence_scores(alignments, emission, labels[0], frame_shift)
+
+        alignments = _update_alignments_speaker(supervisions, alignments)
+
+        return alignments
 
 
-# Compute average score weighted by the span length
-def _score(spans):
-    if not spans:
-        return 0.0
-    # TokenSpan(token=token, start=start, end=end, score=scores[start:end].mean().item())
-    return round(sum(s.score * len(s) for s in spans) / sum(len(s) for s in spans), ndigits=4)
+def _add_confidence_scores(
+    supervisions: List[Supervision],
+    emission: torch.Tensor,
+    labels: List[int],
+    frame_shift: float,
+) -> None:
+    """
+    Add confidence scores to supervisions and their word-level alignments.
+
+    This function modifies supervisions in-place by:
+    1. Computing segment-level confidence scores based on emission probabilities
+    2. Computing word-level confidence scores for each aligned word
+
+    Args:
+        supervisions: List of Supervision objects to add scores to (modified in-place)
+        emission: Emission tensor with shape [batch, time, vocab_size]
+        labels: Token labels corresponding to aligned tokens
+        frame_shift: Frame shift in seconds for converting frames to time
+    """
+    tokens = torch.tensor(labels, dtype=torch.int64, device=emission.device)
+
+    for supervision in supervisions:
+        start_frame = int(supervision.start / frame_shift)
+        end_frame = int(supervision.end / frame_shift)
+
+        # Compute segment-level confidence
+        probabilities = emission[0, start_frame:end_frame].softmax(dim=-1)
+        aligned = probabilities[range(0, end_frame - start_frame), tokens[start_frame:end_frame]]
+        diffprobs = (probabilities.max(dim=-1).values - aligned).cpu()
+        supervision.score = round(1.0 - diffprobs.mean().item(), ndigits=4)
+
+        # Compute word-level confidence if alignment exists
+        if hasattr(supervision, 'alignment') and supervision.alignment:
+            words = supervision.alignment.get('word', [])
+            for w, item in enumerate(words):
+                start = int(item.start / frame_shift) - start_frame
+                end = int(item.end / frame_shift) - start_frame
+                words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean().item(), ndigits=4))
+
+
+def _update_alignments_speaker(supervisions: List[Supervision], alignments: List[Supervision]) -> List[Supervision]:
+    """
+    Update the speaker attribute for a list of supervisions.
+
+    Args:
+        supervisions: List of Supervision objects to get speaker info from
+        alignments: List of aligned Supervision objects to update speaker info to
+    """
+    for supervision, alignment in zip(supervisions, alignments):
+        alignment.speaker = supervision.speaker
+    return alignments

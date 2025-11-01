@@ -39,12 +39,13 @@ Usage: lattifai align [OPTIONS] INPUT_AUDIO_PATH INPUT_SUBTITLE_PATH OUTPUT_SUBT
   Command used to align audio with subtitles
 
 Options:
-  -F, --input_format [srt|vtt|ass|ssa|sub|sbv|txt|auto|gemini]  Input subtitle format.
-  -S, --split_sentence                                           Re-segment subtitles by semantics.
-  -D, --device [cpu|cuda|mps]                                    Device to use for inference.
-  -M, --model_name_or_path TEXT                                  Model name or path for alignment.
-  --api_key TEXT                                                 API key for LattifAI.
-  --help                                                         Show this message and exit.
+  -F, --subtitle_format [srt|vtt|ass|ssa|sub|sbv|txt|auto|gemini]  Input subtitle format.
+  -S, --split_sentence                                              Re-segment subtitles by semantics.
+  -W, --word_level                                                  Include word-level alignment timestamps.
+  -D, --device [cpu|cuda|mps]                                       Device to use for inference.
+  -M, --model_name_or_path TEXT                                     Model name or path for alignment.
+  --api_key TEXT                                                    API key for LattifAI.
+  --help                                                            Show this message and exit.
 ```
 
 #### Understanding --split_sentence
@@ -72,6 +73,79 @@ This feature helps improve alignment accuracy by:
 **Usage**:
 ```bash
 lattifai align --split_sentence audio.wav subtitle.srt output.srt
+```
+
+#### Understanding --word_level
+
+The `--word_level` option enables word-level alignment, providing precise timing information for each individual word in the audio. When enabled, the output includes detailed word boundaries within each subtitle segment, allowing for fine-grained synchronization and analysis.
+
+**Key features**:
+- **Individual word timestamps**: Each word gets its own start and end time
+- **Format-specific output**:
+  - **JSON**: Full alignment details stored in `alignment.word` field of each segment
+  - **TextGrid**: Separate "words" tier alongside the "utterances" tier for linguistic analysis
+  - **TXT**: Each word on a separate line with timestamp range: `[start-end] word`
+  - **Standard subtitle formats** (SRT, VTT, ASS, etc.): Each word becomes a separate subtitle event
+
+**Example output formats**:
+
+**JSON format** (with word-level details):
+```json
+[
+  {
+    "id": "segment-001",
+    "start": 0.5,
+    "end": 2.3,
+    "text": "Hello world",
+    "alignment": {
+      "word": [
+        {"start": 0.5, "end": 1.2, "symbol": "Hello"},
+        {"start": 1.2, "end": 2.3, "symbol": "world"}
+      ]
+    }
+  }
+]
+```
+
+**TXT format** (word-level):
+```
+[0.50-1.20] Hello
+[1.20-2.30] world
+```
+
+**TextGrid format** (Praat-compatible):
+```
+Two tiers created:
+- "utterances" tier: Full segments with original text
+- "words" tier: Individual words with precise boundaries
+```
+
+**Use cases**:
+- **Linguistic analysis**: Study pronunciation patterns, speech timing, and prosody
+- **Karaoke applications**: Highlight individual words as they are spoken
+- **Language learning**: Provide precise word boundaries for pronunciation practice
+- **Accessibility**: Create more granular captions for hearing-impaired users
+- **Video editing**: Enable precise word-level subtitle synchronization
+
+**Usage**:
+```bash
+# Generate word-level aligned JSON
+lattifai align --word_level audio.wav subtitle.srt output.json
+
+# Create TextGrid file for Praat analysis
+lattifai align --word_level audio.wav subtitle.srt output.TextGrid
+
+# Word-level TXT output
+lattifai align --word_level audio.wav subtitle.srt output.txt
+
+# Standard subtitle with word-level events
+lattifai align --word_level audio.wav subtitle.srt output.srt
+```
+
+**Combined with --split_sentence**:
+```bash
+# Optimal alignment: semantic splitting + word-level details
+lattifai align --split_sentence --word_level audio.wav subtitle.srt output.json
 ```
 
 ### Python API
@@ -151,6 +225,7 @@ client.alignment(
     subtitle: str,                        # Path to subtitle/text file
     format: Optional[str] = None,         # Input format: 'srt', 'vtt', 'ass', 'txt', 'gemini', or 'auto' (auto-detect if None)
     split_sentence: bool = False,         # Smart sentence splitting based on punctuation semantics
+    return_details: bool = False,         # Enable word-level alignment details
     output_subtitle_path: Optional[str] = None
 ) -> Tuple[List[Supervision], Optional[str]]  # await client.alignment(...) for AsyncLattifAI
 ```
@@ -160,6 +235,7 @@ client.alignment(
 - `subtitle`: Path to the subtitle or text file
 - `format`: Input subtitle format. Supported values: 'srt', 'vtt', 'ass', 'txt', 'gemini', 'auto'. When set to None or 'auto', the format is automatically detected from file extension. Additional formats (ssa, sub, sbv) are supported through automatic format detection
 - `split_sentence`: Enable intelligent sentence re-splitting (default: False). Set to True when subtitles combine multiple semantic units (non-speech elements + dialogue, or multiple sentences) that would benefit from separate timing alignment
+- `return_details`: Enable word-level alignment details (default: False). When True, each `Supervision` object includes an `alignment` field with word-level timestamps, accessible via `supervision.alignment['word']`. This provides precise timing for each individual word within the segment
 - `output_subtitle_path`: Output path for aligned subtitle (optional)
 
 **Returns**:
@@ -182,6 +258,27 @@ alignments, output_path = client.alignment(
     split_sentence=False,
     output_subtitle_path="output.srt"
 )
+```
+
+### Word-Level Alignment
+
+```python
+from lattifai import LattifAI
+
+client = LattifAI()
+alignments, output_path = client.alignment(
+    audio="speech.wav",
+    subtitle="transcript.srt",
+    return_details=True,  # Enable word-level alignment
+    output_subtitle_path="output.json"  # JSON format preserves word-level data
+)
+
+# Access word-level timestamps
+for segment in alignments:
+    print(f"Segment: {segment.text} ({segment.start:.2f}s - {segment.end:.2f}s)")
+    if segment.alignment and 'word' in segment.alignment:
+        for word in segment.alignment['word']:
+            print(f"  Word: {word.symbol} ({word.start:.2f}s - {word.end:.2f}s)")
 ```
 
 ### Batch Processing

@@ -204,6 +204,7 @@ class GeminiReader:
                         line_number=line_num,
                     )
                 )
+                current_speaker = None  # Reset speaker after use
                 continue
 
             # Parse plain text with timestamp at the end
