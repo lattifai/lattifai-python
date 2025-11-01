@@ -30,7 +30,7 @@ class SubtitleReader(ABCMeta):
         elif format:
             format = format.lower()
 
-        if format == 'gemini':
+        if format == 'gemini' or str(subtitle).endswith('Gemini.md'):
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(subtitle)

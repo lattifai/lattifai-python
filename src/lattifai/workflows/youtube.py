@@ -21,8 +21,9 @@ from .gemini import GeminiTranscriber
 class YouTubeDownloader:
     """YouTube video/audio downloader using yt-dlp"""
 
-    def __init__(self, media_format: str = 'mp3'):
+    def __init__(self, media_format: str = 'mp3', gemini_api_key: Optional[str] = None):
         self.media_format = media_format
+        self.gemini_api_key = gemini_api_key
         self.logger = setup_workflow_logger('youtube')
 
         # Check if yt-dlp is available
@@ -444,12 +445,21 @@ class YouTubeDownloader:
             # Multiple subtitle files found, let user choose
             if FileExistenceManager.is_interactive_mode():
                 self.logger.info(f'📋 Found {len(subtitle_files)} subtitle files')
+                # Enable Gemini option if API key is available
+                has_gemini_key = bool(self.gemini_api_key or os.getenv('GEMINI_API_KEY'))
                 subtitle_choice = FileExistenceManager.prompt_file_selection(
-                    file_type='subtitle', files=[str(f) for f in subtitle_files], operation='use'
+                    file_type='subtitle',
+                    files=[str(f) for f in subtitle_files],
+                    operation='use',
+                    enable_gemini=has_gemini_key,
                 )
 
                 if subtitle_choice == 'cancel':
                     raise RuntimeError('Subtitle selection cancelled by user')
+                elif subtitle_choice == 'gemini':
+                    # User chose to transcribe with Gemini instead of using downloaded subtitles
+                    self.logger.info('✨ User selected Gemini transcription')
+                    return 'gemini'  # Return special value to indicate Gemini transcription
                 elif subtitle_choice:
                     self.logger.info(f'✅ Selected subtitle: {subtitle_choice}')
                     return subtitle_choice
@@ -692,14 +702,20 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # Prompt user if subtitle exists and force_overwrite is not set
         if existing_files['subtitle'] and not self.force_overwrite:
             # Let user choose which subtitle file to use
+            # Enable Gemini option if API key is available
+            has_gemini_key = bool(self.gemini_api_key)
             subtitle_choice = FileExistenceManager.prompt_file_selection(
-                file_type='subtitle', files=existing_files['subtitle'], operation='transcribe'
+                file_type='subtitle',
+                files=existing_files['subtitle'],
+                operation='transcribe',
+                enable_gemini=has_gemini_key,
             )
 
             if subtitle_choice == 'cancel':
                 raise RuntimeError('Transcription cancelled by user')
-            elif subtitle_choice == 'overwrite':
+            elif subtitle_choice in ('overwrite', 'gemini'):
                 # Continue to transcription below
+                # For 'gemini', user explicitly chose to transcribe with Gemini
                 pass
             elif subtitle_choice:  # User selected a specific file
                 # Use selected subtitle
@@ -707,10 +723,10 @@ class YouTubeSubtitleAgent(WorkflowAgent):
                 self.logger.info(f'🔁 Using existing subtitle: {subtitle_path}')
 
                 return {'subtitle_path': str(subtitle_path)}
-            # If user_choice == 'overwrite', continue to transcription below
+            # If user_choice == 'overwrite' or 'gemini', continue to transcription below
 
         # TODO: support other Transcriber options
-        self.logger.info('🎤 Transcribing URL with Gemini 2.5 Pro...')
+        self.logger.info('✨ Transcribing URL with Gemini 2.5 Pro...')
         transcript = await self.transcriber.transcribe_url(url)
         subtitle_path = self.output_dir / f'{video_id}_Gemini.md'
         with open(subtitle_path, 'w', encoding='utf-8') as f:

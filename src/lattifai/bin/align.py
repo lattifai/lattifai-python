@@ -1,4 +1,6 @@
 import asyncio
+import os
+from pathlib import Path
 
 import click
 import colorful
@@ -6,7 +8,9 @@ from lhotse.utils import Pathlike
 
 from lattifai import LattifAI
 from lattifai.bin.cli_base import cli
-from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS, SubtitleIO
+from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS, SUBTITLE_FORMATS, SubtitleIO
+from lattifai.workflows.file_manager import FileExistenceManager
+from lattifai.workflows.gemini import GeminiTranscriber
 from lattifai.workflows.youtube import YouTubeDownloader
 
 
@@ -169,6 +173,13 @@ def align(
     help='API key for LattifAI.',
 )
 @click.option(
+    '--gemini-api-key',
+    '--gemini_api_key',
+    type=str,
+    default=None,
+    help='Gemini API key for transcription fallback when subtitles are unavailable.',
+)
+@click.option(
     '-F',
     '--output-format',
     '--output_format',
@@ -189,6 +200,7 @@ def youtube(
     device: str = 'cpu',
     model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
     api_key: str = None,
+    gemini_api_key: str = None,
     output_format: str = 'vtt',
 ):
     """
@@ -196,7 +208,9 @@ def youtube(
     """
 
     async def _download():
-        downloader = YouTubeDownloader(media_format=media_format)
+        # Pass gemini_api_key to downloader so it can offer Gemini option
+        gemini_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
+        downloader = YouTubeDownloader(media_format=media_format, gemini_api_key=gemini_key)
         media_path = await downloader.download_media(yt_url, output_dir=output_dir, media_format=media_format)
         subtitle_path = await downloader.download_subtitles(yt_url, output_dir=output_dir)
         return media_path, subtitle_path
@@ -210,20 +224,88 @@ def youtube(
     client = LattifAI(model_name_or_path=model_name_or_path, device=device, api_key=api_key)
 
     # Handle subtitle_path which can be a string, list, or None
-    if not subtitle_path:
-        raise RuntimeError(
-            'No subtitle file was downloaded. Media file transcription support is coming soon. '
-            'Please use the `lattifai agent --youtube` command for automatic transcription workflow.'
-        )
+    # Special handling for 'gemini' return value from download_subtitles
+    user_chose_gemini = False
+    if subtitle_path == 'gemini':
+        click.echo(colorful.magenta('✨ User selected Gemini transcription'))
+        subtitle_path = None  # Treat as no subtitle to trigger transcription below
+        user_chose_gemini = True  # Skip checking for existing files
 
-    # If subtitle_path is a list, use the first one
-    if isinstance(subtitle_path, list):
-        if len(subtitle_path) == 0:
-            raise RuntimeError(
-                'No subtitle file was downloaded. Media file transcription support is coming soon. '
-                'Please use the `lattifai agent --youtube` command for automatic transcription workflow.'
+    if not subtitle_path:
+        # Only check for existing files if user didn't explicitly choose Gemini
+        if not user_chose_gemini:
+            click.echo(colorful.yellow('⚠️  No subtitles found from YouTube download.'))
+
+            # Check for existing subtitle files (including Gemini transcripts)
+            click.echo(colorful.cyan('🔍 Checking for existing subtitle files...'))
+            existing_files = FileExistenceManager.check_existing_files(
+                video_id, output_dir, subtitle_formats=SUBTITLE_FORMATS + ['md']
             )
-        subtitle_path = subtitle_path[0]
+
+            # If existing subtitle files found, prompt user to select
+            if existing_files['subtitle']:
+                # Enable Gemini option if API key is available
+                has_gemini_key = bool(gemini_api_key or os.getenv('GEMINI_API_KEY'))
+                subtitle_choice = FileExistenceManager.prompt_file_selection(
+                    file_type='subtitle',
+                    files=existing_files['subtitle'],
+                    operation='transcribe',
+                    enable_gemini=has_gemini_key,
+                )
+
+                if subtitle_choice == 'cancel':
+                    click.echo(colorful.red('❌ Operation cancelled by user'))
+                    raise click.ClickException('Operation cancelled by user')
+                elif subtitle_choice in ('overwrite', 'gemini'):
+                    # User wants to transcribe, continue to transcription below
+                    if subtitle_choice == 'overwrite':
+                        click.echo(colorful.yellow('🔄 Will re-download or transcribe...'))
+                    # For 'gemini', the message is already printed by FileExistenceManager
+                elif subtitle_choice and subtitle_choice != 'proceed':
+                    # User selected a specific file
+                    subtitle_path = subtitle_choice
+                    click.echo(colorful.green(f'✅ Using existing subtitle: {subtitle_path}'))
+                else:
+                    # proceed means no files found, continue to transcription
+                    pass
+
+        # If subtitle_path is still not set, we need to transcribe
+        if not subtitle_path:
+            click.echo(colorful.magenta('✨ Attempting transcription with Gemini...'))
+
+            # Get Gemini API key from parameter or environment variable
+            gemini_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
+            if not gemini_key:
+                click.echo(
+                    colorful.red(
+                        '❌ Gemini API key is required for transcription. '
+                        'Set GEMINI_API_KEY environment variable or use --gemini-api-key option.'
+                    )
+                )
+                raise click.ClickException('Missing Gemini API key')
+
+            try:
+                # Use GeminiTranscriber to transcribe the media file
+                transcriber = GeminiTranscriber(api_key=gemini_key)
+
+                async def _transcribe():
+                    return await transcriber.transcribe_url(yt_url)
+
+                transcript = asyncio.run(_transcribe())
+
+                # Save transcript as Gemini.md file (following the agent pattern)
+                gemini_subtitle_path = Path(output_dir) / f'{video_id}_Gemini.md'
+                with open(gemini_subtitle_path, 'w', encoding='utf-8') as f:
+                    f.write(transcript)
+
+                subtitle_path = str(gemini_subtitle_path)
+                click.echo(colorful.green(f'✅ Transcription completed: {subtitle_path}'))
+
+            except Exception as e:
+                click.echo(colorful.red(f'❌ Transcription failed: {str(e)}'))
+                raise click.ClickException(f'Transcription failed: {str(e)}')
+
+    assert not isinstance(subtitle_path, list)
 
     output_subtitle_path = f'{output_dir}/{video_id}.{output_format}'
     client.alignment(

@@ -188,7 +188,9 @@ class FileExistenceManager:
         return choice
 
     @staticmethod
-    def prompt_file_selection(file_type: str, files: List[str], operation: str = 'use') -> str:
+    def prompt_file_selection(
+        file_type: str, files: List[str], operation: str = 'use', enable_gemini: bool = False
+    ) -> str:
         """
         Prompt user to select a specific file from a list, or choose to overwrite/cancel
 
@@ -196,9 +198,10 @@ class FileExistenceManager:
             file_type: Type of file (e.g., 'gemini transcript', 'subtitle')
             files: List of existing files to choose from
             operation: Type of operation (e.g., "transcribe", "download")
+            enable_gemini: If True, adds "Transcribe with Gemini" option
 
         Returns:
-            Selected file path, or 'overwrite' to regenerate, or 'cancel' to abort
+            Selected file path, 'overwrite' to regenerate, 'gemini' to transcribe with Gemini, or 'cancel' to abort
         """
         if not files:
             return 'proceed'
@@ -222,6 +225,10 @@ class FileExistenceManager:
             # Display full path for clarity
             options.append((f'{colorful.cyan(file_path)}', file_path))
 
+        # Add Gemini transcription option if enabled
+        if enable_gemini:
+            options.append((colorful.magenta('✨ Transcribe with Gemini 2.5 Pro'), 'gemini'))
+
         # Add overwrite and cancel options
         options.append((colorful.yellow(f'Overwrite (re-{operation} or download)'), 'overwrite'))
         options.append((colorful.red('Cancel operation'), 'cancel'))
@@ -233,6 +240,8 @@ class FileExistenceManager:
             print(f'{colorful.red("❌ Operation cancelled")}')
         elif choice == 'overwrite':
             print(f'{colorful.yellow(f"🔄 Overwriting all {file_type} files")}')
+        elif choice == 'gemini':
+            print(f'{colorful.magenta("✨ Will transcribe with Gemini 2.5 Pro")}')
         else:
             print(f'{colorful.green(f"✅ Using: {choice}")}')
 
