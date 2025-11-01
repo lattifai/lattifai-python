@@ -18,7 +18,7 @@ maintainers = [
 requires-python = '>=3.9'
 
 dependencies = [
-    "lattifai-core>=0.2.0",
+    "lattifai-core>=0.2.1",
     "httpx",
     "python-dotenv",
     "lhotse>=1.26.0",
@@ -48,6 +48,7 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX :: Linux',
     'Operating System :: Microsoft :: Windows',
