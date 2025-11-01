@@ -35,7 +35,7 @@ from lattifai.bin.cli_base import cli
 @click.option(
     '--output-format',
     '--output_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt'], case_sensitive=False),
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'TextGrid'], case_sensitive=False),
     default='srt',
     help='Subtitle output format.',
 )

@@ -119,8 +119,8 @@ class YouTubeDownloader:
         Args:
             url: YouTube URL
             output_dir: Output directory (default: temp directory)
-            media_format: Media format - audio (mp3, wav, m4a, aac, opus, ogg, flac)
-                         or video (mp4, webm, mkv, avi, etc.) (default: instance format)
+            media_format: Media format - audio (mp3, wav, m4a, aac, opus, ogg, flac, aiff)
+                         or video (mp4, webm, mkv, avi, mov, etc.) (default: instance format)
             force_overwrite: Skip user confirmation and overwrite existing files
 
         Returns:
@@ -129,7 +129,7 @@ class YouTubeDownloader:
         media_format = media_format or self.media_format
 
         # Determine if format is audio or video
-        audio_formats = ['mp3', 'wav', 'm4a', 'aac', 'opus', 'ogg', 'flac']
+        audio_formats = ['mp3', 'wav', 'm4a', 'aac', 'opus', 'ogg', 'flac', 'aiff']
         is_audio = media_format.lower() in audio_formats
 
         if is_audio:

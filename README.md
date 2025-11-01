@@ -109,8 +109,9 @@ Both clients return a list of `Supervision` segments with timing information and
 
 ## Supported Formats
 
-**Audio**: WAV, MP3, FLAC, M4A, OGG
-**Subtitle**: SRT, VTT, ASS, TXT (plain text)
+**Audio**: WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF
+**Video**: MP4, MKV, MOV, WEBM, AVI
+**Subtitle**: SRT, VTT, ASS, SSA, SUB, SBV, TXT (plain text) and TextGrid(only output now)
 
 ## API Reference
 

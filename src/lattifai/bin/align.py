@@ -138,7 +138,7 @@ def align(
     '-F',
     '--output-format',
     '--output_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'textgrid'], case_sensitive=False),
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'TextGrid'], case_sensitive=False),
     default='vtt',
     help='Subtitle output format.',
 )
