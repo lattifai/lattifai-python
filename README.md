@@ -39,10 +39,12 @@ Usage: lattifai align [OPTIONS] INPUT_AUDIO_PATH INPUT_SUBTITLE_PATH OUTPUT_SUBT
   Command used to align audio with subtitles
 
 Options:
-  -F, --input_format [srt|vtt|ass|txt|auto]  Input Subtitle format.
-  -D, --device [cpu|cuda|mps]                Device to use for inference.
-  --split_sentence                           Smart sentence splitting based on punctuation semantics.
-  --help                                     Show this message and exit.
+  -F, --input_format [srt|vtt|ass|ssa|sub|sbv|txt|auto|gemini]  Input subtitle format.
+  -S, --split_sentence                                           Re-segment subtitles by semantics.
+  -D, --device [cpu|cuda|mps]                                    Device to use for inference.
+  -M, --model_name_or_path TEXT                                  Model name or path for alignment.
+  --api_key TEXT                                                 API key for LattifAI.
+  --help                                                         Show this message and exit.
 ```
 
 #### Understanding --split_sentence
@@ -110,8 +112,12 @@ Both clients return a list of `Supervision` segments with timing information and
 ## Supported Formats
 
 **Audio**: WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF
+
 **Video**: MP4, MKV, MOV, WEBM, AVI
-**Subtitle**: SRT, VTT, ASS, SSA, SUB, SBV, TXT (plain text) and TextGrid(only output now)
+
+**Subtitle Input**: SRT, VTT, ASS, SSA, SUB, SBV, TXT (plain text), Gemini (Google Gemini transcript format)
+
+**Subtitle Output**: All input formats plus TextGrid (Praat format for linguistic analysis)
 
 ## API Reference
 
@@ -143,7 +149,7 @@ Use `async with AsyncLattifAI() as client:` or call `await client.close()` when 
 client.alignment(
     audio: str,                           # Path to audio file
     subtitle: str,                        # Path to subtitle/text file
-    format: Optional[str] = None,         # 'srt', 'vtt', 'ass', 'txt' (auto-detect if None)
+    format: Optional[str] = None,         # Input format: 'srt', 'vtt', 'ass', 'txt', 'gemini', or 'auto' (auto-detect if None)
     split_sentence: bool = False,         # Smart sentence splitting based on punctuation semantics
     output_subtitle_path: Optional[str] = None
 ) -> Tuple[List[Supervision], Optional[str]]  # await client.alignment(...) for AsyncLattifAI
@@ -152,7 +158,7 @@ client.alignment(
 **Parameters**:
 - `audio`: Path to the audio file to be aligned
 - `subtitle`: Path to the subtitle or text file
-- `format`: Subtitle format ('srt', 'vtt', 'ass', 'txt'). Auto-detected if None
+- `format`: Input subtitle format. Supported values: 'srt', 'vtt', 'ass', 'txt', 'gemini', 'auto'. When set to None or 'auto', the format is automatically detected from file extension. Additional formats (ssa, sub, sbv) are supported through automatic format detection
 - `split_sentence`: Enable intelligent sentence re-splitting (default: False). Set to True when subtitles combine multiple semantic units (non-speech elements + dialogue, or multiple sentences) that would benefit from separate timing alignment
 - `output_subtitle_path`: Output path for aligned subtitle (optional)
 

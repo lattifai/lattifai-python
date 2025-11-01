@@ -90,7 +90,23 @@ def align(
     '--media-format',
     '--media_format',
     type=click.Choice(
-        ['mp3', 'wav', 'm4a', 'aac', 'opus', 'mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'mpeg', 'mpg', '3gp'],
+        [
+            # Audio formats
+            'mp3',
+            'wav',
+            'm4a',
+            'aac',
+            'flac',
+            'ogg',
+            'opus',
+            'aiff',
+            # Video formats
+            'mp4',
+            'webm',
+            'mkv',
+            'avi',
+            'mov',
+        ],
         case_sensitive=False,
     ),
     default='mp3',
