@@ -712,7 +712,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # TODO: support other Transcriber options
         self.logger.info('🎤 Transcribing URL with Gemini 2.5 Pro...')
         transcript = await self.transcriber.transcribe_url(url)
-        subtitle_path = self.output_dir / f'{video_id}_gemini.md'
+        subtitle_path = self.output_dir / f'{video_id}_Gemini.md'
         with open(subtitle_path, 'w', encoding='utf-8') as f:
             f.write(transcript)
         result = {'subtitle_path': str(subtitle_path)}
@@ -730,7 +730,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         self.logger.info('🎯 Aligning subtitle with video...')
 
-        if subtitle_path.endswith('_gemini.md'):
+        if subtitle_path.endswith('_Gemini.md'):
             is_gemini_format = True
         else:
             is_gemini_format = False
@@ -802,7 +802,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         # Export to requested subtitle format
         output_path = str(aligned_path).replace(
-            '_aligned.ass', f'{"_gemini" if is_gemini_format else ""}_LattifAI.{self.output_format}'
+            '_aligned.ass', f'{"_Gemini" if is_gemini_format else ""}_LattifAI.{self.output_format}'
         )
         SubtitleIO.write(supervisions, output_path=output_path)
         exported_files[self.output_format] = output_path

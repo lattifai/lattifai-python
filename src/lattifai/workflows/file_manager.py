@@ -77,8 +77,8 @@ class FileExistenceManager:
                     existing_files['subtitle'].append(file_path)
 
         if 'md' in subtitle_formats:
-            # Gemini-specific pattern: {video_id}_gemini.md
-            gemini_subtitle_file = output_path / f'{video_id}_gemini.md'
+            # Gemini-specific pattern: {video_id}_Gemini.md
+            gemini_subtitle_file = output_path / f'{video_id}_Gemini.md'
             if gemini_subtitle_file.exists():
                 existing_files['subtitle'].append(str(gemini_subtitle_file))
 

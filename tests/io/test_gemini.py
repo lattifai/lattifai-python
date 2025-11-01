@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from lattifai.io import GeminiReader, GeminiWriter, TranscriptSegment
+from lattifai.io import GeminiReader, GeminiSegment, GeminiWriter
 from lattifai.io.supervision import Supervision
 
 # Sample transcript content for testing
@@ -67,7 +67,7 @@ class TestGeminiReader:
     def test_read_all_segments(self, tmp_path):
         """Test reading all segments including events and sections."""
         # Create temp file
-        transcript_file = tmp_path / 'test_gemini.md'
+        transcript_file = tmp_path / 'test_Gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Read all segments
@@ -84,7 +84,7 @@ class TestGeminiReader:
 
     def test_read_dialogue_only(self, tmp_path):
         """Test reading only dialogue segments."""
-        transcript_file = tmp_path / 'test_gemini.md'
+        transcript_file = tmp_path / 'test_Gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Read dialogue only
@@ -107,7 +107,7 @@ class TestGeminiReader:
 
     def test_speaker_extrevent(self, tmp_path):
         """Test speaker name extrevent."""
-        transcript_file = tmp_path / 'test_gemini.md'
+        transcript_file = tmp_path / 'test_Gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         segments = GeminiReader.read(transcript_file)
@@ -118,11 +118,11 @@ class TestGeminiReader:
 
         # Check speaker name
         speakers = {s.speaker for s in dialogue_with_speaker}
-        assert 'Mira Murati' in speakers
+        assert 'Mira Murati:' in speakers
 
     def test_section_tracking(self, tmp_path):
         """Test section title tracking."""
-        transcript_file = tmp_path / 'test_gemini.md'
+        transcript_file = tmp_path / 'test_Gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         segments = GeminiReader.read(transcript_file, include_events=True, include_sections=True)
@@ -134,7 +134,7 @@ class TestGeminiReader:
 
     def test_extract_for_alignment(self, tmp_path):
         """Test extracting supervisions for alignment."""
-        transcript_file = tmp_path / 'test_gemini.md'
+        transcript_file = tmp_path / 'test_Gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Extract for alignment
@@ -152,7 +152,7 @@ class TestGeminiReader:
 
     def test_extract_with_merge(self, tmp_path):
         """Test extracting with consecutive segment merging."""
-        transcript_file = tmp_path / 'test_gemini.md'
+        transcript_file = tmp_path / 'test_Gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # Extract without merge
@@ -170,7 +170,7 @@ class TestYouTubeGeminiReader:
 
     def test_read_youtube_format(self, tmp_path):
         """Test reading YouTube format transcript with link timestamps."""
-        transcript_file = tmp_path / 'youtube_gemini.md'
+        transcript_file = tmp_path / 'youtube_Gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # Read all segments
@@ -198,7 +198,7 @@ class TestYouTubeGeminiReader:
 
     def test_youtube_section_headers(self, tmp_path):
         """Test YouTube format section headers."""
-        transcript_file = tmp_path / 'youtube_gemini.md'
+        transcript_file = tmp_path / 'youtube_Gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         segments = GeminiReader.read(transcript_file, include_sections=True)
@@ -214,7 +214,7 @@ class TestYouTubeGeminiReader:
 
     def test_youtube_speaker_dialogue(self, tmp_path):
         """Test YouTube format speaker dialogue parsing."""
-        transcript_file = tmp_path / 'youtube_gemini.md'
+        transcript_file = tmp_path / 'youtube_Gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         segments = GeminiReader.read(transcript_file)
@@ -225,7 +225,7 @@ class TestYouTubeGeminiReader:
 
         # Check speaker name
         speakers = {s.speaker for s in dialogue_with_speaker}
-        assert 'Mira Murati' in speakers
+        assert 'Mira Murati:' in speakers
 
         # Check timestamps are correctly parsed
         for seg in dialogue_with_speaker:
@@ -234,7 +234,7 @@ class TestYouTubeGeminiReader:
 
     def test_youtube_extract_for_alignment(self, tmp_path):
         """Test extracting YouTube format for alignment."""
-        transcript_file = tmp_path / 'youtube_gemini.md'
+        transcript_file = tmp_path / 'youtube_Gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # Extract for alignment
@@ -252,7 +252,7 @@ class TestYouTubeGeminiReader:
 
     def test_youtube_with_merge(self, tmp_path):
         """Test YouTube format with consecutive segment merging."""
-        transcript_file = tmp_path / 'youtube_gemini.md'
+        transcript_file = tmp_path / 'youtube_Gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # Extract without merge
@@ -358,12 +358,12 @@ class TestGeminiWriter:
         assert 'Words:' not in content
 
 
-class TestGeminiTranscriptSegment:
-    """Tests for TranscriptSegment dataclass (shared)."""
+class TestGeminiGeminiSegment:
+    """Tests for GeminiSegment dataclass (shared)."""
 
     def test_segment_creation(self):
-        """Test creating a TranscriptSegment."""
-        segment = TranscriptSegment(
+        """Test creating a GeminiSegment."""
+        segment = GeminiSegment(
             text='Hello world',
             timestamp=13.0,
             speaker='Speaker',
@@ -381,10 +381,10 @@ class TestGeminiTranscriptSegment:
 
     def test_start_property(self):
         """Test the start property."""
-        segment = TranscriptSegment(text='Test', timestamp=10.5)
+        segment = GeminiSegment(text='Test', timestamp=10.5)
         assert segment.start == 10.5
 
-        segment_no_ts = TranscriptSegment(text='Test', timestamp=None)
+        segment_no_ts = GeminiSegment(text='Test', timestamp=None)
         assert segment_no_ts.start == 0.0
 
 
@@ -394,7 +394,7 @@ class TestIntegration:
     def test_full_workflow(self, tmp_path):
         """Test complete read -> align -> write workflow."""
         # 1. Create transcript
-        transcript_file = tmp_path / 'gemini.md'
+        transcript_file = tmp_path / 'Gemini.md'
         transcript_file.write_text(SAMPLE_TRANSCRIPT)
 
         # 2. Extract for alignment
@@ -428,7 +428,7 @@ class TestIntegration:
             aligned_supervisions.append(aligned_sup)
 
         # 4. Write updated transcript
-        updated_file = tmp_path / 'updated_gemini.md'
+        updated_file = tmp_path / 'updated_Gemini.md'
         GeminiWriter.update_timestamps(transcript_file, aligned_supervisions, updated_file)
         assert updated_file.exists()
 
@@ -445,7 +445,7 @@ class TestIntegration:
     def test_youtube_workflow(self, tmp_path):
         """Test complete workflow with YouTube format transcript."""
         # 1. Create YouTube format transcript
-        transcript_file = tmp_path / 'youtube_gemini.md'
+        transcript_file = tmp_path / 'youtube_Gemini.md'
         transcript_file.write_text(SAMPLE_YOUTUBE_TRANSCRIPT)
 
         # 2. Extract for alignment
@@ -479,7 +479,7 @@ class TestIntegration:
             aligned_supervisions.append(aligned_sup)
 
         # 4. Write updated transcript
-        updated_file = tmp_path / 'updated_youtube_gemini.md'
+        updated_file = tmp_path / 'updated_youtube_Gemini.md'
         GeminiWriter.update_timestamps(transcript_file, aligned_supervisions, updated_file)
         assert updated_file.exists()
 

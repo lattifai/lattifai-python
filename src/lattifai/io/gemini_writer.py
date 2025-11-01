@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 
 from lhotse.utils import Pathlike
 
-from .gemini_reader import GeminiReader, TranscriptSegment
+from .gemini_reader import GeminiReader, GeminiSegment
 from .supervision import Supervision
 
 
@@ -73,7 +73,7 @@ class GeminiWriter:
 
     @classmethod
     def _create_timestamp_mapping(
-        cls, original_segments: List[TranscriptSegment], aligned_supervisions: List[Supervision]
+        cls, original_segments: List[GeminiSegment], aligned_supervisions: List[Supervision]
     ) -> Dict[int, float]:
         """Create mapping from line numbers to new timestamps based on alignment.
 

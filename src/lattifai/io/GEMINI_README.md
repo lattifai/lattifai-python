@@ -36,7 +36,7 @@ Thank you for being here today. [00:00:19]
 from lattifai.io import GeminiReader
 
 segments = GeminiReader.read(
-	'videoid_gemini.md',
+	'videoid_Gemini.md',
 	include_events=True,
 	include_sections=True,
 )
@@ -49,7 +49,7 @@ for seg in segments:
 ```python
 from lattifai.io import GeminiReader
 supervisions = GeminiReader.extract_for_alignment(
-	'videoid_gemini.md',
+	'videoid_Gemini.md',
 	merge_consecutive=False,
 	min_duration=0.1,
 )
@@ -63,7 +63,7 @@ from lattifai import LattifAI
 client = LattifAI()
 aligned, output_path = client.alignment(
     audio='video.wav',
-    subtitle='videoid_gemini.md',
+    subtitle='videoid_Gemini.md',
     format='gemini',
     output_subtitle_path='aligned.srt'
 )
@@ -74,7 +74,7 @@ aligned, output_path = client.alignment(
 ```python
 from lattifai.io import GeminiWriter
 GeminiWriter.update_timestamps(
-	original_transcript='videoid_gemini.md',
+	original_transcript='videoid_Gemini.md',
 	aligned_supervisions=aligned,
 	output_path='transcript_aligned.txt'
 )
@@ -94,7 +94,7 @@ GeminiWriter.write_aligned_transcript(
 
 ### GeminiReader
 
-`read(path, include_events=False, include_sections=False)` → List[TranscriptSegment]
+`read(path, include_events=False, include_sections=False)` → List[GeminiSegment]
 `extract_for_alignment(path, merge_consecutive=True, min_duration=0.1)` → List[Supervision]
 
 ### GeminiWriter
@@ -102,6 +102,6 @@ GeminiWriter.write_aligned_transcript(
 `update_timestamps(original_transcript, aligned_supervisions, output_path, timestamp_mapping=None)` → Path
 `write_aligned_transcript(aligned_supervisions, output_path, include_word_timestamps=False)` → Path
 
-### TranscriptSegment
+### GeminiSegment
 
 * `text`, `timestamp`, `speaker`, `section`, `segment_type`, `line_number`

@@ -11,8 +11,8 @@ from .supervision import Supervision
 
 
 @dataclass
-class TranscriptSegment:
-    """Represents a segment in the transcript with metadata."""
+class GeminiSegment:
+    """Represents a segment in the Gemini transcript with metadata."""
 
     text: str
     timestamp: Optional[float] = None
@@ -69,7 +69,7 @@ class GeminiReader:
         transcript_path: Pathlike,
         include_events: bool = False,
         include_sections: bool = False,
-    ) -> List[TranscriptSegment]:
+    ) -> List[GeminiSegment]:
         """Parse YouTube transcript file and return list of transcript segments.
 
         Args:
@@ -78,13 +78,13 @@ class GeminiReader:
                 include_sections: Whether to include section headers
 
         Returns:
-                List of TranscriptSegment objects with all metadata
+                List of GeminiSegment objects with all metadata
         """
-        transcript_path = Path(transcript_path)
+        transcript_path = Path(transcript_path).expanduser().resolve()
         if not transcript_path.exists():
             raise FileNotFoundError(f'Transcript file not found: {transcript_path}')
 
-        segments: List[TranscriptSegment] = []
+        segments: List[GeminiSegment] = []
         current_section = None
         current_speaker = None
 
@@ -110,7 +110,7 @@ class GeminiReader:
                 current_section = section_title.strip()
                 if include_sections:
                     segments.append(
-                        TranscriptSegment(
+                        GeminiSegment(
                             text=section_title.strip(),
                             timestamp=timestamp,
                             section=current_section,
@@ -129,7 +129,7 @@ class GeminiReader:
                 current_section = section_title.strip()
                 if include_sections:
                     segments.append(
-                        TranscriptSegment(
+                        GeminiSegment(
                             text=section_title.strip(),
                             timestamp=timestamp,
                             section=current_section,
@@ -154,7 +154,7 @@ class GeminiReader:
 
                 if include_events and timestamp is not None:
                     segments.append(
-                        TranscriptSegment(
+                        GeminiSegment(
                             text=event_text.strip(),
                             timestamp=timestamp,
                             section=current_section,
@@ -195,7 +195,7 @@ class GeminiReader:
                     timestamp = None
 
                 segments.append(
-                    TranscriptSegment(
+                    GeminiSegment(
                         text=text.strip(),
                         timestamp=timestamp,
                         speaker=current_speaker,
@@ -223,7 +223,7 @@ class GeminiReader:
                     timestamp = None
 
                 segments.append(
-                    TranscriptSegment(
+                    GeminiSegment(
                         text=text.strip(),
                         timestamp=timestamp,
                         speaker=current_speaker,
@@ -241,7 +241,7 @@ class GeminiReader:
                 timestamp = cls.parse_timestamp(url_seconds)
 
                 segments.append(
-                    TranscriptSegment(
+                    GeminiSegment(
                         text=text.strip(),
                         timestamp=timestamp,
                         speaker=current_speaker,
@@ -368,4 +368,4 @@ class GeminiReader:
         return supervisions
 
 
-__all__ = ['GeminiReader', 'TranscriptSegment']
+__all__ = ['GeminiReader', 'GeminiSegment']

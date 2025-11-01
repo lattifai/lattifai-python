@@ -2,7 +2,7 @@ from typing import List, Optional
 
 from lhotse.utils import Pathlike
 
-from .gemini_reader import GeminiReader, TranscriptSegment
+from .gemini_reader import GeminiReader, GeminiSegment
 from .gemini_writer import GeminiWriter
 from .reader import SubtitleFormat, SubtitleReader
 from .supervision import Supervision
@@ -21,7 +21,7 @@ __all__ = [
     'Supervision',
     'GeminiReader',
     'GeminiWriter',
-    'TranscriptSegment',
+    'GeminiSegment',
     'SUBTITLE_FORMATS',
     'INPUT_SUBTITLE_FORMATS',
     'OUTPUT_SUBTITLE_FORMATS',
