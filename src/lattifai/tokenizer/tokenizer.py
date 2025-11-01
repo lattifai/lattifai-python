@@ -286,7 +286,11 @@ class LatticeTokenizer:
             raise Exception(f'Failed to tokenize texts: {response.text}')
         result = response.json()
         lattice_id = result['id']
-        return lattice_id, (result['lattice_graph'], result['final_state'], result.get('acoustic_scale', 1.0))
+        return (
+            supervisions,
+            lattice_id,
+            (result['lattice_graph'], result['final_state'], result.get('acoustic_scale', 1.0)),
+        )
 
     def detokenize(
         self,
@@ -360,7 +364,11 @@ class AsyncLatticeTokenizer(LatticeTokenizer):
             raise Exception(f'Failed to tokenize texts: {response.text}')
         result = response.json()
         lattice_id = result['id']
-        return lattice_id, (result['lattice_graph'], result['final_state'], result.get('acoustic_scale', 1.0))
+        return (
+            supervisions,
+            lattice_id,
+            (result['lattice_graph'], result['final_state'], result.get('acoustic_scale', 1.0)),
+        )
 
     async def detokenize(
         self,

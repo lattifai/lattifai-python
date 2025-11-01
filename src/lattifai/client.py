@@ -114,7 +114,9 @@ class LattifAI(SyncAPIClient):
             # step2: make lattice by call Lattifai API
             print(colorful.cyan('🔗 Step 2: Creating lattice graph from segments'))
             try:
-                lattice_id, lattice_graph = self.tokenizer.tokenize(supervisions, split_sentence=split_sentence)
+                supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
+                    supervisions, split_sentence=split_sentence
+                )
                 print(colorful.green(f'         ✓ Generated lattice graph with ID: {lattice_id}'))
             except Exception as e:
                 text_content = ' '.join([sup.text for sup in supervisions]) if supervisions else ''
@@ -124,7 +126,7 @@ class LattifAI(SyncAPIClient):
             print(colorful.cyan(f'🔍 Step 3: Searching lattice graph with audio: {audio}'))
             try:
                 lattice_results = self.worker.alignment(audio, lattice_graph)
-                print(colorful.green('         ✓ Lattice search completed successfully'))
+                print(colorful.green('         ✓ Lattice search completed'))
             except Exception as e:
                 raise AlignmentError(
                     f'Audio alignment failed for {audio}',
@@ -238,7 +240,7 @@ class AsyncLattifAI(AsyncAPIClient):
 
             print(colorful.cyan('🔗 Step 2: Creating lattice graph from segments'))
             try:
-                lattice_id, lattice_graph = await self.tokenizer.tokenize(
+                supervisions, lattice_id, lattice_graph = await self.tokenizer.tokenize(
                     supervisions,
                     split_sentence=split_sentence,
                 )
@@ -250,7 +252,7 @@ class AsyncLattifAI(AsyncAPIClient):
             print(colorful.cyan(f'🔍 Step 3: Searching lattice graph with audio: {audio}'))
             try:
                 lattice_results = await asyncio.to_thread(self.worker.alignment, audio, lattice_graph)
-                print(colorful.green('         ✓ Lattice search completed successfully'))
+                print(colorful.green('         ✓ Lattice search completed'))
             except Exception as e:
                 raise AlignmentError(
                     f'Audio alignment failed for {audio}',
