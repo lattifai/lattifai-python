@@ -50,6 +50,7 @@ class WorkflowResult:
     status: WorkflowStatus
     data: Optional[Any] = None
     error: Optional[str] = None
+    exception: Optional[Exception] = None  # Store the original exception object
     execution_time: Optional[float] = None
     step_results: Optional[List[Dict[str, Any]]] = None
 
@@ -149,7 +150,11 @@ class WorkflowAgent(abc.ABC):
                 self.logger.error(f'❌ Workflow failed after {execution_time:.2f}s: {str(e)}')
 
             return WorkflowResult(
-                status=WorkflowStatus.FAILED, error=str(e), execution_time=execution_time, step_results=step_results
+                status=WorkflowStatus.FAILED,
+                error=str(e),
+                exception=e,  # Store the original exception
+                execution_time=execution_time,
+                step_results=step_results,
             )
 
     async def _execute_step_with_retry(self, step: WorkflowStep, context: Dict[str, Any]) -> Any:

@@ -170,12 +170,9 @@ def agent(
 
         # Extract error message without support info (to avoid duplication)
         if isinstance(e, LattifAIError):
-            # Get just the core error message
-            error_msg = f'[{e.error_code}] {e.message}'
-            if e.context:
-                context_str = ', '.join(f'{k}={v}' for k, v in e.context.items())
-                error_msg += f'\nContext: {context_str}'
-            click.echo(colorful.red(f'❌ Workflow failed: {error_msg}'))
+            # Use the get_message() method which includes proper formatting
+            click.echo(colorful.red('❌ Workflow failed:'))
+            click.echo(e.get_message())
             # Show support info once at the end
             click.echo(e.get_support_info())
         else:

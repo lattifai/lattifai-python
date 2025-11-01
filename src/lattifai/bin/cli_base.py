@@ -21,3 +21,4 @@ def cli():
     import os
 
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+    os.environ['TOKENIZERS_PARALLELISM'] = 'FALSE'

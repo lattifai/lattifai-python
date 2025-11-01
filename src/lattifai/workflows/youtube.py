@@ -926,4 +926,8 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         if result.is_success:
             return result.data.get('export_results_result', {})
         else:
-            raise Exception(f'Workflow failed: {result.error}')
+            # Re-raise the original exception if available to preserve error type and context
+            if result.exception:
+                raise result.exception
+            else:
+                raise Exception(f'Workflow failed: {result.error}')
