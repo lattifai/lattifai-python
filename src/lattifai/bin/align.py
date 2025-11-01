@@ -86,12 +86,15 @@ def align(
 
 @cli.command()
 @click.option(
-    '-A',
-    '--audio-format',
-    '--audio_format',
-    type=str,
+    '-M',
+    '--media-format',
+    '--media_format',
+    type=click.Choice(
+        ['mp3', 'wav', 'm4a', 'aac', 'opus', 'mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'mpeg', 'mpg', '3gp'],
+        case_sensitive=False,
+    ),
     default='mp3',
-    help='Audio format (e.g., mp3, wav, m4a).',
+    help='Media format for YouTube download (audio or video).',
 )
 @click.option(
     '-S',
@@ -135,7 +138,7 @@ def align(
     '-F',
     '--output-format',
     '--output_format',
-    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt'], case_sensitive=False),
+    type=click.Choice(['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt', 'textgrid'], case_sensitive=False),
     default='vtt',
     help='Subtitle output format.',
 )
@@ -145,7 +148,7 @@ def align(
 )
 def youtube(
     yt_url: str,
-    audio_format: str = 'mp3',
+    media_format: str = 'mp3',
     split_sentence: bool = False,
     output_dir: str = '.',
     device: str = 'cpu',
@@ -154,31 +157,44 @@ def youtube(
     output_format: str = 'vtt',
 ):
     """
-    Download audio and subtitles from YouTube for further alignment.
+    Download media and subtitles from YouTube for further alignment.
     """
 
     async def _download():
-        downloader = YouTubeDownloader(audio_format=audio_format)
-        audio_path = await downloader.download_audio(yt_url, output_dir=output_dir, audio_format=audio_format)
-        subtitle_paths = await downloader.download_subtitles(yt_url, output_dir=output_dir)
-        return audio_path, subtitle_paths
+        downloader = YouTubeDownloader(media_format=media_format)
+        media_path = await downloader.download_media(yt_url, output_dir=output_dir, media_format=media_format)
+        subtitle_path = await downloader.download_subtitles(yt_url, output_dir=output_dir)
+        return media_path, subtitle_path
 
-    audio_path, subtitle_paths = asyncio.run(_download())
+    media_path, subtitle_path = asyncio.run(_download())
 
     # Robustly extract video_id
     from lattifai.workflows.youtube import YouTubeDownloader as YTDL
 
     video_id = YTDL.extract_video_id(yt_url)
     client = LattifAI(model_name_or_path=model_name_or_path, device=device, api_key=api_key)
-    # Use the first subtitle file, raise error if none found
-    if not subtitle_paths or len(subtitle_paths) == 0:
-        raise RuntimeError('No subtitle file was downloaded')
+
+    # Handle subtitle_path which can be a string, list, or None
+    if not subtitle_path:
+        raise RuntimeError(
+            'No subtitle file was downloaded. Media file transcription support is coming soon. '
+            'Please use the `lattifai agent --youtube` command for automatic transcription workflow.'
+        )
+
+    # If subtitle_path is a list, use the first one
+    if isinstance(subtitle_path, list):
+        if len(subtitle_path) == 0:
+            raise RuntimeError(
+                'No subtitle file was downloaded. Media file transcription support is coming soon. '
+                'Please use the `lattifai agent --youtube` command for automatic transcription workflow.'
+            )
+        subtitle_path = subtitle_path[0]
 
     output_subtitle_path = f'{output_dir}/{video_id}.{output_format}'
     client.alignment(
-        audio_path,
-        subtitle_paths[0],
-        format=output_format,
+        media_path,
+        subtitle_path,
+        format='auto',  # Auto-detect input subtitle format
         split_sentence=split_sentence,
         output_subtitle_path=output_subtitle_path,
     )

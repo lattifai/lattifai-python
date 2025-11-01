@@ -105,30 +105,43 @@ class FileExistenceManager:
         # Header with warning color
         print(f'\n{colorful.bold_yellow("⚠️  Existing files found:")}')
 
-        found_files = []
+        # Collect file paths for options
+        file_paths = []
         if has_media:
-            # print(f'{colorful.cyan("🎬 Media files:")}')
-            for file_path in existing_files['media']:
-                found_files.append(f'{colorful.green("•")} 🎬 Media files: {file_path}')
-
+            file_paths.extend(existing_files['media'])
         if has_subtitle:
-            # print(f'{colorful.cyan("📝 Subtitle files:")}')
-            for file_path in existing_files['subtitle']:
-                found_files.append(f'   {colorful.green("•")} "📝 Subtitle files:" {file_path}')
+            file_paths.extend(existing_files['subtitle'])
+
+        # Create display options with emojis
+        options = []
+        for file_path in file_paths:
+            # Determine emoji based on file type
+            if has_media and file_path in existing_files['media']:
+                display_text = f'{colorful.green("•")} 🎬 Media file: {file_path}'
+            else:
+                display_text = f'{colorful.green("•")} 📝 Subtitle file: {file_path}'
+            options.append((display_text, file_path))
+
+        # Add overwrite and cancel options
+        options.extend(
+            [
+                ('                  Overwrite existing files (re-generate or download)', 'overwrite'),
+                ('                  Cancel operation', 'cancel'),
+            ]
+        )
 
         prompt_message = 'What would you like to do?'
-        options = [(f'{file_path}', 'use') for file_path in found_files] + [
-            ('                  Overwrite existing files (re-generate or download)', 'overwrite'),
-            ('                  Cancel operation', 'cancel'),
-        ]
-        choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default='use')
+        default_value = file_paths[0] if file_paths else 'use'
+        choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default=default_value)
 
-        if choice == 'use':
-            print(f'{colorful.green("✅ Using existing files")}')
-        elif choice == 'overwrite':
+        if choice == 'overwrite':
             print(f'{colorful.yellow("🔄 Overwriting existing files")}')
         elif choice == 'cancel':
             print(f'{colorful.red("❌ Operation cancelled")}')
+        elif choice in file_paths:
+            print(f'{colorful.green(f"✅ Using selected file: {choice}")}')
+        else:
+            print(f'{colorful.green("✅ Using existing files")}')
 
         return choice
 
@@ -773,98 +786,3 @@ class _NullContext:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         return False
-
-
-class VideoFileManager:
-    """Platform-agnostic video file management utilities"""
-
-    def __init__(self, platform: str = 'generic'):
-        """
-        Initialize video file manager
-
-        Args:
-            platform: Platform identifier (e.g., 'youtube', 'bilibili', 'vimeo')
-        """
-        self.platform = platform
-        self.file_manager = FileExistenceManager()
-
-    def get_video_filename(self, video_id: str, extension: str) -> str:
-        """
-        Generate standardized filename for video files
-
-        Args:
-            video_id: Video identifier
-            extension: File extension
-
-        Returns:
-            Standardized filename
-        """
-        # Could be extended to support platform-specific naming conventions
-        return f'{video_id}.{extension}'
-
-    def check_existing_files(
-        self,
-        video_id: str,
-        output_dir: str,
-        media_formats: List[str] = None,
-        subtitle_formats: List[str] = None,
-    ) -> Dict[str, List[str]]:
-        """
-        Check for existing media files with platform-specific format support
-
-        Args:
-            video_id: Video ID
-            output_dir: Output directory
-            media_formats: Supported media formats (audio and video combined)
-            subtitle_formats: Supported subtitle formats
-
-        Returns:
-            Dictionary of existing files
-        """
-        return self.file_manager.check_existing_files(video_id, output_dir, media_formats, subtitle_formats)
-
-    def prompt_user_confirmation(self, existing_files: Dict[str, List[str]], operation: str = 'download') -> str:
-        """
-        Prompt user for confirmation using the file manager (legacy, all files together)
-
-        Args:
-            existing_files: Dictionary of existing files
-            operation: Operation description
-
-        Returns:
-            User choice
-        """
-        return self.file_manager.prompt_user_confirmation(existing_files, operation)
-
-    def prompt_file_type_confirmation(self, file_type: str, files: List[str], operation: str = 'download') -> str:
-        """
-        Prompt user for confirmation for a specific file type
-
-        Args:
-            file_type: Type of file ('media', 'subtitle')
-            files: List of existing files of this type
-            operation: Operation description
-
-        Returns:
-            User choice for this file type
-        """
-        return self.file_manager.prompt_file_type_confirmation(file_type, files, operation)
-
-    def prompt_per_file_type_confirmation(
-        self, existing_files: Dict[str, List[str]], operation: str = 'download'
-    ) -> Dict[str, str]:
-        """
-        Prompt user for confirmation separately for each file type
-
-        Args:
-            existing_files: Dictionary of existing files by type
-            operation: Operation description
-
-        Returns:
-            Dictionary mapping file type to user choice
-        """
-        return self.file_manager.prompt_per_file_type_confirmation(existing_files, operation)
-
-    def is_interactive_mode(self) -> bool:
-        """Check if running in interactive mode"""
-        return self.file_manager.is_interactive_mode()

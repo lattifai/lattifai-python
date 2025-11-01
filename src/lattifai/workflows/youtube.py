@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 from ..client import AsyncLattifAI
 from ..io import GeminiReader, GeminiWriter, SubtitleIO
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
-from .file_manager import VideoFileManager
+from .file_manager import FileExistenceManager
 from .gemini import GeminiTranscriber
 
 
@@ -24,7 +24,6 @@ class YouTubeDownloader:
     def __init__(self, media_format: str = 'mp3'):
         self.media_format = media_format
         self.logger = setup_workflow_logger('youtube')
-        self.file_manager = VideoFileManager(platform='youtube')
 
         # Check if yt-dlp is available
         self._check_ytdlp()
@@ -144,6 +143,144 @@ class YouTubeDownloader:
                 url=url, output_dir=output_dir, video_format=media_format, force_overwrite=force_overwrite
             )
 
+    async def _download_media_internal(
+        self,
+        url: str,
+        output_dir: str,
+        media_format: str,
+        is_audio: bool,
+        force_overwrite: bool = False,
+    ) -> str:
+        """
+        Internal unified method for downloading audio or video from YouTube
+
+        Args:
+            url: YouTube URL
+            output_dir: Output directory
+            media_format: Media format (audio or video extension)
+            is_audio: True for audio download, False for video download
+            force_overwrite: Skip user confirmation and overwrite existing files
+
+        Returns:
+            Path to downloaded media file
+        """
+        target_dir = Path(output_dir).expanduser()
+        media_type = 'audio' if is_audio else 'video'
+        emoji = '🎵' if is_audio else '🎬'
+
+        self.logger.info(f'{emoji} Downloading {media_type} from: {url}')
+        self.logger.info(f'📁 Output directory: {target_dir}')
+        self.logger.info(f'{"🎶" if is_audio else "🎥"} Media format: {media_format}')
+
+        # Create output directory if it doesn't exist
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Extract video ID and check for existing files
+        video_id = self.extract_video_id(url)
+        existing_files = FileExistenceManager.check_existing_files(video_id, str(target_dir), [media_format])
+
+        # Handle existing files
+        if existing_files['media'] and not force_overwrite:
+            if FileExistenceManager.is_interactive_mode():
+                user_choice = FileExistenceManager.prompt_user_confirmation(
+                    {'media': existing_files['media']}, 'media download'
+                )
+
+                if user_choice == 'cancel':
+                    raise RuntimeError('Media download cancelled by user')
+                elif user_choice == 'overwrite':
+                    # Continue with download
+                    pass
+                elif user_choice in existing_files['media']:
+                    # User selected a specific file
+                    self.logger.info(f'✅ Using selected media file: {user_choice}')
+                    return user_choice
+                else:
+                    # Fallback: use first file
+                    self.logger.info(f'✅ Using existing media file: {existing_files["media"][0]}')
+                    return existing_files['media'][0]
+            else:
+                # Non-interactive mode: use existing file
+                self.logger.info(f'✅ Using existing media file: {existing_files["media"][0]}')
+                return existing_files['media'][0]
+
+        # Generate output filename template
+        output_template = str(target_dir / f'{video_id}.%(ext)s')
+
+        # Build yt-dlp command based on media type
+        if is_audio:
+            cmd = [
+                'yt-dlp',
+                '--extract-audio',
+                '--audio-format',
+                media_format,
+                '--audio-quality',
+                '0',  # Best quality
+                '--output',
+                output_template,
+                '--no-playlist',
+                url,
+            ]
+        else:
+            cmd = [
+                'yt-dlp',
+                '--format',
+                'bestvideo*+bestaudio/best',
+                '--merge-output-format',
+                media_format,
+                '--output',
+                output_template,
+                '--no-playlist',
+                url,
+            ]
+
+        try:
+            # Run in thread pool to avoid blocking
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
+            )
+
+            self.logger.info(f'✅ {media_type.capitalize()} download completed')
+
+            # Find the downloaded file
+            # Try to parse from yt-dlp output first
+            if is_audio:
+                output_lines = result.stderr.strip().split('\n')
+                for line in reversed(output_lines):
+                    if 'Destination:' in line or 'has already been downloaded' in line:
+                        parts = line.split()
+                        filename = ' '.join(parts[1:]) if 'Destination:' in line else parts[0]
+                        file_path = target_dir / filename
+                        if file_path.exists():
+                            self.logger.info(f'{emoji} Downloaded {media_type} file: {file_path}')
+                            return str(file_path)
+
+            # Check for expected file format
+            expected_file = target_dir / f'{video_id}.{media_format}'
+            if expected_file.exists():
+                self.logger.info(f'{emoji} Downloaded {media_type}: {expected_file}')
+                return str(expected_file)
+
+            # Fallback: search for media files with this video_id
+            if is_audio:
+                fallback_extensions = [media_format, 'mp3', 'wav', 'm4a', 'aac']
+            else:
+                fallback_extensions = [media_format, 'mp4', 'webm', 'mkv']
+
+            for ext in fallback_extensions:
+                files = list(target_dir.glob(f'{video_id}*.{ext}'))
+                if files:
+                    latest_file = max(files, key=os.path.getctime)
+                    self.logger.info(f'{emoji} Found {media_type} file: {latest_file}')
+                    return str(latest_file)
+
+            raise RuntimeError(f'Downloaded {media_type} file not found')
+
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f'Failed to download {media_type}: {e.stderr}')
+            raise RuntimeError(f'Failed to download {media_type}: {e.stderr}')
+
     async def download_audio(
         self,
         url: str,
@@ -157,103 +294,17 @@ class YouTubeDownloader:
         Args:
             url: YouTube URL
             output_dir: Output directory (default: temp directory)
-            media_format: Media format (default: instance format)
+            media_format: Audio format (default: instance format)
             force_overwrite: Skip user confirmation and overwrite existing files
 
         Returns:
             Path to downloaded audio file
         """
-        target_dir = Path(output_dir or tempfile.gettempdir()).expanduser()
+        target_dir = output_dir or tempfile.gettempdir()
         media_format = media_format or self.media_format
-
-        self.logger.info(f'🎵 Downloading audio from: {url}')
-        self.logger.info(f'📁       Output directory: {target_dir}')
-        self.logger.info(f'🎶           Media format: {media_format}')
-
-        # Create output directory if it doesn't exist
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        # Extract video ID and check for existing files
-        video_id = self.extract_video_id(url)
-        existing_files = self.file_manager.check_existing_files(video_id, str(target_dir), media_format)
-
-        # Handle existing files
-        if existing_files['media'] and not force_overwrite:
-            if self.file_manager.is_interactive_mode():
-                user_choice = self.file_manager.prompt_user_confirmation(
-                    {'media': existing_files['media']}, 'media download'
-                )
-
-                if user_choice == 'use':
-                    self.logger.info(f'✅ Using existing media file: {existing_files["media"][0]}')
-                    return existing_files['media'][0]
-                elif user_choice == 'cancel':
-                    raise RuntimeError('Media download cancelled by user')
-                # For 'overwrite', continue with download
-            else:
-                # Non-interactive mode: use existing file
-                self.logger.info(f'✅ Using existing media file: {existing_files["media"][0]}')
-                return existing_files['media'][0]
-
-        # Generate output filename template
-        output_template = str(target_dir / f'{video_id}.%(ext)s')
-
-        cmd = [
-            'yt-dlp',
-            '--extract-audio',
-            '--audio-format',
-            media_format,
-            '--audio-quality',
-            '0',  # Best quality
-            '--output',
-            output_template,
-            '--no-playlist',
-            url,
-        ]
-
-        try:
-            # Run in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
-            )
-
-            self.logger.info('✅ Audio download completed')
-
-            # Find the downloaded file
-            # yt-dlp outputs the filename in the last line of stdout
-            output_lines = result.stderr.strip().split('\n')
-            for line in reversed(output_lines):
-                if 'Destination:' in line or 'has already been downloaded' in line:
-                    # Extract filename from the line
-                    parts = line.split()
-                    if 'Destination:' in line:
-                        filename = ' '.join(parts[1:])
-                    else:
-                        # "file.ext has already been downloaded"
-                        filename = parts[0]
-
-                    file_path = target_dir / filename
-                    if file_path.exists():
-                        self.logger.info(f'📄 Downloaded file: {file_path}')
-                        return str(file_path)
-
-            # Fallback: search for audio files in output directory
-            audio_extensions = [media_format, 'mp3', 'wav', 'm4a', 'aac']
-            for ext in audio_extensions:
-                pattern = f'*.{ext}'
-                files = list(target_dir.glob(pattern))
-                if files:
-                    # Return the most recently created file
-                    latest_file = max(files, key=os.path.getctime)
-                    self.logger.info(f'📄 Found audio file: {latest_file}')
-                    return str(latest_file)
-
-            raise RuntimeError('Downloaded audio file not found')
-
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f'Failed to download audio: {e.stderr}')
-            raise RuntimeError(f'Failed to download audio: {e.stderr}')
+        return await self._download_media_internal(
+            url, target_dir, media_format, is_audio=True, force_overwrite=force_overwrite
+        )
 
     async def download_video(
         self, url: str, output_dir: Optional[str] = None, video_format: str = 'mp4', force_overwrite: bool = False
@@ -270,84 +321,10 @@ class YouTubeDownloader:
         Returns:
             Path to downloaded video file
         """
-        target_dir = Path(output_dir or tempfile.gettempdir()).expanduser()
-
-        self.logger.info(f'🎬 Downloading video from: {url}')
-        self.logger.info(f'📁 Output directory: {target_dir}')
-        self.logger.info(f'🎥 Video format: {video_format}')
-
-        # Create output directory if it doesn't exist
-        target_dir.mkdir(parents=True, exist_ok=True)
-
-        # Extract video ID and check for existing files
-        video_id = self.extract_video_id(url)
-        video_file = target_dir / f'{video_id}.{video_format}'
-
-        # Handle existing files
-        if video_file.exists() and not force_overwrite:
-            if self.file_manager.is_interactive_mode():
-                user_choice = self.file_manager.prompt_user_confirmation({'media': [str(video_file)]}, 'media download')
-
-                if user_choice == 'use':
-                    self.logger.info(f'✅ Using existing media file: {video_file}')
-                    return str(video_file)
-                elif user_choice == 'cancel':
-                    raise RuntimeError('Media download cancelled by user')
-                # For 'overwrite', continue with download
-            else:
-                # Non-interactive mode: use existing file
-                self.logger.info(f'✅ Using existing media file: {video_file}')
-                return str(video_file)
-
-        # Generate output filename template
-        output_template = str(target_dir / f'{video_id}.%(ext)s')
-
-        # Use flexible format selection and merge if needed
-        # 'bestvideo*+bestaudio/best' will merge best video and audio, or download best single file
-        # --merge-output-format ensures the final format matches our requirement
-        cmd = [
-            'yt-dlp',
-            '--format',
-            'bestvideo*+bestaudio/best',
-            '--merge-output-format',
-            video_format,
-            '--output',
-            output_template,
-            '--no-playlist',
-            url,
-        ]
-
-        try:
-            # Run in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
-            )
-            # TODO: check result
-            del result
-            self.logger.info('✅ Video download completed')
-
-            # Find the downloaded file - check for the expected format first
-            video_file = target_dir / f'{video_id}.{video_format}'
-            if video_file.exists():
-                self.logger.info(f'📄 Downloaded video: {video_file}')
-                return str(video_file)
-
-            # Fallback: search for any video files with this video_id
-            video_patterns = [f'{video_id}.{video_format}', f'{video_id}.*']
-            for pattern in video_patterns:
-                video_files = list(target_dir.glob(pattern))
-                if video_files:
-                    # Return the most recently created file
-                    latest_file = max(video_files, key=os.path.getctime)
-                    self.logger.info(f'📄 Downloaded video: {latest_file}')
-                    return str(latest_file)
-
-            raise RuntimeError('Downloaded video file not found')
-
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f'Failed to download video: {e.stderr}')
-            raise RuntimeError(f'Failed to download video: {e.stderr}')
+        target_dir = output_dir or tempfile.gettempdir()
+        return await self._download_media_internal(
+            url, target_dir, video_format, is_audio=False, force_overwrite=force_overwrite
+        )
 
     async def download_subtitles(
         self, url: str, output_dir: str, force_overwrite: bool = False, subtitle_lang: Optional[str] = None
@@ -373,30 +350,38 @@ class YouTubeDownloader:
         # Extract video ID and check for existing subtitle files
         video_id = self.extract_video_id(url)
         if not force_overwrite:
-            existing_files = self.file_manager.check_existing_files(
+            existing_files = FileExistenceManager.check_existing_files(
                 video_id, str(target_dir), subtitle_formats=['vtt', 'srt']
             )
 
             # Handle existing subtitle files
             if existing_files['subtitle'] and not force_overwrite:
-                if self.file_manager.is_interactive_mode():
-                    user_choice = self.file_manager.prompt_user_confirmation(
+                if FileExistenceManager.is_interactive_mode():
+                    user_choice = FileExistenceManager.prompt_user_confirmation(
                         {'subtitle': existing_files['subtitle']}, 'subtitle download'
                     )
 
-                    if user_choice == 'use':
+                    if user_choice == 'cancel':
+                        raise RuntimeError('Subtitle download cancelled by user')
+                    elif user_choice == 'overwrite':
+                        # Continue with download
+                        pass
+                    elif user_choice in existing_files['subtitle']:
+                        # User selected a specific file
+                        subtitle_file = Path(user_choice)
+                        self.logger.info(f'✅ Using selected subtitle file: {subtitle_file}')
+                        return str(subtitle_file)
+                    else:
+                        # Fallback: use first file
                         subtitle_file = Path(existing_files['subtitle'][0])
                         self.logger.info(f'✅ Using existing subtitle file: {subtitle_file}')
                         return str(subtitle_file)
-                    elif user_choice == 'cancel':
-                        raise RuntimeError('Subtitle download cancelled by user')
-                    # For 'overwrite', continue with download
                 else:
                     subtitle_file = Path(existing_files['subtitle'][0])
                     self.logger.info(f'🔍 Found existing subtitle: {subtitle_file}')
                     return str(subtitle_file)
 
-        self.logger.info(f'📄 Downloading subtitle for: {url}')
+        self.logger.info(f'� Downloading subtitle for: {url}')
         if subtitle_lang:
             self.logger.info(f'🎯 Targeting specific subtitle track: {subtitle_lang}')
 
@@ -440,7 +425,7 @@ class YouTubeDownloader:
             for pattern in subtitle_patterns:
                 _subtitle_files = list(target_dir.glob(pattern))
                 for subtitle_file in _subtitle_files:
-                    self.logger.info(f'📄 Downloaded subtitle: {subtitle_file}')
+                    self.logger.info(f'� Downloaded subtitle: {subtitle_file}')
                 subtitle_files.extend(_subtitle_files)
 
             if not subtitle_files:
@@ -666,7 +651,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         self.logger.info('📥 Checking for existing subtitles...')
 
         # Check for existing subtitle files (all formats including Gemini transcripts)
-        existing_files = self.downloader.file_manager.check_existing_files(
+        existing_files = FileExistenceManager.check_existing_files(
             video_id,
             str(self.output_dir),
             subtitle_formats=[
@@ -683,8 +668,6 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         # Prompt user if subtitle exists and force_overwrite is not set
         if existing_files['subtitle'] and not self.force_overwrite:
-            from .file_manager import FileExistenceManager
-
             # Let user choose which subtitle file to use
             subtitle_choice = FileExistenceManager.prompt_file_selection(
                 file_type='subtitle', files=existing_files['subtitle'], operation='transcribe'
@@ -730,7 +713,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             is_gemini_format = False
         subtitle_path = Path(subtitle_path)
 
-        self.logger.info(f'📄 Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
+        self.logger.info(f'� Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
 
         original_subtitle_path = subtitle_path
         output_path = Path(self.output_dir) / f'{Path(media_path).stem}_aligned.ass'

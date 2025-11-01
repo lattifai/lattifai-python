@@ -10,7 +10,7 @@ from lattifai.io import GeminiReader, GeminiWriter
 
 from .agents import YouTubeSubtitleAgent
 from .base import WorkflowAgent, WorkflowResult, WorkflowStep
-from .file_manager import FileExistenceManager, VideoFileManager
+from .file_manager import FileExistenceManager
 
 __all__ = [
     'WorkflowAgent',
@@ -18,7 +18,6 @@ __all__ = [
     'WorkflowResult',
     'YouTubeSubtitleAgent',
     'FileExistenceManager',
-    'VideoFileManager',
     'GeminiReader',
     'GeminiWriter',
 ]
