@@ -31,7 +31,7 @@ All tests cover the complete set of supported formats:
 ### Option Coverage
 
 Tests verify all command-line options:
-- `--subtitle-format` / `-F`
+- `--input-format` / `-F`
 - `--output-format` / `-F`
 - `--video-format`
 - `--audio-format` / `-A`

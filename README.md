@@ -76,7 +76,7 @@ Usage: lattifai align [OPTIONS] INPUT_AUDIO_PATH INPUT_SUBTITLE_PATH OUTPUT_SUBT
   Command used to align audio with subtitles
 
 Options:
-  -F, --subtitle_format [srt|vtt|ass|ssa|sub|sbv|txt|auto|gemini]  Input subtitle format.
+  -F, --input_format [srt|vtt|ass|ssa|sub|sbv|txt|auto|gemini]      Input subtitle format.
   -S, --split_sentence                                              Re-segment subtitles by semantics.
   -W, --word_level                                                  Include word-level alignment timestamps.
   -D, --device [cpu|cuda|mps]                                       Device to use for inference.
@@ -98,7 +98,9 @@ lai youtube --media-format mp3 --split-sentence --word-level --device mps \
   --output-dir ./output --output-format srt https://www.youtube.com/watch?v=VIDEO_ID
 
 # Use Gemini for transcription fallback
-lai youtube --gemini-api-key YOUR_KEY https://www.youtube.com/watch?v=VIDEO_ID
+# Gemini API Key: Get yours at https://aistudio.google.com/apikey
+# Note: Your API key is completely safe - it's never logged or stored by our codebase
+lai youtube --gemini-api-key YOUR_GEMINI_KEY https://www.youtube.com/watch?v=VIDEO_ID
 ```
 
 **Options**:

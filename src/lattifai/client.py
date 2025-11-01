@@ -1,7 +1,6 @@
 """LattifAI client implementation."""
 
 import asyncio
-import logging
 import os
 from typing import Dict, List, Optional, Tuple, Union
 

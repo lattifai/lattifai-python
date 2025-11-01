@@ -140,7 +140,13 @@ class WorkflowAgent(abc.ABC):
 
         except Exception as e:
             execution_time = time.time() - start_time
-            self.logger.error(f'❌ Workflow failed after {execution_time:.2f}s: {str(e)}')
+            # For LattifAI errors, just log the error code and basic message
+            from lattifai.errors import LattifAIError
+
+            if isinstance(e, LattifAIError):
+                self.logger.error(f'❌ Workflow failed after {execution_time:.2f}s: [{e.error_code}] {e.message}')
+            else:
+                self.logger.error(f'❌ Workflow failed after {execution_time:.2f}s: {str(e)}')
 
             return WorkflowResult(
                 status=WorkflowStatus.FAILED, error=str(e), execution_time=execution_time, step_results=step_results
@@ -162,11 +168,18 @@ class WorkflowAgent(abc.ABC):
                 last_error = e
                 step.retry_count += 1
 
+                # For LattifAI errors, show simplified message in logs
+                from lattifai.errors import LattifAIError
+
+                error_summary = f'[{e.error_code}]' if isinstance(e, LattifAIError) else str(e)[:100]
+
                 if step.should_retry():
-                    self.logger.warning(f'⚠️ Step {step.name} failed: {str(e)}. Retrying...')
+                    self.logger.warning(f'⚠️ Step {step.name} failed: {error_summary}. Retrying...')
                     continue
                 else:
-                    self.logger.error(f'❌ Step {step.name} failed after {step.max_retries + 1} attempts')
+                    self.logger.error(
+                        f'❌ Step {step.name} failed after {step.max_retries + 1} attempts: {error_summary}'
+                    )
                     raise e
 
         # This should never be reached, but just in case

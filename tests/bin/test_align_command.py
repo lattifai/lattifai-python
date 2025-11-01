@@ -39,7 +39,7 @@ class TestAlignCommand:
         result = cli_runner.invoke(
             align,
             [
-                '--subtitle-format',
+                '--input-format',
                 input_format,
                 '--device',
                 'cpu',
@@ -135,7 +135,7 @@ class TestAlignCommand:
 
         assert result.exit_code == 0
         assert 'Command used to align media(audio/video) with subtitles' in result.output
-        assert '--subtitle-format' in result.output
+        assert '--input-format' in result.output
         assert '--device' in result.output
         assert '--split-sentence' in result.output
         assert '--model-name-or-path' in result.output

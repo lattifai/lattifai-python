@@ -14,8 +14,8 @@ from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS
 @cli.command()
 @click.option(
     '-F',
-    '--subtitle_format',
-    '--subtitle-format',
+    '--input_format',
+    '--input-format',
     type=click.Choice(INPUT_SUBTITLE_FORMATS, case_sensitive=False),
     default='auto',
     help='Input subtitle format.',
@@ -59,7 +59,7 @@ from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS
     help='API key for LattifAI.',
 )
 @click.argument(
-    'input_audio_path',
+    'input_media_path',
     type=click.Path(exists=True, dir_okay=False),
 )
 @click.argument(
@@ -84,15 +84,30 @@ def align(
     """
     Command used to align media(audio/video) with subtitles
     """
-    client = LattifAI(model_name_or_path=model_name_or_path, device=device, api_key=api_key)
-    client.alignment(
-        input_media_path,
-        input_subtitle_path,
-        format=input_format.lower(),
-        split_sentence=split_sentence,
-        return_details=word_level,
-        output_subtitle_path=output_subtitle_path,
-    )
+    try:
+        client = LattifAI(model_name_or_path=model_name_or_path, device=device, api_key=api_key)
+        client.alignment(
+            input_media_path,
+            input_subtitle_path,
+            format=input_format.lower(),
+            split_sentence=split_sentence,
+            return_details=word_level,
+            output_subtitle_path=output_subtitle_path,
+        )
+        click.echo(colorful.green(f'✅ Alignment completed successfully: {output_subtitle_path}'))
+    except Exception as e:
+        from lattifai.errors import LattifAIError
+
+        # Display error message
+        if isinstance(e, LattifAIError):
+            click.echo(colorful.red('❌ Alignment failed:'))
+            click.echo(e.get_message())
+            # Show support info
+            click.echo(e.get_support_info())
+        else:
+            click.echo(colorful.red(f'❌ Alignment failed: {str(e)}'))
+
+        raise click.ClickException('Alignment failed')
 
 
 @cli.command()
@@ -272,12 +287,9 @@ def youtube(
 
         # Extract error message without support info (to avoid duplication)
         if isinstance(e, LattifAIError):
-            # Get just the core error message
-            error_msg = f'[{e.error_code}] {e.message}'
-            if e.context:
-                context_str = ', '.join(f'{k}={v}' for k, v in e.context.items())
-                error_msg += f'\nContext: {context_str}'
-            click.echo(colorful.red(f'❌ Failed to process YouTube URL: {error_msg}'))
+            # Use the get_message() method which includes proper formatting
+            click.echo(colorful.red('❌ Failed to process YouTube URL:'))
+            click.echo(e.get_message())
             # Show support info once at the end
             click.echo(e.get_support_info())
         else:

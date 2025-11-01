@@ -3,7 +3,6 @@ YouTube downloader module using yt-dlp and Agent
 """
 
 import asyncio
-import logging
 import os
 import re
 import subprocess
