@@ -3,7 +3,7 @@
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 from lattifai.errors import ModelLoadError
 from lattifai.tokenizer import LatticeTokenizer
@@ -92,7 +92,7 @@ def _resolve_model_path(model_name_or_path: str) -> str:
         raise ModelLoadError(model_name_or_path, original_error=e)
 
 
-def _select_device(device: str | None) -> str:
+def _select_device(device: Optional[str]) -> str:
     """Select best available torch device when not explicitly provided."""
     if device:
         return device
