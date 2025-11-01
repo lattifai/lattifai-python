@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '0.2.5'
+version = '0.2.8'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -65,7 +65,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 
 [project.scripts]
 lattifai = 'lattifai.bin:cli'
-install-k2 = 'scripts.install_k2:install_k2'
+lai = 'lattifai.bin:cli'
 
 [tool.setuptools]
 packages = ["lattifai", "lattifai.io", "lattifai.tokenizer", "lattifai.workers", "lattifai.bin", "scripts"]

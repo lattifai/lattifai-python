@@ -14,6 +14,31 @@ We use [this changelog structure](http://keepachangelog.com/).
 
 None.
 
+## [0.2.8] - 2025-11-01
+
+### Added
+- **Shorthand CLI Command**: Introduced `lai` as a convenient alias for `lattifai` command
+- **Agentic Workflows**: Intelligent autonomous pipelines for end-to-end YouTube subtitle generation
+  - `lai agent --youtube` command for automated YouTube processing
+  - Integration with Google Gemini 2.5 Pro for AI-powered transcription
+  - YouTubeSubtitleAgent for programmatic workflow automation
+  - Support for both audio (MP3, WAV, M4A, AAC, OPUS) and video (MP4, WebM, MKV) formats
+  - Smart file management with user confirmation prompts
+  - Retry mechanism for robust processing
+- Python API for agentic workflows with `YouTubeSubtitleAgent`, `YouTubeDownloader`, and `GeminiTranscriber`
+- Updated README documentation to promote `lai` as the recommended command for daily use
+
+### Improved
+- CLI user experience with faster command typing
+- Documentation with `lai` command examples throughout
+- End-to-end workflow automation from YouTube URL to aligned subtitles
+
+### Dependencies
+- Added `yt-dlp` for YouTube video/audio downloading
+- Added `google-genai` for Google Gemini API integration
+- Added `questionary` for interactive CLI prompts
+- Added `pycryptodome` for secure download handling
+
 ## [0.2.5] - 2025-10-26
 
 ### Added

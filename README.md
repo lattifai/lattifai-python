@@ -11,8 +11,8 @@ Advanced forced alignment and subtitle generation powered by [Lattice-1-Alpha](h
 ## Installation
 
 ```bash
-pip install install-k2
-# The installation will automatically detect and use your already installed PyTorch version.
+pip install "install-k2>=0.0.6"
+# The installation will automatically detect and use your already installed PyTorch version(up to 2.8).
 install-k2  # Install k2
 
 pip install lattifai
@@ -24,16 +24,24 @@ pip install lattifai
 
 ### Command Line
 
+The library provides two equivalent commands: `lai` (recommended for convenience) and `lattifai`.
+
 ```bash
-# Align audio with subtitle
+# Align audio with subtitle (using lai command)
+lai align audio.wav subtitle.srt output.srt
+
+# Or use the full command
 lattifai align audio.wav subtitle.srt output.srt
 
 # Convert subtitle format
-lattifai subtitle convert input.srt output.vtt
+lai subtitle convert input.srt output.vtt
 ```
-#### lattifai align options
+
+> **💡 Tip**: Use `lai` for faster typing in your daily workflow!
+
+#### lai align options
 ```
-> lattifai align --help
+> lai align --help
 Usage: lattifai align [OPTIONS] INPUT_AUDIO_PATH INPUT_SUBTITLE_PATH OUTPUT_SUBTITLE_PATH
 
   Command used to align audio with subtitles
@@ -72,7 +80,7 @@ This feature helps improve alignment accuracy by:
 
 **Usage**:
 ```bash
-lattifai align --split_sentence audio.wav subtitle.srt output.srt
+lai align --split_sentence audio.wav subtitle.srt output.srt
 ```
 
 #### Understanding --word_level
@@ -130,22 +138,22 @@ Two tiers created:
 **Usage**:
 ```bash
 # Generate word-level aligned JSON
-lattifai align --word_level audio.wav subtitle.srt output.json
+lai align --word_level audio.wav subtitle.srt output.json
 
 # Create TextGrid file for Praat analysis
-lattifai align --word_level audio.wav subtitle.srt output.TextGrid
+lai align --word_level audio.wav subtitle.srt output.TextGrid
 
 # Word-level TXT output
-lattifai align --word_level audio.wav subtitle.srt output.txt
+lai align --word_level audio.wav subtitle.srt output.txt
 
 # Standard subtitle with word-level events
-lattifai align --word_level audio.wav subtitle.srt output.srt
+lai align --word_level audio.wav subtitle.srt output.srt
 ```
 
 **Combined with --split_sentence**:
 ```bash
 # Optimal alignment: semantic splitting + word-level details
-lattifai align --split_sentence --word_level audio.wav subtitle.srt output.json
+lai align --split_sentence --word_level audio.wav subtitle.srt output.json
 ```
 
 ### Python API
@@ -314,7 +322,7 @@ client = LattifAI(device='cuda')
 client = LattifAI(device='mps')
 
 # CLI
-lattifai align --device mps audio.wav subtitle.srt output.srt
+lai align --device mps audio.wav subtitle.srt output.srt
 ```
 
 ## Configuration
