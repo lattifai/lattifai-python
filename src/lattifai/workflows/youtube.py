@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..client import LattifAI
+from ..client import AsyncLattifAI
 from ..io import GeminiReader, GeminiWriter, SubtitleIO
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
 from .file_manager import VideoFileManager
@@ -588,7 +588,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # Initialize components
         self.downloader = YouTubeDownloader(media_format='mp3')  # Keep for backward compatibility
         self.transcriber = GeminiTranscriber(api_key=self.gemini_api_key)
-        self.aligner = LattifAI()
+        self.aligner = AsyncLattifAI()
 
         # Validate configuration
         if not self.gemini_api_key:
@@ -736,7 +736,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         output_path = Path(self.output_dir) / f'{Path(media_path).stem}_aligned.ass'
 
         # Perform alignment with LattifAI using extracted/original text
-        aligned_result = self.aligner.alignment(
+        aligned_result = await self.aligner.alignment(
             audio=media_path,
             subtitle=str(subtitle_path),  # Use dialogue text for YouTube format, original for plain text
             format='gemini' if is_gemini_format else 'auto',
