@@ -68,7 +68,7 @@ lattifai = 'lattifai.bin:cli'
 lai = 'lattifai.bin:cli'
 
 [tool.setuptools]
-packages = ["lattifai", "lattifai.io", "lattifai.tokenizer", "lattifai.workers", "lattifai.bin", "lattifai.workflows"]
+packages = ["lattifai", "lattifai.io", "lattifai.tokenizer", "lattifai.workers", "lattifai.bin", "lattifai.workflows", "lattifai.workflows.prompts"]
 
 [tool.setuptools.package-dir]
 lattifai = "src/lattifai"

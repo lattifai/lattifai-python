@@ -5,7 +5,6 @@ import os
 from typing import Dict, List, Optional, Tuple, Union
 
 import colorful
-from dotenv import load_dotenv
 from lhotse.utils import Pathlike
 
 from lattifai.base_client import AsyncAPIClient, SyncAPIClient
@@ -21,8 +20,6 @@ from lattifai.errors import (
 from lattifai.io import SubtitleFormat, SubtitleIO, Supervision
 from lattifai.tokenizer import AsyncLatticeTokenizer
 from lattifai.utils import _load_tokenizer, _load_worker, _resolve_model_path, _select_device
-
-load_dotenv()
 
 
 class LattifAI(SyncAPIClient):
