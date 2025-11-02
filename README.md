@@ -676,7 +676,7 @@ export LATTIFAI_API_KEY="your-api-key"
 - Optimized for CPU and GPU (CUDA/MPS)
 
 **Requirements**:
-- Python 3.9+
+- Python 3.10 - 3.13 (3.14 support coming soon)
 - 4GB RAM recommended
 - ~2GB storage for model files
 
