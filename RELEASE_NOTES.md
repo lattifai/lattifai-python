@@ -1,4 +1,126 @@
 ````markdown
+# Release Notes - LattifAI Python v0.4.2
+
+**Release Date:** November 2, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v0.4.2 is a maintenance release that includes code quality improvements, bug fixes, and enhanced file detection for media files.
+
+---
+
+## ✨ Enhancements
+
+### Enhanced Media File Detection
+
+- **Pattern Matching**: Improved file existence checking to detect files with suffixes
+  - Now detects files like `{video_id}_Edit.txt` or `{video_id}.something.txt`
+  - Uses glob patterns similar to subtitle file detection for consistency
+  - Prevents duplicate file entries in existence checks
+
+**Example:**
+```python
+# Now detects both files:
+# - 7nv1snJRCEI.txt (original)
+# - 7nv1snJRCEI_Edit.txt (edited version)
+```
+
+### Code Quality Improvements
+
+- **Module Naming**: Fixed Python builtin module shadowing issue
+  - Renamed `parser.py` to `text_parser.py` to avoid shadowing Python's built-in `parser` module
+  - Updated all imports to use the new module name
+  - Improves code clarity and prevents potential naming conflicts
+
+- **Package Configuration**: Updated `pyproject.toml` to include `lattifai.workflows` package
+  - Ensures workflow modules are properly included in distribution
+  - Removed non-existent `scripts` package reference
+
+---
+
+## 🐛 Bug Fixes
+
+- Fixed file existence detection for media files with naming variations
+- Resolved import path issues after module renaming
+- Corrected package configuration for proper distribution
+
+---
+
+## 🔧 Technical Changes
+
+### Module Restructuring
+
+**Before:**
+```python
+from lattifai.io.parser import parse_speaker_text
+```
+
+**After:**
+```python
+from lattifai.io.text_parser import parse_speaker_text
+```
+
+### File Detection Enhancement
+
+The `FileExistenceManager.check_existing_files()` method now checks for:
+1. Exact match: `{video_id}.{ext}`
+2. Pattern match: `{video_id}*.{ext}` (new in v0.4.2)
+
+This aligns media file detection with subtitle file detection behavior.
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+lai --version
+# or
+lattifai --version
+```
+
+---
+
+## 🔄 Backward Compatibility
+
+✅ **100% Backward Compatible**
+- All public APIs remain unchanged
+- Internal module renaming does not affect external usage
+- Enhanced file detection is additive and does not break existing functionality
+
+---
+
+## 📝 Version Info
+
+- **Version**: 0.4.2
+- **Release Date**: November 2, 2025
+- **Python Support**: 3.9-3.13
+- **Model**: Lattice-1-Alpha
+- **License**: Apache License 2.0
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
+
+---
+
+# Previous Release Notes
+
+## v0.4.1 - Bug Fixes & Documentation Updates
+
 # Release Notes - LattifAI Python v0.4.1
 
 **Release Date:** November 2, 2025
