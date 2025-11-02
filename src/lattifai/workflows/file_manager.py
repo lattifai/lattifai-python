@@ -58,9 +58,16 @@ class FileExistenceManager:
 
         # Check for media files (audio and video)
         for ext in set(media_formats):  # Remove duplicates
+            # Pattern 1: Simple pattern like {video_id}.mp3
             media_file = output_path / f'{video_id}.{ext}'
             if media_file.exists():
                 existing_files['media'].append(str(media_file))
+
+            # Pattern 2: With suffix like {video_id}_Edit.mp3 or {video_id}.something.mp3
+            for media_file in output_path.glob(f'{video_id}*.{ext}'):
+                file_path = str(media_file)
+                if file_path not in existing_files['media']:
+                    existing_files['media'].append(file_path)
 
         # Check for subtitle files
         for ext in set(subtitle_formats):  # Remove duplicates

@@ -251,11 +251,7 @@ def test_split_sentences_text_integrity():
             '\n'.join([f'[{sup.speaker}] {sup.text}' for sup in splits])
         )
 
-        open(str(subtitle_file) + '.debug.supervisions_text', 'w', encoding='utf-8').write(
-            origin_text
-        )
-        open(str(subtitle_file) + '.debug.splits_text', 'w', encoding='utf-8').write(
-            split_text
-        )
+        open(str(subtitle_file) + '.debug.supervisions_text', 'w', encoding='utf-8').write(origin_text)
+        open(str(subtitle_file) + '.debug.splits_text', 'w', encoding='utf-8').write(split_text)
 
     assert origin_text == split_text, 'Text integrity check failed after sentence splitting.'

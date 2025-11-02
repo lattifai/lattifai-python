@@ -4,8 +4,8 @@ from typing import List, Literal, Optional, Union
 
 from lhotse.utils import Pathlike
 
-from .parser import parse_speaker_text
 from .supervision import Supervision
+from .text_parser import parse_speaker_text
 
 SubtitleFormat = Literal['txt', 'srt', 'vtt', 'ass', 'auto']
 
