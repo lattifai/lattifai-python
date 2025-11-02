@@ -18,12 +18,15 @@ from lattifai.io import OUTPUT_SUBTITLE_FORMATS
 @cli.command()
 @click.option('--youtube', '--yt', is_flag=True, help='Process YouTube URL through agentic workflow.')
 @click.option(
+    '-K',
+    '-L',
     '--api-key',
     '--api_key',
     type=str,
     help='LattifAI API key for alignment (overrides LATTIFAI_API_KEY env var).',
 )
 @click.option(
+    '-G',
     '--gemini-api-key',
     '--gemini_api_key',
     type=str,
@@ -134,14 +137,6 @@ def agent(
     # Get API keys
     lattifai_api_key = api_key or os.getenv('LATTIFAI_API_KEY')
     gemini_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
-
-    if not gemini_key:
-        click.echo(
-            colorful.red(
-                '❌ Gemini API key is required. Set GEMINI_API_KEY environment variable or use --gemini-api-key option.'
-            )
-        )
-        return
 
     try:
         # Run the YouTube workflow

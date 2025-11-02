@@ -52,6 +52,8 @@ from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS
     help='Model name or path for alignment.',
 )
 @click.option(
+    '-K',
+    '-L',
     '--api-key',
     '--api_key',
     type=str,
@@ -178,6 +180,8 @@ def align(
     help='Model name or path for alignment.',
 )
 @click.option(
+    '-K',
+    '-L',
     '--api-key',
     '--api_key',
     type=str,
@@ -185,6 +189,7 @@ def align(
     help='API key for LattifAI.',
 )
 @click.option(
+    '-G',
     '--gemini-api-key',
     '--gemini_api_key',
     type=str,
@@ -223,13 +228,6 @@ def youtube(
 
     # Get Gemini API key
     gemini_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
-    if not gemini_key:
-        click.echo(
-            colorful.red(
-                '❌ Gemini API key is required. Set GEMINI_API_KEY environment variable or use --gemini-api-key option.'
-            )
-        )
-        raise click.ClickException('Missing Gemini API key')
 
     async def _process():
         # Initialize components with their configuration (only config, not runtime params)
