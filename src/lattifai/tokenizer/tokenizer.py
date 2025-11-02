@@ -231,7 +231,7 @@ class LatticeTokenizer:
                     remainder = ''
                 # Detect and split special sentence types: e.g., '[APPLAUSE] &gt;&gt; MIRA MURATI:' -> ['[APPLAUSE]', '&gt;&gt; MIRA MURATI:']  # noqa: E501
                 resplit_parts = self._resplit_special_sentence_types(_sentence)
-                if any(resplit_parts[-1].endswith(sp) for sp in [':', '：', ']']):
+                if any(resplit_parts[-1].endswith(sp) for sp in [':', '：']):
                     if s < len(_sentences) - 1:
                         _sentences[s + 1] = resplit_parts[-1] + ' ' + _sentences[s + 1]
                     else:  # last part
