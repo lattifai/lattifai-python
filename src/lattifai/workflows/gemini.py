@@ -32,7 +32,9 @@ class GeminiTranscriber:
         self.prompt_loader = get_prompt_loader()
 
         if not self.api_key:
-            raise ValueError('Gemini API key is required')
+            self.logger.warning(
+                '⚠️ Gemini API key not provided. API key will be required when calling transcription methods.'
+            )
 
     async def __call__(self, youtube_url: str) -> str:
         """Main entry point for transcription"""
@@ -48,6 +50,9 @@ class GeminiTranscriber:
         Returns:
             Transcribed text
         """
+        if not self.api_key:
+            raise ValueError('Gemini API key is required for transcription')
+
         self.logger.info(f'🎤 Starting Gemini transcription for: {youtube_url}')
 
         try:
@@ -101,6 +106,9 @@ class GeminiTranscriber:
         Returns:
             Transcribed text
         """
+        if not self.api_key:
+            raise ValueError('Gemini API key is required for transcription')
+
         self.logger.info(f'🎤 Starting Gemini transcription for file: {media_file_path}')
 
         try:
