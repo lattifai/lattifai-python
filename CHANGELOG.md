@@ -1,8 +1,28 @@
 # CHANGELOG
 
-## Versioning
+## ## [0.4.3] - 2025-11-02
 
-The LattifAI library adheres to [Semantic Versioning](http://semver.org/).
+### Fixed
+- **CRITICAL**: Fixed `No module named 'lattifai.workflows.prompts'` error that prevented agentic workflows from running
+- Added `lattifai.workflows.prompts` package to `pyproject.toml` configuration
+- Included workflow prompt template files in package distribution
+- Removed hardcoded cwd in CLI command tests for better portability
+- Enhanced text integrity check in sentence splitting tests
+- Improved error handling to preserve original exception context
+
+### Added
+- Short option flags for API keys: `-K, -L, --api-key` and `-G, --gemini-api-key`
+- Support for Python 3.14 in version requirements
+
+### Improved
+- Environment variable handling with enhanced dotenv loading in CLI
+- API key validation and logging in GeminiTranscriber with better error messages
+- Package configuration by properly including workflow packages and data files
+- Cache management for alignment models with better error preservation
+
+### Changed
+- Updated Python version requirements to `>=3.10,<3.14`
+- Package version incremented to 0.4.3ifAI library adheres to [Semantic Versioning](http://semver.org/).
 LattifAI-Py has a `major.minor.patch` version scheme. The major and minor version
 numbers of LattifAI-Py are the major and minor version of the bound core library,
 respectively. The patch version is incremented independently of the core
@@ -13,6 +33,27 @@ We use [this changelog structure](http://keepachangelog.com/).
 ## Unreleased
 
 None.
+
+## [0.4.3] - 2025-11-02
+
+### Added
+- Short option flags for API keys: `-k, --api-key` and `-g, --gemini-api-key`
+- Support for Python 3.14 in version requirements
+
+### Improved
+- Environment variable handling with enhanced dotenv loading in CLI
+- API key validation and logging in GeminiTranscriber with better error messages
+- Package configuration by updating package list in `pyproject.toml`
+- Cache management for alignment models with better error preservation
+
+### Changed
+- Updated Python version requirements to `>=3.10,<3.14`
+- Package version incremented to 0.4.3
+
+### Fixed
+- Removed hardcoded cwd in CLI command tests for better portability
+- Enhanced text integrity check in sentence splitting tests
+- Improved error handling to preserve original exception context
 
 ## [0.4.1] - 2025-11-02
 

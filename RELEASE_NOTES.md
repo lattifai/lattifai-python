@@ -1,4 +1,224 @@
 ````markdown
+# Release Notes - LattifAI Python v0.4.3
+
+**Release Date:** November 2, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v0.4.3 is a critical patch release that fixes a module import error affecting agentic workflows. This release also introduces convenient short option flags for API keys, improved environment variable handling, and expanded Python version support.
+
+---
+
+## 🐛 Critical Bug Fixes
+
+### Fixed Module Import Error for Workflows
+
+**Issue:** Workflow commands failed with error: `No module named 'lattifai.workflows.prompts'`
+
+**Fix:** Updated package configuration in `pyproject.toml` to correctly include the `lattifai.workflows.prompts` package and its data files.
+
+This fix ensures that:
+- ✅ `lai agent --youtube` commands work correctly
+- ✅ Workflow prompt templates are properly included in the package
+- ✅ All agentic workflow features function as expected
+
+**Impact:** Without this fix, users could not use any agentic workflow features introduced in v0.4.0.
+
+---
+
+## ✨ Enhancements
+
+### Short Option Flags for API Keys
+
+Added convenient short options for API key parameters in CLI commands:
+
+- **`-K, -L, --api-key`**: LattifAI API key (previously only `--api-key`)
+- **`-G, --gemini-api-key`**: Gemini API key (previously only `--gemini-api-key`)
+
+**Example:**
+```bash
+# Before: verbose option names
+lai agent --youtube URL --api-key YOUR_KEY --gemini-api-key YOUR_GEMINI_KEY
+
+# Now: use short options for faster typing
+lai agent --youtube URL -K YOUR_KEY -G YOUR_GEMINI_KEY
+
+# Also works with align command
+lai align -K YOUR_KEY audio.wav subtitle.srt output.srt
+```
+
+### Improved Environment Variable Handling
+
+- **Enhanced dotenv Loading**: More robust `.env` file loading in CLI commands
+- **Better API Key Detection**: Improved validation and logging for API keys in GeminiTranscriber
+- **Clearer Error Messages**: When API keys are missing or invalid, you'll see more actionable error messages
+
+### Python Version Support
+
+- **Extended Support**: Now officially supports Python 3.10 through Python 3.14
+- **Updated Requirements**: `requires-python = '>=3.10,<3.14'` in package configuration
+- **Version Increment**: Package version updated to 0.4.3
+
+### Package Configuration Updates
+
+- **Improved Package List**: Updated `pyproject.toml` with correct package structure
+- **Better Organization**: Removed outdated package references and added workflow prompts package
+
+---
+
+## 🔧 Technical Changes
+
+### Package Configuration Fix
+
+**Updated `pyproject.toml`:**
+```toml
+[tool.setuptools]
+packages = [
+    "lattifai",
+    "lattifai.io",
+    "lattifai.tokenizer",
+    "lattifai.workers",
+    "lattifai.bin",
+    "lattifai.workflows",
+    "lattifai.workflows.prompts"  # ← Fixed: Added this package
+]
+
+[tool.setuptools.package-data]
+"lattifai.workflows.prompts" = ["**/*.txt", "**/*.md"]  # Include prompt templates
+```
+
+### CLI Improvements
+
+**Short Options Added:**
+```python
+@click.option('-K', '-L', '--api-key', help='LattifAI API key')
+@click.option('-G', '--gemini-api-key', help='Gemini API key')
+```
+
+### API Key Validation
+
+Enhanced error handling in `GeminiTranscriber`:
+- Preserves original exceptions for better debugging
+- Adds detailed logging for API key validation failures
+- Clearer error messages when Gemini API calls fail
+
+### Testing Improvements
+
+- Removed hardcoded `cwd` in CLI command tests for better portability
+- Enhanced text integrity checks in sentence splitting tests
+- More robust test isolation
+
+---
+
+## 🐛 Additional Bug Fixes
+
+- Fixed API key validation edge cases in GeminiTranscriber
+- Improved error handling to preserve original exception context
+- Enhanced cache management for alignment models
+- Better error messages for lattice decoding failures
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+lai --version
+# or
+lattifai --version
+```
+
+### Python Version Requirements:
+
+This release requires Python 3.10 or higher (up to Python 3.13):
+
+```bash
+python --version  # Should show Python 3.10.x or higher
+```
+
+---
+
+## 🔄 Backward Compatibility
+
+✅ **100% Backward Compatible**
+- All existing long-form options continue to work
+- Short options are additive enhancements
+- No breaking changes to API or CLI behavior
+- Existing scripts require no modifications
+
+**Migration Note:** You can start using short options (`-K`, `-G`) immediately, but existing usage with long options (`--api-key`, `--gemini-api-key`) remains fully supported.
+
+---
+
+## 💡 Usage Examples
+
+### Using Short Options
+
+**Agent Command:**
+```bash
+# Concise command with short options
+lai agent --youtube "https://youtu.be/VIDEO_ID" -G YOUR_GEMINI_KEY -K YOUR_LATTIFAI_KEY
+
+# Mix short and long options as needed
+lai agent --youtube "URL" -G YOUR_GEMINI_KEY --output-format srt
+```
+
+**Align Command:**
+```bash
+# Quick alignment with API key
+lai align -K YOUR_KEY audio.wav subtitle.srt output.srt
+
+# Combine with other options
+lai align -K YOUR_KEY --split-sentence --word-level audio.wav sub.srt out.srt
+```
+
+### Environment Variables (Recommended)
+
+Set API keys in your environment or `.env` file to avoid passing them in commands:
+
+```bash
+# In your shell or .env file
+export LATTIFAI_API_KEY="your-lattifai-key"
+export GEMINI_API_KEY="your-gemini-key"
+
+# Then use commands without API key options
+lai agent --youtube "URL"
+lai align audio.wav subtitle.srt output.srt
+```
+
+---
+
+## 📝 Version Info
+
+- **Version**: 0.4.3
+- **Release Date**: November 2, 2025
+- **Python Support**: 3.10 - 3.13
+- **Model**: Lattice-1-Alpha
+- **License**: Apache License 2.0
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
+
+---
+
+# Previous Release Notes
+
+## v0.4.2 - Enhanced Media File Detection
+
 # Release Notes - LattifAI Python v0.4.2
 
 **Release Date:** November 2, 2025
