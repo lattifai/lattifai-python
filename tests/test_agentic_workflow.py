@@ -111,7 +111,6 @@ def test_cli_command():
         ['lattifai', 'agent', '--help'],
         capture_output=True,
         text=True,
-        cwd='/Users/feiteng/GEEK/OmniCaptions/lattifai-python',
     )
 
     print('✅ CLI command registered successfully')
