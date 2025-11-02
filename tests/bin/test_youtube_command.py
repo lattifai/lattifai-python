@@ -26,37 +26,40 @@ class TestYoutubeCommand:
     )
     def test_youtube_output_formats(self, cli_runner, tmp_path, output_format):
         """Test youtube command with different output formats"""
-        with patch('lattifai.workflows.youtube.YouTubeDownloader') as mock_downloader:
-            with patch('lattifai.bin.align.LattifAI') as mock_aligner:
-                # Mock the downloader - use AsyncMock for async methods
-                mock_instance = MagicMock()
-                mock_instance.download_audio = AsyncMock(return_value=str(tmp_path / 'audio.mp3'))
-                mock_instance.download_subtitles = AsyncMock(return_value=[str(tmp_path / 'subtitle.vtt')])
-                mock_downloader.return_value = mock_instance
-                mock_downloader.extract_video_id = MagicMock(return_value='test_video_id')
+        with patch('lattifai.workflows.youtube.YouTubeSubtitleAgent') as mock_agent:
+            with patch('lattifai.workflows.youtube.YouTubeDownloader'):
+                with patch('lattifai.workflows.gemini.GeminiTranscriber'):
+                    with patch('lattifai.bin.align.AsyncLattifAI'):
+                        # Mock the agent's process_youtube_url method
+                        mock_agent_instance = MagicMock()
+                        mock_agent_instance.process_youtube_url = AsyncMock(
+                            return_value={
+                                'metadata': {'title': 'Test Video', 'duration': 120},
+                                'exported_files': {output_format: str(tmp_path / f'output.{output_format}')},
+                                'subtitle_count': 10,
+                            }
+                        )
+                        mock_agent.return_value = mock_agent_instance
 
-                # Mock the aligner
-                mock_aligner_instance = MagicMock()
-                mock_aligner_instance.alignment.return_value = ([], None)
-                mock_aligner.return_value = mock_aligner_instance
+                        result = cli_runner.invoke(
+                            cli,
+                            [
+                                'youtube',
+                                '--output-format',
+                                output_format,
+                                '--output-dir',
+                                str(tmp_path),
+                                '--device',
+                                'cpu',
+                                'https://www.youtube.com/watch?v=kb9suz-kkoM',
+                            ],
+                            catch_exceptions=False,
+                        )
 
-                result = cli_runner.invoke(
-                    cli,
-                    [
-                        'youtube',
-                        '--output-format',
-                        output_format,
-                        '--output-dir',
-                        str(tmp_path),
-                        '--device',
-                        'cpu',
-                        'https://www.youtube.com/watch?v=kb9suz-kkoM',
-                    ],
-                    catch_exceptions=False,
-                )
-
-                # Command should accept the format parameter
-                assert result.exit_code in [0, 1, 2], f'Format {output_format} test failed with output: {result.output}'
+                        # Command should accept the format parameter
+                        assert result.exit_code in [0, 1, 2], (
+                            f'Format {output_format} test failed with output: {result.output}'
+                        )
 
     @pytest.mark.parametrize('device', ['cpu', 'cuda', 'mps'])
     def test_youtube_device_options(self, cli_runner, tmp_path, device):
