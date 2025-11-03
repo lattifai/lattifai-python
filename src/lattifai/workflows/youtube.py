@@ -708,7 +708,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         # If subtitle was already downloaded in step 1 and user selected it, use it directly
         if downloaded_subtitle_path and downloaded_subtitle_path != 'gemini':
-            self.logger.info(f'📥 Using subtitle downloaded in previous step: {downloaded_subtitle_path}')
+            self.logger.info(f'📥 Using subtitle: {downloaded_subtitle_path}')
             return {'subtitle_path': downloaded_subtitle_path}
 
         # Check for existing subtitles if subtitle was not downloaded yet

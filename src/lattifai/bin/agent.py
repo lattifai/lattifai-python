@@ -302,6 +302,10 @@ if not check_dependencies():
 if __name__ == '__main__':
     import os
 
+    from dotenv import find_dotenv, load_dotenv
+
+    load_dotenv(find_dotenv(usecwd=True))
+
     asyncio.run(
         _run_youtube_workflow(
             # url='https://www.youtube.com/watch?v=7nv1snJRCEI',
