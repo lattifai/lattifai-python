@@ -1,19 +1,70 @@
 import json
 import time
 from collections import defaultdict
-from typing import Any, BinaryIO, Dict, Tuple, Union
+from typing import Any, BinaryIO, Dict, Iterable, Optional, Tuple, Union
 
 import numpy as np
 import onnxruntime as ort
-import resampy
 import soundfile as sf
 import torch
 from lhotse import FbankConfig
-from lhotse.audio import read_audio
+from lhotse.augmentation import get_or_create_resampler
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
 
 from lattifai.errors import AlignmentError, AudioFormatError, AudioLoadError, DependencyError, ModelLoadError
+
+ChannelSelectorType = Union[int, Iterable[int], str]
+
+
+def resample_audio(
+    audio_sr: Tuple[torch.Tensor, int],
+    sampling_rate: int,
+    device: Optional[str],
+    channel_selector: Optional[ChannelSelectorType] = 'average',
+) -> torch.Tensor:
+    """
+    return:
+        (1, T)
+    """
+    audio, sr = audio_sr
+
+    if channel_selector is None:
+        # keep the original multi-channel signal
+        tensor = audio
+    elif isinstance(channel_selector, int):
+        assert audio.shape[0] >= channel_selector, f'Invalid channel: {channel_selector}'
+        tensor = audio[channel_selector : channel_selector + 1].clone()
+        del audio
+    elif isinstance(channel_selector, str):
+        assert channel_selector == 'average'
+        tensor = torch.mean(audio.to(device), dim=0, keepdim=True)
+        del audio
+    else:
+        assert isinstance(channel_selector, Iterable)
+        num_channels = audio.shape[0]
+        print(f'Selecting channels {channel_selector} from the signal with {num_channels} channels.')
+        assert isinstance(channel_selector, Iterable)
+        if max(channel_selector) >= num_channels:
+            raise ValueError(
+                f'Cannot select channel subset {channel_selector} from a signal with {num_channels} channels.'
+            )
+        tensor = audio[channel_selector]
+
+    tensor = tensor.to(device)
+    if sr != sampling_rate:
+        resampler = get_or_create_resampler(sr, sampling_rate).to(device=device)
+        length = tensor.size(-1)
+        chunk_size = sampling_rate * 3600
+        if length > chunk_size:
+            resampled_chunks = []
+            for i in range(0, length, chunk_size):
+                resampled_chunks.append(resampler(tensor[..., i : i + chunk_size]))
+            tensor = torch.cat(resampled_chunks, dim=-1)
+        else:
+            tensor = resampler(tensor)
+
+    return tensor
 
 
 class Lattice1AlphaWorker:
@@ -42,7 +93,7 @@ class Lattice1AlphaWorker:
             self.acoustic_ort = ort.InferenceSession(
                 f'{model_path}/acoustic_opt.onnx',
                 sess_options,
-                providers=providers + ['CoreMLExecutionProvider', 'CPUExecutionProvider'],
+                providers=providers + ['CPUExecutionProvider', 'CoreMLExecutionProvider'],
             )
         except Exception as e:
             raise ModelLoadError(f'acoustic model from {model_path}', original_error=e)
@@ -87,17 +138,13 @@ class Lattice1AlphaWorker:
         self.timings['emission'] += time.time() - _start
         return emission  # (1, T, vocab_size) torch
 
-    def load_audio(self, audio: Union[Pathlike, BinaryIO]) -> Tuple[torch.Tensor, int]:
+    def load_audio(
+        self, audio: Union[Pathlike, BinaryIO], channel_selector: Optional[ChannelSelectorType] = 'average'
+    ) -> Tuple[torch.Tensor, int]:
         # load audio
         try:
-            waveform, sample_rate = read_audio(audio)  # numpy array
-            if len(waveform.shape) == 1:
-                waveform = waveform.reshape([1, -1])  # (1, L)
-            else:  # make sure channel first
-                if waveform.shape[0] > waveform.shape[1]:
-                    waveform = waveform.transpose(0, 1)
-                # average multiple channels
-                waveform = np.mean(waveform, axis=0, keepdims=True)  # (1, L)
+            waveform, sample_rate = sf.read(audio, always_2d=True, dtype='float32')  # numpy array
+            waveform = waveform.T  # (channels, samples)
         except Exception as primary_error:
             # Fallback to PyAV for formats not supported by soundfile
             try:
@@ -135,23 +182,16 @@ class Lattice1AlphaWorker:
 
                 # Concatenate all frames
                 waveform = np.concatenate(frames, axis=1)
-                # Average multiple channels to mono
-                if waveform.shape[0] > 1:
-                    waveform = np.mean(waveform, axis=0, keepdims=True)
-
                 sample_rate = audio_stream.codec_context.sample_rate
             except Exception as e:
                 raise AudioLoadError(str(audio), original_error=e)
 
-        try:
-            if sample_rate != self.config['sample_rate']:
-                waveform = resampy.resample(waveform, sample_rate, self.config['sample_rate'], axis=1)
-        except Exception:
-            raise AudioFormatError(
-                str(audio), f'Failed to resample from {sample_rate}Hz to {self.config["sample_rate"]}Hz'
-            )
-
-        return torch.from_numpy(waveform).to(self.device)  # (1, L)
+        return resample_audio(
+            (torch.from_numpy(waveform), sample_rate),
+            self.config.get('sampling_rate', 16000),
+            device=self.device.type,
+            channel_selector=channel_selector,
+        )
 
     def alignment(
         self, audio: Union[Union[Pathlike, BinaryIO], torch.tensor], lattice_graph: Tuple[str, int, float]

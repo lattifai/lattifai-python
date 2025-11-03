@@ -27,7 +27,6 @@ dependencies = [
     "praatio",
     "tgt",
     "onnxruntime",
-    "resampy",
     "g2p-phonemizer==0.1.1",
     "wtpsplit>=2.1.6",
     "av",
