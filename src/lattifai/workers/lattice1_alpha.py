@@ -13,13 +13,7 @@ from lhotse.audio import read_audio
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
 
-from lattifai.errors import (
-    AlignmentError,
-    AudioFormatError,
-    AudioLoadError,
-    DependencyError,
-    ModelLoadError,
-)
+from lattifai.errors import AlignmentError, AudioFormatError, AudioLoadError, DependencyError, ModelLoadError
 
 
 class Lattice1AlphaWorker:
@@ -231,9 +225,9 @@ class Lattice1AlphaWorker:
                 emission.to(device) * acoustic_scale,
                 decoding_graph.to(device),
                 torch.tensor([emission.shape[1]], dtype=torch.int32),
-                search_beam=100,
-                output_beam=40,
-                min_active_states=200,
+                search_beam=200,
+                output_beam=80,
+                min_active_states=400,
                 max_active_states=10000,
                 subsampling_factor=1,
                 reject_low_confidence=False,
