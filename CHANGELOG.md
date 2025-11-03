@@ -1,6 +1,21 @@
 # CHANGELOG
 
-## ## [0.4.3] - 2025-11-02
+## [0.4.4] - 2025-11-03
+
+### Improved
+- **Alignment Success Rate**: Significantly increased beam search parameters for improved alignment accuracy
+  - Increased `search_beam` from 50 to 200 (4x improvement)
+  - Increased `output_beam` from 20 to 80 (4x improvement)
+  - Enhanced decoding performance and reduced alignment failures
+- **Speaker Name Parsing**: Fixed speaker text name parsing and restoration with correct regex patterns
+  - Fixed `SPEAKER_PATTERN2` regex to properly match uppercase speaker names
+  - Improved speaker name extraction for formats like "JOHN DOE: text"
+  - Enhanced speaker text restoration in subtitle output
+
+### Changed
+- Package version incremented to 0.4.4
+
+## [0.4.3] - 2025-11-02
 
 ### Fixed
 - **CRITICAL**: Fixed `No module named 'lattifai.workflows.prompts'` error that prevented agentic workflows from running
