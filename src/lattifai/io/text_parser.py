@@ -8,12 +8,12 @@ SPEAKER_PATTERN = re.compile(r'((?:>>|&gt;&gt;|>|&gt;).*?[:：])\s*(.*)')
 # Transcriber Output Example:
 # 26:19.919 --> 26:34.921
 # [SPEAKER_01]: 越来越多的科技巨头入...
-SPEAKER_LATTIFAI = re.compile(r'(^\[SPEAKER_.*?\]:)\s*(.*)')
+SPEAKER_LATTIFAI = re.compile(r'(^\[SPEAKER_.*?\][:：])\s*(.*)')
 
 # NISHTHA BHATIA: Hey, everyone.
 # DIETER: Oh, hey, Nishtha.
 # GEMINI: That might
-SPEAKER_PATTERN2 = re.compile(r'^([A-Z]{1,15}(?:\s+[A-Z]{1,15})?)[:：]\s*(.*)$')
+SPEAKER_PATTERN2 = re.compile(r'^([A-Z]{1,15}(?:\s+[A-Z]{1,15})?[:：])\s*(.*)$')
 
 
 def parse_speaker_text(line) -> Tuple[Optional[str], str]:
