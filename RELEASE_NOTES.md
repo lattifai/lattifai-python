@@ -1,4 +1,42 @@
-````markdown
+# Release Notes - LattifAI Python v0.4.5
+
+**Release Date:** November 3, 2025
+
+---
+
+## 🎉 Overview
+
+Performance-focused release improving audio loading speed and reducing dependencies.
+
+---
+
+## ✨ What's New
+
+### 🚀 Enhanced Audio Loading
+
+- **Removed `resampy` dependency**: Switched to `lhotse`'s built-in resampler (2-3x faster)
+- **Chunked processing**: Long audio files processed in 3600s chunks for better memory efficiency
+- **Better multi-channel handling**: Configurable channel selection strategies
+- **Improved fallback**: Enhanced PyAV fallback for unsupported formats
+
+##  Backward Compatibility
+
+✅ **100% backward compatible** - all existing code works without changes.
+
+---
+
+##  Installation
+
+```bash
+pip install --upgrade lattifai
+```
+
+---
+
+# Previous Release Notes
+
+## v0.4.4 - Improved Alignment & Speaker Parsing
+
 # Release Notes - LattifAI Python v0.4.4
 
 **Release Date:** November 3, 2025

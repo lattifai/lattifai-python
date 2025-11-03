@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.4.5] - 2025-11-03
+
+### Improved
+- **Audio Loading Performance**: Refactored `load_audio` method to remove dependency on `lhotse.audio.read_audio`
+  - Replaced `resampy` with `lhotse` built-in resampler for better performance
+  - Enhanced audio resampling with chunked processing for long audio files (3600s chunks)
+  - Improved memory efficiency with proper tensor cleanup
+  - Better multi-channel audio handling with configurable channel selection
+  - Removed `resampy` dependency from requirements
+
+### Changed
+- Package version incremented to 0.4.5
+
 ## [0.4.4] - 2025-11-03
 
 ### Improved
