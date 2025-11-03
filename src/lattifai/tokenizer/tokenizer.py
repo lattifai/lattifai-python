@@ -148,7 +148,7 @@ class LatticeTokenizer:
         oov_words = []
         for text in texts:
             words = text.lower().replace('-', ' ').replace('—', ' ').replace('–', ' ').split()
-            oovs = [w for w in words if w not in self.words]
+            oovs = [w.strip(PUNCTUATION) for w in words if w not in self.words]
             if oovs:
                 oov_words.extend([w for w in oovs if (w not in self.words and len(w) <= MAXIMUM_WORD_LENGTH)])
 
