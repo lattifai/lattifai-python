@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 import torch
 
 from lattifai.errors import LATTICE_DECODING_FAILURE_HELP, LatticeDecodingError
-from lattifai.io import Supervision
+from lattifai.io import Supervision, normalize_html_text
 from lattifai.tokenizer.phonemizer import G2Phonemizer
 
 PUNCTUATION = '!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~'
@@ -147,6 +147,7 @@ class LatticeTokenizer:
 
         oov_words = []
         for text in texts:
+            text = normalize_html_text(text)
             words = text.lower().replace("-", " ").replace("—", " ").replace("–", " ").split()
             oovs = [w.strip(PUNCTUATION) for w in words if w not in self.words]
             if oovs:

@@ -3,7 +3,7 @@ import sys
 import types
 from typing import List, Optional, Tuple
 
-import pytest
+from lattifai.io import SubtitleIO
 
 if "k2" not in sys.modules:
     sys.modules["k2"] = types.ModuleType("k2")
@@ -221,36 +221,45 @@ def test_split_sentences_retains_speaker_for_final_remainder():
 
 
 def test_split_sentences_text_integrity():
+    import tempfile
+    import zipfile
     from pathlib import Path
 
-    subtitle_file = Path("~/Downloads/lattifai_youtube_google/eIUqw3_YcCI.en.vtt").expanduser()
-    subtitle_file = Path("~/Downloads/lattifai_youtube_google/7nv1snJRCEI.en.vtt").expanduser()
-    if not subtitle_file.exists():
-        pytest.skip("Subtitle file not found, skipping integrity test.")
-        return
+    tokenizer = LatticeTokenizer(client_wrapper=None)
 
-    from lattifai.io import SubtitleIO
-    from lattifai.utils import _resolve_model_path
+    for subtitle_file in [
+        "tests/data/subtitles/7nv1snJRCEI.en.vtt.zip",
+        "tests/data/subtitles/eIUqw3_YcCI.en.vtt.zip",
+        "tests/data/subtitles/_xYSQe9oq6c.en.vtt.zip",
+    ]:
+        # Unzip the subtitle file
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with zipfile.ZipFile(subtitle_file, "r") as zip_ref:
+                zip_ref.extractall(tmpdir)
 
-    model_path = _resolve_model_path("Lattifai/Lattice-1-Alpha")
-    tokenizer = LatticeTokenizer.from_pretrained(None, model_path, device="cpu")
+            # Find the extracted .vtt file
+            vtt_files = list(Path(tmpdir).glob("*.vtt"))
+            if not vtt_files:
+                raise FileNotFoundError(f"No .vtt file found in {subtitle_file}")
 
-    supervisions = SubtitleIO.read(subtitle_file)
-    tokenizer.init_sentence_splitter()
-    splits = tokenizer.split_sentences(supervisions)
+            extracted_file = str(vtt_files[0])
+            supervisions = SubtitleIO.read(extracted_file)
 
-    origin_text = "".join([(sup.speaker or "").strip() + sup.text for sup in supervisions]).replace(" ", "")
-    split_text = "".join([(sup.speaker or "").strip() + sup.text for sup in splits]).replace(" ", "")
+            tokenizer.init_sentence_splitter()
+            splits = tokenizer.split_sentences(supervisions)
 
-    if origin_text != split_text:
-        open(str(subtitle_file) + ".debug.supervisions.txt", "w", encoding="utf-8").write(
-            "\n".join([f"[{sup.speaker}] {sup.text}" for sup in supervisions])
-        )
-        open(str(subtitle_file) + ".debug.splits.txt", "w", encoding="utf-8").write(
-            "\n".join([f"[{sup.speaker}] {sup.text}" for sup in splits])
-        )
+            origin_text = "".join([(sup.speaker or "").strip() + sup.text for sup in supervisions]).replace(" ", "")
+            split_text = "".join([(sup.speaker or "").strip() + sup.text for sup in splits]).replace(" ", "")
 
-        open(str(subtitle_file) + ".debug.supervisions_text", "w", encoding="utf-8").write(origin_text)
-        open(str(subtitle_file) + ".debug.splits_text", "w", encoding="utf-8").write(split_text)
+            if origin_text != split_text:
+                open(str(subtitle_file) + ".debug.supervisions.txt", "w", encoding="utf-8").write(
+                    "\n".join([f"[{sup.speaker}] {sup.text}" for sup in supervisions])
+                )
+                open(str(subtitle_file) + ".debug.splits.txt", "w", encoding="utf-8").write(
+                    "\n".join([f"[{sup.speaker}] {sup.text}" for sup in splits])
+                )
 
-    assert origin_text == split_text, "Text integrity check failed after sentence splitting."
+                open(str(subtitle_file) + ".debug.supervisions_text", "w", encoding="utf-8").write(origin_text)
+                open(str(subtitle_file) + ".debug.splits_text", "w", encoding="utf-8").write(split_text)
+
+            assert origin_text == split_text, "Text integrity check failed after sentence splitting."

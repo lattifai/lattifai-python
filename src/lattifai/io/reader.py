@@ -73,6 +73,7 @@ class SubtitleReader(ABCMeta):
 
         supervisions = []
         for event in subs.events:
+            # NOT apply text_parser.py:normalize_html_text here, to keep original text in subtitles
             speaker, text = parse_speaker_text(event.text)
             supervisions.append(
                 Supervision(

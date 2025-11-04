@@ -16,8 +16,35 @@ SPEAKER_LATTIFAI = re.compile(r"(^\[SPEAKER_.*?\][:：])\s*(.*)")
 SPEAKER_PATTERN2 = re.compile(r"^([A-Z]{1,15}(?:\s+[A-Z]{1,15})?[:：])\s*(.*)$")
 
 
+def normalize_html_text(text: str) -> str:
+    """Normalize HTML text by decoding entities and stripping whitespace."""
+    html_entities = {
+        "&amp;": "&",
+        "&lt;": "<",
+        "&gt;": ">",
+        "&quot;": '"',
+        "&#39;": "'",
+        "&nbsp;": " ",
+        "\\N": " ",
+        "…": " ",
+    }
+    for entity, char in html_entities.items():
+        text = text.replace(entity, char)
+
+    text = re.sub(r"\s+", " ", text)  # Replace multiple spaces with a single space
+
+    # Convert curly apostrophes to straight apostrophes for common English contractions
+    # Handles: 't 's 'll 're 've 'd 'm
+    # For example, convert "don't" to "don't"
+    text = re.sub(r"([a-zA-Z])’([tsdm]|ll|re|ve)\b", r"\1'\2", text, flags=re.IGNORECASE)
+    # For example, convert "5’s" to "5's"
+    text = re.sub(r"([0-9])’([s])\b", r"\1'\2", text, flags=re.IGNORECASE)
+
+    return text.strip()
+
+
 def parse_speaker_text(line) -> Tuple[Optional[str], str]:
-    line = line.replace("\\N", " ")
+    """Parse a line of text to extract speaker and content."""
 
     if ":" not in line and "：" not in line:
         return None, line
