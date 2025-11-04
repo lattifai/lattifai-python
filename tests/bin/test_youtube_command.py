@@ -1,10 +1,5 @@
 """Tests for lattifai youtube command"""
 
-import asyncio
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
 from click.testing import CliRunner
 
@@ -21,43 +16,43 @@ class TestYoutubeCommand:
     """Test cases for youtube command"""
 
     @pytest.mark.parametrize(
-        'output_format',
-        ['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt'],
+        "output_format",
+        ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt"],
     )
     def test_youtube_output_formats(self, cli_runner, tmp_path, output_format, monkeypatch):
         """Test youtube command with different output formats"""
         # Set environment variable for API key
-        monkeypatch.setenv('GEMINI_API_KEY', 'test_api_key')
+        monkeypatch.setenv("GEMINI_API_KEY", "test_api_key")
 
         result = cli_runner.invoke(
             cli,
             [
-                'youtube',
-                '--output-format',
+                "youtube",
+                "--output-format",
                 output_format,
-                '--output-dir',
+                "--output-dir",
                 str(tmp_path),
-                '--device',
-                'cpu',
-                'https://www.youtube.com/watch?v=kb9suz-kkoM',
+                "--device",
+                "cpu",
+                "https://www.youtube.com/watch?v=kb9suz-kkoM",
             ],
         )
 
         # Command should accept the format parameter
-        assert result.exit_code in [0, 1, 2], f'Format {output_format} test failed with output: {result.output}'
+        assert result.exit_code in [0, 1, 2], f"Format {output_format} test failed with output: {result.output}"
 
-    @pytest.mark.parametrize('device', ['cpu', 'cuda', 'mps'])
+    @pytest.mark.parametrize("device", ["cpu", "cuda", "mps"])
     def test_youtube_device_options(self, cli_runner, tmp_path, device):
         """Test youtube command with different device options"""
         result = cli_runner.invoke(
             cli,
             [
-                'youtube',
-                '--device',
+                "youtube",
+                "--device",
                 device,
-                '--output-dir',
+                "--output-dir",
                 str(tmp_path),
-                'https://www.youtube.com/watch?v=kb9suz-kkoM',
+                "https://www.youtube.com/watch?v=kb9suz-kkoM",
             ],
         )
 
@@ -69,13 +64,13 @@ class TestYoutubeCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'youtube',
-                '--split-sentence',
-                '--device',
-                'cpu',
-                '--output-dir',
+                "youtube",
+                "--split-sentence",
+                "--device",
+                "cpu",
+                "--output-dir",
                 str(tmp_path),
-                'https://www.youtube.com/watch?v=kb9suz-kkoM',
+                "https://www.youtube.com/watch?v=kb9suz-kkoM",
             ],
         )
 
@@ -86,14 +81,14 @@ class TestYoutubeCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'youtube',
-                '--audio-format',
-                'mp3',
-                '--device',
-                'cpu',
-                '--output-dir',
+                "youtube",
+                "--audio-format",
+                "mp3",
+                "--device",
+                "cpu",
+                "--output-dir",
                 str(tmp_path),
-                'https://www.youtube.com/watch?v=kb9suz-kkoM',
+                "https://www.youtube.com/watch?v=kb9suz-kkoM",
             ],
         )
 
@@ -104,14 +99,14 @@ class TestYoutubeCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'youtube',
-                '--model-name-or-path',
-                'Lattifai/Lattice-1-Alpha',
-                '--device',
-                'cpu',
-                '--output-dir',
+                "youtube",
+                "--model-name-or-path",
+                "Lattifai/Lattice-1-Alpha",
+                "--device",
+                "cpu",
+                "--output-dir",
                 str(tmp_path),
-                'https://www.youtube.com/watch?v=kb9suz-kkoM',
+                "https://www.youtube.com/watch?v=kb9suz-kkoM",
             ],
         )
 
@@ -122,12 +117,12 @@ class TestYoutubeCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'youtube',
-                '--device',
-                'cpu',
-                '--output-dir',
+                "youtube",
+                "--device",
+                "cpu",
+                "--output-dir",
                 str(tmp_path),
-                'not_a_valid_url',
+                "not_a_valid_url",
             ],
         )
 
@@ -136,12 +131,12 @@ class TestYoutubeCommand:
 
     def test_youtube_help(self, cli_runner):
         """Test youtube command help output"""
-        result = cli_runner.invoke(cli, ['youtube', '--help'])
+        result = cli_runner.invoke(cli, ["youtube", "--help"])
 
         assert result.exit_code == 0
-        assert 'Download media and subtitles from YouTube' in result.output
-        assert '--output-format' in result.output
-        assert '--media-format' in result.output
-        assert '--device' in result.output
-        assert '--split-sentence' in result.output
-        assert '--model-name-or-path' in result.output
+        assert "Download media and subtitles from YouTube" in result.output
+        assert "--output-format" in result.output
+        assert "--media-format" in result.output
+        assert "--device" in result.output
+        assert "--split-sentence" in result.output
+        assert "--model-name-or-path" in result.output

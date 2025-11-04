@@ -26,16 +26,16 @@ class PromptLoader:
         Raises:
             FileNotFoundError: If prompt file doesn't exist
         """
-        prompt_path = self.prompts_dir / category / f'{name}.txt'
+        prompt_path = self.prompts_dir / category / f"{name}.txt"
 
         if not prompt_path.exists():
-            raise FileNotFoundError(f'Prompt not found: {prompt_path}')
+            raise FileNotFoundError(f"Prompt not found: {prompt_path}")
 
-        return prompt_path.read_text(encoding='utf-8').strip()
+        return prompt_path.read_text(encoding="utf-8").strip()
 
     def get_gemini_transcription_prompt(self) -> str:
         """Get the Gemini transcription Gem prompt"""
-        return self.load_prompt('gemini', 'transcription_gem')
+        return self.load_prompt("gemini", "transcription_gem")
 
 
 # Global instance

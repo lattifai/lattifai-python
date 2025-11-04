@@ -688,7 +688,7 @@ export LATTIFAI_API_KEY="your-api-key"
 git clone https://github.com/lattifai/lattifai-python.git
 cd lattifai-python
 pip install -e ".[test]"
-./scripts/install-hooks.sh  # Optional: install pre-commit hooks
+pre-commit install
 ```
 
 ### Testing
@@ -702,9 +702,7 @@ pytest tests/test_basic.py   # Specific test
 ### Code Quality
 
 ```bash
-ruff check src/ tests/       # Lint
-ruff format src/ tests/      # Format
-isort src/ tests/            # Sort imports
+pre-commit run
 ```
 
 ## Contributing
@@ -712,7 +710,7 @@ isort src/ tests/            # Sort imports
 1. Fork the repository
 2. Create a feature branch
 3. Make changes and add tests
-4. Run `pytest` and `ruff check`
+4. Run `pytest` and `pre-commit run`
 5. Submit a pull request
 
 ## License

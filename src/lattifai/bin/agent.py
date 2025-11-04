@@ -5,105 +5,104 @@ Agent command for YouTube workflow
 import asyncio
 import os
 import sys
-from typing import List, Optional
+from typing import Optional
 
 import click
 import colorful
-from lhotse.utils import Pathlike
 
 from lattifai.bin.cli_base import cli
 from lattifai.io import OUTPUT_SUBTITLE_FORMATS
 
 
 @cli.command()
-@click.option('--youtube', '--yt', is_flag=True, help='Process YouTube URL through agentic workflow.')
+@click.option("--youtube", "--yt", is_flag=True, help="Process YouTube URL through agentic workflow.")
 @click.option(
-    '-K',
-    '-L',
-    '--api-key',
-    '--api_key',
+    "-K",
+    "-L",
+    "--api-key",
+    "--api_key",
     type=str,
-    help='LattifAI API key for alignment (overrides LATTIFAI_API_KEY env var).',
+    help="LattifAI API key for alignment (overrides LATTIFAI_API_KEY env var).",
 )
 @click.option(
-    '-G',
-    '--gemini-api-key',
-    '--gemini_api_key',
+    "-G",
+    "--gemini-api-key",
+    "--gemini_api_key",
     type=str,
-    help='Gemini API key for transcription (overrides GEMINI_API_KEY env var).',
+    help="Gemini API key for transcription (overrides GEMINI_API_KEY env var).",
 )
 @click.option(
-    '-D',
-    '--device',
-    type=click.Choice(['cpu', 'cuda', 'mps'], case_sensitive=False),
-    default='cpu',
-    help='Device to use for inference.',
+    "-D",
+    "--device",
+    type=click.Choice(["cpu", "cuda", "mps"], case_sensitive=False),
+    default="cpu",
+    help="Device to use for inference.",
 )
 @click.option(
-    '-M',
-    '--model-name-or-path',
-    '--model_name_or_path',
+    "-M",
+    "--model-name-or-path",
+    "--model_name_or_path",
     type=str,
-    default='Lattifai/Lattice-1-Alpha',
-    help='Model name or path for alignment.',
+    default="Lattifai/Lattice-1-Alpha",
+    help="Model name or path for alignment.",
 )
 @click.option(
-    '--media-format',
-    '--media_format',
+    "--media-format",
+    "--media_format",
     type=click.Choice(
-        ['mp3', 'wav', 'm4a', 'aac', 'opus', 'mp4', 'webm', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'mpeg', 'mpg', '3gp'],
+        ["mp3", "wav", "m4a", "aac", "opus", "mp4", "webm", "mkv", "avi", "mov", "flv", "wmv", "mpeg", "mpg", "3gp"],
         case_sensitive=False,
     ),
-    default='mp4',
-    help='Media format for YouTube download (audio or video).',
+    default="mp4",
+    help="Media format for YouTube download (audio or video).",
 )
 @click.option(
-    '--output-format',
-    '--output_format',
+    "--output-format",
+    "--output_format",
     type=click.Choice(OUTPUT_SUBTITLE_FORMATS, case_sensitive=False),
-    default='srt',
-    help='Subtitle output format.',
+    default="srt",
+    help="Subtitle output format.",
 )
 @click.option(
-    '--output-dir',
-    '--output_dir',
+    "--output-dir",
+    "--output_dir",
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
-    help='Output directory for generated files (default: current directory).',
+    help="Output directory for generated files (default: current directory).",
 )
 @click.option(
-    '--max-retries',
-    '--max_retries',
+    "--max-retries",
+    "--max_retries",
     type=int,
     default=0,
-    help='Maximum number of retries for failed steps.',
+    help="Maximum number of retries for failed steps.",
 )
 @click.option(
-    '-S',
-    '--split-sentence',
-    '--split_sentence',
+    "-S",
+    "--split-sentence",
+    "--split_sentence",
     is_flag=True,
     default=False,
-    help='Re-segment subtitles by semantics.',
+    help="Re-segment subtitles by semantics.",
 )
 @click.option(
-    '--word-level',
-    '--word_level',
+    "--word-level",
+    "--word_level",
     is_flag=True,
     default=False,
-    help='Include word-level alignment timestamps in output (for JSON, TextGrid, and subtitle formats).',
+    help="Include word-level alignment timestamps in output (for JSON, TextGrid, and subtitle formats).",
 )
-@click.option('--verbose', '-v', is_flag=True, help='Enable verbose logging.')
-@click.option('--force', '-f', is_flag=True, help='Force overwrite existing files without confirmation.')
-@click.argument('url', type=str, required=True)
+@click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging.")
+@click.option("--force", "-f", is_flag=True, help="Force overwrite existing files without confirmation.")
+@click.argument("url", type=str, required=True)
 def agent(
     youtube: bool,
     url: str,
     api_key: Optional[str] = None,
     gemini_api_key: Optional[str] = None,
-    device: str = 'cpu',
-    model_name_or_path: str = 'Lattifai/Lattice-1-Alpha',
-    media_format: str = 'mp4',
-    output_format: str = 'srt',
+    device: str = "cpu",
+    model_name_or_path: str = "Lattifai/Lattice-1-Alpha",
+    media_format: str = "mp4",
+    output_format: str = "srt",
     output_dir: Optional[str] = None,
     max_retries: int = 0,
     split_sentence: bool = False,
@@ -121,22 +120,22 @@ def agent(
     """
 
     if not youtube:
-        click.echo(colorful.red('❌ Please specify a workflow type. Use --youtube for YouTube processing.'))
+        click.echo(colorful.red("❌ Please specify a workflow type. Use --youtube for YouTube processing."))
         return
 
     # Setup logging
     import logging
 
     log_level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(level=log_level, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
     # Set default output directory
     if not output_dir:
         output_dir = os.getcwd()
 
     # Get API keys
-    lattifai_api_key = api_key or os.getenv('LATTIFAI_API_KEY')
-    gemini_key = gemini_api_key or os.getenv('GEMINI_API_KEY')
+    lattifai_api_key = api_key or os.getenv("LATTIFAI_API_KEY")
+    gemini_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
 
     try:
         # Run the YouTube workflow
@@ -158,7 +157,7 @@ def agent(
         )
 
     except KeyboardInterrupt:
-        click.echo(colorful.yellow('\n⚠️ Process interrupted by user'))
+        click.echo(colorful.yellow("\n⚠️ Process interrupted by user"))
         sys.exit(1)
     except Exception as e:
         from lattifai.errors import LattifAIError
@@ -166,12 +165,12 @@ def agent(
         # Extract error message without support info (to avoid duplication)
         if isinstance(e, LattifAIError):
             # Use the get_message() method which includes proper formatting
-            click.echo(colorful.red('❌ Workflow failed:'))
+            click.echo(colorful.red("❌ Workflow failed:"))
             click.echo(e.get_message())
             # Show support info once at the end
             click.echo(e.get_support_info())
         else:
-            click.echo(colorful.red(f'❌ Workflow failed: {str(e)}'))
+            click.echo(colorful.red(f"❌ Workflow failed: {str(e)}"))
 
         if verbose:
             import traceback
@@ -196,12 +195,12 @@ async def _run_youtube_workflow(
 ):
     """Run the YouTube processing workflow"""
 
-    click.echo(colorful.cyan('🚀 LattifAI Agentic Workflow - YouTube Processing'))
-    click.echo(f'📺      YouTube URL: {url}')
-    click.echo(f'🎬     Media format: {media_format}')
-    click.echo(f'📝    Output format: {output_format}')
-    click.echo(f'📁 Output directory: {output_dir}')
-    click.echo(f'🔄      Max retries: {max_retries}')
+    click.echo(colorful.cyan("🚀 LattifAI Agentic Workflow - YouTube Processing"))
+    click.echo(f"📺      YouTube URL: {url}")
+    click.echo(f"🎬     Media format: {media_format}")
+    click.echo(f"📝    Output format: {output_format}")
+    click.echo(f"📁 Output directory: {output_dir}")
+    click.echo(f"🔄      Max retries: {max_retries}")
     click.echo()
 
     # Import workflow components
@@ -235,12 +234,12 @@ async def _run_youtube_workflow(
     )
 
     # Display results
-    click.echo(colorful.bold_white_on_green('🎉 Workflow completed successfully!'))
+    click.echo(colorful.bold_white_on_green("🎉 Workflow completed successfully!"))
     click.echo()
-    click.echo(colorful.bold_white_on_green('📊 Results:'))
+    click.echo(colorful.bold_white_on_green("📊 Results:"))
 
     # Show metadata
-    metadata = result.get('metadata', {})
+    metadata = result.get("metadata", {})
     if metadata:
         click.echo(f'🎬    Title: {metadata.get("title", "Unknown")}')
         click.echo(f'👤 Uploader: {metadata.get("uploader", "Unknown").strip()}')
@@ -248,18 +247,18 @@ async def _run_youtube_workflow(
         click.echo()
 
     # Show exported files
-    exported_files = result.get('exported_files', {})
+    exported_files = result.get("exported_files", {})
     if exported_files:
-        click.echo(colorful.bold_white_on_green('📄 Generated subtitle files:'))
+        click.echo(colorful.bold_white_on_green("📄 Generated subtitle files:"))
         for format_name, file_path in exported_files.items():
-            click.echo(f'  {format_name.upper()}: {file_path}')
+            click.echo(f"  {format_name.upper()}: {file_path}")
         click.echo()
 
     # Show subtitle count
-    subtitle_count = result.get('subtitle_count', 0)
-    click.echo(f'📝 Generated {subtitle_count} subtitle segments')
+    subtitle_count = result.get("subtitle_count", 0)
+    click.echo(f"📝 Generated {subtitle_count} subtitle segments")
 
-    click.echo(colorful.bold_white_on_green('✨ All done! Your aligned subtitles are ready.'))
+    click.echo(colorful.bold_white_on_green("✨ All done! Your aligned subtitles are ready."))
 
 
 # Add dependencies check
@@ -268,26 +267,26 @@ def check_dependencies():
     missing_deps = []
 
     try:
-        from google import genai
+        from google import genai  # noqa: F401
     except ImportError:
-        missing_deps.append('google-genai')
+        missing_deps.append("google-genai")
 
     try:
-        import yt_dlp
+        import yt_dlp  # noqa: F401
     except ImportError:
-        missing_deps.append('yt-dlp')
+        missing_deps.append("yt-dlp")
 
     try:
-        from dotenv import load_dotenv
+        from dotenv import load_dotenv  # noqa: F401
     except ImportError:
-        missing_deps.append('python-dotenv')
+        missing_deps.append("python-dotenv")
 
     if missing_deps:
-        click.echo(colorful.red('❌ Missing required dependencies:'))
+        click.echo(colorful.red("❌ Missing required dependencies:"))
         for dep in missing_deps:
-            click.echo(f'  - {dep}')
+            click.echo(f"  - {dep}")
         click.echo()
-        click.echo('Install them with:')
+        click.echo("Install them with:")
         click.echo(f'  pip install {" ".join(missing_deps)}')
         return False
 
@@ -299,7 +298,7 @@ if not check_dependencies():
     pass  # Don't exit on import, let the command handle it
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import os
 
     from dotenv import find_dotenv, load_dotenv
@@ -309,14 +308,14 @@ if __name__ == '__main__':
     asyncio.run(
         _run_youtube_workflow(
             # url='https://www.youtube.com/watch?v=7nv1snJRCEI',
-            url='https://www.youtube.com/watch?v=DQacCB9tDaw',
-            lattifai_api_key=os.getenv('LATTIFAI_API_KEY'),
-            gemini_api_key=os.getenv('GEMINI_API_KEY', ''),
-            device='mps',
-            model_name_or_path='Lattifai/Lattice-1-Alpha',
-            media_format='mp3',
-            output_format='TextGrid',
-            output_dir='~/Downloads/lattifai_youtube',
+            url="https://www.youtube.com/watch?v=DQacCB9tDaw",
+            lattifai_api_key=os.getenv("LATTIFAI_API_KEY"),
+            gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+            device="mps",
+            model_name_or_path="Lattifai/Lattice-1-Alpha",
+            media_format="mp3",
+            output_format="TextGrid",
+            output_dir="~/Downloads/lattifai_youtube",
             max_retries=0,
             split_sentence=True,
             word_level=False,

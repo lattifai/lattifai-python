@@ -1,4 +1,3 @@
-import os
 import sys
 import warnings
 
@@ -26,9 +25,9 @@ except ImportError:
     from importlib_metadata import version
 
 try:
-    __version__ = version('lattifai')
+    __version__ = version("lattifai")
 except Exception:
-    __version__ = '0.1.0'  # fallback version
+    __version__ = "0.1.0"  # fallback version
 
 
 # Check and auto-install k2 if not present
@@ -39,15 +38,15 @@ def _check_and_install_k2():
     except ImportError:
         import subprocess
 
-        print('k2 is not installed. Attempting to install k2...')
+        print("k2 is not installed. Attempting to install k2...")
         try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'install-k2'])
-            subprocess.check_call([sys.executable, '-m', 'install_k2'])
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "install-k2"])
+            subprocess.check_call([sys.executable, "-m", "install_k2"])
             import k2  # Try importing again after installation
 
-            print('k2 installed successfully.')
+            print("k2 installed successfully.")
         except Exception as e:
-            warnings.warn(f'Failed to install k2 automatically. Please install it manually. Error: {e}')
+            warnings.warn(f"Failed to install k2 automatically. Please install it manually. Error: {e}")
     return True
 
 
@@ -57,11 +56,11 @@ _check_and_install_k2()
 
 # Lazy import for LattifAI to avoid dependency issues during basic import
 def __getattr__(name):
-    if name == 'LattifAI':
+    if name == "LattifAI":
         from .client import LattifAI
 
         return LattifAI
-    if name == 'AsyncLattifAI':
+    if name == "AsyncLattifAI":
         from .client import AsyncLattifAI
 
         return AsyncLattifAI
@@ -69,21 +68,21 @@ def __getattr__(name):
 
 
 __all__ = [
-    'LattifAI',  # noqa: F822
-    'AsyncLattifAI',  # noqa: F822
-    'LattifAIError',
-    'AudioProcessingError',
-    'AudioLoadError',
-    'AudioFormatError',
-    'SubtitleProcessingError',
-    'SubtitleParseError',
-    'AlignmentError',
-    'LatticeEncodingError',
-    'LatticeDecodingError',
-    'ModelLoadError',
-    'DependencyError',
-    'APIError',
-    'ConfigurationError',
-    'SubtitleIO',
-    '__version__',
+    "LattifAI",  # noqa: F822
+    "AsyncLattifAI",  # noqa: F822
+    "LattifAIError",
+    "AudioProcessingError",
+    "AudioLoadError",
+    "AudioFormatError",
+    "SubtitleProcessingError",
+    "SubtitleParseError",
+    "AlignmentError",
+    "LatticeEncodingError",
+    "LatticeDecodingError",
+    "ModelLoadError",
+    "DependencyError",
+    "APIError",
+    "ConfigurationError",
+    "SubtitleIO",
+    "__version__",
 ]

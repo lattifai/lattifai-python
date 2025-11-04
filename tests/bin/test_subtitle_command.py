@@ -1,8 +1,6 @@
 """Tests for lattifai subtitle commands"""
 
-import tempfile
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -18,30 +16,30 @@ def cli_runner():
 
 @pytest.fixture
 def sample_subtitle_file():
-    return 'tests/data/SA1.srt'
+    return "tests/data/SA1.srt"
 
 
 class TestSubtitleConvertCommand:
     """Test cases for subtitle convert command"""
 
     @pytest.mark.parametrize(
-        'output_ext',
-        ['srt', 'vtt', 'ass', 'ssa', 'sub'],
+        "output_ext",
+        ["srt", "vtt", "ass", "ssa", "sub"],
     )
     def test_subtitle_convert_formats(self, cli_runner, sample_subtitle_file, tmp_path, output_ext):
         """Test subtitle convert command with different output formats"""
-        output_file = tmp_path / f'output.{output_ext}'
+        output_file = tmp_path / f"output.{output_ext}"
 
         # pysubs2 is imported inside the function, so we need to mock it at the module level
-        with patch('pysubs2.load') as mock_load:
+        with patch("pysubs2.load") as mock_load:
             mock_subtitle = MagicMock()
             mock_load.return_value = mock_subtitle
 
             result = cli_runner.invoke(
                 cli,
                 [
-                    'subtitle',
-                    'convert',
+                    "subtitle",
+                    "convert",
                     sample_subtitle_file,
                     str(output_file),
                 ],
@@ -50,17 +48,17 @@ class TestSubtitleConvertCommand:
 
             # Command should accept the format parameter
             # Exit code 0 = success, 1 = expected error with test data
-            assert result.exit_code in [0, 1], f'Format {output_ext} not accepted by CLI'
+            assert result.exit_code in [0, 1], f"Format {output_ext} not accepted by CLI"
 
     def test_subtitle_convert_missing_input(self, cli_runner, tmp_path):
         """Test subtitle convert command with missing input file"""
         result = cli_runner.invoke(
             cli,
             [
-                'subtitle',
-                'convert',
-                'nonexistent_file.srt',
-                str(tmp_path / 'output.vtt'),
+                "subtitle",
+                "convert",
+                "nonexistent_file.srt",
+                str(tmp_path / "output.vtt"),
             ],
         )
 
@@ -69,31 +67,31 @@ class TestSubtitleConvertCommand:
 
     def test_subtitle_convert_help(self, cli_runner):
         """Test subtitle convert command help output"""
-        result = cli_runner.invoke(cli, ['subtitle', 'convert', '--help'])
+        result = cli_runner.invoke(cli, ["subtitle", "convert", "--help"])
 
         assert result.exit_code == 0
-        assert 'Convert subtitle file to another format' in result.output
+        assert "Convert subtitle file to another format" in result.output
 
 
 class TestSubtitleDownloadCommand:
     """Test cases for subtitle download command"""
 
     @pytest.mark.parametrize(
-        'output_format',
-        ['srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'best'],
+        "output_format",
+        ["srt", "vtt", "ass", "ssa", "sub", "sbv", "best"],
     )
     def test_subtitle_download_formats(self, cli_runner, tmp_path, output_format):
         """Test subtitle download command with different output formats"""
         result = cli_runner.invoke(
             cli,
             [
-                'subtitle',
-                'download',
-                '--output-dir',
+                "subtitle",
+                "download",
+                "--output-dir",
                 str(tmp_path),
-                '--output-format',
+                "--output-format",
                 output_format,
-                'https://www.youtube.com/shorts/wX9ybkEYDc0',
+                "https://www.youtube.com/shorts/wX9ybkEYDc0",
             ],
         )
 
@@ -105,13 +103,13 @@ class TestSubtitleDownloadCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'subtitle',
-                'download',
-                '--output-dir',
+                "subtitle",
+                "download",
+                "--output-dir",
                 str(tmp_path),
-                '--lang',
-                'en',
-                'https://www.youtube.com/shorts/wX9ybkEYDc0',
+                "--lang",
+                "en",
+                "https://www.youtube.com/shorts/wX9ybkEYDc0",
             ],
         )
 
@@ -122,12 +120,12 @@ class TestSubtitleDownloadCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'subtitle',
-                'download',
-                '--output-dir',
+                "subtitle",
+                "download",
+                "--output-dir",
                 str(tmp_path),
-                '--force-overwrite',
-                'https://www.youtube.com/shorts/wX9ybkEYDc0',
+                "--force-overwrite",
+                "https://www.youtube.com/shorts/wX9ybkEYDc0",
             ],
         )
 
@@ -138,28 +136,28 @@ class TestSubtitleDownloadCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'subtitle',
-                'download',
-                '--output-dir',
+                "subtitle",
+                "download",
+                "--output-dir",
                 str(tmp_path),
-                'not_a_valid_youtube_url',
+                "not_a_valid_youtube_url",
             ],
         )
 
         # Should fail with invalid URL error
         assert result.exit_code != 0
-        assert 'Invalid' in result.output or 'Error' in result.output
+        assert "Invalid" in result.output or "Error" in result.output
 
     def test_subtitle_download_help(self, cli_runner):
         """Test subtitle download command help output"""
-        result = cli_runner.invoke(cli, ['subtitle', 'download', '--help'])
+        result = cli_runner.invoke(cli, ["subtitle", "download", "--help"])
 
         assert result.exit_code == 0
-        assert 'Download subtitles from YouTube URL' in result.output
-        assert '--output-dir' in result.output
-        assert '--output-format' in result.output
-        assert '--lang' in result.output
-        assert '--force-overwrite' in result.output
+        assert "Download subtitles from YouTube URL" in result.output
+        assert "--output-dir" in result.output
+        assert "--output-format" in result.output
+        assert "--lang" in result.output
+        assert "--force-overwrite" in result.output
 
 
 class TestSubtitleListSubsCommand:
@@ -170,9 +168,9 @@ class TestSubtitleListSubsCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'subtitle',
-                'list-subs',
-                'https://www.youtube.com/shorts/wX9ybkEYDc0',
+                "subtitle",
+                "list-subs",
+                "https://www.youtube.com/shorts/wX9ybkEYDc0",
             ],
         )
 
@@ -184,22 +182,22 @@ class TestSubtitleListSubsCommand:
         result = cli_runner.invoke(
             cli,
             [
-                'subtitle',
-                'list-subs',
-                'not_a_valid_youtube_url',
+                "subtitle",
+                "list-subs",
+                "not_a_valid_youtube_url",
             ],
         )
 
         # Should fail with invalid URL error
         assert result.exit_code != 0
-        assert 'Invalid' in result.output or 'Error' in result.output
+        assert "Invalid" in result.output or "Error" in result.output
 
     def test_subtitle_list_subs_help(self, cli_runner):
         """Test subtitle list-subs command help output"""
-        result = cli_runner.invoke(cli, ['subtitle', 'list-subs', '--help'])
+        result = cli_runner.invoke(cli, ["subtitle", "list-subs", "--help"])
 
         assert result.exit_code == 0
-        assert 'List available subtitle tracks' in result.output
+        assert "List available subtitle tracks" in result.output
 
 
 class TestSubtitleGroupHelp:
@@ -207,10 +205,10 @@ class TestSubtitleGroupHelp:
 
     def test_subtitle_help(self, cli_runner):
         """Test subtitle command group help output"""
-        result = cli_runner.invoke(cli, ['subtitle', '--help'])
+        result = cli_runner.invoke(cli, ["subtitle", "--help"])
 
         assert result.exit_code == 0
-        assert 'Commands for subtitle format conversion' in result.output
-        assert 'convert' in result.output
-        assert 'download' in result.output
-        assert 'list-subs' in result.output
+        assert "Commands for subtitle format conversion" in result.output
+        assert "convert" in result.output
+        assert "download" in result.output
+        assert "list-subs" in result.output

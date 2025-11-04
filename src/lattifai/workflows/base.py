@@ -7,20 +7,20 @@ import logging
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import colorful
 
 
 def setup_workflow_logger(name: str) -> logging.Logger:
     """Setup a logger with consistent formatting for workflow modules"""
-    logger = logging.getLogger(f'workflows.{name}')
+    logger = logging.getLogger(f"workflows.{name}")
 
     # Only add handler if it doesn't exist
     if not logger.handlers:
         handler = logging.StreamHandler()
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)+17s.py:%(lineno)-4d - %(levelname)-8s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S'
+            "%(asctime)s - %(name)+17s.py:%(lineno)-4d - %(levelname)-8s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)
@@ -30,17 +30,17 @@ def setup_workflow_logger(name: str) -> logging.Logger:
     return logger
 
 
-logger = setup_workflow_logger('base')
+logger = setup_workflow_logger("base")
 
 
 class WorkflowStatus(Enum):
     """Workflow execution status"""
 
-    PENDING = 'pending'
-    RUNNING = 'running'
-    COMPLETED = 'completed'
-    FAILED = 'failed'
-    RETRYING = 'retrying'
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    RETRYING = "retrying"
 
 
 @dataclass
@@ -84,7 +84,7 @@ class WorkflowAgent(abc.ABC):
         self.name = name
         self.max_retries = max_retries
         self.steps: List[WorkflowStep] = []
-        self.logger = setup_workflow_logger('agent')
+        self.logger = setup_workflow_logger("agent")
 
     @abc.abstractmethod
     def define_steps(self) -> List[WorkflowStep]:
@@ -111,11 +111,11 @@ class WorkflowAgent(abc.ABC):
         context = kwargs.copy()
         step_results = []
 
-        self.logger.info(colorful.bold_white_on_green(f'🚀 Starting workflow: {self.name}'))
+        self.logger.info(colorful.bold_white_on_green(f"🚀 Starting workflow: {self.name}"))
 
         try:
             for i, step in enumerate(self.steps):
-                step_info = f'📋 Step {i + 1}/{len(self.steps)}: {step.name}'
+                step_info = f"📋 Step {i + 1}/{len(self.steps)}: {step.name}"
                 self.logger.info(colorful.bold_white_on_green(step_info))
 
                 step_start = time.time()
@@ -123,17 +123,17 @@ class WorkflowAgent(abc.ABC):
                 step_duration = time.time() - step_start
 
                 step_results.append(
-                    {'step_name': step.name, 'status': 'completed', 'duration': step_duration, 'result': step_result}
+                    {"step_name": step.name, "status": "completed", "duration": step_duration, "result": step_result}
                 )
 
                 # Update context with step result
-                context[f'step_{i}_result'] = step_result
+                context[f"step_{i}_result"] = step_result
                 context[f'{step.name.lower().replace(" ", "_")}_result'] = step_result
 
-                self.logger.info(f'✅ Step {i + 1} completed in {step_duration:.2f}s')
+                self.logger.info(f"✅ Step {i + 1} completed in {step_duration:.2f}s")
 
             execution_time = time.time() - start_time
-            self.logger.info(f'🎉 Workflow completed in {execution_time:.2f}s')
+            self.logger.info(f"🎉 Workflow completed in {execution_time:.2f}s")
 
             return WorkflowResult(
                 status=WorkflowStatus.COMPLETED, data=context, execution_time=execution_time, step_results=step_results
@@ -145,9 +145,9 @@ class WorkflowAgent(abc.ABC):
             from lattifai.errors import LattifAIError
 
             if isinstance(e, LattifAIError):
-                self.logger.error(f'❌ Workflow failed after {execution_time:.2f}s: [{e.error_code}] {e.message}')
+                self.logger.error(f"❌ Workflow failed after {execution_time:.2f}s: [{e.error_code}] {e.message}")
             else:
-                self.logger.error(f'❌ Workflow failed after {execution_time:.2f}s: {str(e)}')
+                self.logger.error(f"❌ Workflow failed after {execution_time:.2f}s: {str(e)}")
 
             return WorkflowResult(
                 status=WorkflowStatus.FAILED,
@@ -164,7 +164,7 @@ class WorkflowAgent(abc.ABC):
         for attempt in range(step.max_retries + 1):
             try:
                 if attempt > 0:
-                    self.logger.info(f'🔄 Retrying step {step.name} (attempt {attempt + 1}/{step.max_retries + 1})')
+                    self.logger.info(f"🔄 Retrying step {step.name} (attempt {attempt + 1}/{step.max_retries + 1})")
 
                 result = await self.execute_step(step, context)
                 return result
@@ -176,14 +176,14 @@ class WorkflowAgent(abc.ABC):
                 # For LattifAI errors, show simplified message in logs
                 from lattifai.errors import LattifAIError
 
-                error_summary = f'[{e.error_code}]' if isinstance(e, LattifAIError) else str(e)[:100]
+                error_summary = f"[{e.error_code}]" if isinstance(e, LattifAIError) else str(e)[:100]
 
                 if step.should_retry():
-                    self.logger.warning(f'⚠️ Step {step.name} failed: {error_summary}. Retrying...')
+                    self.logger.warning(f"⚠️ Step {step.name} failed: {error_summary}. Retrying...")
                     continue
                 else:
                     self.logger.error(
-                        f'❌ Step {step.name} failed after {step.max_retries + 1} attempts: {error_summary}'
+                        f"❌ Step {step.name} failed after {step.max_retries + 1} attempts: {error_summary}"
                     )
                     raise e
 

@@ -15,17 +15,17 @@ from .utils import (
 from .writer import SubtitleWriter
 
 __all__ = [
-    'SubtitleReader',
-    'SubtitleWriter',
-    'SubtitleIO',
-    'Supervision',
-    'GeminiReader',
-    'GeminiWriter',
-    'GeminiSegment',
-    'SUBTITLE_FORMATS',
-    'INPUT_SUBTITLE_FORMATS',
-    'OUTPUT_SUBTITLE_FORMATS',
-    'ALL_SUBTITLE_FORMATS',
+    "SubtitleReader",
+    "SubtitleWriter",
+    "SubtitleIO",
+    "Supervision",
+    "GeminiReader",
+    "GeminiWriter",
+    "GeminiSegment",
+    "SUBTITLE_FORMATS",
+    "INPUT_SUBTITLE_FORMATS",
+    "OUTPUT_SUBTITLE_FORMATS",
+    "ALL_SUBTITLE_FORMATS",
 ]
 
 

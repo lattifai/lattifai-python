@@ -7,7 +7,7 @@ from lhotse.utils import Pathlike
 from .supervision import Supervision
 from .text_parser import parse_speaker_text
 
-SubtitleFormat = Literal['txt', 'srt', 'vtt', 'ass', 'auto']
+SubtitleFormat = Literal["txt", "srt", "vtt", "ass", "auto"]
 
 
 class SubtitleReader(ABCMeta):
@@ -27,28 +27,27 @@ class SubtitleReader(ABCMeta):
             Parsed text in Lhotse Cut
         """
         if not format and Path(str(subtitle)).exists():
-            format = Path(str(subtitle)).suffix.lstrip('.').lower()
+            format = Path(str(subtitle)).suffix.lstrip(".").lower()
         elif format:
             format = format.lower()
 
-        if format == 'gemini' or str(subtitle).endswith('Gemini.md'):
+        if format == "gemini" or str(subtitle).endswith("Gemini.md"):
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(subtitle)
-        elif format == 'txt' or (format == 'auto' and str(subtitle)[-4:].lower() == '.txt'):
+        elif format == "txt" or (format == "auto" and str(subtitle)[-4:].lower() == ".txt"):
             if not Path(str(subtitle)).exists():  # str
-                lines = [line.strip() for line in str(subtitle).split('\n')]
+                lines = [line.strip() for line in str(subtitle).split("\n")]
             else:  # file
                 path_str = str(subtitle)
-                with open(path_str, encoding='utf-8') as f:
+                with open(path_str, encoding="utf-8") as f:
                     lines = [line.strip() for line in f.readlines()]
             supervisions = [Supervision(text=line) for line in lines if line]
         else:
             try:
                 supervisions = cls._parse_subtitle(subtitle, format=format)
             except Exception as e:
-                del e
-                print(f"Failed to parse subtitle with format {format}, trying 'gemini' parser.")
+                print(f"Failed to parse subtitle with Format: {format}, Exception: {e}, trying 'gemini' parser.")
                 from .gemini_reader import GeminiReader
 
                 supervisions = GeminiReader.extract_for_alignment(subtitle)
@@ -61,15 +60,16 @@ class SubtitleReader(ABCMeta):
 
         try:
             subs: pysubs2.SSAFile = pysubs2.load(
-                subtitle, encoding='utf-8', format_=format if format != 'auto' else None
+                subtitle, encoding="utf-8", format_=format if format != "auto" else None
             )  # file
         except IOError:
             try:
                 subs: pysubs2.SSAFile = pysubs2.SSAFile.from_string(
-                    subtitle, format_=format if format != 'auto' else None
+                    subtitle, format_=format if format != "auto" else None
                 )  # str
-            except:
-                subs: pysubs2.SSAFile = pysubs2.load(subtitle, encoding='utf-8')  # auto detect format
+            except Exception as e:
+                del e
+                subs: pysubs2.SSAFile = pysubs2.load(subtitle, encoding="utf-8")  # auto detect format
 
         supervisions = []
         for event in subs.events:

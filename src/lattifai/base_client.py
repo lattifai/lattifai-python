@@ -23,11 +23,11 @@ class BaseAPIClient(ABC):
         default_headers: Optional[Dict[str, str]] = None,
     ) -> None:
         if api_key is None:
-            api_key = os.environ.get('LATTIFAI_API_KEY')
+            api_key = os.environ.get("LATTIFAI_API_KEY")
         if api_key is None:
             raise ConfigurationError(
-                'The api_key client option must be set either by passing api_key to the client '
-                'or by setting the LATTIFAI_API_KEY environment variable'
+                "The api_key client option must be set either by passing api_key to the client "
+                "or by setting the LATTIFAI_API_KEY environment variable"
             )
 
         self._api_key = api_key
@@ -36,8 +36,8 @@ class BaseAPIClient(ABC):
         self._max_retries = max_retries
 
         headers = {
-            'User-Agent': 'LattifAI/Python',
-            'Authorization': f'Bearer {self._api_key}',
+            "User-Agent": "LattifAI/Python",
+            "Authorization": f"Bearer {self._api_key}",
         }
         if default_headers:
             headers.update(default_headers)
@@ -78,7 +78,7 @@ class SyncAPIClient(BaseAPIClient):
 
     def post(self, api_endpoint: str, *, json: Optional[Dict[str, Any]] = None, **kwargs) -> httpx.Response:
         """Make a POST request to the specified API endpoint."""
-        return self._request('POST', api_endpoint, json=json, **kwargs)
+        return self._request("POST", api_endpoint, json=json, **kwargs)
 
 
 class AsyncAPIClient(BaseAPIClient):
@@ -123,4 +123,4 @@ class AsyncAPIClient(BaseAPIClient):
         **kwargs,
     ) -> httpx.Response:
         """Make a POST request to the specified API endpoint."""
-        return await self._request('POST', api_endpoint, json=json, files=files, **kwargs)
+        return await self._request("POST", api_endpoint, json=json, files=files, **kwargs)

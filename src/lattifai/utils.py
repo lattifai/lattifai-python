@@ -12,8 +12,8 @@ from lattifai.workers import Lattice1AlphaWorker
 
 def _get_cache_marker_path(cache_dir: Path) -> Path:
     """Get the path for the cache marker file with current date."""
-    today = datetime.now().strftime('%Y%m%d')
-    return cache_dir / f'.done{today}'
+    today = datetime.now().strftime("%Y%m%d")
+    return cache_dir / f".done{today}"
 
 
 def _is_cache_valid(cache_dir: Path) -> bool:
@@ -22,7 +22,7 @@ def _is_cache_valid(cache_dir: Path) -> bool:
         return False
 
     # Find any .done* marker files
-    marker_files = list(cache_dir.glob('.done*'))
+    marker_files = list(cache_dir.glob(".done*"))
     if not marker_files:
         return False
 
@@ -31,8 +31,8 @@ def _is_cache_valid(cache_dir: Path) -> bool:
 
     # Extract date from marker filename (format: .doneYYYYMMDD)
     try:
-        date_str = latest_marker.name.replace('.done', '')
-        marker_date = datetime.strptime(date_str, '%Y%m%d')
+        date_str = latest_marker.name.replace(".done", "")
+        marker_date = datetime.strptime(date_str, "%Y%m%d")
         # Check if marker is older than 1 days
         if datetime.now() - marker_date > timedelta(days=1):
             return False
@@ -45,7 +45,7 @@ def _is_cache_valid(cache_dir: Path) -> bool:
 def _create_cache_marker(cache_dir: Path) -> None:
     """Create a cache marker file with current date and clean old markers."""
     # Remove old marker files
-    for old_marker in cache_dir.glob('.done*'):
+    for old_marker in cache_dir.glob(".done*"):
         old_marker.unlink(missing_ok=True)
 
     # Create new marker file
@@ -68,7 +68,7 @@ def _resolve_model_path(model_name_or_path: str) -> str:
     # Check if we have a valid cached version
     if _is_cache_valid(cache_dir):
         # Return the snapshot path (latest version)
-        snapshots_dir = cache_dir / 'snapshots'
+        snapshots_dir = cache_dir / "snapshots"
         if snapshots_dir.exists():
             snapshot_dirs = [d for d in snapshots_dir.iterdir() if d.is_dir()]
             if snapshot_dirs:
@@ -77,13 +77,13 @@ def _resolve_model_path(model_name_or_path: str) -> str:
                 return str(latest_snapshot)
 
     try:
-        downloaded_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
+        downloaded_path = snapshot_download(repo_id=model_name_or_path, repo_type="model")
         _create_cache_marker(cache_dir)
         return downloaded_path
     except LocalEntryNotFoundError:
         try:
-            os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-            downloaded_path = snapshot_download(repo_id=model_name_or_path, repo_type='model')
+            os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+            downloaded_path = snapshot_download(repo_id=model_name_or_path, repo_type="model")
             _create_cache_marker(cache_dir)
             return downloaded_path
         except Exception as e:  # pragma: no cover - bubble up for caller context
@@ -99,11 +99,11 @@ def _select_device(device: Optional[str]) -> str:
 
     import torch
 
-    detected = 'cpu'
+    detected = "cpu"
     if torch.backends.mps.is_available():
-        detected = 'mps'
+        detected = "mps"
     elif torch.cuda.is_available():
-        detected = 'cuda'
+        detected = "cuda"
     return detected
 
 
@@ -122,7 +122,7 @@ def _load_tokenizer(
             device=device,
         )
     except Exception as e:
-        raise ModelLoadError(f'tokenizer from {model_path}', original_error=e)
+        raise ModelLoadError(f"tokenizer from {model_path}", original_error=e)
 
 
 def _load_worker(model_path: str, device: str) -> Lattice1AlphaWorker:
@@ -130,4 +130,4 @@ def _load_worker(model_path: str, device: str) -> Lattice1AlphaWorker:
     try:
         return Lattice1AlphaWorker(model_path, device=device, num_threads=8)
     except Exception as e:
-        raise ModelLoadError(f'worker from {model_path}', original_error=e)
+        raise ModelLoadError(f"worker from {model_path}", original_error=e)

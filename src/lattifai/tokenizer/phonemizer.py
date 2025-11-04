@@ -4,13 +4,13 @@ from typing import List, Optional, Union
 from dp.phonemizer import Phonemizer  # g2p-phonemizer
 from num2words import num2words
 
-LANGUAGE = 'omni'
+LANGUAGE = "omni"
 
 
 class G2Phonemizer:
     def __init__(self, model_checkpoint, device):
         self.phonemizer = Phonemizer.from_checkpoint(model_checkpoint, device=device).predictor
-        self.pattern = re.compile(r'\d+')
+        self.pattern = re.compile(r"\d+")
 
     def num2words(self, word, lang: str):
         matches = self.pattern.findall(word)
@@ -31,7 +31,7 @@ class G2Phonemizer:
             is_list = False
 
         predictions = self.phonemizer(
-            [self.num2words(word.replace(' .', '.').replace('.', ' .'), lang=lang or 'en') for word in words],
+            [self.num2words(word.replace(" .", ".").replace(".", " ."), lang=lang or "en") for word in words],
             lang=LANGUAGE,
             batch_size=min(batch_size or len(words), 128),
             num_prons=num_prons,

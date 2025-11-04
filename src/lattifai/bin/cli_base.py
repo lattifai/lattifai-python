@@ -15,11 +15,11 @@ def cli():
     load_dotenv(find_dotenv(usecwd=True))
 
     logging.basicConfig(
-        format='%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
+        format="%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s",
         level=logging.INFO,
     )
 
     import os
 
-    os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
-    os.environ['TOKENIZERS_PARALLELISM'] = 'FALSE'
+    os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+    os.environ["TOKENIZERS_PARALLELISM"] = "FALSE"

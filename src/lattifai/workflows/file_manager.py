@@ -21,10 +21,10 @@ class FileExistenceManager:
     """Utility class for handling file existence checks and user confirmations"""
 
     FILE_TYPE_INFO = {
-        'media': ('🎬', 'Media'),
+        "media": ("🎬", "Media"),
         # 'audio': ('📱', 'Audio'),
         # 'video': ('🎬', 'Video'),
-        'subtitle': ('📝', 'Subtitle'),
+        "subtitle": ("📝", "Subtitle"),
     }
 
     @staticmethod
@@ -47,52 +47,52 @@ class FileExistenceManager:
             Dictionary with 'media', 'subtitle' keys containing lists of existing files
         """
         output_path = Path(output_dir).expanduser()
-        existing_files = {'media': [], 'subtitle': []}
+        existing_files = {"media": [], "subtitle": []}
 
         if not output_path.exists():
             return existing_files
 
         # Default formats - combine audio and video formats
-        media_formats = media_formats or ['mp3', 'wav', 'm4a', 'aac', 'opus', 'mp4', 'webm', 'mkv', 'avi']
-        subtitle_formats = subtitle_formats or ['md', 'srt', 'vtt', 'ass', 'ssa', 'sub', 'sbv', 'txt']
+        media_formats = media_formats or ["mp3", "wav", "m4a", "aac", "opus", "mp4", "webm", "mkv", "avi"]
+        subtitle_formats = subtitle_formats or ["md", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt"]
 
         # Check for media files (audio and video)
         for ext in set(media_formats):  # Remove duplicates
             # Pattern 1: Simple pattern like {video_id}.mp3
-            media_file = output_path / f'{video_id}.{ext}'
+            media_file = output_path / f"{video_id}.{ext}"
             if media_file.exists():
-                existing_files['media'].append(str(media_file))
+                existing_files["media"].append(str(media_file))
 
             # Pattern 2: With suffix like {video_id}_Edit.mp3 or {video_id}.something.mp3
-            for media_file in output_path.glob(f'{video_id}*.{ext}'):
+            for media_file in output_path.glob(f"{video_id}*.{ext}"):
                 file_path = str(media_file)
-                if file_path not in existing_files['media']:
-                    existing_files['media'].append(file_path)
+                if file_path not in existing_files["media"]:
+                    existing_files["media"].append(file_path)
 
         # Check for subtitle files
         for ext in set(subtitle_formats):  # Remove duplicates
             # Check multiple naming patterns for subtitle files
             # Pattern 1: Simple pattern like {video_id}.vtt
-            subtitle_file = output_path / f'{video_id}.{ext}'
+            subtitle_file = output_path / f"{video_id}.{ext}"
             if subtitle_file.exists():
-                existing_files['subtitle'].append(str(subtitle_file))
+                existing_files["subtitle"].append(str(subtitle_file))
 
             # Pattern 2: With language/track suffix like {video_id}.en-trackid.vtt
-            for sub_file in output_path.glob(f'{video_id}.*.{ext}'):
+            for sub_file in output_path.glob(f"{video_id}.*.{ext}"):
                 file_path = str(sub_file)
-                if file_path not in existing_files['subtitle']:
-                    existing_files['subtitle'].append(file_path)
+                if file_path not in existing_files["subtitle"]:
+                    existing_files["subtitle"].append(file_path)
 
-        if 'md' in subtitle_formats:
+        if "md" in subtitle_formats:
             # Gemini-specific pattern: {video_id}_Gemini.md
-            gemini_subtitle_file = output_path / f'{video_id}_Gemini.md'
+            gemini_subtitle_file = output_path / f"{video_id}_Gemini.md"
             if gemini_subtitle_file.exists():
-                existing_files['subtitle'].append(str(gemini_subtitle_file))
+                existing_files["subtitle"].append(str(gemini_subtitle_file))
 
         return existing_files
 
     @staticmethod
-    def prompt_user_confirmation(existing_files: Dict[str, List[str]], operation: str = 'download') -> str:
+    def prompt_user_confirmation(existing_files: Dict[str, List[str]], operation: str = "download") -> str:
         """
         Prompt user for confirmation when files already exist (legacy, confirms all files together)
 
@@ -103,11 +103,11 @@ class FileExistenceManager:
         Returns:
             User choice: 'use' (use existing), 'overwrite' (regenerate), or 'cancel'
         """
-        has_media = bool(existing_files.get('media', []))
-        has_subtitle = bool(existing_files.get('subtitle', []))
+        has_media = bool(existing_files.get("media", []))
+        has_subtitle = bool(existing_files.get("subtitle", []))
 
         if not has_media and not has_subtitle:
-            return 'proceed'  # No existing files, proceed normally
+            return "proceed"  # No existing files, proceed normally
 
         # Header with warning color
         print(f'\n{colorful.bold_yellow("⚠️  Existing files found:")}')
@@ -115,15 +115,15 @@ class FileExistenceManager:
         # Collect file paths for options
         file_paths = []
         if has_media:
-            file_paths.extend(existing_files['media'])
+            file_paths.extend(existing_files["media"])
         if has_subtitle:
-            file_paths.extend(existing_files['subtitle'])
+            file_paths.extend(existing_files["subtitle"])
 
         # Create display options with emojis
         options = []
         for file_path in file_paths:
             # Determine emoji based on file type
-            if has_media and file_path in existing_files['media']:
+            if has_media and file_path in existing_files["media"]:
                 display_text = f'{colorful.green("•")} 🎬 Media file: {file_path}'
             else:
                 display_text = f'{colorful.green("•")} 📝 Subtitle file: {file_path}'
@@ -132,18 +132,18 @@ class FileExistenceManager:
         # Add overwrite and cancel options
         options.extend(
             [
-                ('                  Overwrite existing files (re-generate or download)', 'overwrite'),
-                ('                  Cancel operation', 'cancel'),
+                ("                  Overwrite existing files (re-generate or download)", "overwrite"),
+                ("                  Cancel operation", "cancel"),
             ]
         )
 
-        prompt_message = 'What would you like to do?'
-        default_value = file_paths[0] if file_paths else 'use'
+        prompt_message = "What would you like to do?"
+        default_value = file_paths[0] if file_paths else "use"
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default=default_value)
 
-        if choice == 'overwrite':
+        if choice == "overwrite":
             print(f'{colorful.yellow("🔄 Overwriting existing files")}')
-        elif choice == 'cancel':
+        elif choice == "cancel":
             print(f'{colorful.red("❌ Operation cancelled")}')
         elif choice in file_paths:
             print(f'{colorful.green(f"✅ Using selected file: {choice}")}')
@@ -153,7 +153,7 @@ class FileExistenceManager:
         return choice
 
     @staticmethod
-    def prompt_file_type_confirmation(file_type: str, files: List[str], operation: str = 'download') -> str:
+    def prompt_file_type_confirmation(file_type: str, files: List[str], operation: str = "download") -> str:
         """
         Prompt user for confirmation for a specific file type
 
@@ -166,9 +166,9 @@ class FileExistenceManager:
             User choice: 'use' (use existing), 'overwrite' (regenerate), or 'cancel'
         """
         if not files:
-            return 'proceed'
+            return "proceed"
 
-        emoji, label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ('📄', file_type.capitalize()))
+        emoji, label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ("📄", file_type.capitalize()))
         del emoji  # Unused variable
 
         # Header with warning color
@@ -177,26 +177,26 @@ class FileExistenceManager:
         for file_path in files:
             print(f'   {colorful.green("•")} {file_path}')
 
-        prompt_message = f'What would you like to do with {label.lower()} files?'
+        prompt_message = f"What would you like to do with {label.lower()} files?"
         options = [
-            (f'Use existing {label.lower()} files (skip {operation})', 'use'),
-            (f'Overwrite {label.lower()} files (re-{operation})', 'overwrite'),
-            ('Cancel operation', 'cancel'),
+            (f"Use existing {label.lower()} files (skip {operation})", "use"),
+            (f"Overwrite {label.lower()} files (re-{operation})", "overwrite"),
+            ("Cancel operation", "cancel"),
         ]
-        choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default='use')
+        choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default="use")
 
-        if choice == 'use':
+        if choice == "use":
             print(f'{colorful.green(f"✅ Using existing {label.lower()} files")}')
-        elif choice == 'overwrite':
+        elif choice == "overwrite":
             print(f'{colorful.yellow(f"🔄 Overwriting {label.lower()} files")}')
-        elif choice == 'cancel':
+        elif choice == "cancel":
             print(f'{colorful.red("❌ Operation cancelled")}')
 
         return choice
 
     @staticmethod
     def prompt_file_selection(
-        file_type: str, files: List[str], operation: str = 'use', enable_gemini: bool = False
+        file_type: str, files: List[str], operation: str = "use", enable_gemini: bool = False
     ) -> str:
         """
         Prompt user to select a specific file from a list, or choose to overwrite/cancel
@@ -211,7 +211,7 @@ class FileExistenceManager:
             Selected file path, 'overwrite' to regenerate, 'gemini' to transcribe with Gemini, or 'cancel' to abort
         """
         if not files:
-            return 'proceed'
+            return "proceed"
 
         # If only one file, simplify the choice
         if len(files) == 1:
@@ -220,7 +220,7 @@ class FileExistenceManager:
                     file_type=file_type, files=files, operation=operation
                 )
                 if files
-                else 'proceed'
+                else "proceed"
             )
 
         # Multiple files: let user choose which one
@@ -230,24 +230,24 @@ class FileExistenceManager:
         options = []
         for i, file_path in enumerate(files, 1):
             # Display full path for clarity
-            options.append((f'{colorful.cyan(file_path)}', file_path))
+            options.append((f"{colorful.cyan(file_path)}", file_path))
 
         # Add Gemini transcription option if enabled
         if enable_gemini:
-            options.append((colorful.magenta('✨ Transcribe with Gemini 2.5 Pro'), 'gemini'))
+            options.append((colorful.magenta("✨ Transcribe with Gemini 2.5 Pro"), "gemini"))
 
         # Add overwrite and cancel options
-        options.append((colorful.yellow(f'Overwrite (re-{operation} or download)'), 'overwrite'))
-        options.append((colorful.red('Cancel operation'), 'cancel'))
+        options.append((colorful.yellow(f"Overwrite (re-{operation} or download)"), "overwrite"))
+        options.append((colorful.red("Cancel operation"), "cancel"))
 
-        prompt_message = colorful.bold_black_on_cyan(f'Select which {file_type} to use:')
+        prompt_message = colorful.bold_black_on_cyan(f"Select which {file_type} to use:")
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default=files[0])
 
-        if choice == 'cancel':
+        if choice == "cancel":
             print(f'{colorful.red("❌ Operation cancelled")}')
-        elif choice == 'overwrite':
+        elif choice == "overwrite":
             print(f'{colorful.yellow(f"🔄 Overwriting all {file_type} files")}')
-        elif choice == 'gemini':
+        elif choice == "gemini":
             print(f'{colorful.magenta("✨ Will transcribe with Gemini 2.5 Pro")}')
         else:
             print(f'{colorful.green(f"✅ Using: {choice}")}')
@@ -256,7 +256,7 @@ class FileExistenceManager:
 
     @staticmethod
     def prompt_per_file_type_confirmation(
-        existing_files: Dict[str, List[str]], operation: str = 'download'
+        existing_files: Dict[str, List[str]], operation: str = "download"
     ) -> Dict[str, str]:
         """
         Prompt user for confirmation for each file type, combining interactive selections when possible.
@@ -269,7 +269,7 @@ class FileExistenceManager:
             Dictionary mapping file type to user choice ('use', 'overwrite', 'proceed', or 'cancel')
         """
         ordered_types = []
-        for preferred in ['media', 'audio', 'video', 'subtitle']:
+        for preferred in ["media", "audio", "video", "subtitle"]:
             if preferred not in ordered_types:
                 ordered_types.append(preferred)
         for file_type in existing_files.keys():
@@ -277,7 +277,7 @@ class FileExistenceManager:
                 ordered_types.append(file_type)
 
         file_types_with_files = [ft for ft in ordered_types if existing_files.get(ft)]
-        choices = {ft: 'proceed' for ft in ordered_types}
+        choices = {ft: "proceed" for ft in ordered_types}
 
         if not file_types_with_files:
             return choices
@@ -292,9 +292,9 @@ class FileExistenceManager:
         for file_type in file_types_with_files:
             choice = FileExistenceManager.prompt_file_type_confirmation(file_type, existing_files[file_type], operation)
             choices[file_type] = choice
-            if choice == 'cancel':
+            if choice == "cancel":
                 for remaining in file_types_with_files[file_types_with_files.index(file_type) + 1 :]:
-                    choices[remaining] = 'cancel'
+                    choices[remaining] = "cancel"
                 break
 
         return choices
@@ -339,7 +339,7 @@ class FileExistenceManager:
                     default=default,
                 ).ask()
             except (KeyboardInterrupt, EOFError):
-                return 'cancel'
+                return "cancel"
             except Exception:
                 selection = None
 
@@ -347,7 +347,7 @@ class FileExistenceManager:
                 return selection
             if default:
                 return default
-            return 'cancel'
+            return "cancel"
 
         return FileExistenceManager._prompt_with_numeric_input(prompt_message, options, default)
 
@@ -358,17 +358,17 @@ class FileExistenceManager:
         default: str = None,
     ) -> str:
         numbered_choices = {str(index + 1): value for index, (_, value) in enumerate(options)}
-        label_lines = [f'{index + 1}. {label}' for index, (label, _) in enumerate(options)]
-        prompt_header = f'{prompt_message}'
+        label_lines = [f"{index + 1}. {label}" for index, (label, _) in enumerate(options)]
+        prompt_header = f"{prompt_message}"
         print(prompt_header)
         for line in label_lines:
             print(line)
 
         while True:
             try:
-                raw_choice = input(f'\nEnter your choice (1-{len(options)}): ').strip()
+                raw_choice = input(f"\nEnter your choice (1-{len(options)}): ").strip()
             except (EOFError, KeyboardInterrupt):
-                return 'cancel'
+                return "cancel"
 
             if not raw_choice and default:
                 return default
@@ -376,7 +376,7 @@ class FileExistenceManager:
             if raw_choice in numbered_choices:
                 return numbered_choices[raw_choice]
 
-            print('Invalid choice. Please enter one of the displayed numbers.')
+            print("Invalid choice. Please enter one of the displayed numbers.")
 
     @staticmethod
     def _combined_file_type_prompt(
@@ -404,7 +404,7 @@ class FileExistenceManager:
         file_types: Sequence[str],
         operation: str,
     ) -> Optional[Dict[str, str]]:
-        states = {file_type: 'use' for file_type in file_types}
+        states = {file_type: "use" for file_type in file_types}
         selected_index = 0
         total_items = len(file_types) + 2  # file types + confirm + cancel
         total_lines = len(file_types) + 4  # prompt + items + confirm/cancel + instructions
@@ -414,7 +414,7 @@ class FileExistenceManager:
         num_mapping = {str(index + 1): index for index in range(len(file_types))}
 
         try:
-            if os.name == 'nt':
+            if os.name == "nt":
                 read_key = FileExistenceManager._read_key_windows
                 raw_mode = _NullContext()
             else:
@@ -424,20 +424,20 @@ class FileExistenceManager:
             with raw_mode:
                 while True:
                     key = read_key()
-                    if key == 'up':
+                    if key == "up":
                         selected_index = (selected_index - 1) % total_items
                         FileExistenceManager._refresh_combined_file_menu(
                             total_lines, existing_files, file_types, states, selected_index, operation
                         )
-                    elif key == 'down':
+                    elif key == "down":
                         selected_index = (selected_index + 1) % total_items
                         FileExistenceManager._refresh_combined_file_menu(
                             total_lines, existing_files, file_types, states, selected_index, operation
                         )
-                    elif key in ('enter', 'space'):
+                    elif key in ("enter", "space"):
                         if selected_index < len(file_types):
                             current_type = file_types[selected_index]
-                            states[current_type] = 'overwrite' if states[current_type] == 'use' else 'use'
+                            states[current_type] = "overwrite" if states[current_type] == "use" else "use"
                             FileExistenceManager._refresh_combined_file_menu(
                                 total_lines, existing_files, file_types, states, selected_index, operation
                             )
@@ -445,7 +445,7 @@ class FileExistenceManager:
                             return FileExistenceManager._finalize_combined_states(file_types, states)
                         else:
                             return FileExistenceManager._cancel_combined_states(file_types)
-                    elif key == 'cancel':
+                    elif key == "cancel":
                         return FileExistenceManager._cancel_combined_states(file_types)
                     elif key in num_mapping:
                         selected_index = num_mapping[key]
@@ -469,49 +469,49 @@ class FileExistenceManager:
         selected_index: int,
         operation: str,
     ) -> None:
-        prompt = colorful.bold_black_on_cyan('Select how to handle existing files')
+        prompt = colorful.bold_black_on_cyan("Select how to handle existing files")
         print(prompt)
 
         for idx, file_type in enumerate(file_types):
-            label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ('📄', file_type.capitalize()))[1]
+            label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ("📄", file_type.capitalize()))[1]
             count = len(existing_files.get(file_type, []))
             count_suffix = f' ({count} file{"s" if count != 1 else ""})'
-            state_plain = 'Use existing' if states[file_type] == 'use' else f'Overwrite ({operation})'
+            state_plain = "Use existing" if states[file_type] == "use" else f"Overwrite ({operation})"
             if idx == selected_index:
-                prefix = colorful.bold_white('>')
-                line = colorful.bold_black_on_cyan(f'{label}: {state_plain}{count_suffix}')
+                prefix = colorful.bold_white(">")
+                line = colorful.bold_black_on_cyan(f"{label}: {state_plain}{count_suffix}")
             else:
-                prefix = ' '
-                if states[file_type] == 'use':
-                    state_text = colorful.green('Use existing')
+                prefix = " "
+                if states[file_type] == "use":
+                    state_text = colorful.green("Use existing")
                 else:
-                    state_text = colorful.yellow(f'Overwrite ({operation})')
-                line = f'{label}: {state_text}{count_suffix}'
-            print(f'{prefix} {line}')
+                    state_text = colorful.yellow(f"Overwrite ({operation})")
+                line = f"{label}: {state_text}{count_suffix}"
+            print(f"{prefix} {line}")
 
         confirm_index = len(file_types)
         cancel_index = len(file_types) + 1
 
         if selected_index == confirm_index:
-            confirm_line = colorful.bold_black_on_cyan('Confirm selections')
-            confirm_prefix = colorful.bold_white('>')
+            confirm_line = colorful.bold_black_on_cyan("Confirm selections")
+            confirm_prefix = colorful.bold_white(">")
         else:
-            confirm_line = colorful.bold_green('Confirm selections')
-            confirm_prefix = ' '
-        print(f'{confirm_prefix} {confirm_line}')
+            confirm_line = colorful.bold_green("Confirm selections")
+            confirm_prefix = " "
+        print(f"{confirm_prefix} {confirm_line}")
 
         if selected_index == cancel_index:
-            cancel_line = colorful.bold_black_on_cyan('Cancel operation')
-            cancel_prefix = colorful.bold_white('>')
+            cancel_line = colorful.bold_black_on_cyan("Cancel operation")
+            cancel_prefix = colorful.bold_white(">")
         else:
-            cancel_line = colorful.bold_red('Cancel operation')
-            cancel_prefix = ' '
-        print(f'{cancel_prefix} {cancel_line}')
+            cancel_line = colorful.bold_red("Cancel operation")
+            cancel_prefix = " "
+        print(f"{cancel_prefix} {cancel_line}")
 
         print(
-            'Use '
-            + colorful.bold_black_on_cyan('↑/↓')
-            + ' to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort.'
+            "Use "
+            + colorful.bold_black_on_cyan("↑/↓")
+            + " to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort."
         )
 
     @staticmethod
@@ -523,58 +523,58 @@ class FileExistenceManager:
         selected_index: int,
         operation: str,
     ) -> None:
-        move_up = '\033[F' * total_lines
-        clear_line = '\033[K'
+        move_up = "\033[F" * total_lines
+        clear_line = "\033[K"
         sys.stdout.write(move_up)
         sys.stdout.write(clear_line)
         sys.stdout.flush()
 
-        prompt = colorful.bold_black_on_cyan('Select how to handle existing files')
+        prompt = colorful.bold_black_on_cyan("Select how to handle existing files")
         print(prompt)
 
         for idx, file_type in enumerate(file_types):
             sys.stdout.write(clear_line)
-            label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ('📄', file_type.capitalize()))[1]
+            label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ("📄", file_type.capitalize()))[1]
             count = len(existing_files.get(file_type, []))
             count_suffix = f' ({count} file{"s" if count != 1 else ""})'
-            state_plain = 'Use existing' if states[file_type] == 'use' else f'Overwrite ({operation})'
+            state_plain = "Use existing" if states[file_type] == "use" else f"Overwrite ({operation})"
             if idx == selected_index:
-                prefix = colorful.bold_white('>')
-                line = colorful.bold_black_on_cyan(f'{label}: {state_plain}{count_suffix}')
+                prefix = colorful.bold_white(">")
+                line = colorful.bold_black_on_cyan(f"{label}: {state_plain}{count_suffix}")
             else:
-                prefix = ' '
-                if states[file_type] == 'use':
-                    state_text = colorful.green('Use existing')
+                prefix = " "
+                if states[file_type] == "use":
+                    state_text = colorful.green("Use existing")
                 else:
-                    state_text = colorful.yellow(f'Overwrite ({operation})')
-                line = f'{label}: {state_text}{count_suffix}'
-            print(f'{prefix} {line}')
+                    state_text = colorful.yellow(f"Overwrite ({operation})")
+                line = f"{label}: {state_text}{count_suffix}"
+            print(f"{prefix} {line}")
 
         sys.stdout.write(clear_line)
         confirm_index = len(file_types)
         cancel_index = len(file_types) + 1
         if selected_index == confirm_index:
-            confirm_line = colorful.bold_black_on_cyan('Confirm selections')
-            confirm_prefix = colorful.bold_white('>')
+            confirm_line = colorful.bold_black_on_cyan("Confirm selections")
+            confirm_prefix = colorful.bold_white(">")
         else:
-            confirm_line = colorful.bold_green('Confirm selections')
-            confirm_prefix = ' '
-        print(f'{confirm_prefix} {confirm_line}')
+            confirm_line = colorful.bold_green("Confirm selections")
+            confirm_prefix = " "
+        print(f"{confirm_prefix} {confirm_line}")
 
         sys.stdout.write(clear_line)
         if selected_index == cancel_index:
-            cancel_line = colorful.bold_black_on_cyan('Cancel operation')
-            cancel_prefix = colorful.bold_white('>')
+            cancel_line = colorful.bold_black_on_cyan("Cancel operation")
+            cancel_prefix = colorful.bold_white(">")
         else:
-            cancel_line = colorful.bold_red('Cancel operation')
-            cancel_prefix = ' '
-        print(f'{cancel_prefix} {cancel_line}')
+            cancel_line = colorful.bold_red("Cancel operation")
+            cancel_prefix = " "
+        print(f"{cancel_prefix} {cancel_line}")
 
         sys.stdout.write(clear_line)
         print(
-            'Use '
-            + colorful.bold_black_on_cyan('↑/↓')
-            + ' to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort.'
+            "Use "
+            + colorful.bold_black_on_cyan("↑/↓")
+            + " to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort."
         )
         sys.stdout.flush()
 
@@ -586,41 +586,41 @@ class FileExistenceManager:
     ) -> Dict[str, str]:
         label_choices = []
         for file_type in file_types:
-            label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ('📄', file_type.capitalize()))[1]
+            label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ("📄", file_type.capitalize()))[1]
             count = len(existing_files.get(file_type, []))
             count_suffix = f' ({count} file{"s" if count != 1 else ""})'
-            label_choices.append(questionary.Choice(title=f'{label}{count_suffix}', value=file_type))
+            label_choices.append(questionary.Choice(title=f"{label}{count_suffix}", value=file_type))
 
-        label_choices.append(questionary.Choice(title='Cancel operation', value='__cancel__'))
+        label_choices.append(questionary.Choice(title="Cancel operation", value="__cancel__"))
 
         try:
             selection = questionary.checkbox(
-                message='Select file types to overwrite (others will use existing files)',
+                message="Select file types to overwrite (others will use existing files)",
                 choices=label_choices,
-                instruction='Press Space to toggle overwrite. Press Enter to confirm.',
+                instruction="Press Space to toggle overwrite. Press Enter to confirm.",
             ).ask()
         except (KeyboardInterrupt, EOFError):
             return FileExistenceManager._cancel_combined_states(file_types)
 
-        if selection is None or '__cancel__' in selection:
+        if selection is None or "__cancel__" in selection:
             return FileExistenceManager._cancel_combined_states(file_types)
 
-        states = {file_type: ('overwrite' if file_type in selection else 'use') for file_type in file_types}
+        states = {file_type: ("overwrite" if file_type in selection else "use") for file_type in file_types}
         return FileExistenceManager._finalize_combined_states(file_types, states)
 
     @staticmethod
     def _finalize_combined_states(file_types: Sequence[str], states: Dict[str, str]) -> Dict[str, str]:
-        return {file_type: ('overwrite' if states.get(file_type) == 'overwrite' else 'use') for file_type in file_types}
+        return {file_type: ("overwrite" if states.get(file_type) == "overwrite" else "use") for file_type in file_types}
 
     @staticmethod
     def _cancel_combined_states(file_types: Sequence[str]) -> Dict[str, str]:
-        return {file_type: 'cancel' for file_type in file_types}
+        return {file_type: "cancel" for file_type in file_types}
 
     @staticmethod
     def _supports_native_selector() -> bool:
         if not sys.stdin.isatty() or not sys.stdout.isatty():
             return False
-        if os.name == 'nt':
+        if os.name == "nt":
             try:
                 import msvcrt  # noqa: F401
             except ImportError:
@@ -653,7 +653,7 @@ class FileExistenceManager:
         FileExistenceManager._render_menu(prompt_message, options, selected_index)
 
         try:
-            if os.name == 'nt':
+            if os.name == "nt":
                 read_key = FileExistenceManager._read_key_windows
                 raw_mode = _NullContext()
             else:
@@ -663,20 +663,20 @@ class FileExistenceManager:
             with raw_mode:
                 while True:
                     key = read_key()
-                    if key == 'up':
+                    if key == "up":
                         selected_index = (selected_index - 1) % len(options)
                         FileExistenceManager._refresh_menu(total_lines, prompt_message, options, selected_index)
-                    elif key == 'down':
+                    elif key == "down":
                         selected_index = (selected_index + 1) % len(options)
                         FileExistenceManager._refresh_menu(total_lines, prompt_message, options, selected_index)
-                    elif key == 'enter':
+                    elif key == "enter":
                         return options[selected_index][1]
                     elif key in value_by_number:
                         return value_by_number[key]
-                    elif key == 'cancel':
-                        return 'cancel'
+                    elif key == "cancel":
+                        return "cancel"
         except KeyboardInterrupt:
-            return 'cancel'
+            return "cancel"
         except Exception:
             return FileExistenceManager._prompt_with_numeric_input(prompt_message, options, default)
         finally:
@@ -684,17 +684,17 @@ class FileExistenceManager:
 
     @staticmethod
     def _render_menu(prompt_message: str, options: Sequence[Tuple[str, str]], selected_index: int) -> None:
-        prompt = f'{prompt_message}'
+        prompt = f"{prompt_message}"
         print(prompt)
         for idx, (label, _) in enumerate(options):
             if idx == selected_index:
-                prefix = colorful.bold_white('>')
+                prefix = colorful.bold_white(">")
                 suffix = colorful.bold_black_on_cyan(str(label))
             else:
-                prefix = ' '
+                prefix = " "
                 suffix = label
-            print(f'{prefix} {suffix}')
-        print('Use ' + colorful.bold_black_on_cyan('↑/↓') + ' to move, Enter to confirm, or press a number to choose.')
+            print(f"{prefix} {suffix}")
+        print("Use " + colorful.bold_black_on_cyan("↑/↓") + " to move, Enter to confirm, or press a number to choose.")
 
     @staticmethod
     def _refresh_menu(
@@ -703,24 +703,24 @@ class FileExistenceManager:
         options: Sequence[Tuple[str, str]],
         selected_index: int,
     ) -> None:
-        move_up = '\033[F' * total_lines
-        clear_line = '\033[K'
+        move_up = "\033[F" * total_lines
+        clear_line = "\033[K"
         sys.stdout.write(move_up)
         sys.stdout.write(clear_line)
         sys.stdout.flush()
-        prompt = f'{prompt_message}'
+        prompt = f"{prompt_message}"
         print(prompt)
         for idx, (label, _) in enumerate(options):
             sys.stdout.write(clear_line)
             if idx == selected_index:
-                prefix = colorful.bold_white('>')
+                prefix = colorful.bold_white(">")
                 suffix = colorful.bold_black_on_cyan(str(label))
             else:
-                prefix = ' '
+                prefix = " "
                 suffix = label
-            print(f'{prefix} {suffix}')
+            print(f"{prefix} {suffix}")
         sys.stdout.write(clear_line)
-        print('Use ' + colorful.bold_black_on_cyan('↑/↓') + ' to move, Enter to confirm, or press a number to choose.')
+        print("Use " + colorful.bold_black_on_cyan("↑/↓") + " to move, Enter to confirm, or press a number to choose.")
         sys.stdout.flush()
 
     @staticmethod
@@ -729,53 +729,53 @@ class FileExistenceManager:
 
         while True:
             ch = msvcrt.getwch()
-            if ch in ('\x00', '\xe0'):
+            if ch in ("\x00", "\xe0"):
                 extended = msvcrt.getwch()
-                if extended == 'H':
-                    return 'up'
-                if extended == 'P':
-                    return 'down'
+                if extended == "H":
+                    return "up"
+                if extended == "P":
+                    return "down"
                 continue
-            if ch in ('\r', '\n'):
-                return 'enter'
-            if ch == ' ':
-                return 'space'
+            if ch in ("\r", "\n"):
+                return "enter"
+            if ch == " ":
+                return "space"
             if ch.isdigit():
                 return ch
-            if ch.lower() in ('j', 'k'):
-                return 'down' if ch.lower() == 'j' else 'up'
-            if ch == '\x1b':
-                return 'cancel'
-            if ch == '\x03':
+            if ch.lower() in ("j", "k"):
+                return "down" if ch.lower() == "j" else "up"
+            if ch == "\x1b":
+                return "cancel"
+            if ch == "\x03":
                 raise KeyboardInterrupt
 
     @staticmethod
     def _read_key_posix() -> str:
         ch = sys.stdin.read(1)
-        if ch == '\x1b':
+        if ch == "\x1b":
             seq = sys.stdin.read(2)
-            if seq == '[A':
-                return 'up'
-            if seq == '[B':
-                return 'down'
-            return 'cancel'
-        if ch in ('\r', '\n'):
-            return 'enter'
-        if ch == ' ':
-            return 'space'
+            if seq == "[A":
+                return "up"
+            if seq == "[B":
+                return "down"
+            return "cancel"
+        if ch in ("\r", "\n"):
+            return "enter"
+        if ch == " ":
+            return "space"
         if ch.isdigit():
             return ch
-        if ch.lower() == 'j':
-            return 'down'
-        if ch.lower() == 'k':
-            return 'up'
-        if ch == '\x03':
+        if ch.lower() == "j":
+            return "down"
+        if ch.lower() == "k":
+            return "up"
+        if ch == "\x03":
             raise KeyboardInterrupt
-        return ''
+        return ""
 
     @staticmethod
     def _stdin_raw_mode():
-        if os.name == 'nt':
+        if os.name == "nt":
             return _NullContext()
 
         import termios

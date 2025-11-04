@@ -19,7 +19,7 @@ class GeminiWriter:
         hours = int(seconds // 3600)
         minutes = int((seconds % 3600) // 60)
         secs = int(seconds % 60)
-        return f'[{hours:02d}:{minutes:02d}:{secs:02d}]'
+        return f"[{hours:02d}:{minutes:02d}:{secs:02d}]"
 
     @classmethod
     def update_timestamps(
@@ -44,7 +44,7 @@ class GeminiWriter:
         output_path = Path(output_path)
 
         # Read original file
-        with open(original_path, 'r', encoding='utf-8') as f:
+        with open(original_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         # Parse original segments to get line numbers
@@ -66,7 +66,7 @@ class GeminiWriter:
 
         # Write updated content
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, 'w', encoding='utf-8') as f:
+        with open(output_path, "w", encoding="utf-8") as f:
             f.writelines(updated_lines)
 
         return output_path
@@ -83,7 +83,7 @@ class GeminiWriter:
         mapping = {}
 
         # Create a simple text-based matching
-        dialogue_segments = [s for s in original_segments if s.segment_type == 'dialogue']
+        dialogue_segments = [s for s in original_segments if s.segment_type == "dialogue"]
 
         # Try to match based on text content
         for aligned_sup in aligned_supervisions:
@@ -120,7 +120,7 @@ class GeminiWriter:
 
         # Replace timestamp patterns
         # Pattern 1: [HH:MM:SS] at the end or in brackets
-        line = re.sub(r'\[\d{2}:\d{2}:\d{2}\]', new_ts_str, line)
+        line = re.sub(r"\[\d{2}:\d{2}:\d{2}\]", new_ts_str, line)
 
         return line
 
@@ -146,28 +146,28 @@ class GeminiWriter:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write('# Aligned Transcript\n\n')
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write("# Aligned Transcript\n\n")
 
             for i, sup in enumerate(aligned_supervisions):
                 # Write segment with timestamp
                 start_ts = cls.format_timestamp(sup.start)
-                f.write(f'{start_ts} {sup.text}\n')
+                f.write(f"{start_ts} {sup.text}\n")
 
                 # Optionally write word-level timestamps
-                if include_word_timestamps and hasattr(sup, 'alignment') and sup.alignment:
-                    if 'word' in sup.alignment:
-                        f.write('  Words: ')
+                if include_word_timestamps and hasattr(sup, "alignment") and sup.alignment:
+                    if "word" in sup.alignment:
+                        f.write("  Words: ")
                         word_parts = []
-                        for word_info in sup.alignment['word']:
-                            word_ts = cls.format_timestamp(word_info['start'])
+                        for word_info in sup.alignment["word"]:
+                            word_ts = cls.format_timestamp(word_info["start"])
                             word_parts.append(f'{word_info["symbol"]}{word_ts}')
-                        f.write(' '.join(word_parts))
-                        f.write('\n')
+                        f.write(" ".join(word_parts))
+                        f.write("\n")
 
-                f.write('\n')
+                f.write("\n")
 
         return output_path
 
 
-__all__ = ['GeminiWriter']
+__all__ = ["GeminiWriter"]

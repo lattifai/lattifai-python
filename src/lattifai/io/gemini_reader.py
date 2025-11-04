@@ -1,9 +1,9 @@
 """Reader for YouTube transcript files with speaker labels and timestamps."""
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from lhotse.utils import Pathlike
 
@@ -18,7 +18,7 @@ class GeminiSegment:
     timestamp: Optional[float] = None
     speaker: Optional[str] = None
     section: Optional[str] = None
-    segment_type: str = 'dialogue'  # 'dialogue', 'event', or 'section_header'
+    segment_type: str = "dialogue"  # 'dialogue', 'event', or 'section_header'
     line_number: int = 0
 
     @property
@@ -31,15 +31,15 @@ class GeminiReader:
     """Parser for YouTube transcript format with speaker labels and timestamps."""
 
     # Regex patterns for parsing (supports both [HH:MM:SS] and [MM:SS] formats)
-    TIMESTAMP_PATTERN = re.compile(r'\[(\d{1,2}):(\d{2}):(\d{2})\]|\[(\d{1,2}):(\d{2})\]')
-    SECTION_HEADER_PATTERN = re.compile(r'^##\s*\[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.+)$')
-    SPEAKER_PATTERN = re.compile(r'^\*\*(.+?[:：])\*\*\s*(.+)$')
-    EVENT_PATTERN = re.compile(r'^\[([^\]]+)\]\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$')
-    INLINE_TIMESTAMP_PATTERN = re.compile(r'^(.+?)\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$')
+    TIMESTAMP_PATTERN = re.compile(r"\[(\d{1,2}):(\d{2}):(\d{2})\]|\[(\d{1,2}):(\d{2})\]")
+    SECTION_HEADER_PATTERN = re.compile(r"^##\s*\[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.+)$")
+    SPEAKER_PATTERN = re.compile(r"^\*\*(.+?[:：])\*\*\s*(.+)$")
+    EVENT_PATTERN = re.compile(r"^\[([^\]]+)\]\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$")
+    INLINE_TIMESTAMP_PATTERN = re.compile(r"^(.+?)\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$")
 
     # New patterns for YouTube link format: [[MM:SS](URL&t=seconds)]
-    YOUTUBE_SECTION_PATTERN = re.compile(r'^##\s*\[\[(\d{1,2}):(\d{2})\]\([^)]*&t=(\d+)\)\]\s*(.+)$')
-    YOUTUBE_INLINE_PATTERN = re.compile(r'^(.+?)\s*\[\[(\d{1,2}):(\d{2})\]\([^)]*&t=(\d+)\)\]$')
+    YOUTUBE_SECTION_PATTERN = re.compile(r"^##\s*\[\[(\d{1,2}):(\d{2})\]\([^)]*&t=(\d+)\)\]\s*(.+)$")
+    YOUTUBE_INLINE_PATTERN = re.compile(r"^(.+?)\s*\[\[(\d{1,2}):(\d{2})\]\([^)]*&t=(\d+)\)\]$")
 
     @classmethod
     def parse_timestamp(cls, *args) -> float:
@@ -61,7 +61,7 @@ class GeminiReader:
             # Direct seconds (from YouTube &t= parameter)
             return int(args[0])
         else:
-            raise ValueError(f'Invalid timestamp args: {args}')
+            raise ValueError(f"Invalid timestamp args: {args}")
 
     @classmethod
     def read(
@@ -82,13 +82,13 @@ class GeminiReader:
         """
         transcript_path = Path(transcript_path).expanduser().resolve()
         if not transcript_path.exists():
-            raise FileNotFoundError(f'Transcript file not found: {transcript_path}')
+            raise FileNotFoundError(f"Transcript file not found: {transcript_path}")
 
         segments: List[GeminiSegment] = []
         current_section = None
         current_speaker = None
 
-        with open(transcript_path, 'r', encoding='utf-8') as f:
+        with open(transcript_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         for line_num, line in enumerate(lines, start=1):
@@ -97,9 +97,9 @@ class GeminiReader:
                 continue
 
             # Skip table of contents
-            if line.startswith('* ['):
+            if line.startswith("* ["):
                 continue
-            if line.startswith('## Table of Contents'):
+            if line.startswith("## Table of Contents"):
                 continue
 
             # Parse section headers
@@ -114,7 +114,7 @@ class GeminiReader:
                             text=section_title.strip(),
                             timestamp=timestamp,
                             section=current_section,
-                            segment_type='section_header',
+                            segment_type="section_header",
                             line_number=line_num,
                         )
                     )
@@ -133,7 +133,7 @@ class GeminiReader:
                             text=section_title.strip(),
                             timestamp=timestamp,
                             section=current_section,
-                            segment_type='section_header',
+                            segment_type="section_header",
                             line_number=line_num,
                         )
                     )
@@ -158,7 +158,7 @@ class GeminiReader:
                             text=event_text.strip(),
                             timestamp=timestamp,
                             section=current_section,
-                            segment_type='event',
+                            segment_type="event",
                             line_number=line_num,
                         )
                     )
@@ -200,7 +200,7 @@ class GeminiReader:
                         timestamp=timestamp,
                         speaker=current_speaker,
                         section=current_section,
-                        segment_type='dialogue',
+                        segment_type="dialogue",
                         line_number=line_num,
                     )
                 )
@@ -228,7 +228,7 @@ class GeminiReader:
                         timestamp=timestamp,
                         speaker=current_speaker,
                         section=current_section,
-                        segment_type='dialogue',
+                        segment_type="dialogue",
                         line_number=line_num,
                     )
                 )
@@ -246,14 +246,14 @@ class GeminiReader:
                         timestamp=timestamp,
                         speaker=current_speaker,
                         section=current_section,
-                        segment_type='dialogue',
+                        segment_type="dialogue",
                         line_number=line_num,
                     )
                 )
                 continue
 
             # Skip markdown headers and other formatting
-            if line.startswith('#'):
+            if line.startswith("#"):
                 continue
 
         return segments
@@ -283,10 +283,10 @@ class GeminiReader:
         segments = cls.read(transcript_path, include_events=False, include_sections=False)
 
         # Filter to only dialogue segments with timestamps
-        dialogue_segments = [s for s in segments if s.segment_type == 'dialogue' and s.timestamp is not None]
+        dialogue_segments = [s for s in segments if s.segment_type == "dialogue" and s.timestamp is not None]
 
         if not dialogue_segments:
-            raise ValueError(f'No dialogue segments with timestamps found in {transcript_path}')
+            raise ValueError(f"No dialogue segments with timestamps found in {transcript_path}")
 
         # Sort by timestamp
         dialogue_segments.sort(key=lambda x: x.timestamp)
@@ -308,7 +308,7 @@ class GeminiReader:
                     text=segment.text,
                     start=segment.timestamp,
                     duration=max(duration, min_duration),
-                    id=f'segment_{i:05d}',
+                    id=f"segment_{i:05d}",
                     speaker=segment.speaker,
                 )
             )
@@ -337,13 +337,13 @@ class GeminiReader:
                 else:
                     # Different speaker or gap too large, save previous segment
                     if current_texts:
-                        merged_text = ' '.join(current_texts)
+                        merged_text = " ".join(current_texts)
                         merged.append(
                             Supervision(
                                 text=merged_text,
                                 start=current_start,
                                 duration=last_end_time - current_start,
-                                id=f'merged_{len(merged):05d}',
+                                id=f"merged_{len(merged):05d}",
                             )
                         )
                     current_speaker = segment.speaker
@@ -353,13 +353,13 @@ class GeminiReader:
 
             # Add final segment
             if current_texts:
-                merged_text = ' '.join(current_texts)
+                merged_text = " ".join(current_texts)
                 merged.append(
                     Supervision(
                         text=merged_text,
                         start=current_start,
                         duration=last_end_time - current_start,
-                        id=f'merged_{len(merged):05d}',
+                        id=f"merged_{len(merged):05d}",
                     )
                 )
 
@@ -368,4 +368,4 @@ class GeminiReader:
         return supervisions
 
 
-__all__ = ['GeminiReader', 'GeminiSegment']
+__all__ = ["GeminiReader", "GeminiSegment"]

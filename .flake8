@@ -1,0 +1,13 @@
+[flake8]
+show-source=true
+statistics=true
+max-line-length = 120
+per-file-ignores =
+  src/lattifai/*.py: E402, F401
+  src/lattifai/bin/*.py: W503, F541, E501, F541, F811
+  src/lattifai/workflows/*.py: W503
+  tests/io/*.py: E501
+
+exclude =
+  .git,
+  setup.py,
