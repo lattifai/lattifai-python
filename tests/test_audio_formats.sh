@@ -1,6 +1,6 @@
 set -e
 
-lattifai align tests/data/SA1.m4a tests/data/SA1.TXT tests/data/SA1.vtt
+lattifai align tests/data/SA1.m4a tests/data/SA1.TXT tests/data/SA1.TextGrid -W
 lattifai align tests/data/SA1.mp4 tests/data/SA1.TXT tests/data/SA1.vtt
 
 lattifai align tests/data/SA1.ogg tests/data/SA1.TXT tests/data/SA1.vtt

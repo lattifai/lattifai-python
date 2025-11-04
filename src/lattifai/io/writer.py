@@ -33,11 +33,11 @@ class SubtitleWriter(ABCMeta):
                     sup_dict = sup.to_dict()
                     json_data.append(sup_dict)
                 json.dump(json_data, f, ensure_ascii=False, indent=4)
-        elif str(output_path).endswith('.TextGrid') or str(output_path).endswith('.textgrid'):
+        elif str(output_path).lower().endswith('.textgrid'):
             from tgt import Interval, IntervalTier, TextGrid, write_to_file
 
             tg = TextGrid()
-            supervisions, words = [], []
+            supervisions, words, scores = [], [], {'utterances': [], 'words': []}
             for supervision in sorted(alignments, key=lambda x: x.start):
                 text = (
                     f'{supervision.speaker} {supervision.text}' if supervision.speaker is not None else supervision.text
@@ -48,10 +48,22 @@ class SubtitleWriter(ABCMeta):
                 if word_items:
                     for item in word_items:
                         words.append(Interval(item.start, item.end, item.symbol))
+                        if item.score is not None:
+                            scores['words'].append(Interval(item.start, item.end, f'{item.score:.2f}'))
+                if supervision.has_custom('score'):
+                    scores['utterances'].append(
+                        Interval(supervision.start, supervision.end, f'{supervision.score:.2f}')
+                    )
 
             tg.add_tier(IntervalTier(name='utterances', objects=supervisions))
             if words:
                 tg.add_tier(IntervalTier(name='words', objects=words))
+
+            if scores['utterances']:
+                tg.add_tier(IntervalTier(name='utterance_scores', objects=scores['utterances']))
+            if scores['words']:
+                tg.add_tier(IntervalTier(name='word_scores', objects=scores['words']))
+
             write_to_file(tg, output_path, format='long')
         else:
             subs = pysubs2.SSAFile()
