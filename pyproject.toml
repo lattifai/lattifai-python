@@ -15,7 +15,7 @@ authors = [
 maintainers = [
   { name = 'Lattice', email = 'tech@lattifai.com' },
 ]
-requires-python = '>=3.10,<3.14'
+requires-python = '>=3.10,<3.15'
 
 dependencies = [
     "lattifai-core>=0.2.1",
@@ -46,6 +46,7 @@ classifiers = [
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
     'Operating System :: MacOS :: MacOS X',
     'Operating System :: POSIX :: Linux',
     'Operating System :: Microsoft :: Windows',
