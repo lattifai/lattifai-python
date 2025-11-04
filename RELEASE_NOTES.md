@@ -1,4 +1,99 @@
-# Release Notes - LattifAI Python v0.4.5
+# Release Notes - LattifAI Python v0.4.6
+
+**Release Date:** November 5, 2025
+
+---
+
+## Overview
+
+This release adds Python 3.14 support and improves subtitle parsing to better preserve original formatting.
+
+---
+
+## What's New
+
+### Python 3.14 Support
+
+LattifAI now officially supports Python 3.14, ensuring compatibility with the latest Python release.
+
+- Added Python 3.14 to supported versions (`>=3.10,<3.15`)
+- Updated package classifiers for Python 3.14
+- Tested compatibility with Python 3.14 runtime
+
+### Enhanced Subtitle Parsing
+
+Improved subtitle content processing to maintain better fidelity with original subtitle files.
+
+**Key Improvements:**
+- **Preserved HTML Entities**: Original HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, etc.) are now preserved after alignment, preventing unwanted decoding.
+- **Improved Text Fidelity**: Enhanced parsing logic to retain special characters and formatting in subtitles.
+
+**Impact:**
+- ✅ Better preservation of special characters and symbols in subtitles
+- ✅ More accurate representation of original subtitle content
+- ✅ Improved compatibility with subtitle files containing encoded characters
+
+**Example:**
+
+Before v0.4.6:
+```srt
+1
+00:00:01,000 --> 00:00:03,000
+She said &quot;Hello&quot; &amp; goodbye
+```
+HTML entities might be decoded as : `She said "Hello" & goodbye` in the output.
+
+After v0.4.6:
+```srt
+1
+00:00:01,234 --> 00:00:03,456
+She said &quot;Hello&quot; &amp; goodbye
+```
+HTML entities are preserved in the output.
+
+---
+
+## Installation
+
+```bash
+pip install --upgrade lattifai
+```
+
+Verify installation:
+```bash
+lai --version
+# Expected: lattifai 0.4.6
+```
+
+---
+
+## Backward Compatibility
+
+✅ **100% backward compatible** - all existing code works without changes.
+
+---
+
+## Version Info
+
+- **Version**: 0.4.6
+- **Release Date**: November 5, 2025
+- **Python Support**: 3.10 - 3.14
+- **Model**: Lattice-1-Alpha
+- **License**: Apache License 2.0
+
+---
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
+
+---
+
+# Previous Release Notes
+
+## v0.4.5 - Enhanced Audio Loading
 
 **Release Date:** November 3, 2025
 

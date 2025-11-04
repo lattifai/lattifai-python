@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.4.6] - 2025-11-05
+
+### Added
+- Python 3.14 support in package requirements and classifiers
+
+### Improved
+- Subtitle parsing now preserves original HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, etc.)
+- Better subtitle content integrity during the parsing phase
+- Reduced unnecessary HTML entity decoding for cleaner subtitle output
+
+### Changed
+- Package version incremented to 0.4.6
+
 ## [0.4.5] - 2025-11-03
 
 ### Improved
