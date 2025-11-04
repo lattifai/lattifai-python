@@ -15,7 +15,7 @@ This release adds Python 3.14 support and improves subtitle parsing to better pr
 ### Python 3.14 Support
 
 LattifAI now officially supports Python 3.14, ensuring compatibility with the latest Python release.
-
+- **doesn't support python 3.14 for now** because of onnxruntime [microsoft/onnxruntime#26309](https://github.com/microsoft/onnxruntime/issues/26309)
 - Added Python 3.14 to supported versions (`>=3.10,<3.15`)
 - Updated package classifiers for Python 3.14
 - Tested compatibility with Python 3.14 runtime
