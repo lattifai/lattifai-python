@@ -11,7 +11,7 @@
 </p>
 
 
-# LattifAI Python
+# LattifAI: Precision Alignment, Infinite Possibilities
 
 Advanced forced alignment and subtitle generation powered by [Lattice-1-Alpha](https://huggingface.co/Lattifai/Lattice-1-Alpha) model.
 
