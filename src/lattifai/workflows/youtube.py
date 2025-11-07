@@ -818,6 +818,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             raise ValueError("Aligned subtitle path not found")
 
         output_format = context.get("output_format", "srt")
+        include_speaker_in_text = context.get("include_speaker_in_text", True)
         self.logger.info(f"📤 Exporting results in format: {output_format}")
 
         supervisions = SubtitleIO.read(aligned_path, format="ass")
@@ -850,7 +851,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         output_path = str(aligned_path).replace(
             "_aligned.ass", f'{"_Gemini" if is_gemini_format else ""}_LattifAI.{output_format}'
         )
-        SubtitleIO.write(supervisions, output_path=output_path)
+        SubtitleIO.write(supervisions, output_path=output_path, include_speaker_in_text=include_speaker_in_text)
         exported_files[output_format] = output_path
         self.logger.info(f"✅ Exported {output_format.upper()}: {output_path}")
 

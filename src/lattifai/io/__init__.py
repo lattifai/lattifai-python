@@ -40,5 +40,10 @@ class SubtitleIO:
         return SubtitleReader.read(subtitle, format=format)
 
     @classmethod
-    def write(cls, alignments: List[Supervision], output_path: Pathlike) -> Pathlike:
-        return SubtitleWriter.write(alignments, output_path)
+    def write(
+        cls,
+        alignments: List[Supervision],
+        output_path: Pathlike,
+        include_speaker_in_text: bool = True,
+    ) -> Pathlike:
+        return SubtitleWriter.write(alignments, output_path, include_speaker_in_text=include_speaker_in_text)

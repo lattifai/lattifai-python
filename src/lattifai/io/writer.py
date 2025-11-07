@@ -13,7 +13,12 @@ class SubtitleWriter(ABCMeta):
     """Class for writing subtitle files with optional word-level alignment."""
 
     @classmethod
-    def write(cls, alignments: List[Supervision], output_path: Pathlike) -> Pathlike:
+    def write(
+        cls,
+        alignments: List[Supervision],
+        output_path: Pathlike,
+        include_speaker_in_text: bool = True,
+    ) -> Pathlike:
         if str(output_path)[-4:].lower() == ".txt":
             with open(output_path, "w", encoding="utf-8") as f:
                 for sup in alignments:
@@ -22,7 +27,10 @@ class SubtitleWriter(ABCMeta):
                         for item in word_items:
                             f.write(f"[{item.start:.2f}-{item.end:.2f}] {item.symbol}\n")
                     else:
-                        text = f"{sup.speaker} {sup.text}" if sup.speaker is not None else sup.text
+                        if include_speaker_in_text and sup.speaker is not None:
+                            text = f"{sup.speaker} {sup.text}"
+                        else:
+                            text = sup.text
                         f.write(f"[{sup.start:.2f}-{sup.end:.2f}] {text}\n")
 
         elif str(output_path)[-5:].lower() == ".json":
@@ -33,15 +41,17 @@ class SubtitleWriter(ABCMeta):
                     sup_dict = sup.to_dict()
                     json_data.append(sup_dict)
                 json.dump(json_data, f, ensure_ascii=False, indent=4)
+
         elif str(output_path).lower().endswith(".textgrid"):
             from tgt import Interval, IntervalTier, TextGrid, write_to_file
 
             tg = TextGrid()
             supervisions, words, scores = [], [], {"utterances": [], "words": []}
             for supervision in sorted(alignments, key=lambda x: x.start):
-                text = (
-                    f"{supervision.speaker} {supervision.text}" if supervision.speaker is not None else supervision.text
-                )
+                if include_speaker_in_text and supervision.speaker is not None:
+                    text = f"{supervision.speaker} {supervision.text}"
+                else:
+                    text = supervision.text
                 supervisions.append(Interval(supervision.start, supervision.end, text or ""))
                 # Extract word-level alignment using helper function
                 word_items = parse_alignment_from_supervision(supervision)
@@ -65,6 +75,7 @@ class SubtitleWriter(ABCMeta):
                 tg.add_tier(IntervalTier(name="word_scores", objects=scores["words"]))
 
             write_to_file(tg, output_path, format="long")
+
         else:
             subs = pysubs2.SSAFile()
             for sup in alignments:
@@ -76,7 +87,10 @@ class SubtitleWriter(ABCMeta):
                             pysubs2.SSAEvent(start=int(word.start * 1000), end=int(word.end * 1000), text=word.symbol)
                         )
                 else:
-                    text = f"{sup.speaker} {sup.text}" if sup.speaker is not None else sup.text
+                    if include_speaker_in_text and sup.speaker is not None:
+                        text = f"{sup.speaker} {sup.text}"
+                    else:
+                        text = sup.text
                     subs.append(pysubs2.SSAEvent(start=int(sup.start * 1000), end=int(sup.end * 1000), text=text or ""))
             subs.save(output_path)
 

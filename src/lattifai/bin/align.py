@@ -28,6 +28,11 @@ from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS
     help="Normalize and strip HTML tags/entities from subtitle text before alignment.",
 )
 @click.option(
+    "--include-speaker-in-text/--no-include-speaker-in-text",
+    default=True,
+    help="Include speaker name in text output (default: True)",
+)
+@click.option(
     "-S",
     "--split-sentence",
     "--split_sentence",
@@ -90,6 +95,7 @@ def align(
     device: str = "cpu",
     model_name_or_path: str = "Lattifai/Lattice-1-Alpha",
     api_key: str = None,
+    include_speaker_in_text: bool = True,
 ):
     """
     Command used to align media(audio/video) with subtitles
@@ -109,6 +115,7 @@ def align(
             split_sentence=split_sentence,
             return_details=word_level,
             output_subtitle_path=output_subtitle_path,
+            include_speaker_in_text=include_speaker_in_text,
         )
         click.echo(colorful.green(f"✅ Alignment completed successfully: {output_subtitle_path}"))
     except Exception as e:
@@ -161,6 +168,11 @@ def align(
     is_flag=True,
     default=False,
     help="Normalize and strip HTML tags/entities from downloaded or transcribed subtitle text.",
+)
+@click.option(
+    "--include-speaker-in-text/--no-include-speaker-in-text",
+    default=True,
+    help="Include speaker name in text output (default: True)",
 )
 @click.option(
     "-S",
@@ -242,6 +254,7 @@ def youtube(
     api_key: str = None,
     gemini_api_key: str = None,
     output_format: str = "vtt",
+    include_speaker_in_text: bool = True,
 ):
     """
     Download media and subtitles from YouTube for further alignment.
@@ -274,6 +287,7 @@ def youtube(
             output_format=output_format,
             split_sentence=split_sentence,
             word_level=word_level,
+            include_speaker_in_text=include_speaker_in_text,
         )
         return result
 

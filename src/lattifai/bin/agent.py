@@ -99,6 +99,11 @@ from lattifai.io import OUTPUT_SUBTITLE_FORMATS
     default=False,
     help="Normalize and strip HTML tags/entities from subtitle text before alignment.",
 )
+@click.option(
+    "--include-speaker-in-text/--no-include-speaker-in-text",
+    default=True,
+    help="Include speaker name in text output (default: True)",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging.")
 @click.option("--force", "-f", is_flag=True, help="Force overwrite existing files without confirmation.")
 @click.argument("url", type=str, required=True)
@@ -118,6 +123,7 @@ def agent(
     normalize_text: bool = False,
     verbose: bool = False,
     force: bool = False,
+    include_speaker_in_text: bool = True,
 ):
     """
     LattifAI Agentic Workflow Agent
@@ -166,6 +172,7 @@ def agent(
                 split_sentence=split_sentence,
                 word_level=word_level,
                 force_overwrite=force,
+                include_speaker_in_text=include_speaker_in_text,
             )
         )
 
@@ -205,6 +212,7 @@ async def _run_youtube_workflow(
     split_sentence: bool = False,
     word_level: bool = False,
     force_overwrite: bool = False,
+    include_speaker_in_text: bool = True,
 ):
     """Run the YouTube processing workflow"""
 
@@ -244,6 +252,7 @@ async def _run_youtube_workflow(
         output_format=output_format,
         split_sentence=split_sentence,
         word_level=word_level,
+        include_speaker_in_text=include_speaker_in_text,
     )
 
     # Display results

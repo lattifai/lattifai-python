@@ -23,9 +23,15 @@ def subtitle():
     "output_subtitle_path",
     type=click.Path(allow_dash=True),
 )
+@click.option(
+    "--include-speaker-in-text/--no-include-speaker-in-text",
+    default=True,
+    help="Include speaker name in text output (default: True)",
+)
 def convert(
     input_subtitle_path: Pathlike,
     output_subtitle_path: Pathlike,
+    include_speaker_in_text: bool = True,
 ):
     """
     Convert subtitle file to another format.
@@ -34,7 +40,7 @@ def convert(
         from lattifai.io import SubtitleIO
 
         alignments = SubtitleIO.read(input_subtitle_path)
-        SubtitleIO.write(alignments, output_subtitle_path)
+        SubtitleIO.write(alignments, output_subtitle_path, include_speaker_in_text=include_speaker_in_text)
     else:
         import pysubs2
 
