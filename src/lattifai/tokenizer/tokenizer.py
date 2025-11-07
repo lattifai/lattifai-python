@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 import torch
 
 from lattifai.errors import LATTICE_DECODING_FAILURE_HELP, LatticeDecodingError
-from lattifai.io import Supervision, normalize_html_text
+from lattifai.io import Supervision
+from lattifai.io import normalize_text as normalize_html_text
 from lattifai.tokenizer.phonemizer import G2Phonemizer
 
 PUNCTUATION = '!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~'

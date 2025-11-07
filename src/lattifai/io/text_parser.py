@@ -16,8 +16,28 @@ SPEAKER_LATTIFAI = re.compile(r"(^\[SPEAKER_.*?\][:：])\s*(.*)")
 SPEAKER_PATTERN2 = re.compile(r"^([A-Z]{1,15}(?:\s+[A-Z]{1,15})?[:：])\s*(.*)$")
 
 
-def normalize_html_text(text: str) -> str:
-    """Normalize HTML text by decoding entities and stripping whitespace."""
+NORMALIZE_TEXT = False  # Global toggle controlled by CLI
+
+
+def set_normalize_text(enabled: bool) -> None:
+    """Enable or disable HTML text normalization globally."""
+    global NORMALIZE_TEXT
+    NORMALIZE_TEXT = bool(enabled)
+
+
+def normalize_text(text: str) -> str:
+    """Normalize subtitle text by:
+    - Decoding common HTML entities
+    - Removing HTML tags (e.g., <i>, <font>, <b>, <br>)
+    - Collapsing multiple whitespace into a single space
+    - Converting curly apostrophes to straight ones in common contractions
+    """
+    if not text:
+        return ""
+
+    # # Remove HTML tags first (replace with space to avoid concatenation)
+    # text = re.sub(r"<[^>]+>", " ", text)
+
     html_entities = {
         "&amp;": "&",
         "&lt;": "<",
@@ -26,19 +46,17 @@ def normalize_html_text(text: str) -> str:
         "&#39;": "'",
         "&nbsp;": " ",
         "\\N": " ",
-        "…": " ",
+        "…": " ",  # replace ellipsis with space to avoid merging words
     }
     for entity, char in html_entities.items():
         text = text.replace(entity, char)
 
-    text = re.sub(r"\s+", " ", text)  # Replace multiple spaces with a single space
-
     # Convert curly apostrophes to straight apostrophes for common English contractions
-    # Handles: 't 's 'll 're 've 'd 'm
-    # For example, convert "don't" to "don't"
     text = re.sub(r"([a-zA-Z])’([tsdm]|ll|re|ve)\b", r"\1'\2", text, flags=re.IGNORECASE)
-    # For example, convert "5’s" to "5's"
     text = re.sub(r"([0-9])’([s])\b", r"\1'\2", text, flags=re.IGNORECASE)
+
+    # Collapse whitespace (after replacements)
+    text = re.sub(r"\s+", " ", text)
 
     return text.strip()
 

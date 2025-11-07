@@ -5,7 +5,7 @@ from typing import List, Literal, Optional, Union
 from lhotse.utils import Pathlike
 
 from .supervision import Supervision
-from .text_parser import parse_speaker_text
+from .text_parser import NORMALIZE_TEXT, normalize_text, parse_speaker_text
 
 SubtitleFormat = Literal["txt", "srt", "vtt", "ass", "auto"]
 
@@ -73,7 +73,8 @@ class SubtitleReader(ABCMeta):
 
         supervisions = []
         for event in subs.events:
-            # NOT apply text_parser.py:normalize_html_text here, to keep original text in subtitles
+            if NORMALIZE_TEXT:
+                event.text = normalize_text(event.text)
             speaker, text = parse_speaker_text(event.text)
             supervisions.append(
                 Supervision(

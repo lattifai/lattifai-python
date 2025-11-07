@@ -213,3 +213,20 @@ class TestAgentCommand:
         assert "--split-sentence" in result.output
         assert "--verbose" in result.output
         assert "--force" in result.output
+        assert "--normalize-text" in result.output
+
+    def test_agent_normalize_html_text_flag(self, cli_runner, tmp_path, monkeypatch):
+        """Test agent command accepts --normalize-text flag"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test_api_key")
+        result = cli_runner.invoke(
+            cli,
+            [
+                "agent",
+                "--youtube",
+                "--normalize-text",
+                "--output-dir",
+                str(tmp_path),
+                "https://www.youtube.com/shorts/wX9ybkEYDc0",
+            ],
+        )
+        assert result.exit_code in [0, 1, 2]

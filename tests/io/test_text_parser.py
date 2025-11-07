@@ -1,6 +1,6 @@
 import pytest
 
-from lattifai.io.text_parser import normalize_html_text, parse_speaker_text
+from lattifai.io.text_parser import normalize_text, parse_speaker_text
 
 # Test cases for parse_speaker_text
 # Each tuple contains: (input_line, expected_speaker, expected_text)
@@ -52,7 +52,7 @@ def test_parse_speaker_text(input_line, expected_speaker, expected_text):
     """
     Tests the parse_speaker_text function with various inputs.
     """
-    speaker, text = parse_speaker_text(normalize_html_text(input_line))
+    speaker, text = parse_speaker_text(normalize_text(input_line))
     assert speaker == expected_speaker, f"Failed for input: '{input_line}'"
     assert text == expected_text
 
@@ -73,9 +73,9 @@ HTML_ENTITIES_CASES = [
 
 
 @pytest.mark.parametrize("input_text, expected_output", HTML_ENTITIES_CASES)
-def test_normalize_html_text(input_text, expected_output):
+def test_normalize_text(input_text, expected_output):
     """
     Tests the decode_html_entities function with various inputs.
     """
-    output = normalize_html_text(input_text)
+    output = normalize_text(input_text)
     assert output == expected_output, f"Failed for input: '{input_text}'"

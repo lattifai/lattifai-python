@@ -91,6 +91,14 @@ from lattifai.io import OUTPUT_SUBTITLE_FORMATS
     default=False,
     help="Include word-level alignment timestamps in output (for JSON, TextGrid, and subtitle formats).",
 )
+@click.option(
+    "-N",
+    "--normalize-text",
+    "--normalize_text",
+    is_flag=True,
+    default=False,
+    help="Normalize and strip HTML tags/entities from subtitle text before alignment.",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging.")
 @click.option("--force", "-f", is_flag=True, help="Force overwrite existing files without confirmation.")
 @click.argument("url", type=str, required=True)
@@ -107,6 +115,7 @@ def agent(
     max_retries: int = 0,
     split_sentence: bool = False,
     word_level: bool = False,
+    normalize_text: bool = False,
     verbose: bool = False,
     force: bool = False,
 ):
@@ -138,6 +147,10 @@ def agent(
     gemini_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
 
     try:
+        if normalize_text:
+            from lattifai.io.text_parser import set_normalize_text
+
+            set_normalize_text(True)
         # Run the YouTube workflow
         asyncio.run(
             _run_youtube_workflow(

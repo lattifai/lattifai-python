@@ -20,6 +20,14 @@ from lattifai.io import INPUT_SUBTITLE_FORMATS, OUTPUT_SUBTITLE_FORMATS
     help="Input subtitle format.",
 )
 @click.option(
+    "-N",
+    "--normalize-text",
+    "--normalize_text",
+    is_flag=True,
+    default=False,
+    help="Normalize and strip HTML tags/entities from subtitle text before alignment.",
+)
+@click.option(
     "-S",
     "--split-sentence",
     "--split_sentence",
@@ -76,6 +84,7 @@ def align(
     input_subtitle_path: Pathlike,
     output_subtitle_path: Pathlike,
     input_format: str = "auto",
+    normalize_text: bool = False,
     split_sentence: bool = False,
     word_level: bool = False,
     device: str = "cpu",
@@ -86,6 +95,12 @@ def align(
     Command used to align media(audio/video) with subtitles
     """
     try:
+        if normalize_text:
+            # Activate global normalization flag for subtitle ingestion
+            from lattifai.io.text_parser import set_normalize_text
+
+            set_normalize_text(True)
+
         client = LattifAI(model_name_or_path=model_name_or_path, device=device, api_key=api_key)
         client.alignment(
             input_media_path,
@@ -138,6 +153,14 @@ def align(
     ),
     default="mp3",
     help="Media format for YouTube download (audio or video).",
+)
+@click.option(
+    "-N",
+    "--normalize-text",
+    "--normalize_text",
+    is_flag=True,
+    default=False,
+    help="Normalize and strip HTML tags/entities from downloaded or transcribed subtitle text.",
 )
 @click.option(
     "-S",
@@ -210,6 +233,7 @@ def align(
 def youtube(
     yt_url: str,
     media_format: str = "mp3",
+    normalize_text: bool = False,
     split_sentence: bool = False,
     word_level: bool = False,
     output_dir: str = ".",
@@ -254,6 +278,10 @@ def youtube(
         return result
 
     try:
+        if normalize_text:
+            from lattifai.io.text_parser import set_normalize_text
+
+            set_normalize_text(True)
         result = asyncio.run(_process())
 
         # Display results

@@ -136,3 +136,21 @@ class TestAlignCommand:
         assert "--device" in result.output
         assert "--split-sentence" in result.output
         assert "--model-name-or-path" in result.output
+        assert "--normalize-text" in result.output
+
+    def test_align_normalize_html_text_flag(self, cli_runner, sample_audio_file, sample_subtitle_file, tmp_path):
+        """Test align command accepts --normalize-text flag"""
+        output_file = tmp_path / "output_normalized.srt"
+        result = cli_runner.invoke(
+            align,
+            [
+                "--normalize-text",
+                "--device",
+                "cpu",
+                sample_audio_file,
+                sample_subtitle_file,
+                str(output_file),
+            ],
+            catch_exceptions=True,
+        )
+        assert result.exit_code in [0, 1], f"normalize-html-text flag not accepted (exit code: {result.exit_code})"

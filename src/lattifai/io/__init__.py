@@ -6,7 +6,7 @@ from .gemini_reader import GeminiReader, GeminiSegment
 from .gemini_writer import GeminiWriter
 from .reader import SubtitleFormat, SubtitleReader
 from .supervision import Supervision
-from .text_parser import normalize_html_text
+from .text_parser import normalize_text
 from .utils import (
     ALL_SUBTITLE_FORMATS,
     INPUT_SUBTITLE_FORMATS,
@@ -27,6 +27,7 @@ __all__ = [
     "INPUT_SUBTITLE_FORMATS",
     "OUTPUT_SUBTITLE_FORMATS",
     "ALL_SUBTITLE_FORMATS",
+    "normalize_text",
 ]
 
 
