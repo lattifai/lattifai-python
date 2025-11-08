@@ -34,7 +34,9 @@ dependencies = [
     "questionary>=2.0",
     "yt-dlp",
     "pycryptodome",
-    "google-genai"
+    "google-genai",
+    # config
+    "nemo-run>=0.5.0"
 ]
 
 classifiers = [
@@ -65,6 +67,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 [project.scripts]
 lattifai = 'lattifai.bin:cli'
 lai = 'lattifai.bin:cli'
+lairun = 'lattifai.bin.run:main'
 
 [tool.setuptools]
 packages = ["lattifai", "lattifai.io", "lattifai.tokenizer", "lattifai.workers", "lattifai.bin", "lattifai.workflows", "lattifai.workflows.prompts"]
