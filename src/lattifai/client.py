@@ -1,154 +1,174 @@
-"""LattifAI client implementation."""
+"""LattifAI client implementation with config-driven architecture."""
 
 import asyncio
-import os
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 
 import colorful
 from lhotse.utils import Pathlike
 
+from lattifai.alignment import Lattice1Aligner
 from lattifai.base_client import AsyncAPIClient, SyncAPIClient
+from lattifai.config import AlignmentConfig, ClientConfig, SubtitleConfig
 from lattifai.errors import (
     AlignmentError,
-    ConfigurationError,
     LatticeDecodingError,
     LatticeEncodingError,
-    LattifAIError,
     SubtitleProcessingError,
-    handle_exception,
 )
-from lattifai.io import SubtitleFormat, SubtitleIO, Supervision
-from lattifai.tokenizer import AsyncLatticeTokenizer
-from lattifai.utils import _load_tokenizer, _load_worker, _resolve_model_path, _select_device
+from lattifai.subtitle import SubtitleFormat, Subtitler, Supervision
 
 
 class LattifAI(SyncAPIClient):
-    """Synchronous LattifAI client."""
+    """
+    Synchronous LattifAI client for audio/video-subtitle alignment.
+
+    This client provides synchronous methods for aligning audio/video files with subtitle/transcript
+    text using the Lattice-1 forced alignment model. It supports multiple subtitle formats
+    (SRT, VTT, ASS, TXT) and provides word-level alignment with configurable sentence splitting.
+
+    The client uses a config-driven architecture with three main configuration objects:
+    - ClientConfig: API connection settings (API key, base URL, timeout, retries)
+    - AlignmentConfig: Model and alignment behavior settings
+    - SubtitleConfig: Subtitle I/O format and processing settings
+
+    Example:
+        >>> from lattifai import LattifAI, ClientConfig
+        >>>
+        >>> # Initialize with default settings
+        >>> client = LattifAI()
+        >>>
+        >>> # Or with custom configuration
+        >>> config = ClientConfig(api_key="your-api-key")
+        >>> client = LattifAI(config=config)
+        >>>
+        >>> # Perform alignment
+        >>> alignments, output_path = client.alignment(
+        ...     input_media_path="audio.wav",
+        ...     input_subtitle_path="subtitle.srt",
+        ...     output_subtitle_path="aligned.srt"
+        ... )
+
+    Attributes:
+        aligner: Lattice1Aligner instance for performing forced alignment
+        subtitler: Subtitler instance for reading/writing subtitle files
+    """
 
     def __init__(
         self,
-        *,
-        api_key: Optional[str] = None,
-        model_name_or_path: str = "Lattifai/Lattice-1-Alpha",
-        device: Optional[str] = None,
-        base_url: Optional[str] = None,
-        timeout: Union[float, int] = 120.0,
-        max_retries: int = 2,
-        default_headers: Optional[Dict[str, str]] = None,
+        client_config: Optional[ClientConfig] = None,
+        alignment_config: Optional[AlignmentConfig] = None,
+        subtitle_config: Optional[SubtitleConfig] = None,
     ) -> None:
-        if api_key is None:
-            api_key = os.environ.get("LATTIFAI_API_KEY")
-        if api_key is None:
-            raise ConfigurationError(
-                "The api_key client option must be set either by passing api_key to the client "
-                "or by setting the LATTIFAI_API_KEY environment variable"
-            )
+        """
+        Initialize LattifAI synchronous client.
 
-        if base_url is None:
-            base_url = os.environ.get("LATTIFAI_BASE_URL")
-        if not base_url:
-            base_url = "https://api.lattifai.com/v1"
+        Args:
+            client_config: Client configuration for API connection settings. If None, uses defaults
+                          (reads API key from LATTIFAI_API_KEY environment variable).
+            alignment_config: Alignment model and behavior configuration. If None, uses default
+                            settings (Lattice-1 model, auto device selection).
+            subtitle_config: Subtitle I/O configuration for format handling and processing.
+                           If None, uses default settings (auto-detect format).
 
-        super().__init__(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=timeout,
-            max_retries=max_retries,
-            default_headers=default_headers,
-        )
+        Raises:
+            ConfigurationError: If API key is not provided and LATTIFAI_API_KEY env var is not set.
+        """
+        # Initialize configs with defaults if not provided
+        if client_config is None:
+            client_config = ClientConfig()
 
-        model_path = _resolve_model_path(model_name_or_path)
-        device = _select_device(device)
+        if alignment_config is None:
+            alignment_config = AlignmentConfig()
 
-        self.tokenizer = _load_tokenizer(self, model_path, device)
-        self.worker = _load_worker(model_path, device)
-        self.device = device
+        if subtitle_config is None:
+            subtitle_config = SubtitleConfig()
+
+        # Initialize base API client
+        super().__init__(config=client_config)
+
+        # aligner
+        self.aligner = Lattice1Aligner(self, config=alignment_config)
+
+        # subtitler IO
+        self.subtitler = Subtitler(config=subtitle_config)
 
     def alignment(
         self,
-        audio: Pathlike,
-        subtitle: Pathlike,
-        format: Optional[SubtitleFormat] = None,
-        split_sentence: bool = False,
-        return_details: bool = False,
+        input_media_path: Pathlike,
+        input_subtitle_path: Pathlike,
+        input_subtitle_format: Optional[SubtitleFormat] = None,
+        split_sentence: Optional[bool] = None,
         output_subtitle_path: Optional[Pathlike] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
-        """Perform alignment on audio and subtitle/text.
+        """
+        Perform forced alignment on audio and subtitle/text.
+
+        This method aligns subtitle text with audio by finding the precise timing of each word
+        and subtitle segment. It uses the Lattice-1 forced alignment model to process the audio
+        and match it against the provided subtitle text.
+
+        The alignment process consists of five steps:
+        1. Parse the input subtitle file into segments
+        2. Generate a lattice graph from subtitle text
+        3. Search the lattice using audio features
+        4. Decode results to extract word-level timings
+        5. Export aligned subtitles (if output path provided)
 
         Args:
-            audio: Audio file path
-            subtitle: Subtitle/Text to align with audio
-            format: Input subtitle format (srt, vtt, ass, txt). Auto-detected if None
-            split_sentence: Enable intelligent sentence re-splitting based on punctuation semantics
-            return_details: Return word-level alignment details in Supervision.alignment field
-            output_subtitle_path: Output path for aligned subtitle (optional)
+            input_media_path: Path to audio/video file (WAV, MP3, FLAC, MP4, etc.). Must be readable by ffmpeg.
+            input_subtitle_path: Path to subtitle or plain text file to align with audio.
+            input_subtitle_format: Input subtitle format ('srt', 'vtt', 'ass', 'txt'). If None, auto-detects
+                   from file extension or uses config default.
+            split_sentence: Enable automatic sentence re-splitting for better alignment accuracy.
+                          If None, uses config default (typically False).
+            output_subtitle_path: Optional path to write aligned subtitle file. If provided,
+                                exports results in the same format as input (or config default).
 
         Returns:
             Tuple containing:
-                - List of aligned Supervision objects with timing information
-                - Output subtitle path (if output_subtitle_path was provided)
+                - List of Supervision objects with aligned timing information (start, duration, text)
+                - Output subtitle path (same as input parameter, or None if not provided)
 
         Raises:
-            SubtitleProcessingError: If subtitle file cannot be parsed
-            LatticeEncodingError: If lattice graph generation fails
-            AlignmentError: If audio alignment fails
-            LatticeDecodingError: If lattice decoding fails
+            SubtitleProcessingError: If subtitle file cannot be parsed or output cannot be written.
+            LatticeEncodingError: If lattice graph generation fails (invalid text format).
+            AlignmentError: If audio alignment fails (audio processing or model inference error).
+            LatticeDecodingError: If lattice decoding fails (invalid results from model).
+
+        Example:
+            >>> client = LattifAI()
+            >>> alignments, output_path = client.alignment(
+            ...     input_media_path="speech.wav",
+            ...     input_subtitle_path="transcript.srt",
+            ...     output_subtitle_path="aligned.srt"
+            ... )
+            >>> for seg in alignments:
+            ...     print(f"{seg.start:.2f}s - {seg.end:.2f}s: {seg.text}")
         """
         try:
-            # step1: parse text or subtitles
-            print(colorful.cyan(f"📖 Step 1: Reading subtitle file from {subtitle}"))
+            # Step 1: Parse subtitle file
+            print(colorful.cyan(f"📖 Step 1: Reading subtitle file from {input_subtitle_path}"))
             try:
-                supervisions = SubtitleIO.read(subtitle, format=format)
+                supervisions = self.subtitler.read(input_path=input_subtitle_path, format=input_subtitle_format)
                 print(colorful.green(f"         ✓ Parsed {len(supervisions)} subtitle segments"))
             except Exception as e:
                 raise SubtitleProcessingError(
-                    f"Failed to parse subtitle file: {subtitle}",
-                    subtitle_path=str(subtitle),
+                    f"Failed to parse subtitle file: {input_subtitle_path}",
+                    subtitle_path=str(input_subtitle_path),
                     context={"original_error": str(e)},
                 )
 
-            # step2: make lattice by call Lattifai API
-            print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
-            try:
-                supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
-                    supervisions, split_sentence=split_sentence
-                )
-                print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
-            except Exception as e:
-                text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
-                raise LatticeEncodingError(text_content, original_error=e)
+            # Step 2-4: Align using Lattice1Aligner
+            supervisions, alignments = self.aligner.alignment(
+                input_media_path,
+                supervisions,
+                split_sentence=split_sentence or self.subtitler.config.split_sentence,
+            )
 
-            # step3: search lattice graph with audio
-            print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with audio: {audio}"))
-            try:
-                lattice_results = self.worker.alignment(audio, lattice_graph)
-                print(colorful.green("         ✓ Lattice search completed"))
-            except Exception as e:
-                raise AlignmentError(
-                    f"Audio alignment failed for {audio}",
-                    audio_path=str(audio),
-                    subtitle_path=str(subtitle),
-                    context={"original_error": str(e)},
-                )
-
-            # step4: decode lattice results to aligned segments
-            print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
-            try:
-                alignments = self.tokenizer.detokenize(
-                    lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
-                )
-                print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
-            except LatticeDecodingError as e:
-                print(colorful.red("         x Failed to decode lattice alignment results"))
-                raise e
-            except Exception as e:
-                print(colorful.red("         x Failed to decode lattice alignment results"))
-                raise LatticeDecodingError(lattice_id, original_error=e)
-
-            # step5: export alignments to target format
-            if output_subtitle_path:
+            # Step 5: Export alignments
+            if output_subtitle_path or self.subtitler.config.output_path:
                 try:
-                    SubtitleIO.write(alignments, output_path=output_subtitle_path)
+                    _ = self.subtitler.write(alignments, output_path=output_subtitle_path)
                     print(colorful.green(f"🎉🎉🎉🎉🎉 Subtitle file written to: {output_subtitle_path}"))
                 except Exception as e:
                     raise SubtitleProcessingError(
@@ -156,6 +176,7 @@ class LattifAI(SyncAPIClient):
                         subtitle_path=str(output_subtitle_path),
                         context={"original_error": str(e)},
                     )
+
             return (alignments, output_subtitle_path)
 
         except (SubtitleProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
@@ -165,114 +186,169 @@ class LattifAI(SyncAPIClient):
             # Catch any unexpected errors and wrap them
             raise AlignmentError(
                 "Unexpected error during alignment process",
-                audio_path=str(audio),
-                subtitle_path=str(subtitle),
+                media_path=str(input_media_path),
+                subtitle_path=str(input_subtitle_path),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
 
 
 class AsyncLattifAI(AsyncAPIClient):
-    """Asynchronous LattifAI client."""
+    """
+    Asynchronous LattifAI client for audio/video-subtitle alignment.
+
+    This client provides asynchronous methods for aligning audio/video files with subtitle/transcript
+    text using the Lattice-1 forced alignment model. It supports concurrent processing and is
+    ideal for batch alignment tasks or integration into async applications.
+
+    The async client uses the same config-driven architecture as the synchronous client and
+    supports multiple subtitle formats (SRT, VTT, ASS, TXT) with word-level alignment.
+
+    Example:
+        >>> import asyncio
+        >>> from lattifai import AsyncLattifAI, ClientConfig
+        >>>
+        >>> async def align():
+        ...     config = ClientConfig(api_key="your-api-key")
+        ...     client = AsyncLattifAI(config=config)
+        ...
+        ...     alignments, output_path = await client.alignment(
+        ...         input_media_path="audio.wav",
+        ...         input_subtitle_path="subtitle.srt",
+        ...         output_subtitle_path="aligned.srt"
+        ...     )
+        ...     return alignments
+        >>>
+        >>> asyncio.run(align())
+
+    Attributes:
+        aligner: Lattice1Aligner instance for performing forced alignment (wrapped in async)
+        subtitler: Subtitler instance for reading/writing subtitle files
+    """
 
     def __init__(
         self,
-        *,
-        api_key: Optional[str] = None,
-        model_name_or_path: str = "Lattifai/Lattice-1-Alpha",
-        device: Optional[str] = None,
-        base_url: Optional[str] = None,
-        timeout: Union[float, int] = 120.0,
-        max_retries: int = 2,
-        default_headers: Optional[Dict[str, str]] = None,
+        client_config: Optional[ClientConfig] = None,
+        alignment_config: Optional[AlignmentConfig] = None,
+        subtitle_config: Optional[SubtitleConfig] = None,
     ) -> None:
-        if api_key is None:
-            api_key = os.environ.get("LATTIFAI_API_KEY")
-        if api_key is None:
-            raise ConfigurationError(
-                "The api_key client option must be set either by passing api_key to the client "
-                "or by setting the LATTIFAI_API_KEY environment variable"
-            )
+        """
+        Initialize asynchronous LattifAI client.
 
-        if base_url is None:
-            base_url = os.environ.get("LATTIFAI_BASE_URL")
-        if not base_url:
-            base_url = "https://api.lattifai.com/v1"
+        Args:
+            client_config: Client configuration for API connection settings. If None, uses defaults
+                          (reads API key from LATTIFAI_API_KEY environment variable).
+            alignment_config: Alignment configuration including API settings and model parameters.
+                            If None, uses defaults. API key is required either via config or
+                            LATTIFAI_API_KEY environment variable.
+            subtitle_config: Subtitle I/O configuration for format handling and processing.
+                           If None, uses default settings.
 
-        super().__init__(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=timeout,
-            max_retries=max_retries,
-            default_headers=default_headers,
-        )
+        Raises:
+            ConfigurationError: If API key is not provided via alignment_config or environment variable.
+        """
+        # Initialize configs with defaults if not provided
+        if client_config is None:
+            client_config = ClientConfig()
 
-        model_path = _resolve_model_path(model_name_or_path)
-        device = _select_device(device)
+        if alignment_config is None:
+            alignment_config = AlignmentConfig()
 
-        self.tokenizer = _load_tokenizer(self, model_path, device, tokenizer_cls=AsyncLatticeTokenizer)
-        self.worker = _load_worker(model_path, device)
-        self.device = device
+        if subtitle_config is None:
+            subtitle_config = SubtitleConfig()
+
+        # Initialize base API client
+        super().__init__(config=client_config)
+
+        # aligner (will be async version in future)
+        self.aligner = Lattice1Aligner(self, config=alignment_config)
+
+        # subtitler IO
+        self.subtitler = Subtitler(config=subtitle_config)
 
     async def alignment(
         self,
-        audio: Pathlike,
-        subtitle: Pathlike,
-        format: Optional[SubtitleFormat] = None,
-        split_sentence: bool = False,
-        return_details: bool = False,
+        input_media_path: Pathlike,
+        input_subtitle_path: Pathlike,
+        input_subtitle_format: Optional[SubtitleFormat] = None,
+        split_sentence: Optional[bool] = None,
         output_subtitle_path: Optional[Pathlike] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
+        """
+        Perform asynchronous forced alignment on audio and subtitle/text.
+
+        This async method aligns subtitle text with audio by finding the precise timing of
+        each word and subtitle segment. It supports concurrent processing and is ideal for
+        batch alignment tasks.
+
+        The alignment process consists of five steps:
+        1. Parse the input subtitle file into segments
+        2. Generate a lattice graph from subtitle text (async)
+        3. Search the lattice using audio features (async)
+        4. Decode results to extract word-level timings (async)
+        5. Export aligned subtitles (if output path provided, async)
+
+        Args:
+            input_media_path: Path to audio/video file (WAV, MP3, FLAC, MP4, etc.). Must be readable by ffmpeg.
+            input_subtitle_path: Path to subtitle or plain text file to align with audio.
+            input_subtitle_format: Input subtitle format ('srt', 'vtt', 'ass', 'txt'). If None, uses config
+                   default or auto-detects from file extension.
+            split_sentence: Enable automatic sentence re-splitting for better alignment accuracy.
+                          If None, uses config default (typically False).
+            output_subtitle_path: Optional path to write aligned subtitle file. If provided,
+                                exports results asynchronously.
+
+        Returns:
+            Tuple containing:
+                - List of Supervision objects with aligned timing information
+                - Output subtitle path (same as input parameter, or None if not provided)
+
+        Raises:
+            SubtitleProcessingError: If subtitle file cannot be parsed or output cannot be written.
+            LatticeEncodingError: If lattice graph generation fails (invalid text format).
+            AlignmentError: If audio alignment fails (audio processing or model inference error).
+            LatticeDecodingError: If lattice decoding fails (invalid results from model).
+
+        Example:
+            >>> import asyncio
+            >>> async def main():
+            ...     client = AsyncLattifAI()
+            ...     alignments, output_path = await client.alignment(
+            ...         input_media_path="speech.wav",
+            ...         input_subtitle_path="transcript.srt",
+            ...         output_subtitle_path="aligned.srt"
+            ...     )
+            ...     for seg in alignments:
+            ...         print(f"{seg.start:.2f}s - {seg.end:.2f}s: {seg.text}")
+            >>> asyncio.run(main())
+        """
         try:
-            print(colorful.cyan(f"📖 Step 1: Reading subtitle file from {subtitle}"))
+            # Step 1: Parse subtitle file (async)
+            print(colorful.cyan(f"📖 Step 1: Reading subtitle file from {input_subtitle_path}"))
             try:
-                supervisions = await asyncio.to_thread(SubtitleIO.read, subtitle, format=format)
+                supervisions = await asyncio.to_thread(
+                    self.subtitler.read, input_path=input_subtitle_path, format=input_subtitle_format
+                )
                 print(colorful.green(f"         ✓ Parsed {len(supervisions)} subtitle segments"))
             except Exception as e:
                 raise SubtitleProcessingError(
-                    f"Failed to parse subtitle file: {subtitle}",
-                    subtitle_path=str(subtitle),
+                    f"Failed to parse subtitle file: {input_subtitle_path}",
+                    subtitle_path=str(input_subtitle_path),
                     context={"original_error": str(e)},
                 )
 
-            print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
-            try:
-                supervisions, lattice_id, lattice_graph = await self.tokenizer.tokenize(
-                    supervisions,
-                    split_sentence=split_sentence,
-                )
-                print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
-            except Exception as e:
-                text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
-                raise LatticeEncodingError(text_content, original_error=e)
+            # Step 2-4: Align using Lattice1Aligner (will be async in future)
+            # For now, we wrap the sync aligner in asyncio.to_thread
+            supervisions, alignments = await asyncio.to_thread(
+                self.aligner.alignment,
+                input_media_path,
+                supervisions,
+                split_sentence=split_sentence or self.subtitler.config.split_sentence,
+            )
 
-            print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with audio: {audio}"))
-            try:
-                lattice_results = await asyncio.to_thread(self.worker.alignment, audio, lattice_graph)
-                print(colorful.green("         ✓ Lattice search completed"))
-            except Exception as e:
-                raise AlignmentError(
-                    f"Audio alignment failed for {audio}",
-                    audio_path=str(audio),
-                    subtitle_path=str(subtitle),
-                    context={"original_error": str(e)},
-                )
-
-            print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
-            try:
-                alignments = await self.tokenizer.detokenize(
-                    lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
-                )
-                print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
-            except LatticeDecodingError as e:
-                print(colorful.red("         x Failed to decode lattice alignment results"))
-                raise e
-            except Exception as e:
-                print(colorful.red("         x Failed to decode lattice alignment results"))
-                raise LatticeDecodingError(lattice_id, original_error=e)
-
-            if output_subtitle_path:
+            # Step 5: Export alignments (async)
+            if output_subtitle_path or self.subtitler.config.output_path:
                 try:
-                    await asyncio.to_thread(SubtitleIO.write, alignments, output_subtitle_path)
+                    await asyncio.to_thread(self.subtitler.write, alignments, output_path=output_subtitle_path)
                     print(colorful.green(f"🎉🎉🎉🎉🎉 Subtitle file written to: {output_subtitle_path}"))
                 except Exception as e:
                     raise SubtitleProcessingError(
@@ -284,12 +360,14 @@ class AsyncLattifAI(AsyncAPIClient):
             return (alignments, output_subtitle_path)
 
         except (SubtitleProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
+            # Re-raise our specific errors as-is
             raise
         except Exception as e:
+            # Catch any unexpected errors and wrap them
             raise AlignmentError(
                 "Unexpected error during alignment process",
-                audio_path=str(audio),
-                subtitle_path=str(subtitle),
+                media_path=str(input_media_path),
+                subtitle_path=str(input_subtitle_path),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
 
@@ -308,5 +386,8 @@ if __name__ == "__main__":
         split_sentence = False
 
     (alignments, output_subtitle_path) = client.alignment(
-        audio, subtitle, output_subtitle_path=output, split_sentence=split_sentence, return_details=True
+        input_media_path=audio,
+        input_subtitle_path=subtitle,
+        output_subtitle_path=output,
+        split_sentence=split_sentence,
     )

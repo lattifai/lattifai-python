@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..client import AsyncLattifAI
-from ..io import SUBTITLE_FORMATS, GeminiWriter, SubtitleIO
+from ..subtitle import SUBTITLE_FORMATS, GeminiWriter, SubtitleIO
+from ..transcription import GeminiTranscriber
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
 from .file_manager import FileExistenceManager
-from .gemini import GeminiTranscriber
 
 
 class YouTubeDownloader:

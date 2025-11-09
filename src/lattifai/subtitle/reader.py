@@ -5,7 +5,9 @@ from typing import List, Literal, Optional, Union
 from lhotse.utils import Pathlike
 
 from .supervision import Supervision
-from .text_parser import NORMALIZE_TEXT, normalize_text, parse_speaker_text
+from .text_parser import NORMALIZE_TEXT
+from .text_parser import normalize_text as normalize_text_fn
+from .text_parser import parse_speaker_text
 
 SubtitleFormat = Literal["txt", "srt", "vtt", "ass", "auto"]
 
@@ -14,7 +16,9 @@ class SubtitleReader(ABCMeta):
     """Parser for converting different subtitle formats to List[Supervision]."""
 
     @classmethod
-    def read(cls, subtitle: Pathlike, format: Optional[SubtitleFormat] = None) -> List[Supervision]:
+    def read(
+        cls, subtitle: Pathlike, format: Optional[SubtitleFormat] = None, normalize_text: Optional[bool] = False
+    ) -> List[Supervision]:
         """Parse text and convert to Lhotse List[Supervision].
 
         Args:
@@ -42,10 +46,12 @@ class SubtitleReader(ABCMeta):
                 path_str = str(subtitle)
                 with open(path_str, encoding="utf-8") as f:
                     lines = [line.strip() for line in f.readlines()]
+                    if NORMALIZE_TEXT or normalize_text:
+                        lines = [normalize_text_fn(line) for line in lines]
             supervisions = [Supervision(text=line) for line in lines if line]
         else:
             try:
-                supervisions = cls._parse_subtitle(subtitle, format=format)
+                supervisions = cls._parse_subtitle(subtitle, format=format, normalize_text=normalize_text)
             except Exception as e:
                 print(f"Failed to parse subtitle with Format: {format}, Exception: {e}, trying 'gemini' parser.")
                 from .gemini_reader import GeminiReader
@@ -55,7 +61,9 @@ class SubtitleReader(ABCMeta):
         return supervisions
 
     @classmethod
-    def _parse_subtitle(cls, subtitle: Pathlike, format: Optional[SubtitleFormat]) -> List[Supervision]:
+    def _parse_subtitle(
+        cls, subtitle: Pathlike, format: Optional[SubtitleFormat], normalize_text: Optional[bool] = False
+    ) -> List[Supervision]:
         import pysubs2
 
         try:
@@ -73,8 +81,8 @@ class SubtitleReader(ABCMeta):
 
         supervisions = []
         for event in subs.events:
-            if NORMALIZE_TEXT:
-                event.text = normalize_text(event.text)
+            if NORMALIZE_TEXT or normalize_text:
+                event.text = normalize_text_fn(event.text)
             speaker, text = parse_speaker_text(event.text)
             supervisions.append(
                 Supervision(

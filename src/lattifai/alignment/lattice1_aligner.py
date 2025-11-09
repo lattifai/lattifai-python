@@ -1,0 +1,110 @@
+"""LattifAI client implementation with config-driven architecture."""
+
+import asyncio
+from typing import Any, List, Optional, Tuple
+
+import colorful
+from lhotse.utils import Pathlike
+
+from lattifai.config import AlignmentConfig
+from lattifai.errors import (
+    AlignmentError,
+    LatticeDecodingError,
+    LatticeEncodingError,
+)
+from lattifai.subtitle import Supervision
+from lattifai.utils import _resolve_model_path
+
+from .lattice1_alpha import _load_worker
+from .tokenizer import AsyncLatticeTokenizer, LatticeTokenizer, _load_tokenizer
+
+ClientType = Any
+
+
+class Lattice1Aligner(object):
+    """Synchronous LattifAI client with config-driven architecture."""
+
+    def __init__(
+        self,
+        client_wrapper: ClientType,
+        *,
+        config: Optional[AlignmentConfig] = None,
+    ) -> None:
+        if config is None:
+            config = AlignmentConfig()
+
+        self.config = config
+        model_path = _resolve_model_path(config.model_name_or_path)
+
+        self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.device)
+        self.worker = _load_worker(model_path, config.device)
+
+    def alignment(
+        self,
+        audio: Pathlike,
+        supervisions: List[Supervision],
+        split_sentence: Optional[bool] = False,
+    ) -> Tuple[List[Supervision], List[Supervision]]:
+        """
+        Perform alignment on audio and supervisions.
+
+        Args:
+            audio: Audio file path
+            supervisions: List of supervision segments to align
+            split_sentence: Enable sentence re-splitting
+
+        Returns:
+            Tuple of (supervisions, alignments)
+
+        Raises:
+            LatticeEncodingError: If lattice graph generation fails
+            AlignmentError: If audio alignment fails
+            LatticeDecodingError: If lattice decoding fails
+        """
+        try:
+            print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
+            try:
+                supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
+                    supervisions, split_sentence=split_sentence
+                )
+                print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
+            except Exception as e:
+                text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
+                raise LatticeEncodingError(text_content, original_error=e)
+
+            print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with audio: {audio}"))
+            try:
+                lattice_results = self.worker.alignment(audio, lattice_graph)
+                print(colorful.green("         ✓ Lattice search completed"))
+            except Exception as e:
+                raise AlignmentError(
+                    f"Audio alignment failed for {audio}",
+                    media_path=str(audio),
+                    context={"original_error": str(e)},
+                )
+
+            print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
+            try:
+                alignments = self.tokenizer.detokenize(
+                    lattice_id, lattice_results, supervisions=supervisions, return_details=True
+                )
+                print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
+            except LatticeDecodingError as e:
+                print(colorful.red("         x Failed to decode lattice alignment results"))
+                raise e
+            except Exception as e:
+                print(colorful.red("         x Failed to decode lattice alignment results"))
+                raise LatticeDecodingError(lattice_id, original_error=e)
+
+            return (supervisions, alignments)
+
+        except (LatticeEncodingError, AlignmentError, LatticeDecodingError):
+            raise
+        except Exception as e:
+            raise e
+
+            # raise AlignmentError(
+            #     "Unexpected error during alignment process",
+            #     media_path=str(audio),
+            #     context={"original_error": str(e), "error_type": e.__class__.__name__},
+            # )

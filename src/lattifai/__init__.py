@@ -1,6 +1,20 @@
 import sys
 import warnings
+from importlib.metadata import version
 
+# Re-export client classes
+from .client import AsyncLattifAI, LattifAI
+
+# Re-export config classes
+from .config import (
+    AUDIO_FORMATS,
+    MEDIA_FORMATS,
+    VIDEO_FORMATS,
+    AlignmentConfig,
+    ClientConfig,
+    MediaConfig,
+    SubtitleConfig,
+)
 from .errors import (
     AlignmentError,
     APIError,
@@ -16,13 +30,7 @@ from .errors import (
     SubtitleParseError,
     SubtitleProcessingError,
 )
-from .io import SubtitleIO
-
-try:
-    from importlib.metadata import version
-except ImportError:
-    # Python < 3.8
-    from importlib_metadata import version
+from .subtitle import SubtitleIO
 
 try:
     __version__ = version("lattifai")
@@ -54,22 +62,19 @@ def _check_and_install_k2():
 _check_and_install_k2()
 
 
-# Lazy import for LattifAI to avoid dependency issues during basic import
-def __getattr__(name):
-    if name == "LattifAI":
-        from .client import LattifAI
-
-        return LattifAI
-    if name == "AsyncLattifAI":
-        from .client import AsyncLattifAI
-
-        return AsyncLattifAI
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
-
-
 __all__ = [
-    "LattifAI",  # noqa: F822
-    "AsyncLattifAI",  # noqa: F822
+    # Client classes
+    "LattifAI",
+    "AsyncLattifAI",
+    # Config classes
+    "AlignmentConfig",
+    "ClientConfig",
+    "SubtitleConfig",
+    "MediaConfig",
+    "AUDIO_FORMATS",
+    "VIDEO_FORMATS",
+    "MEDIA_FORMATS",
+    # Error classes
     "LattifAIError",
     "AudioProcessingError",
     "AudioLoadError",
@@ -83,6 +88,8 @@ __all__ = [
     "DependencyError",
     "APIError",
     "ConfigurationError",
+    # I/O
     "SubtitleIO",
+    # Version
     "__version__",
 ]

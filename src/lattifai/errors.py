@@ -71,10 +71,10 @@ class LattifAIError(Exception):
 class AudioProcessingError(LattifAIError):
     """Error during audio processing operations."""
 
-    def __init__(self, message: str, audio_path: Optional[str] = None, **kwargs):
+    def __init__(self, message: str, media_path: Optional[str] = None, **kwargs):
         context = kwargs.get("context", {})
-        if audio_path:
-            context["audio_path"] = audio_path
+        if media_path:
+            context["media_path"] = media_path
         kwargs["context"] = context
         super().__init__(message, **kwargs)
 
@@ -82,27 +82,27 @@ class AudioProcessingError(LattifAIError):
 class AudioLoadError(AudioProcessingError):
     """Error loading or reading audio file."""
 
-    def __init__(self, audio_path: str, original_error: Optional[Exception] = None, **kwargs):
-        message = f"Failed to load audio file: {colorful.red(audio_path)}"
+    def __init__(self, media_path: str, original_error: Optional[Exception] = None, **kwargs):
+        message = f"Failed to load audio file: {colorful.red(media_path)}"
         if original_error:
             message += f" - {colorful.red(str(original_error))}"
 
         context = kwargs.get("context", {})
-        context.update({"audio_path": audio_path, "original_error": str(original_error) if original_error else None})
+        context.update({"media_path": media_path, "original_error": str(original_error) if original_error else None})
         kwargs["context"] = context
 
-        super().__init__(message, audio_path=audio_path, **kwargs)
+        super().__init__(message, media_path=media_path, **kwargs)
 
 
 class AudioFormatError(AudioProcessingError):
     """Error with audio format or codec."""
 
-    def __init__(self, audio_path: str, format_issue: str, **kwargs):
-        message = f"Audio format error for {colorful.red(audio_path)}: {colorful.red(format_issue)}"
+    def __init__(self, media_path: str, format_issue: str, **kwargs):
+        message = f"Audio format error for {colorful.red(media_path)}: {colorful.red(format_issue)}"
         context = kwargs.get("context", {})
-        context.update({"audio_path": audio_path, "format_issue": format_issue})
+        context.update({"media_path": media_path, "format_issue": format_issue})
         kwargs["context"] = context
-        super().__init__(message, audio_path=audio_path, **kwargs)
+        super().__init__(message, media_path=media_path, **kwargs)
 
 
 class SubtitleProcessingError(LattifAIError):
@@ -130,10 +130,10 @@ class SubtitleParseError(SubtitleProcessingError):
 class AlignmentError(LattifAIError):
     """Error during audio-text alignment process."""
 
-    def __init__(self, message: str, audio_path: Optional[str] = None, subtitle_path: Optional[str] = None, **kwargs):
+    def __init__(self, message: str, media_path: Optional[str] = None, subtitle_path: Optional[str] = None, **kwargs):
         context = kwargs.get("context", {})
-        if audio_path:
-            context["audio_path"] = audio_path
+        if media_path:
+            context["media_path"] = media_path
         if subtitle_path:
             context["subtitle_path"] = subtitle_path
         kwargs["context"] = context

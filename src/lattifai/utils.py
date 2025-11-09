@@ -6,8 +6,6 @@ from pathlib import Path
 from typing import Any, Optional, Type
 
 from lattifai.errors import ModelLoadError
-from lattifai.tokenizer import LatticeTokenizer
-from lattifai.workers import Lattice1AlphaWorker
 
 
 def _get_cache_marker_path(cache_dir: Path) -> Path:
@@ -94,7 +92,7 @@ def _resolve_model_path(model_name_or_path: str) -> str:
 
 def _select_device(device: Optional[str]) -> str:
     """Select best available torch device when not explicitly provided."""
-    if device:
+    if device and device != "auto":
         return device
 
     import torch
@@ -105,29 +103,3 @@ def _select_device(device: Optional[str]) -> str:
     elif torch.cuda.is_available():
         detected = "cuda"
     return detected
-
-
-def _load_tokenizer(
-    client_wrapper: Any,
-    model_path: str,
-    device: str,
-    *,
-    tokenizer_cls: Type[LatticeTokenizer] = LatticeTokenizer,
-) -> LatticeTokenizer:
-    """Instantiate tokenizer with consistent error handling."""
-    try:
-        return tokenizer_cls.from_pretrained(
-            client_wrapper=client_wrapper,
-            model_path=model_path,
-            device=device,
-        )
-    except Exception as e:
-        raise ModelLoadError(f"tokenizer from {model_path}", original_error=e)
-
-
-def _load_worker(model_path: str, device: str) -> Lattice1AlphaWorker:
-    """Instantiate lattice worker with consistent error handling."""
-    try:
-        return Lattice1AlphaWorker(model_path, device=device, num_threads=8)
-    except Exception as e:
-        raise ModelLoadError(f"worker from {model_path}", original_error=e)

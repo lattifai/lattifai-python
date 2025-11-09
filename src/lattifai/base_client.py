@@ -6,8 +6,10 @@ from typing import Any, Awaitable, Callable, Dict, Optional, Union  # noqa: F401
 
 import httpx
 
+from .config import ClientConfig
+
 # Import from errors module for consistency
-from .errors import APIError, ConfigurationError, LattifAIError
+from .errors import APIError, ConfigurationError
 
 
 class BaseAPIClient(ABC):
@@ -15,40 +17,33 @@ class BaseAPIClient(ABC):
 
     def __init__(
         self,
-        *,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        timeout: Union[float, httpx.Timeout] = 60.0,
-        max_retries: int = 2,
-        default_headers: Optional[Dict[str, str]] = None,
+        config: ClientConfig,
     ) -> None:
-        if api_key is None:
-            api_key = os.environ.get("LATTIFAI_API_KEY")
-        if api_key is None:
+        if config.api_key is None:
             raise ConfigurationError(
                 "The api_key client option must be set either by passing api_key to the client "
                 "or by setting the LATTIFAI_API_KEY environment variable"
             )
 
-        self._api_key = api_key
-        self._base_url = base_url
-        self._timeout = timeout
-        self._max_retries = max_retries
+        self._api_key = config.api_key
+        self._base_url = config.base_url
+        self._timeout = config.timeout
+        self._max_retries = config.max_retries
 
         headers = {
             "User-Agent": "LattifAI/Python",
             "Authorization": f"Bearer {self._api_key}",
         }
-        if default_headers:
-            headers.update(default_headers)
+        if config.default_headers:
+            headers.update(config.default_headers)
         self._default_headers = headers
 
 
 class SyncAPIClient(BaseAPIClient):
     """Synchronous API client."""
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, config: ClientConfig) -> None:
+        super().__init__(config)
         self._client = httpx.Client(
             base_url=self._base_url,
             timeout=self._timeout,
@@ -84,8 +79,8 @@ class SyncAPIClient(BaseAPIClient):
 class AsyncAPIClient(BaseAPIClient):
     """Asynchronous API client."""
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+    def __init__(self, config: ClientConfig) -> None:
+        super().__init__(config)
         self._client = httpx.AsyncClient(
             base_url=self._base_url,
             timeout=self._timeout,

@@ -1,6 +1,7 @@
 import json
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, BinaryIO, Dict, Iterable, Optional, Tuple, Union
 
 import numpy as np
@@ -141,6 +142,9 @@ class Lattice1AlphaWorker:
     def load_audio(
         self, audio: Union[Pathlike, BinaryIO], channel_selector: Optional[ChannelSelectorType] = "average"
     ) -> Tuple[torch.Tensor, int]:
+        if isinstance(audio, Pathlike):
+            audio = str(Path(audio).expanduser())
+
         # load audio
         try:
             waveform, sample_rate = sf.read(audio, always_2d=True, dtype="float32")  # numpy array
@@ -222,7 +226,7 @@ class Lattice1AlphaWorker:
         except Exception as e:
             raise AlignmentError(
                 "Failed to compute acoustic features from audio",
-                audio_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
+                media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
                 context={"original_error": str(e)},
             )
         self.timings["emission"] += time.time() - _start
@@ -275,10 +279,18 @@ class Lattice1AlphaWorker:
         except Exception as e:
             raise AlignmentError(
                 "Failed to perform forced alignment",
-                audio_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
+                media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
                 context={"original_error": str(e), "emission_shape": list(emission.shape), "device": str(device)},
             )
         self.timings["align_segments"] += time.time() - _start
 
         channel = 0
         return emission, results, labels, 0.02, 0.0, channel  # frame_shift=20ms, offset=0.0s
+
+
+def _load_worker(model_path: str, device: str) -> Lattice1AlphaWorker:
+    """Instantiate lattice worker with consistent error handling."""
+    try:
+        return Lattice1AlphaWorker(model_path, device=device, num_threads=8)
+    except Exception as e:
+        raise ModelLoadError(f"worker from {model_path}", original_error=e)

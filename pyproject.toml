@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '0.4.6'
+version = '0.5.0'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -65,12 +65,26 @@ Discussions = 'https://github.com/lattifai/lattifai-python/discussions'
 Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 
 [project.scripts]
-lattifai = 'lattifai.bin:cli'
-lai = 'lattifai.bin:cli'
-lairun = 'lattifai.bin.run:main'
+"lai-align" = "lattifai.cli.align:main"
+"lai-youtube" = "lattifai.cli.youtube:main"
+"lai" = "lattifai.__main__:app"
+"lattifai" = "lattifai.__main__:app"
+
+[project.entry-points."nemo_run.cli"]
+lai = "lattifai.cli"
+lattifai = "lattifai.cli"
 
 [tool.setuptools]
-packages = ["lattifai", "lattifai.io", "lattifai.tokenizer", "lattifai.workers", "lattifai.bin", "lattifai.workflows", "lattifai.workflows.prompts"]
+packages = [
+    "lattifai",
+    "lattifai.alignment",
+    "lattifai.config",
+    "lattifai.subtitle",
+    "lattifai.transcription",
+    "lattifai.workflow",
+    "lattifai.workflow.prompts",
+    "lattifai.cli",
+]
 
 [tool.setuptools.package-dir]
 lattifai = "src/lattifai"

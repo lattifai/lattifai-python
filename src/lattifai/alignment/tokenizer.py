@@ -7,10 +7,10 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 import torch
 
-from lattifai.errors import LATTICE_DECODING_FAILURE_HELP, LatticeDecodingError
-from lattifai.io import Supervision
-from lattifai.io import normalize_text as normalize_html_text
-from lattifai.tokenizer.phonemizer import G2Phonemizer
+from lattifai.alignment.phonemizer import G2Phonemizer
+from lattifai.errors import LATTICE_DECODING_FAILURE_HELP, LatticeDecodingError, ModelLoadError
+from lattifai.subtitle import Supervision
+from lattifai.subtitle import normalize_text as normalize_html_text
 
 PUNCTUATION = '!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~'
 END_PUNCTUATION = '.!?"]。！？”】'
@@ -474,3 +474,21 @@ def _update_alignments_speaker(supervisions: List[Supervision], alignments: List
     for supervision, alignment in zip(supervisions, alignments):
         alignment.speaker = supervision.speaker
     return alignments
+
+
+def _load_tokenizer(
+    client_wrapper: Any,
+    model_path: str,
+    device: str,
+    *,
+    tokenizer_cls: Type[LatticeTokenizer] = LatticeTokenizer,
+) -> LatticeTokenizer:
+    """Instantiate tokenizer with consistent error handling."""
+    try:
+        return tokenizer_cls.from_pretrained(
+            client_wrapper=client_wrapper,
+            model_path=model_path,
+            device=device,
+        )
+    except Exception as e:
+        raise ModelLoadError(f"tokenizer from {model_path}", original_error=e)
