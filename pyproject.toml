@@ -67,12 +67,11 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 [project.scripts]
 "lai-align" = "lattifai.cli.align:main"
 "lai-youtube" = "lattifai.cli.youtube:main"
-"lai" = "lattifai.__main__:app"
-"lattifai" = "lattifai.__main__:app"
 
 [project.entry-points."lai_run.cli"]
 lai = "lattifai.cli"
 lattifai = "lattifai.cli"
+align = "lattifai.cli.align"
 
 [tool.setuptools]
 packages = [

@@ -8,6 +8,8 @@ from typing_extensions import Annotated
 from lattifai.client import LattifAI
 from lattifai.config import AlignmentConfig, ClientConfig, MediaConfig, SubtitleConfig
 
+__all__ = ["align"]
+
 
 @run.cli.entrypoint(name="align", namespace="lai")
 def align(
@@ -18,6 +20,7 @@ def align(
 ):
     """
     Align audio/video with subtitle file.
+    Shortcut: invoking ``lairun align`` is equivalent to running ``lairun lai align``.
 
     Args:
         alignment: Alignment configuration (includes API settings)
@@ -25,20 +28,20 @@ def align(
 
     Examples:
         # Basic usage
-        lai align audio.wav subtitle.srt output.srt
+        lairun align audio.wav subtitle.srt output.srt
 
         # With config overrides
-        lai align audio.wav subtitle.srt output.srt \
+        lairun align audio.wav subtitle.srt output.srt \
             --alignment.device=cuda \
             --alignment.word-level=true
 
         # With custom model and API settings
-        lai align audio.wav subtitle.srt output.srt \
+        lairun align audio.wav subtitle.srt output.srt \
             --alignment.model-name-or-path="Lattifai/Lattice-1" \
             --alignment.api-key="your-key"
 
         # Using media config for URL input
-        lai align --media.input-path="https://example.com/audio.mp3" subtitle.srt \
+        lairun align --media.input-path="https://example.com/audio.mp3" subtitle.srt \
             --media.output-dir="/tmp/alignment"
     """
     media_config = media or MediaConfig()
