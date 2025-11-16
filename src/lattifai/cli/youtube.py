@@ -65,40 +65,61 @@ def youtube(
     """
     Download media from YouTube (when needed) and align subtitles.
 
+    This command provides a convenient workflow for aligning subtitles with YouTube videos.
+    It can automatically download media from YouTube URLs, or work with pre-downloaded files.
+    The command intelligently detects whether the input is a YouTube URL or a local file path.
+
+    When a YouTube URL is provided:
+    1. Downloads media in the specified format (audio or video)
+    2. Optionally downloads available subtitles from YouTube
+    3. Performs forced alignment with the provided or downloaded subtitles
+
+    Shortcut: invoking ``lai-youtube`` is equivalent to running ``lai alignment youtube``.
+
     Args:
         media: Media configuration for controlling formats and output directories.
-            Fields: input_path, media_format, sample_rate, channels, output_dir,
-                    output_path, output_format, prefer_audio, default_audio_format,
-                    default_video_format, force_overwrite
+            Fields: input_path (YouTube URL or local file path), media_format,
+                    sample_rate, channels, output_dir, output_path, output_format,
+                    prefer_audio, default_audio_format, default_video_format,
+                    force_overwrite
         client: API client configuration.
             Fields: api_key, base_url, timeout, max_retries, default_headers
-        alignment: Alignment configuration (includes model and API settings).
+        alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name_or_path, device, batch_size
-        subtitle: Subtitle configuration used for reading/writing subtitle files.
+        subtitle: Subtitle configuration for reading/writing subtitle files.
             Fields: input_format, input_path, output_format, output_path,
                     normalize_text, split_sentence, word_level,
                     include_speaker_in_text, encoding
 
     Examples:
         # Download from YouTube and align with existing subtitle
-        lai youtube https://youtu.be/VIDEO --subtitle.input-path=sub.srt
+        lai alignment youtube https://youtu.be/VIDEO --subtitle.input-path=sub.srt
 
         # Use a pre-downloaded file
-        lai youtube /path/to/audio.mp3 --subtitle.input-path=sub.srt
+        lai alignment youtube /path/to/audio.mp3 --subtitle.input-path=sub.srt
 
-        # Override download format and enable word-level alignment
-        lai youtube https://youtu.be/VIDEO --media.output-format=mp3 \
-            --subtitle.word-level=true --alignment.device=cuda
+        # Download as audio and enable word-level alignment
+        lai alignment youtube https://youtu.be/VIDEO \\
+            --media.prefer-audio=true \\
+            --subtitle.input-path=sub.srt \\
+            --subtitle.word-level=true
 
-        # Full configuration example
-        lai youtube https://youtu.be/VIDEO \
-            --media.output-dir=/tmp/youtube \
-            --media.output-format=wav \
-            --subtitle.input-path=subtitle.srt \
-            --subtitle.output-path=aligned.srt \
-            --subtitle.split-sentence=true \
-            --subtitle.word-level=true \
-            --alignment.device=mps \
+        # Override download format and use GPU acceleration
+        lai alignment youtube https://youtu.be/VIDEO \\
+            --media.output-format=mp3 \\
+            --subtitle.input-path=sub.srt \\
+            --subtitle.word-level=true \\
+            --alignment.device=cuda
+
+        # Full configuration example with custom output
+        lai alignment youtube https://youtu.be/VIDEO \\
+            --media.output-dir=/tmp/youtube \\
+            --media.output-format=wav \\
+            --subtitle.input-path=subtitle.srt \\
+            --subtitle.output-path=aligned.srt \\
+            --subtitle.split-sentence=true \\
+            --subtitle.word-level=true \\
+            --alignment.device=mps \\
             --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha
     """
     media_config = media or MediaConfig()

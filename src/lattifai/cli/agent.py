@@ -57,7 +57,63 @@ def agent(
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
     max_retries: int = 0,
 ):
-    """Run the agentic YouTube workflow (download → transcribe → align → export)."""
+    """
+    Run the agentic YouTube workflow (download → transcribe → align → export).
+
+    This workflow performs a complete end-to-end processing pipeline:
+    1. Download media from YouTube URL
+    2. Transcribe audio using Gemini API
+    3. Align transcription with audio
+    4. Export results in the desired format
+
+    Args:
+        media: Media configuration for YouTube download and output handling.
+            Fields: input_path (YouTube URL), media_format, sample_rate, channels,
+                    output_dir, output_path, output_format, prefer_audio,
+                    default_audio_format, default_video_format, force_overwrite
+        client: API client configuration.
+            Fields: api_key, base_url, timeout, max_retries, default_headers
+        alignment: Alignment configuration (model selection and inference settings).
+            Fields: model_name_or_path, device, batch_size
+        subtitle: Subtitle I/O configuration (file reading/writing and formatting).
+            Fields: input_format, input_path, output_format, output_path,
+                    normalize_text, split_sentence, word_level,
+                    include_speaker_in_text, encoding
+        transcription: Transcription configuration for Gemini API.
+            Fields: api_key, model_name, prompt_text, enable_diarization, language
+        max_retries: Maximum number of retries for failed operations (default: 0)
+
+    Examples:
+        # Basic YouTube video processing
+        lai agent workflow --media.input-path="https://youtu.be/VIDEO_ID" \\
+                          --transcription.api-key=YOUR_GEMINI_KEY
+
+        # Download as audio only with word-level alignment
+        lai agent workflow --media.input-path="https://youtu.be/VIDEO_ID" \\
+                          --media.prefer-audio=true \\
+                          --subtitle.word-level=true \\
+                          --transcription.api-key=YOUR_GEMINI_KEY
+
+        # Enable speaker diarization and sentence splitting
+        lai agent workflow --media.input-path="https://youtu.be/VIDEO_ID" \\
+                          --transcription.enable-diarization=true \\
+                          --subtitle.split-sentence=true \\
+                          --transcription.api-key=YOUR_GEMINI_KEY
+
+        # Full configuration with custom output directory
+        lai agent workflow \\
+            --media.input-path="https://youtu.be/VIDEO_ID" \\
+            --media.output-dir=/tmp/youtube \\
+            --media.output-format=wav \\
+            --subtitle.output-format=json \\
+            --subtitle.word-level=true \\
+            --subtitle.split-sentence=true \\
+            --alignment.device=cuda \\
+            --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha \\
+            --transcription.api-key=YOUR_GEMINI_KEY \\
+            --transcription.enable-diarization=true \\
+            --max-retries=3
+    """
 
     media_config = media or MediaConfig()
     subtitle_config = subtitle or SubtitleConfig()

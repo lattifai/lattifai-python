@@ -21,7 +21,12 @@ def align(
     """
     Align audio/video with subtitle file.
 
-    Shortcut: invoking ``lairun align`` is equivalent to running ``lairun lai align``.
+    This command performs forced alignment between audio/video media and subtitle text,
+    generating accurate timestamps for each subtitle segment and optionally word-level
+    timestamps. The alignment engine uses advanced speech recognition models to ensure
+    precise synchronization between audio and text.
+
+    Shortcut: invoking ``lai-align`` is equivalent to running ``lai alignment align``.
 
     Args:
         media: Media configuration for audio/video input and output handling.
@@ -39,43 +44,43 @@ def align(
 
     Examples:
         # Basic usage with media and subtitle paths
-        lai align --media.input-path=audio.wav \
-                  --subtitle.input-path=subtitle.srt \
+        lai alignment align --media.input-path=audio.wav \\
+                  --subtitle.input-path=subtitle.srt \\
                   --subtitle.output-path=output.srt
 
         # With GPU acceleration and word-level alignment
-        lai align --media.input-path=audio.mp4 \
-                  --subtitle.input-path=subtitle.srt \
-                  --subtitle.output-path=output.json \
-                  --alignment.device=cuda \
+        lai alignment align --media.input-path=audio.mp4 \\
+                  --subtitle.input-path=subtitle.srt \\
+                  --subtitle.output-path=output.json \\
+                  --alignment.device=cuda \\
                   --subtitle.word-level=true
 
         # Smart sentence splitting with custom output format
-        lai align --media.input-path=audio.wav \
-                  --subtitle.input-path=subtitle.srt \
-                  --subtitle.output-path=output.vtt \
-                  --subtitle.split-sentence=true \
+        lai alignment align --media.input-path=audio.wav \\
+                  --subtitle.input-path=subtitle.srt \\
+                  --subtitle.output-path=output.vtt \\
+                  --subtitle.split-sentence=true \\
                   --subtitle.output-format=vtt
 
         # Using remote audio URL
-        lai align --media.input-path="https://example.com/audio.mp3" \
-                  --media.output-dir=/tmp/alignment \
-                  --subtitle.input-path=subtitle.srt \
+        lai alignment align --media.input-path="https://example.com/audio.mp3" \\
+                  --media.output-dir=/tmp/alignment \\
+                  --subtitle.input-path=subtitle.srt \\
                   --subtitle.output-path=output.srt
 
         # Full configuration example with all common options
-        lai align \
-            --media.input-path=audio.wav \
-            --media.output-dir=/tmp/output \
-            --subtitle.input-path=subtitle.srt \
-            --subtitle.output-path=aligned.json \
-            --subtitle.input-format=srt \
-            --subtitle.output-format=json \
-            --subtitle.split-sentence=true \
-            --subtitle.word-level=true \
-            --subtitle.normalize-text=true \
-            --alignment.device=mps \
-            --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha \
+        lai alignment align \\
+            --media.input-path=audio.wav \\
+            --media.output-dir=/tmp/output \\
+            --subtitle.input-path=subtitle.srt \\
+            --subtitle.output-path=aligned.json \\
+            --subtitle.input-format=srt \\
+            --subtitle.output-format=json \\
+            --subtitle.split-sentence=true \\
+            --subtitle.word-level=true \\
+            --subtitle.normalize-text=true \\
+            --alignment.device=mps \\
+            --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha \\
             --alignment.batch-size=1
     """
     media_config = media or MediaConfig()

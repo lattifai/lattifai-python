@@ -18,10 +18,18 @@ def convert(
     """
     Convert subtitle file to another format.
 
+    This command reads a subtitle file from one format and writes it to another format,
+    preserving all timing information, text content, and speaker labels (if present).
+    Supports common subtitle formats including SRT, VTT, JSON, and Praat TextGrid.
+
+    Shortcut: invoking ``lai-subtitle-convert`` is equivalent to running ``lai subtitle convert``.
+
     Args:
-        input_path: Path to input subtitle file
-        output_path: Path to output subtitle file
-        subtitle: Subtitle configuration
+        input_path: Path to input subtitle file (supports SRT, VTT, JSON, TextGrid formats)
+        output_path: Path to output subtitle file (format determined by file extension)
+        subtitle: Subtitle configuration for controlling text normalization and formatting.
+            Fields: input_format, output_format, normalize_text, split_sentence,
+                    word_level, include_speaker_in_text, encoding
 
     Examples:
         # Basic format conversion
@@ -34,6 +42,10 @@ def convert(
         # Convert without speaker info
         lai subtitle convert input.srt output.vtt \\
             --subtitle.include-speaker-in-text=false
+
+        # Convert with text normalization
+        lai subtitle convert input.json output.srt \\
+            --subtitle.normalize-text=true
     """
     from lattifai.subtitle import Subtitler
 
@@ -55,16 +67,22 @@ def normalize(
     """
     Normalize subtitle text by cleaning HTML entities and whitespace.
 
-    This command reads a subtitle file, normalizes all text content by:
-    - Decoding common HTML entities (&amp;, &lt;, &gt;, &quot;, &#39;, &nbsp;)
-    - Removing HTML tags (e.g., <i>, <font>, <b>, <br>)
-    - Collapsing multiple whitespace into single spaces
-    - Converting curly apostrophes to straight ones in contractions
+    This command reads a subtitle file and normalizes all text content by applying
+    the following transformations:
+    - Decode common HTML entities (&amp;, &lt;, &gt;, &quot;, &#39;, &nbsp;)
+    - Remove HTML tags (e.g., <i>, <font>, <b>, <br>)
+    - Collapse multiple whitespace characters into single spaces
+    - Convert curly apostrophes to straight ones in contractions
+    - Strip leading and trailing whitespace from each segment
+
+    Shortcut: invoking ``lai-subtitle-normalize`` is equivalent to running ``lai subtitle normalize``.
 
     Args:
-        input_path: Path to input subtitle file
-        output_path: Path to output subtitle file (default: overwrite input file)
-        subtitle: Subtitle configuration
+        input_path: Path to input subtitle file to normalize
+        output_path: Path to output subtitle file (defaults to overwriting input file)
+        subtitle: Subtitle configuration for text normalization.
+            Fields: input_format, output_format, normalize_text (automatically enabled),
+                    encoding
 
     Examples:
         # Normalize subtitle in-place
@@ -75,6 +93,10 @@ def normalize(
 
         # Normalize with format conversion
         lai subtitle normalize input.vtt output.srt
+
+        # Normalize and specify encoding
+        lai subtitle normalize input.srt output.srt \\
+            --subtitle.encoding=utf-8
     """
     from lattifai.subtitle import Subtitler
 
