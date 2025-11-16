@@ -15,7 +15,7 @@ from lattifai.errors import (
     LatticeEncodingError,
     SubtitleProcessingError,
 )
-from lattifai.subtitle import SubtitleFormat, Subtitler, Supervision
+from lattifai.subtitle import InputSubtitleFormat, Subtitler, Supervision
 
 
 class LattifAI(SyncAPIClient):
@@ -96,7 +96,7 @@ class LattifAI(SyncAPIClient):
         self,
         input_media_path: Pathlike,
         input_subtitle_path: Pathlike,
-        input_subtitle_format: Optional[SubtitleFormat] = None,
+        input_subtitle_format: Optional[InputSubtitleFormat] = None,
         split_sentence: Optional[bool] = None,
         output_subtitle_path: Optional[Pathlike] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
@@ -269,7 +269,7 @@ class AsyncLattifAI(AsyncAPIClient):
         self,
         input_media_path: Pathlike,
         input_subtitle_path: Pathlike,
-        input_subtitle_format: Optional[SubtitleFormat] = None,
+        input_subtitle_format: Optional[InputSubtitleFormat] = None,
         split_sentence: Optional[bool] = None,
         output_subtitle_path: Optional[Pathlike] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:

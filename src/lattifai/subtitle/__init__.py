@@ -5,15 +5,9 @@ from lhotse.utils import Pathlike
 from ..config import SubtitleConfig
 from .gemini_reader import GeminiReader, GeminiSegment
 from .gemini_writer import GeminiWriter
-from .reader import SubtitleFormat, SubtitleReader
+from .reader import InputSubtitleFormat, SubtitleReader
 from .supervision import Supervision
 from .text_parser import normalize_text
-from .utils import (
-    ALL_SUBTITLE_FORMATS,
-    INPUT_SUBTITLE_FORMATS,
-    OUTPUT_SUBTITLE_FORMATS,
-    SUBTITLE_FORMATS,
-)
 from .writer import SubtitleWriter
 
 __all__ = [
@@ -24,10 +18,6 @@ __all__ = [
     "GeminiReader",
     "GeminiWriter",
     "GeminiSegment",
-    "SUBTITLE_FORMATS",
-    "INPUT_SUBTITLE_FORMATS",
-    "OUTPUT_SUBTITLE_FORMATS",
-    "ALL_SUBTITLE_FORMATS",
     "normalize_text",
     "Subtitler",
 ]
@@ -39,7 +29,7 @@ class SubtitleIO:
 
     @classmethod
     def read(
-        cls, subtitle: Pathlike, format: Optional[SubtitleFormat] = None, normalize_text: Optional[bool] = False
+        cls, subtitle: Pathlike, format: Optional[InputSubtitleFormat] = None, normalize_text: Optional[bool] = False
     ) -> List[Supervision]:
         return SubtitleReader.read(subtitle, format=format, normalize_text=normalize_text)
 
@@ -62,7 +52,7 @@ class Subtitler:
     def read(
         self,
         input_path: Optional[Pathlike] = None,
-        format: Optional[SubtitleFormat] = None,
+        format: Optional[InputSubtitleFormat] = None,
         normalize_text: Optional[bool] = False,
     ) -> List[Supervision]:
         if not input_path:

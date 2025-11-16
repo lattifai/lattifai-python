@@ -44,18 +44,38 @@ class MediaConfig:
 
     # Input configuration (local filesystem path or URL)
     input_path: Optional[str] = None
+    """Local file path or URL to audio/video content."""
+
     media_format: str = "auto"
+    """Media format (mp3, wav, mp4, etc.) or 'auto' for automatic detection."""
+
     sample_rate: Optional[int] = None
+    """Audio sample rate in Hz (e.g., 16000, 44100)."""
+
     channels: Optional[int] = None
+    """Number of audio channels (1=mono, 2=stereo)."""
 
     # Output / download configuration
     output_dir: Path = field(default_factory=lambda: Path.cwd())
+    """Directory for output files (default: current working directory)."""
+
     output_path: Optional[str] = None
+    """Full path for output file (overrides output_dir + filename)."""
+
     output_format: Optional[str] = None
+    """Output media format (mp3, wav, mp4, etc.)."""
+
     prefer_audio: bool = True
+    """Prefer audio format when 'auto' is specified."""
+
     default_audio_format: str = "mp3"
+    """Default audio format when no format is specified."""
+
     default_video_format: str = "mp4"
+    """Default video format when no format is specified."""
+
     force_overwrite: bool = False
+    """Overwrite existing output files without prompting."""
 
     def __post_init__(self) -> None:
         """Validate configuration and normalize paths/formats."""

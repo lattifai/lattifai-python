@@ -16,13 +16,13 @@ class AlignmentConfig:
 
     # Alignment configuration
     model_name_or_path: str = "Lattifai/Lattice-1-Alpha"
-    """Model identifier or path to local model directory."""
+    """Model identifier or path to local model directory (e.g., 'Lattifai/Lattice-1-Alpha')."""
 
     device: Literal["cpu", "cuda", "mps"] = "cpu"
-    """Computation device for model inference."""
+    """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""
 
     batch_size: int = 1
-    """Inference batch size for processing multiple samples."""
+    """Batch size for inference (number of samples processed simultaneously)."""
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""

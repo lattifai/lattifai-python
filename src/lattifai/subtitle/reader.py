@@ -4,12 +4,11 @@ from typing import List, Literal, Optional, Union
 
 from lhotse.utils import Pathlike
 
+from ..config.subtitle import InputSubtitleFormat, OutputSubtitleFormat
 from .supervision import Supervision
 from .text_parser import NORMALIZE_TEXT
 from .text_parser import normalize_text as normalize_text_fn
 from .text_parser import parse_speaker_text
-
-SubtitleFormat = Literal["txt", "srt", "vtt", "ass", "auto"]
 
 
 class SubtitleReader(ABCMeta):
@@ -17,7 +16,7 @@ class SubtitleReader(ABCMeta):
 
     @classmethod
     def read(
-        cls, subtitle: Pathlike, format: Optional[SubtitleFormat] = None, normalize_text: Optional[bool] = False
+        cls, subtitle: Pathlike, format: Optional[InputSubtitleFormat] = None, normalize_text: Optional[bool] = False
     ) -> List[Supervision]:
         """Parse text and convert to Lhotse List[Supervision].
 
@@ -62,7 +61,7 @@ class SubtitleReader(ABCMeta):
 
     @classmethod
     def _parse_subtitle(
-        cls, subtitle: Pathlike, format: Optional[SubtitleFormat], normalize_text: Optional[bool] = False
+        cls, subtitle: Pathlike, format: Optional[OutputSubtitleFormat], normalize_text: Optional[bool] = False
     ) -> List[Supervision]:
         import pysubs2
 

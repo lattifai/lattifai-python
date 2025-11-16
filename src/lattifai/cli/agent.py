@@ -1,7 +1,5 @@
 """Agent workflow CLI entry point with nemo_run."""
 
-from __future__ import annotations
-
 import asyncio
 from typing import Optional
 

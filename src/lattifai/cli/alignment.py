@@ -20,29 +20,63 @@ def align(
 ):
     """
     Align audio/video with subtitle file.
+
     Shortcut: invoking ``lairun align`` is equivalent to running ``lairun lai align``.
 
     Args:
-        alignment: Alignment configuration (includes API settings)
-        subtitle: Subtitle configuration
+        media: Media configuration for audio/video input and output handling.
+            Fields: input_path, media_format, sample_rate, channels, output_dir,
+                    output_path, output_format, prefer_audio, default_audio_format,
+                    default_video_format, force_overwrite
+        client: API client configuration.
+            Fields: api_key, base_url, timeout, max_retries, default_headers
+        alignment: Alignment configuration (model selection and inference settings).
+            Fields: model_name_or_path, device, batch_size
+        subtitle: Subtitle I/O configuration (file reading/writing and formatting).
+            Fields: input_format, input_path, output_format, output_path,
+                    normalize_text, split_sentence, word_level,
+                    include_speaker_in_text, encoding
 
     Examples:
-        # Basic usage
-        lairun align audio.wav subtitle.srt output.srt
+        # Basic usage with media and subtitle paths
+        lai align --media.input-path=audio.wav \
+                  --subtitle.input-path=subtitle.srt \
+                  --subtitle.output-path=output.srt
 
-        # With config overrides
-        lairun align audio.wav subtitle.srt output.srt \
-            --alignment.device=cuda \
-            --alignment.word-level=true
+        # With GPU acceleration and word-level alignment
+        lai align --media.input-path=audio.mp4 \
+                  --subtitle.input-path=subtitle.srt \
+                  --subtitle.output-path=output.json \
+                  --alignment.device=cuda \
+                  --subtitle.word-level=true
 
-        # With custom model and API settings
-        lairun align audio.wav subtitle.srt output.srt \
-            --alignment.model-name-or-path="Lattifai/Lattice-1" \
-            --alignment.api-key="your-key"
+        # Smart sentence splitting with custom output format
+        lai align --media.input-path=audio.wav \
+                  --subtitle.input-path=subtitle.srt \
+                  --subtitle.output-path=output.vtt \
+                  --subtitle.split-sentence=true \
+                  --subtitle.output-format=vtt
 
-        # Using media config for URL input
-        lairun align --media.input-path="https://example.com/audio.mp3" subtitle.srt \
-            --media.output-dir="/tmp/alignment"
+        # Using remote audio URL
+        lai align --media.input-path="https://example.com/audio.mp3" \
+                  --media.output-dir=/tmp/alignment \
+                  --subtitle.input-path=subtitle.srt \
+                  --subtitle.output-path=output.srt
+
+        # Full configuration example with all common options
+        lai align \
+            --media.input-path=audio.wav \
+            --media.output-dir=/tmp/output \
+            --subtitle.input-path=subtitle.srt \
+            --subtitle.output-path=aligned.json \
+            --subtitle.input-format=srt \
+            --subtitle.output-format=json \
+            --subtitle.split-sentence=true \
+            --subtitle.word-level=true \
+            --subtitle.normalize-text=true \
+            --alignment.device=mps \
+            --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha \
+            --alignment.batch-size=1
     """
     media_config = media or MediaConfig()
     if not media_config.input_path:

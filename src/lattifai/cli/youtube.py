@@ -1,7 +1,5 @@
 """YouTube workflow CLI entry point with nemo_run."""
 
-from __future__ import annotations
-
 import asyncio
 from typing import Optional
 
@@ -19,21 +17,46 @@ def _is_youtube_url(value: str) -> bool:
     return any(host in lowered for host in ("youtube.com", "youtu.be"))
 
 
-async def _download_media_with_config(url: str, config: MediaConfig) -> str:
-    """Download media from YouTube based on media configuration."""
+async def _download_media_and_subtitles(url: str, config: MediaConfig, subtitle_config: SubtitleConfig) -> str:
+    """
+    Download media and optionally subtitles from YouTube.
+
+    Args:
+        url: YouTube URL to download from
+        config: Media configuration for download settings
+        subtitle_config: Subtitle configuration for subtitle download settings
+
+    Returns:
+        Path to the downloaded media file
+    """
     downloader = YouTubeDownloader()
     media_format = config.normalize_format()
-    return await downloader.download_media(
+
+    # Download subtitles if not already provided in subtitle_config
+    if not subtitle_config.input_path:
+        subtitle_file = await downloader.download_subtitles(
+            url=url,
+            output_dir=str(config.output_dir),
+            force_overwrite=config.force_overwrite,
+            subtitle_lang=None,  # Download all available subtitles
+            enable_gemini_option=False,
+        )
+        if subtitle_file and subtitle_file != "gemini":
+            subtitle_config.input_path = subtitle_file
+
+    # Download media
+    media_file = await downloader.download_media(
         url=url,
         output_dir=str(config.output_dir),
         media_format=media_format,
         force_overwrite=config.force_overwrite,
     )
 
+    return media_file
+
 
 @run.cli.entrypoint(name="youtube", namespace="alignment")
 def youtube(
-    yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
@@ -43,28 +66,45 @@ def youtube(
     Download media from YouTube (when needed) and align subtitles.
 
     Args:
-        yt_url: Local path or URL to audio/video content.
         media: Media configuration for controlling formats and output directories.
+            Fields: input_path, media_format, sample_rate, channels, output_dir,
+                    output_path, output_format, prefer_audio, default_audio_format,
+                    default_video_format, force_overwrite
         client: API client configuration.
+            Fields: api_key, base_url, timeout, max_retries, default_headers
         alignment: Alignment configuration (includes model and API settings).
+            Fields: model_name_or_path, device, batch_size
         subtitle: Subtitle configuration used for reading/writing subtitle files.
+            Fields: input_format, input_path, output_format, output_path,
+                    normalize_text, split_sentence, word_level,
+                    include_speaker_in_text, encoding
 
     Examples:
         # Download from YouTube and align with existing subtitle
-        lai youtube --media.input-path="https://youtu.be/VIDEO"
+        lai youtube https://youtu.be/VIDEO --subtitle.input-path=sub.srt
 
         # Use a pre-downloaded file
-        lai youtube /path/to/audio.mp3
+        lai youtube /path/to/audio.mp3 --subtitle.input-path=sub.srt
 
-        # Override download format
-        lai youtube --media.input-path="https://youtu.be/VIDEO"
+        # Override download format and enable word-level alignment
+        lai youtube https://youtu.be/VIDEO --media.output-format=mp3 \
+            --subtitle.word-level=true --alignment.device=cuda
+
+        # Full configuration example
+        lai youtube https://youtu.be/VIDEO \
+            --media.output-dir=/tmp/youtube \
+            --media.output-format=wav \
+            --subtitle.input-path=subtitle.srt \
+            --subtitle.output-path=aligned.srt \
+            --subtitle.split-sentence=true \
+            --subtitle.word-level=true \
+            --alignment.device=mps \
+            --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha
     """
     media_config = media or MediaConfig()
 
-    if yt_url is not None:
-        media_config.set_input_path(yt_url)
-    elif not media_config.input_path:
-        raise ValueError("Provide an input media path via argument or media.input-path configuration.")
+    if not media_config.input_path:
+        raise ValueError("Provide --media.input-path=youtube_url to specify the YouTube video URL.")
 
     subtitle_config = subtitle or SubtitleConfig()
 
@@ -73,13 +113,21 @@ def youtube(
         raise ValueError("Unable to determine media source. Ensure input path or media config is provided.")
 
     if media_config.is_input_remote() and _is_youtube_url(source):
-        downloaded_path = asyncio.run(_download_media_with_config(source, media_config))
+        downloaded_path = asyncio.run(_download_media_and_subtitles(source, media_config, subtitle_config))
         media_config.set_input_path(downloaded_path)
+
+    if not subtitle_config.output_path:
+        from pathlib import Path
+
+        media_name = Path(media_config.input_path).stem
+        subtitle_config.output_path = (
+            media_config.output_dir / f"{media_name}_LattifAI.{subtitle_config.output_format or 'srt'}"
+        )
 
     client = LattifAI(client_config=client, alignment_config=alignment, subtitle_config=subtitle_config)
 
     return client.alignment(
-        yt_url=media_config.input_path,
+        input_media_path=media_config.input_path,
         input_subtitle_path=subtitle_config.input_path,
         output_subtitle_path=subtitle_config.output_path,
     )

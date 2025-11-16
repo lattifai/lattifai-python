@@ -72,7 +72,7 @@ class Lattice1Aligner(object):
                 text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
                 raise LatticeEncodingError(text_content, original_error=e)
 
-            print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with audio: {audio}"))
+            print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
             try:
                 lattice_results = self.worker.alignment(audio, lattice_graph)
                 print(colorful.green("         ✓ Lattice search completed"))
