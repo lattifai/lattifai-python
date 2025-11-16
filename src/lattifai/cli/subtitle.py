@@ -9,7 +9,7 @@ from typing_extensions import Annotated
 from lattifai.config import SubtitleConfig
 
 
-@run.cli.entrypoint(name="convert", namespace="lai")
+@run.cli.entrypoint(name="convert", namespace="subtitle")
 def convert(
     input_path: Path,
     output_path: Path,

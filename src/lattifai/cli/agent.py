@@ -50,7 +50,7 @@ def _create_agent(
     )
 
 
-@run.cli.entrypoint(namespace="lai")
+@run.cli.entrypoint(name="workflow", namespace="agent")
 def agent(
     url: str,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,

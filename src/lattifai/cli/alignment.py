@@ -11,7 +11,7 @@ from lattifai.config import AlignmentConfig, ClientConfig, MediaConfig, Subtitle
 __all__ = ["align"]
 
 
-@run.cli.entrypoint(name="align", namespace="lai")
+@run.cli.entrypoint(name="align", namespace="alignment")
 def align(
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,

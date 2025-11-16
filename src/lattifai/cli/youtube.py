@@ -31,7 +31,7 @@ async def _download_media_with_config(url: str, config: MediaConfig) -> str:
     )
 
 
-@run.cli.entrypoint(namespace="lai")
+@run.cli.entrypoint(name="youtube", namespace="alignment")
 def youtube(
     yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,

@@ -65,13 +65,14 @@ Discussions = 'https://github.com/lattifai/lattifai-python/discussions'
 Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 
 [project.scripts]
-"lai-align" = "lattifai.cli.align:main"
+"lai-align" = "lattifai.cli.alignment:main"
 "lai-youtube" = "lattifai.cli.youtube:main"
+"lai-agent" = "lattifai.cli.agent:main"
 
 [project.entry-points."lai_run.cli"]
-lai = "lattifai.cli"
-lattifai = "lattifai.cli"
-align = "lattifai.cli.align"
+alignment = "lattifai.cli"
+subtitle = "lattifai.cli"
+agent = "lattifai.cli"
 
 [tool.setuptools]
 packages = [
