@@ -98,9 +98,13 @@ def normalize(
     return output_path
 
 
-def main():
-    run.cli.main(convert, normalize)
+def main_convert():
+    run.cli.main(convert)
+
+
+def main_normalize():
+    run.cli.main(normalize)
 
 
 if __name__ == "__main__":
-    main()
+    main_convert()

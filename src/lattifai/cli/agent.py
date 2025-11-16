@@ -50,7 +50,6 @@ def _create_agent(
 
 @run.cli.entrypoint(name="workflow", namespace="agent")
 def agent(
-    url: str,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
@@ -80,7 +79,7 @@ def agent(
 
     workflow_result = asyncio.run(
         workflow_agent.execute(
-            url=url,
+            url=media_config.input_path,
             output_dir=str(output_dir),
             media_format=media_format,
             force_overwrite=media_config.force_overwrite,

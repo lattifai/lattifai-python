@@ -67,12 +67,14 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 [project.scripts]
 "lai-align" = "lattifai.cli.alignment:main"
 "lai-youtube" = "lattifai.cli.youtube:main"
-"lai-agent" = "lattifai.cli.agent:main"
+"lai-subtitle-convert" = "lattifai.cli.subtitle:main_convert"
+"lai-subtitle-normalize" = "lattifai.cli.subtitle:main_normalize"
+# "lai-agent" = "lattifai.cli.agent:main"
 
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"
 subtitle = "lattifai.cli"
-agent = "lattifai.cli"
+# agent = "lattifai.cli"
 
 [tool.setuptools]
 packages = [
