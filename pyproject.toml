@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '0.5.0'
+version = '1.0.0rc0'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -36,7 +36,7 @@ dependencies = [
     "pycryptodome",
     "google-genai",
     # config
-    "nemo-run>=0.5.0"
+    "lattifai-run>=1.0.0rc1",
 ]
 
 classifiers = [
@@ -70,7 +70,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 "lai" = "lattifai.__main__:app"
 "lattifai" = "lattifai.__main__:app"
 
-[project.entry-points."nemo_run.cli"]
+[project.entry-points."lai_run.cli"]
 lai = "lattifai.cli"
 lattifai = "lattifai.cli"
 

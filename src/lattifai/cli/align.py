@@ -9,9 +9,8 @@ from lattifai.client import LattifAI
 from lattifai.config import AlignmentConfig, ClientConfig, MediaConfig, SubtitleConfig
 
 
-@run.cli.entrypoint(name="lai")
+@run.cli.entrypoint(name="align", namespace="lai")
 def align(
-    input_media_path: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
@@ -21,7 +20,6 @@ def align(
     Align audio/video with subtitle file.
 
     Args:
-        input_media_path: Path to input audio/video file
         alignment: Alignment configuration (includes API settings)
         subtitle: Subtitle configuration
 
@@ -44,9 +42,7 @@ def align(
             --media.output-dir="/tmp/alignment"
     """
     media_config = media or MediaConfig()
-    if input_media_path is not None:
-        media_config.set_input_path(input_media_path)
-    elif not media_config.input_path:
+    if not media_config.input_path:
         raise ValueError("Provide an input media path via argument or media.input-path configuration.")
 
     subtitle_config = subtitle or SubtitleConfig()
