@@ -48,7 +48,7 @@ def _create_agent(
     )
 
 
-@run.cli.entrypoint(name="workflow", namespace="agent")
+@run.cli.entrypoint(name="agent", namespace="agent")
 def agent(
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
@@ -85,34 +85,34 @@ def agent(
 
     Examples:
         # Basic YouTube video processing
-        lai agent workflow --media.input-path="https://youtu.be/VIDEO_ID" \\
-                          --transcription.api-key=YOUR_GEMINI_KEY
+        lai agent workflow media.input_path="https://youtu.be/VIDEO_ID" \\
+                          transcription.api_key=YOUR_GEMINI_KEY
 
         # Download as audio only with word-level alignment
-        lai agent workflow --media.input-path="https://youtu.be/VIDEO_ID" \\
+        lai agent workflow media.input_path="https://youtu.be/VIDEO_ID" \\
                           --media.prefer-audio=true \\
                           --subtitle.word-level=true \\
-                          --transcription.api-key=YOUR_GEMINI_KEY
+                          transcription.api_key=YOUR_GEMINI_KEY
 
         # Enable speaker diarization and sentence splitting
-        lai agent workflow --media.input-path="https://youtu.be/VIDEO_ID" \\
+        lai agent workflow media.input_path="https://youtu.be/VIDEO_ID" \\
                           --transcription.enable-diarization=true \\
-                          --subtitle.split-sentence=true \\
-                          --transcription.api-key=YOUR_GEMINI_KEY
+                          subtitle.split_sentence=true \\
+                          transcription.api_key=YOUR_GEMINI_KEY
 
         # Full configuration with custom output directory
         lai agent workflow \\
-            --media.input-path="https://youtu.be/VIDEO_ID" \\
-            --media.output-dir=/tmp/youtube \\
+            media.input_path="https://youtu.be/VIDEO_ID" \\
+            media.output_dir=/tmp/youtube \\
             --media.output-format=wav \\
             --subtitle.output-format=json \\
             --subtitle.word-level=true \\
-            --subtitle.split-sentence=true \\
+            subtitle.split_sentence=true \\
             --alignment.device=cuda \\
             --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha \\
-            --transcription.api-key=YOUR_GEMINI_KEY \\
+            transcription.api_key=YOUR_GEMINI_KEY \\
             --transcription.enable-diarization=true \\
-            --max-retries=3
+            max_retries=3
     """
 
     media_config = media or MediaConfig()

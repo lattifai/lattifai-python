@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from lattifai.io import Supervision
+from lattifai.subtitle import Supervision
 
 
 class TestAlignmentAPISignature:
@@ -41,17 +41,17 @@ class TestAlignmentAPISignature:
         params = sig.parameters
 
         # Check required parameters
-        assert "audio" in params, "alignment() should have audio parameter"
-        assert "subtitle" in params, "alignment() should have subtitle parameter"
+        assert "input_media_path" in params, "alignment() should have input_media_path parameter"
+        assert "input_subtitle_path" in params, "alignment() should have input_subtitle_path parameter"
 
         # Check optional parameters
-        assert "format" in params, "alignment() should have format parameter"
+        assert "input_subtitle_format" in params, "alignment() should have input_subtitle_format parameter"
         assert "split_sentence" in params, "alignment() should have split_sentence parameter"
         assert "output_subtitle_path" in params, "alignment() should have output_subtitle_path parameter"
 
         # Check parameter defaults
-        assert params["format"].default is None, "format should default to None"
-        assert params["split_sentence"].default is False, "split_sentence should default to False"
+        assert params["input_subtitle_format"].default is None, "input_subtitle_format should default to None"
+        assert params["split_sentence"].default is None, "split_sentence should default to None"
         assert params["output_subtitle_path"].default is None, "output_subtitle_path should default to None"
 
         print("✓ alignment() has correct parameters with correct defaults")
@@ -69,7 +69,7 @@ class TestAlignmentAPISignature:
         assert LattifAIError is not None, "LattifAIError should be importable"
 
         # Test I/O types
-        from lattifai.io import SubtitleIO
+        from lattifai import SubtitleIO
 
         assert Supervision is not None, "Supervision should be importable"
         assert SubtitleIO is not None, "SubtitleIO should be importable"
@@ -124,7 +124,7 @@ class TestAlignmentReturnValue:
         assert docstring is not None, "alignment() should have a docstring"
 
         # Check for key information in docstring
-        assert "audio" in docstring.lower(), "Docstring should document audio parameter"
+        assert "media" in docstring.lower(), "Docstring should document media parameter"
         assert "subtitle" in docstring.lower(), "Docstring should document subtitle parameter"
         assert "format" in docstring.lower(), "Docstring should document format parameter"
         assert "split_sentence" in docstring.lower(), "Docstring should document split_sentence parameter"
@@ -139,7 +139,7 @@ class TestSubtitleIOAPI:
 
     def test_subtitle_io_read(self, tmp_path):
         """Test SubtitleIO.read() method."""
-        from lattifai.io import SubtitleIO
+        from lattifai import SubtitleIO
 
         # Create a simple SRT file
         srt_content = """1
@@ -166,7 +166,7 @@ Second subtitle
 
     def test_subtitle_io_write(self, tmp_path):
         """Test SubtitleIO.write() method."""
-        from lattifai.io import SubtitleIO
+        from lattifai import SubtitleIO
 
         # Create supervisions
         supervisions = [
@@ -190,7 +190,7 @@ Second subtitle
 
     def test_subtitle_format_auto_detection(self, tmp_path):
         """Test that format auto-detection works."""
-        from lattifai.io import SubtitleIO
+        from lattifai import SubtitleIO
 
         # Test with different extensions
         formats = {
@@ -229,12 +229,12 @@ class TestAPIConsistency:
         sig = inspect.signature(LattifAI.__init__)
         params = sig.parameters
 
-        # Check parameter names
-        expected_params = ["api_key", "model_name_or_path", "device", "base_url", "timeout", "max_retries"]
+        # Check parameter names - LattifAI uses config objects
+        expected_params = ["client_config", "alignment_config", "subtitle_config"]
         for param in expected_params:
             assert param in params, f"{param} should be a parameter of LattifAI.__init__"
 
-        print("✓ LattifAI initialization parameters are correct")
+        print("✓ LattifAI initialization parameters are correct (config-based)")
 
     def test_error_inheritance(self):
         """Test that LattifAIError is the base exception."""

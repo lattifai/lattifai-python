@@ -3,14 +3,14 @@ import sys
 import types
 from typing import List, Optional, Tuple
 
-from lattifai.io import SubtitleIO
+from lattifai import SubtitleIO
 
 if "k2" not in sys.modules:
     sys.modules["k2"] = types.ModuleType("k2")
 
 
-from lattifai.io import Supervision
-from lattifai.tokenizer.tokenizer import LatticeTokenizer
+from lattifai.alignment.tokenizer import LatticeTokenizer
+from lattifai.subtitle import Supervision
 
 
 class FakeSplitter:

@@ -74,7 +74,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"
 subtitle = "lattifai.cli"
-# agent = "lattifai.cli"
+agent = "lattifai.cli"
 
 [tool.setuptools]
 packages = [

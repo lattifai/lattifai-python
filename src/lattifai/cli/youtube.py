@@ -113,11 +113,11 @@ def youtube(
 
         # Full configuration example with custom output
         lai alignment youtube https://youtu.be/VIDEO \\
-            --media.output-dir=/tmp/youtube \\
+            media.output_dir=/tmp/youtube \\
             --media.output-format=wav \\
             --subtitle.input-path=subtitle.srt \\
             --subtitle.output-path=aligned.srt \\
-            --subtitle.split-sentence=true \\
+            subtitle.split_sentence=true \\
             --subtitle.word-level=true \\
             --alignment.device=mps \\
             --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha
@@ -125,7 +125,7 @@ def youtube(
     media_config = media or MediaConfig()
 
     if not media_config.input_path:
-        raise ValueError("Provide --media.input-path=youtube_url to specify the YouTube video URL.")
+        raise ValueError("Provide media.input_path=youtube_url to specify the YouTube video URL.")
 
     subtitle_config = subtitle or SubtitleConfig()
 

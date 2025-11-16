@@ -50,7 +50,8 @@ def test_LattifAI_import():
 def test_io_imports():
     """Test that I/O modules can be imported"""
     try:
-        from lattifai.io import SubtitleIO, Supervision
+        from lattifai import SubtitleIO
+        from lattifai.subtitle import Supervision
 
         assert Supervision is not None
         assert SubtitleIO is not None

@@ -38,7 +38,7 @@ def test_basic_error_functionality():
         raise AudioLoadError("/path/to/nonexistent.wav", Exception("File not found"))
     except AudioLoadError as e:
         print(f"✓ AudioLoadError caught with context: {e.context}")
-        assert e.context["audio_path"] == "/path/to/nonexistent.wav"
+        assert e.context["media_path"] == "/path/to/nonexistent.wav"
 
     # Test configuration error
     try:
@@ -104,7 +104,7 @@ def test_context_propagation():
         "/test/audio.mp3", Exception("Permission denied"), context={"file_size": 1024, "format": "mp3"}
     )
 
-    assert audio_error.context["audio_path"] == "/test/audio.mp3"
+    assert audio_error.context["media_path"] == "/test/audio.mp3"
     assert audio_error.context["file_size"] == 1024
     assert audio_error.context["format"] == "mp3"
     assert "Permission denied" in audio_error.context["original_error"]

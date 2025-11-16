@@ -13,10 +13,10 @@ def test_imports():
     """Test that all modules can be imported"""
     print("🧪 Testing imports...")
 
-    from lattifai.workflows import YouTubeSubtitleAgent
-    from lattifai.workflows.base import WorkflowAgent
-    from lattifai.workflows.gemini import GeminiTranscriber
-    from lattifai.workflows.youtube import YouTubeDownloader
+    from lattifai.transcription.gemini import GeminiTranscriber
+    from lattifai.workflow import YouTubeSubtitleAgent
+    from lattifai.workflow.base import WorkflowAgent
+    from lattifai.workflow.youtube import YouTubeDownloader
 
     print("✅ All workflow modules imported successfully")
     assert YouTubeSubtitleAgent is not None
@@ -31,7 +31,7 @@ async def test_youtube_downloader():
     """Test YouTube downloader functionality"""
     print("\n🧪 Testing YouTube downloader...")
 
-    from lattifai.workflows.youtube import YouTubeDownloader
+    from lattifai.workflow.youtube import YouTubeDownloader
 
     downloader = YouTubeDownloader()
 
@@ -52,19 +52,20 @@ def test_gemini_config():
     """Test Gemini API configuration"""
     print("\n🧪 Testing Gemini configuration...")
 
-    from lattifai.workflows.gemini import GeminiTranscriber
+    from lattifai.config import TranscriptionConfig
+    from lattifai.transcription.gemini import GeminiTranscriber
 
     # Test with dummy API key - it should accept it at initialization
     # (validation happens when actually using the API)
-    transcriber = GeminiTranscriber(api_key="test_key")
-    gem_info = transcriber.get_gem_info()
+    config = TranscriptionConfig(gemini_api_key="test_key")
+    transcriber = GeminiTranscriber(transcription_config=config)
 
-    print(f'✅ Gemini configured: {gem_info["gem_name"]}')
+    print(f"✅ Gemini configured with model: {transcriber.config.model_name}")
     print("⚠️ Note: actual API key validation happens when making requests")
 
     assert transcriber is not None
-    assert gem_info is not None
-    assert "gem_name" in gem_info
+    assert transcriber.config is not None
+    assert transcriber.config.gemini_api_key == "test_key"
 
 
 # Test 4: Check workflow setup
@@ -74,7 +75,7 @@ def test_workflow_setup():
 
     from unittest.mock import MagicMock
 
-    from lattifai.workflows import YouTubeSubtitleAgent
+    from lattifai.workflow import YouTubeSubtitleAgent
 
     # Test agent creation with mock components
     mock_downloader = MagicMock()

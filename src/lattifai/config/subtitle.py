@@ -74,7 +74,7 @@ class SubtitleConfig:
         if self.output_format not in OUTPUT_SUBTITLE_FORMATS:
             raise ValueError(f"output_format must be one of {OUTPUT_SUBTITLE_FORMATS}, got '{self.output_format}'")
 
-    def check_sanity(self) -> None:
+    def check_sanity(self) -> bool:
         """Perform sanity checks on the configuration."""
         assert self.is_input_path_existed(), "Input subtitle path must be provided and exist."
 

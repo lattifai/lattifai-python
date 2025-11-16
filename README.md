@@ -696,10 +696,11 @@ from lattifai import LattifAI
 
 client = LattifAI()
 alignments, output_path = client.alignment(
-            input_media_path="audio.wav",
-            input_subtitle_path="subtitle.srt",
-            split_sentence=False,
-            output_subtitle_path="output.srt",
+    input_media_path="audio.wav",
+    input_subtitle_path="subtitle.srt",
+    input_subtitle_format=None,  # Optional: auto-detect from file extension
+    split_sentence=None,  # Optional: uses config default if None
+    output_subtitle_path="output.srt",
 )
 ```
 
@@ -715,7 +716,8 @@ async def main():
         alignments, output_path = await client.alignment(
             input_media_path="audio.wav",
             input_subtitle_path="subtitle.srt",
-            split_sentence=False,
+            input_subtitle_format=None,  # Optional: auto-detect from file extension
+            split_sentence=None,  # Optional: uses config default if None
             output_subtitle_path="output.srt",
         )
 
@@ -724,6 +726,86 @@ asyncio.run(main())
 ```
 
 Both clients return a list of `Supervision` segments with timing information and, if provided, the path where the aligned subtitle was written.
+
+### Configuration Objects
+
+LattifAI uses a config-driven architecture with three main configuration classes:
+
+#### ClientConfig
+
+```python
+from lattifai import ClientConfig
+
+config = ClientConfig(
+    api_key="your-api-key",        # Optional: defaults to LATTIFAI_API_KEY env var
+    base_url="https://api.lattifai.com",  # API base URL
+    timeout=30.0,                   # Request timeout in seconds
+    max_retries=3,                  # Maximum retry attempts
+)
+
+client = LattifAI(client_config=config)
+```
+
+#### AlignmentConfig
+
+```python
+from lattifai import AlignmentConfig
+
+config = AlignmentConfig(
+    model_name_or_path="Lattifai/Lattice-1-Alpha",  # Model identifier or local path
+    device="cpu",                   # Device: "cpu", "cuda", "cuda:0", "mps"
+    batch_size=1,                   # Batch size for processing
+)
+
+client = LattifAI(alignment_config=config)
+```
+
+#### SubtitleConfig
+
+```python
+from lattifai import SubtitleConfig
+
+config = SubtitleConfig(
+    input_path=None,                # Default input path
+    output_path=None,               # Default output path
+    input_format=None,              # Input format (auto-detect if None)
+    output_format=None,             # Output format (same as input if None)
+    split_sentence=False,           # Enable sentence re-splitting
+    word_level=False,               # Include word-level timestamps
+    normalize_text=True,            # Normalize text (clean HTML entities)
+    include_speaker_in_text=False,  # Include speaker labels in text
+)
+
+client = LattifAI(subtitle_config=config)
+```
+
+#### Using All Configs Together
+
+```python
+from lattifai import LattifAI, ClientConfig, AlignmentConfig, SubtitleConfig
+
+client = LattifAI(
+    client_config=ClientConfig(
+        api_key="your-api-key",
+        timeout=60.0,
+    ),
+    alignment_config=AlignmentConfig(
+        model_name_or_path="Lattifai/Lattice-1-Alpha",
+        device="cuda",
+    ),
+    subtitle_config=SubtitleConfig(
+        split_sentence=True,
+        word_level=True,
+        output_format="json",
+    ),
+)
+
+alignments, output_path = client.alignment(
+    input_media_path="audio.wav",
+    input_subtitle_path="subtitle.srt",
+    output_subtitle_path="output.json",
+)
+```
 
 ## Supported Formats
 
@@ -740,13 +822,101 @@ Both clients return a list of `Supervision` segments with timing information and
 ### LattifAI (sync)
 
 ```python
+class LattifAI:
+    def __init__(
+        self,
+        client_config: Optional[ClientConfig] = None,
+        alignment_config: Optional[AlignmentConfig] = None,
+        subtitle_config: Optional[SubtitleConfig] = None,
+    ) -> None:
+        """
+        Initialize LattifAI synchronous client.
 
+        Args:
+            client_config: Client configuration (API key, base URL, timeout, retries).
+                          If None, uses defaults (reads API key from LATTIFAI_API_KEY env var).
+            alignment_config: Alignment model and behavior configuration.
+                            If None, uses defaults (Lattice-1 model, auto device selection).
+            subtitle_config: Subtitle I/O configuration for format handling.
+                           If None, uses defaults (auto-detect format).
+        """
+
+    def alignment(
+        self,
+        input_media_path: Pathlike,
+        input_subtitle_path: Pathlike,
+        input_subtitle_format: Optional[InputSubtitleFormat] = None,
+        split_sentence: Optional[bool] = None,
+        output_subtitle_path: Optional[Pathlike] = None,
+    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
+        """
+        Perform forced alignment on audio/video and subtitle/text.
+
+        Args:
+            input_media_path: Path to audio/video file (WAV, MP3, FLAC, MP4, etc.).
+            input_subtitle_path: Path to subtitle or plain text file to align.
+            input_subtitle_format: Input subtitle format ('srt', 'vtt', 'ass', 'txt').
+                                  If None, auto-detects from file extension.
+            split_sentence: Enable automatic sentence re-splitting for better accuracy.
+                          If None, uses config default.
+            output_subtitle_path: Optional path to write aligned subtitle file.
+
+        Returns:
+            Tuple of (List[Supervision], Optional[Pathlike]):
+                - List of Supervision objects with aligned timing information
+                - Output subtitle path (or None if not provided)
+
+        Raises:
+            SubtitleProcessingError: If subtitle file cannot be parsed or written.
+            LatticeEncodingError: If lattice graph generation fails.
+            AlignmentError: If audio alignment fails.
+            LatticeDecodingError: If lattice decoding fails.
+        """
 ```
 
 ### AsyncLattifAI (async)
 
 ```python
+class AsyncLattifAI:
+    def __init__(
+        self,
+        client_config: Optional[ClientConfig] = None,
+        alignment_config: Optional[AlignmentConfig] = None,
+        subtitle_config: Optional[SubtitleConfig] = None,
+    ) -> None:
+        """
+        Initialize AsyncLattifAI asynchronous client.
 
+        Args:
+            client_config: Client configuration (API key, base URL, timeout, retries).
+            alignment_config: Alignment model and behavior configuration.
+            subtitle_config: Subtitle I/O configuration for format handling.
+        """
+
+    async def alignment(
+        self,
+        input_media_path: Pathlike,
+        input_subtitle_path: Pathlike,
+        input_subtitle_format: Optional[InputSubtitleFormat] = None,
+        split_sentence: Optional[bool] = None,
+        output_subtitle_path: Optional[Pathlike] = None,
+    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
+        """
+        Perform asynchronous forced alignment on audio/video and subtitle/text.
+
+        Same parameters and return type as LattifAI.alignment(), but runs asynchronously.
+        Ideal for batch alignment tasks or integration into async applications.
+
+        Args:
+            input_media_path: Path to audio/video file.
+            input_subtitle_path: Path to subtitle or plain text file.
+            input_subtitle_format: Input subtitle format (auto-detect if None).
+            split_sentence: Enable sentence re-splitting (uses config default if None).
+            output_subtitle_path: Optional output path.
+
+        Returns:
+            Tuple of (List[Supervision], Optional[Pathlike])
+        """
 ```
 
 Use `async with AsyncLattifAI() as client:` or call `await client.close()` when you are done to release the underlying HTTP session.

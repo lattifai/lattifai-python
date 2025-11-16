@@ -5,7 +5,7 @@ Test the special sentence type re-splitting functionality
 
 import sys
 
-from lattifai.tokenizer.tokenizer import LatticeTokenizer
+from lattifai.alignment.tokenizer import LatticeTokenizer
 
 
 def test_resplit_special_sentence_types():

@@ -2,8 +2,7 @@
 
 import pytest
 
-from lattifai.io import GeminiReader, GeminiSegment, GeminiWriter
-from lattifai.io.supervision import Supervision
+from lattifai.subtitle import GeminiReader, GeminiSegment, GeminiWriter, Supervision
 
 # Sample transcript content for testing
 SAMPLE_TRANSCRIPT = """## OpenAI Spring Update: GPT-4o

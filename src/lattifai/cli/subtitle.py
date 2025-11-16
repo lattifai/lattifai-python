@@ -13,7 +13,7 @@ from lattifai.config import SubtitleConfig
 def convert(
     input_path: Path,
     output_path: Path,
-    subtitle: Annotated[Optional[SubtitleConfig], run.Config[SubtitleConfig]] = None,
+    normalize_text: bool = False,
 ):
     """
     Convert subtitle file to another format.
@@ -27,27 +27,28 @@ def convert(
     Args:
         input_path: Path to input subtitle file (supports SRT, VTT, JSON, TextGrid formats)
         output_path: Path to output subtitle file (format determined by file extension)
-        subtitle: Subtitle configuration for controlling text normalization and formatting.
-            Fields: input_format, output_format, normalize_text, split_sentence,
-                    word_level, include_speaker_in_text, encoding
+        normalize_text: Whether to normalize subtitle text during conversion.
+            This applies text cleaning such as removing HTML tags, decoding entities,
+            collapsing whitespace, and standardizing punctuation.
 
     Examples:
         # Basic format conversion
         lai subtitle convert input.srt output.vtt
 
         # Convert to TextGrid with speaker info
-        lai subtitle convert input.srt output.TextGrid \\
-            --subtitle.include-speaker-in-text=true
+        lai subtitle convert input.srt output.TextGrid
 
         # Convert without speaker info
-        lai subtitle convert input.srt output.vtt \\
-            --subtitle.include-speaker-in-text=false
+        lai subtitle convert input.srt output.vtt
 
         # Convert with text normalization
-        lai subtitle convert input.json output.srt \\
-            --subtitle.normalize-text=true
+        lai subtitle convert input.json output.srt
     """
     from lattifai.subtitle import Subtitler
+
+    subtitle = SubtitleConfig(
+        normalize_text=normalize_text,
+    )
 
     subtitler = Subtitler(config=subtitle)
 

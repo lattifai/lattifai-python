@@ -44,39 +44,39 @@ def align(
 
     Examples:
         # Basic usage with media and subtitle paths
-        lai alignment align --media.input-path=audio.wav \\
+        lai alignment align media.input_path=audio.wav \\
                   --subtitle.input-path=subtitle.srt \\
                   --subtitle.output-path=output.srt
 
         # With GPU acceleration and word-level alignment
-        lai alignment align --media.input-path=audio.mp4 \\
+        lai alignment align media.input_path=audio.mp4 \\
                   --subtitle.input-path=subtitle.srt \\
                   --subtitle.output-path=output.json \\
                   --alignment.device=cuda \\
                   --subtitle.word-level=true
 
         # Smart sentence splitting with custom output format
-        lai alignment align --media.input-path=audio.wav \\
+        lai alignment align media.input_path=audio.wav \\
                   --subtitle.input-path=subtitle.srt \\
                   --subtitle.output-path=output.vtt \\
-                  --subtitle.split-sentence=true \\
+                  subtitle.split_sentence=true \\
                   --subtitle.output-format=vtt
 
         # Using remote audio URL
-        lai alignment align --media.input-path="https://example.com/audio.mp3" \\
-                  --media.output-dir=/tmp/alignment \\
+        lai alignment align media.input_path="https://example.com/audio.mp3" \\
+                  media.output_dir=/tmp/alignment \\
                   --subtitle.input-path=subtitle.srt \\
                   --subtitle.output-path=output.srt
 
         # Full configuration example with all common options
         lai alignment align \\
-            --media.input-path=audio.wav \\
-            --media.output-dir=/tmp/output \\
+            media.input_path=audio.wav \\
+            media.output_dir=/tmp/output \\
             --subtitle.input-path=subtitle.srt \\
             --subtitle.output-path=aligned.json \\
             --subtitle.input-format=srt \\
             --subtitle.output-format=json \\
-            --subtitle.split-sentence=true \\
+            subtitle.split_sentence=true \\
             --subtitle.word-level=true \\
             --subtitle.normalize-text=true \\
             --alignment.device=mps \\

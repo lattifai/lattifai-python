@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest  # noqa: F401
 
-MODULE_PATH = Path(__file__).resolve().parents[2] / "src" / "lattifai" / "workflows" / "file_manager.py"
+MODULE_PATH = Path(__file__).resolve().parents[2] / "src" / "lattifai" / "workflow" / "file_manager.py"
 MODULE_SPEC = importlib.util.spec_from_file_location("file_manager_for_tests", MODULE_PATH)
 file_manager = importlib.util.module_from_spec(MODULE_SPEC)
 assert MODULE_SPEC and MODULE_SPEC.loader

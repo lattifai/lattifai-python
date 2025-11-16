@@ -1,15 +1,13 @@
 """Tests for configuration system."""
 
-from pathlib import Path
-
 import pytest
 
 from lattifai.config import (
     AlignmentConfig,
+    ClientConfig,
     MediaConfig,
     SubtitleConfig,
     TranscriptionConfig,
-    YouTubeWorkflowConfig,
 )
 
 
@@ -48,45 +46,37 @@ class TestAlignmentConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = AlignmentConfig()
-        # API defaults
-        assert config.api_key is None
-        assert config.base_url == "https://api.lattifai.com/v1"
-        assert config.timeout == 120.0
-        assert config.max_retries == 2
-        assert config.default_headers is None
         # Alignment defaults
         assert config.device == "cpu"
         assert config.model_name_or_path == "Lattifai/Lattice-1-Alpha"
-        assert config.split_sentence is False
-        assert config.word_level is False
         assert config.batch_size == 1
 
     def test_api_key_from_env(self, monkeypatch):
         """Test API key loaded from environment."""
         monkeypatch.setenv("LATTIFAI_API_KEY", "env-key")
-        config = AlignmentConfig()
+        config = ClientConfig()
         assert config.api_key == "env-key"
 
     def test_base_url_from_env(self, monkeypatch):
         """Test base URL loaded from environment."""
         monkeypatch.setenv("LATTIFAI_BASE_URL", "https://custom.api.com")
-        config = AlignmentConfig(api_key="test-key")
+        config = ClientConfig(api_key="test-key")
         assert config.base_url == "https://custom.api.com"
 
     def test_invalid_timeout(self):
         """Test validation of timeout parameter."""
         with pytest.raises(ValueError, match="timeout must be greater than 0"):
-            AlignmentConfig(api_key="test-key", timeout=0)
+            ClientConfig(api_key="test-key", timeout=0)
 
     def test_invalid_max_retries(self):
         """Test validation of max_retries parameter."""
         with pytest.raises(ValueError, match="max_retries must be non-negative"):
-            AlignmentConfig(api_key="test-key", max_retries=-1)
+            ClientConfig(api_key="test-key", max_retries=-1)
 
     def test_custom_headers(self):
         """Test custom headers configuration."""
         headers = {"X-Custom": "value"}
-        config = AlignmentConfig(api_key="test-key", default_headers=headers)
+        config = ClientConfig(api_key="test-key", default_headers=headers)
         assert config.default_headers == headers
 
     def test_custom_alignment_values(self):
@@ -94,14 +84,10 @@ class TestAlignmentConfig:
         config = AlignmentConfig(
             device="cuda",
             model_name_or_path="custom-model",
-            split_sentence=True,
-            word_level=True,
             batch_size=4,
         )
         assert config.device == "cuda"
         assert config.model_name_or_path == "custom-model"
-        assert config.split_sentence is True
-        assert config.word_level is True
         assert config.batch_size == 4
 
     def test_invalid_batch_size(self):
@@ -124,29 +110,24 @@ class TestSubtitleConfig:
         assert config.input_format == "auto"
         assert config.output_format == "srt"
         assert config.normalize_text is False
-        assert config.output_dir == Path(".")
+        assert config.output_path is None
         assert config.include_speaker_in_text is True
         assert config.encoding == "utf-8"
 
     def test_custom_values(self, tmp_path):
         """Test custom configuration values."""
-        output_dir = tmp_path / "output"
         config = SubtitleConfig(
             input_format="vtt",
             output_format="json",
             normalize_text=True,
-            output_dir=output_dir,
             include_speaker_in_text=False,
             encoding="utf-16",
         )
         assert config.input_format == "vtt"
         assert config.output_format == "json"
         assert config.normalize_text is True
-        assert config.output_dir == output_dir
         assert config.include_speaker_in_text is False
         assert config.encoding == "utf-16"
-        # Should create output directory
-        assert output_dir.exists()
 
     def test_invalid_input_format(self):
         """Test validation of input_format parameter."""
@@ -165,7 +146,6 @@ class TestTranscriptionConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = TranscriptionConfig()
-        assert config.gemini_api_key is None
         assert config.device == "cpu"
         assert config.media_format == "mp4"
         assert config.max_retries == 0
@@ -215,38 +195,3 @@ class TestTranscriptionConfig:
         """Test validation of media_format parameter."""
         with pytest.raises(ValueError, match="media_format must be one of"):
             TranscriptionConfig(media_format="invalid")
-
-
-class TestYouTubeWorkflowConfig:
-    """Test YouTubeWorkflowConfig class."""
-
-    def test_default_values(self):
-        """Test default configuration values."""
-        config = YouTubeWorkflowConfig()
-        assert isinstance(config.alignment, AlignmentConfig)
-        assert isinstance(config.subtitle, SubtitleConfig)
-        assert isinstance(config.transcription, TranscriptionConfig)
-        assert config.output_dir == Path(".")
-
-    def test_custom_values(self, tmp_path):
-        """Test custom configuration values."""
-        output_dir = tmp_path / "workflow_output"
-        config = YouTubeWorkflowConfig(
-            alignment=AlignmentConfig(api_key="test-key", device="cuda"),
-            subtitle=SubtitleConfig(output_format="json"),
-            transcription=TranscriptionConfig(media_format="mp3"),
-            output_dir=output_dir,
-        )
-        assert config.alignment.api_key == "test-key"
-        assert config.alignment.device == "cuda"
-        assert config.subtitle.output_format == "json"
-        assert config.transcription.media_format == "mp3"
-        assert config.output_dir == output_dir
-        # Should create output directory
-        assert output_dir.exists()
-
-    def test_subtitle_output_dir_sync(self, tmp_path):
-        """Test that subtitle output_dir is synchronized with workflow output_dir."""
-        output_dir = tmp_path / "sync_test"
-        config = YouTubeWorkflowConfig(output_dir=output_dir)
-        assert config.subtitle.output_dir == output_dir

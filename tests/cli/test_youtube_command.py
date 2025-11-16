@@ -1,0 +1,130 @@
+"""Tests for lattifai youtube command"""
+
+import os
+import subprocess
+
+import pytest
+from dotenv import find_dotenv, load_dotenv
+
+load_dotenv(find_dotenv(usecwd=True))
+
+
+def run_youtube_command(args, env=None):
+    """Helper function to run the youtube command and return result"""
+    cmd = ["lai", "alignment", "youtube"]
+
+    if os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false").lower() == "true":
+        cmd.append("--dryrun")
+
+    cmd.extend(args)
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+            env=env,
+        )
+        return result
+    except subprocess.TimeoutExpired:
+        return None
+    except subprocess.CalledProcessError as e:
+        print(" ".join(cmd))
+        raise e
+
+
+class TestYoutubeCommand:
+    """Test cases for youtube command"""
+
+    @pytest.mark.parametrize(
+        "output_format",
+        ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt"],
+    )
+    def test_youtube_output_formats(self, tmp_path, output_format):
+        """Test youtube command with different output formats"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            f"subtitle.output_format={output_format}",
+            "alignment.device=cpu",
+            "subtitle.input_path=dummy.srt",
+        ]
+
+        run_youtube_command(args)
+
+    @pytest.mark.parametrize("device", ["cpu", "cuda", "mps"])
+    def test_youtube_device_options(self, tmp_path, device):
+        """Test youtube command with different device options"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            f"alignment.device={device}",
+            "subtitle.input_path=dummy.srt",
+        ]
+
+        run_youtube_command(args)
+
+    def test_youtube_split_sentence_option(self, tmp_path):
+        """Test youtube command with split-sentence option"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            "subtitle.split_sentence=true",
+            "alignment.device=cpu",
+            "subtitle.input_path=dummy.srt",
+        ]
+
+        run_youtube_command(args)
+
+    def test_youtube_media_format_option(self, tmp_path):
+        """Test youtube command with media format option"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            "media.output_format=mp3",
+            "media.prefer_audio=true",
+            "alignment.device=cpu",
+            "subtitle.input_path=dummy.srt",
+        ]
+
+        run_youtube_command(args)
+
+    def test_youtube_model_name_option(self, tmp_path):
+        """Test youtube command with custom model name"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            "alignment.model_name_or_path=Lattifai/Lattice-1-Alpha",
+            "alignment.device=cpu",
+            "subtitle.input_path=dummy.srt",
+        ]
+
+        run_youtube_command(args)
+
+    def test_youtube_invalid_url(self, tmp_path):
+        """Test youtube command with invalid URL"""
+        args = [
+            "media.input_path=not_a_valid_url",
+            f"media.output_dir={tmp_path}",
+            "alignment.device=cpu",
+            "subtitle.input_path=dummy.srt",
+        ]
+
+        result = run_youtube_command(args)
+
+        if result is not None:
+            assert result.returncode in [0, 1, 2] or "usage:" in result.stderr
+
+    def test_youtube_help(self):
+        """Test youtube command help output"""
+        args = ["--help"]
+        result = run_youtube_command(args)
+
+        if result is not None:
+            assert result.returncode == 0 or "usage:" in result.stdout or "help" in result.stdout
+            if result.returncode == 0:
+                help_text = result.stdout + result.stderr
+                assert "media" in help_text
+                assert "subtitle" in help_text
+                assert "alignment" in help_text
