@@ -92,27 +92,25 @@ LattifAI provides a powerful CLI powered by [NeMo Run](https://github.com/lattif
 
 ```bash
 # Align audio with subtitle
-lai alignment align media.input_path=audio.wav \
-                    subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.srt
+lai alignment align audio.wav subtitle.srt output.srt
 
 # Download and align YouTube content
-lai alignment youtube media.input_path="https://youtube.com/watch?v=VIDEO_ID"
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
 
 # Convert subtitle formats
-lai subtitle convert input_path=input.srt output_path=output.vtt
+lai subtitle convert input.srt output.vtt
 
 # Normalize subtitle text (clean HTML entities)
-lai subtitle normalize input_path=input.srt output_path=output.srt
+lai subtitle normalize input.srt output.srt
 ```
 
 > **💡 New to NeMo Run?** Check out the [Configuration Guide](#advanced-configuration-with-nemo-run) below to learn about powerful features like YAML configs, config reuse, and parameter sweeps.
 
 ```bash
-lai alignment youtube \
-    media.input_path="https://www.youtube.com/watch?v=DQacCB9tDaw" \
+lai alignment youtube "https://www.youtube.com/watch?v=DQacCB9tDaw" \
     media.output_dir=~/Downloads/lattifai_youtube \
-    subtitle.split_sentence=true subtitle.normalize_text=true \
+    subtitle.split_sentence=true \
+    subtitle.normalize_text=true \
     subtitle.output_path=~/Downloads/lattifai_youtube/DQacCB9tDaw_LattifAI.srt
 ```
 
@@ -139,26 +137,24 @@ Align audio/video with subtitle files using forced alignment.
 **Basic Usage:**
 ```bash
 # Simple alignment
-lai alignment align media.input_path=audio.wav \
-                    subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.srt \
-                    alignment.device=cuda
+lai alignment align audio.wav subtitle.srt output.srt
+
+# With GPU acceleration
+lai alignment align audio.wav subtitle.srt output.srt alignment.device=cuda
 
 # Smart sentence splitting and normalize text
-lai alignment align media.input_path=audio.wav \
-                    subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.vtt \
-                    subtitle.split_sentence=true \
-                    subtitle.normalize_text=true
+lai alignment align audio.wav subtitle.srt output.vtt \
+    subtitle.split_sentence=true \
+    subtitle.normalize_text=true
 ```
 
 **Common Options:**
-- `media.input_path`: Path to audio/video file (required)
-- `subtitle.input_path`: Path to subtitle file (required)
-- `subtitle.output_path`: Output path for aligned subtitle
-- `subtitle.split_sentence`: Enable intelligent sentence splitting
-- `alignment.device`: Device to use (`cpu`, `cuda`, or `mps`)
-- `alignment.model_name_or_path`: Model to use for alignment
+- First argument: Path to audio/video file (or use `input_media_path=`)
+- Second argument: Path to subtitle file (or use `input_subtitle_path=`)
+- Third argument: Output path for aligned subtitle (or use `output_subtitle_path=`)
+- `subtitle.split_sentence=true`: Enable intelligent sentence splitting
+- `alignment.device=cuda`: Device to use (`cpu`, `cuda`, or `mps`)
+- `alignment.model_name_or_path=MODEL`: Model to use for alignment
 
 #### lai alignment youtube
 
@@ -166,27 +162,27 @@ Download media and optionally subtitles from YouTube, then perform forced alignm
 
 **Basic Usage:**
 ```bash
-# Basic YouTube alignment with existing subtitle
-lai alignment youtube media.input_path="https://youtube.com/watch?v=VIDEO_ID" \
-                      subtitle.input_path=subtitle.srt
+# Basic YouTube alignment (downloads YouTube subtitles automatically)
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
 
-# more configuration with custom output
-lai alignment youtube media.input_path="https://youtube.com/watch?v=VIDEO_ID" \
-                      media.output_dir=/tmp/youtube \
-                      media.output_format=wav \
-                      subtitle.input_path=subtitle.srt \
-                      subtitle.output_path=aligned.srt \
-                      subtitle.split_sentence=true \
-                      alignment.device=mps
+# Custom output directory and format
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID" \
+    media.output_dir=/tmp/youtube \
+    media.output_format=wav
+
+# Full configuration with smart splitting
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID" \
+    subtitle.output_path=aligned.srt \
+    subtitle.split_sentence=true \
+    alignment.device=mps
 ```
 
 **Common Options:**
-- `media.input_path`: YouTube URL or local file path (required)
-- `subtitle.input_path`: Path to subtitle file
-- `media.output_dir`: Directory for downloaded media
-- `media.output_format`: Media format (`mp3`, `wav`, `mp4`, etc.)
-- `subtitle.output_path`: Output path for aligned subtitle
-- `alignment.device`: Device to use for alignment
+- First argument: YouTube URL (or use `yt_url=`)
+- `media.output_dir=/path`: Directory for downloaded media
+- `media.output_format=mp3`: Media format (`mp3`, `wav`, `mp4`, etc.)
+- `subtitle.output_path=file.srt`: Output path for aligned subtitle
+- `alignment.device=cuda`: Device to use for alignment
 
 #### lai agent workflow (under construction)
 
@@ -208,7 +204,7 @@ Convert subtitle files between different formats.
 lai subtitle convert input.srt output.vtt
 
 # Convert with text normalization
-lai subtitle convert input.json output.srt normalize_text=true
+lai subtitle convert input.srt output.json normalize_text=true
 ```
 
 **Arguments:**
