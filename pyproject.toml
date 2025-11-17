@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.0.0rc0'
+version = '1.0.0rc1'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -36,7 +36,7 @@ dependencies = [
     "pycryptodome",
     "google-genai>=1.22.0",
     # config
-    "lattifai-run>=1.0.0rc1",
+    "lattifai-run>=1.0.0rc2",
 ]
 
 classifiers = [
