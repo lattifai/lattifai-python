@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## [1.0.0rc1] - 2025-11-17
+
+### Major Refactor
+
+#### CLI Architecture Improvements
+- **New CLI Framework**: Migrated to `nemo_run` (lattifai-run) based configuration system
+  - Replaced individual command entry points with unified `lai` command structure
+  - Commands now use format: `lai alignment align`, `lai subtitle convert`, `lai agent youtube`
+- **Positional Argument Support**: Enhanced CLI to support intuitive positional arguments
+  - Enable concise commands: `lai subtitle convert input.srt output.vtt`
+  - Support mixed usage: `lai subtitle convert input_path=a.srt b.vtt normalize_text=true`
+
+#### Feature Enhancements
+- **Subtitle Commands**: Added dedicated `convert` and `normalize` subcommands
+  - `lai subtitle convert`: Convert between subtitle formats (SRT, VTT, JSON, TextGrid, etc.)
+  - `lai subtitle normalize`: Clean and format subtitle text with HTML normalization
+- **Transcription Integration**: Enhanced transcription capabilities
+  - Added `use_transcription` option in `SubtitleConfig` to toggle transcription service
+  - Introduced `model_name` in `TranscriptionConfig` for model specification
+  - Refactored `BaseTranscriber` to handle both audio and video inputs
+  - Implemented prompt management system for loading AI model prompts dynamically
+- **Configuration System**: New flexible configuration architecture
+  - Config classes now use `nemo_run` framework for better composability
+  - Support for runtime configuration overrides
+  - Enhanced media handling configuration
+
+#### Documentation Updates
+- Simplified command examples throughout README to use positional arguments
+- Enhanced command descriptions for alignment, subtitle, and youtube workflows
+- Updated all CLI usage examples to reflect new command structure
+
+#### Technical Changes
+- Updated dependency: `lattifai-run>=1.0.0rc2` for enhanced CLI support
+- Enhanced file management logic in `FileExistenceManager`
+- Refactored entry points and namespaces for better organization
+
+### Changed
+- Package version updated to 1.0.0rc1
+- CLI command structure migrated to subcommand-based architecture
+- Configuration system moved to nemo_run framework
+
 ## [0.4.6] - 2025-11-05
 
 ### Added

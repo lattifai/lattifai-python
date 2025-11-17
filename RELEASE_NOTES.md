@@ -1,3 +1,252 @@
+````markdown
+# Release Notes - LattifAI Python v1.0.0rc1
+
+**Release Date:** November 17, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.0.0rc1 is a major refactor release that introduces a modern CLI architecture, enhanced configuration system, and improved user experience. This release candidate brings significant improvements to command structure, argument handling, and overall code organization.
+
+---
+
+## ✨ Major Changes
+
+### 🔄 CLI Architecture Refactor
+
+**New Command Structure**
+
+Migrated to a unified subcommand-based CLI powered by `nemo_run` (lattifai-run) framework:
+
+**New Structure (v1.0.0rc1):**
+```bash
+lai alignment align audio.wav subtitle.srt output.srt
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
+lai subtitle convert input.srt output.vtt
+```
+
+**Benefits:**
+- ✅ **Organized Commands**: Logical grouping of related functionality
+- ✅ **Extensibility**: Easier to add new subcommands and features
+- ✅ **Consistency**: Uniform command structure across all operations
+- ✅ **Discoverability**: Better help system with hierarchical commands
+
+### 🚀 Positional Argument Support
+
+Enhanced CLI to support intuitive positional arguments alongside keyword arguments:
+
+**Concise Positional Arguments:**
+```bash
+# Simple and clean
+lai alignment align audio.wav subtitle.srt output.srt
+lai subtitle convert input.srt output.vtt
+```
+
+**Mixed Arguments:**
+```bash
+# Combine positional and keyword arguments
+lai subtitle convert input.srt output.vtt normalize_text=true
+lai alignment align audio.wav subtitle.srt output.srt subtitle.split_sentence=true
+```
+
+**Traditional Keyword Arguments:**
+```bash
+# Fully backward compatible
+lai subtitle convert input_path=input.srt output_path=output.vtt
+```
+
+**Impact:**
+- ✅ Faster command typing for common use cases
+- ✅ Reduced verbosity in everyday workflows
+- ✅ Backward compatible with existing scripts
+- ✅ Flexible mixing of argument styles
+
+### 📦 New Subtitle Commands
+
+Introduced dedicated subcommands for subtitle operations:
+
+**1. Subtitle Convert**
+```bash
+# Convert between formats
+lai subtitle convert input.srt output.vtt
+lai subtitle convert input.json output.TextGrid
+
+# With normalization
+lai subtitle convert input.srt output.vtt normalize_text=true
+```
+
+**2. Subtitle Normalize**
+```bash
+# Clean and format subtitle text
+lai subtitle normalize input.srt output.srt
+lai subtitle normalize input.vtt output.vtt normalize_text=true
+```
+
+### ⚙️ Enhanced Configuration System
+
+**New Configuration Architecture:**
+
+- **nemo_run Framework**: Migrated configuration to industry-proven nemo_run system
+- **Composable Configs**: Build complex configurations from simple components
+- **Runtime Overrides**: Easily override configurations at command line
+- **Type Safety**: Better type checking and validation
+
+**Configuration Options:**
+
+```bash
+# Subtitle configuration
+lai alignment align audio.wav sub.srt out.srt \
+  subtitle.split_sentence=true \
+  subtitle.normalize_text=true
+```
+
+### 🎯 Transcription Enhancements
+
+**Improved Transcription Integration:**
+
+- **Toggle Transcription**: New `use_transcription` option to enable/disable transcription
+- **Model Selection**: Specify transcription model via `model_name` parameter
+- **Flexible Input**: Enhanced `BaseTranscriber` handles both audio and video
+- **Prompt Management**: Dynamic AI prompt loading system for better output quality
+
+**Usage:**
+```bash
+# Use transcription for alignment
+lai alignment youtube "URL" \
+  subtitle.use_transcription=true \
+  transcription.model_name="gemini-2.5-pro"
+
+```
+
+---
+
+## 📋 Command Reference
+
+### Alignment Commands
+
+**Basic Alignment:**
+```bash
+lai alignment align audio.wav subtitle.srt output.srt
+```
+
+**YouTube Alignment:**
+```bash
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
+```
+
+---
+
+## 🔄 Migration Guide
+
+### Command Migration
+
+**Alignment:**
+```bash
+lai alignment align audio.wav subtitle.srt output.srt
+```
+
+**Subtitle Convert and Normalize:**
+```bash
+lai subtitle convert input.srt output.vtt
+
+lai subtitle normalize input.srt output.srt
+```
+
+### Python API
+
+✅ **No changes required** - All Python API remains backward compatible:
+
+```python
+from lattifai import LattifAI
+
+client = LattifAI()
+alignments, output_path = client.alignment(
+    input_media_path="audio.wav",
+    input_subtitle_path="subtitle.srt",
+    output_subtitle_path="output.srt",
+    input_subtitle_format=None,  # Optional: auto-detect from file extension
+    split_sentence=None,  # Optional: uses config default if None
+)
+```
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+### Verify Installation:
+
+```bash
+lai --help
+# View new command structure
+```
+
+---
+
+## 🔗 Dependencies
+
+### New Dependency
+
+- **lattifai-run>=1.0.0rc2**: Enhanced CLI framework with positional argument support
+
+### Updated Requirements
+
+- Python 3.10-3.14 support maintained
+- All other dependencies remain compatible
+
+---
+
+## 📊 Performance
+
+✅ **No performance regression**
+- Command execution speed unchanged
+- Configuration parsing is efficient
+
+---
+
+## 🧪 Testing
+
+This release includes:
+- ✅ Comprehensive CLI argument parsing tests
+- ✅ Configuration system validation tests
+- ✅ Integration tests for all commands
+
+---
+
+## 📝 Version Info
+
+- **Version**: 1.0.0rc1
+- **Release Date**: November 17, 2025
+- **Python Support**: 3.10 - 3.14
+- **Model**: Lattice-1-Alpha
+- **License**: Apache License 2.0
+
+---
+
+## 🙏 Acknowledgments
+
+This major refactor improves the overall architecture and user experience of LattifAI. Special thanks to the NVIDIA NeMo team for the nemo_run framework that powers our new CLI system.
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
+
+---
+
+# Previous Release Notes
+
+## v0.4.6 - Enhanced Subtitle Parsing
+
 # Release Notes - LattifAI Python v0.4.6
 
 **Release Date:** November 5, 2025
