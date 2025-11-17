@@ -22,7 +22,6 @@ class TestMediaConfig:
         config = MediaConfig(input_path=str(media_file))
 
         assert config.input_path == str(media_file)
-        assert config.media_format == "wav"
         assert config.is_input_remote() is False
 
     def test_url_input(self, tmp_path):
@@ -32,7 +31,6 @@ class TestMediaConfig:
         config = MediaConfig(input_path=media_url, output_dir=tmp_path)
 
         assert config.input_path == media_url
-        assert config.media_format == "mp3"
         assert config.is_input_remote() is True
 
         output_path = config.prepare_output_path()
@@ -147,7 +145,6 @@ class TestTranscriptionConfig:
         """Test default configuration values."""
         config = TranscriptionConfig()
         assert config.device == "cpu"
-        assert config.media_format == "mp4"
         assert config.max_retries == 0
         assert config.force_overwrite is False
         assert config.verbose is False
@@ -165,7 +162,6 @@ class TestTranscriptionConfig:
         config = TranscriptionConfig(
             gemini_api_key="test-key",
             device="cuda",
-            media_format="mp3",
             max_retries=3,
             force_overwrite=True,
             verbose=True,
@@ -174,7 +170,6 @@ class TestTranscriptionConfig:
         )
         assert config.gemini_api_key == "test-key"
         assert config.device == "cuda"
-        assert config.media_format == "mp3"
         assert config.max_retries == 3
         assert config.force_overwrite is True
         assert config.verbose is True
@@ -190,8 +185,3 @@ class TestTranscriptionConfig:
         """Test validation of device parameter."""
         with pytest.raises(ValueError, match="device must be one of"):
             TranscriptionConfig(device="invalid")
-
-    def test_invalid_media_format(self):
-        """Test validation of media_format parameter."""
-        with pytest.raises(ValueError, match="media_format must be one of"):
-            TranscriptionConfig(media_format="invalid")

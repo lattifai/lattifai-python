@@ -44,6 +44,7 @@ class Lattice1Aligner(object):
         audio: Pathlike,
         supervisions: List[Supervision],
         split_sentence: Optional[bool] = False,
+        return_details: Optional[bool] = False,
     ) -> Tuple[List[Supervision], List[Supervision]]:
         """
         Perform alignment on audio and supervisions.
@@ -86,7 +87,7 @@ class Lattice1Aligner(object):
             print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
             try:
                 alignments = self.tokenizer.detokenize(
-                    lattice_id, lattice_results, supervisions=supervisions, return_details=True
+                    lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
                 )
                 print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
             except LatticeDecodingError as e:

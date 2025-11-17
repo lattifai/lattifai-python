@@ -1,5 +1,6 @@
 """Alignment CLI entry point with nemo_run."""
 
+from pathlib import Path
 from typing import Optional
 
 import nemo_run as run
@@ -13,6 +14,9 @@ __all__ = ["align"]
 
 @run.cli.entrypoint(name="align", namespace="alignment")
 def align(
+    input_media_path: Optional[Path] = None,
+    input_subtitle_path: Optional[Path] = None,
+    output_subtitle_path: Optional[Path] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
@@ -43,48 +47,35 @@ def align(
                     include_speaker_in_text, encoding
 
     Examples:
-        # Basic usage with media and subtitle paths
-        lai alignment align media.input_path=audio.wav \\
-                  --subtitle.input-path=subtitle.srt \\
-                  --subtitle.output-path=output.srt
+        # Basic usage with positional arguments
+        lai alignment align audio.wav subtitle.srt output.srt
 
-        # With GPU acceleration and word-level alignment
-        lai alignment align media.input_path=audio.mp4 \\
-                  --subtitle.input-path=subtitle.srt \\
-                  --subtitle.output-path=output.json \\
-                  --alignment.device=cuda \\
-                  --subtitle.word-level=true
+        # Mixing positional and keyword arguments
+        lai alignment align audio.mp4 subtitle.srt output.json \\
+            alignment.device=cuda \\
+            subtitle.word_level=true
 
         # Smart sentence splitting with custom output format
-        lai alignment align media.input_path=audio.wav \\
-                  --subtitle.input-path=subtitle.srt \\
-                  --subtitle.output-path=output.vtt \\
-                  subtitle.split_sentence=true \\
-                  --subtitle.output-format=vtt
+        lai alignment align audio.wav subtitle.srt output.vtt \\
+            subtitle.split_sentence=true
 
-        # Using remote audio URL
-        lai alignment align media.input_path="https://example.com/audio.mp3" \\
-                  media.output_dir=/tmp/alignment \\
-                  --subtitle.input-path=subtitle.srt \\
-                  --subtitle.output-path=output.srt
-
-        # Full configuration example with all common options
+        # Using keyword arguments (traditional syntax)
         lai alignment align \\
-            media.input_path=audio.wav \\
+            input_media_path=audio.wav \\
+            input_subtitle_path=subtitle.srt \\
+            output_subtitle_path=output.srt
+
+        # Full configuration with nested config objects
+        lai alignment align audio.wav subtitle.srt aligned.json \\
             media.output_dir=/tmp/output \\
-            --subtitle.input-path=subtitle.srt \\
-            --subtitle.output-path=aligned.json \\
-            --subtitle.input-format=srt \\
-            --subtitle.output-format=json \\
             subtitle.split_sentence=true \\
-            --subtitle.word-level=true \\
-            --subtitle.normalize-text=true \\
-            --alignment.device=mps \\
-            --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha \\
-            --alignment.batch-size=1
+            subtitle.word_level=true \\
+            subtitle.normalize_text=true \\
+            alignment.device=mps \\
+            alignment.model_name_or_path=Lattifai/Lattice-1-Alpha
     """
     media_config = media or MediaConfig()
-    if not media_config.input_path:
+    if not output_subtitle_path and not media_config.input_path:
         raise ValueError("Provide an input media path via argument or media.input-path configuration.")
 
     subtitle_config = subtitle or SubtitleConfig()
@@ -92,9 +83,9 @@ def align(
     client = LattifAI(client_config=client, alignment_config=alignment, subtitle_config=subtitle_config)
 
     return client.alignment(
-        input_media_path=media_config.input_path,
-        input_subtitle_path=subtitle_config.input_path,
-        output_subtitle_path=subtitle_config.output_path,
+        input_media_path=input_media_path or media_config.input_path,
+        input_subtitle_path=input_subtitle_path or subtitle_config.input_path,
+        output_subtitle_path=output_subtitle_path or subtitle_config.output_path,
     )
 
 

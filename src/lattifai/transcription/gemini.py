@@ -9,14 +9,20 @@ from google import genai
 from google.genai.types import GenerateContentConfig, Part, ThinkingConfig
 
 from lattifai.config import TranscriptionConfig
+from lattifai.transcription.base import BaseTranscriber
+from lattifai.transcription.prompts import get_prompt_loader
 
 
-class GeminiTranscriber:
+class GeminiTranscriber(BaseTranscriber):
     """
     Gemini 2.5 Pro audio transcription with config-driven architecture.
 
     Uses TranscriptionConfig for all behavioral settings.
     """
+
+    # Transcriber metadata
+    name = "Gemini"
+    file_suffix = ".md"
 
     # The specific Gem URL
     GEM_URL = "https://gemini.google.com/gem/1870ly7xvW2hU_umtv-LedGsjywT0sQiN"
@@ -37,6 +43,9 @@ class GeminiTranscriber:
 
         self.config = transcription_config
         self.logger = logging.getLogger(__name__)
+        self._client: Optional[genai.Client] = None
+        self._generation_config: Optional[GenerateContentConfig] = None
+        self._system_prompt: Optional[str] = None
 
         # Warn if API key not available
         if not self.config.gemini_api_key:
@@ -62,50 +71,12 @@ class GeminiTranscriber:
             ValueError: If API key not provided
             RuntimeError: If transcription fails
         """
-        if not self.config.gemini_api_key:
-            raise ValueError("Gemini API key is required for transcription")
-
         if self.config.verbose:
             self.logger.info(f"🎤 Starting Gemini transcription for: {url}")
 
         try:
-            # Initialize client
-            client = genai.Client(api_key=self.config.gemini_api_key)
-
-            # Load prompt (using simple transcription prompt for now)
-            system_prompt = self._get_transcription_prompt()
-
-            # Generate transcription
-            if self.config.verbose:
-                self.logger.info(f"🔄 Sending request to {self.config.model_name}...")
-
-            config = GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_modalities=["TEXT"],
-                thinking_config=ThinkingConfig(
-                    include_thoughts=False,
-                    thinking_budget=-1,
-                ),
-            )
-
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: client.models.generate_content(
-                    model=self.config.model_name,
-                    contents=Part.from_uri(file_uri=url, mime_type="video/*"),
-                    config=config,
-                ),
-            )
-
-            if not response.text:
-                raise RuntimeError("Empty response from Gemini API")
-
-            transcript = response.text.strip()
-
-            if self.config.verbose:
-                self.logger.info(f"✅ Transcription completed: {len(transcript)} characters")
-
-            return transcript
+            contents = Part.from_uri(file_uri=url, mime_type="video/*")
+            return await self._run_generation(contents, source=url)
 
         except ImportError:
             raise RuntimeError("Google GenAI SDK not installed. Please install with: pip install google-genai")
@@ -127,57 +98,21 @@ class GeminiTranscriber:
             ValueError: If API key not provided
             RuntimeError: If transcription fails
         """
-        if not self.config.gemini_api_key:
-            raise ValueError("Gemini API key is required for transcription")
-
         media_file_path = Path(media_file_path)
 
         if self.config.verbose:
             self.logger.info(f"🎤 Starting Gemini transcription for file: {media_file_path}")
 
         try:
-            # Initialize client
-            client = genai.Client(api_key=self.config.gemini_api_key)
-
-            # Load prompt
-            system_prompt = self._get_transcription_prompt()
+            client = self._get_client()
 
             # Upload audio file
             if self.config.verbose:
                 self.logger.info("📤 Uploading audio file to Gemini...")
             media_file = client.files.upload(path=str(media_file_path))
 
-            # Generate transcription
-            if self.config.verbose:
-                self.logger.info(f"🔄 Sending transcription request to {self.config.model_name}...")
-
-            config = GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_modalities=["TEXT"],
-                thinking_config=ThinkingConfig(
-                    include_thoughts=False,
-                    thinking_budget=-1,
-                ),
-            )
-
-            response = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: client.models.generate_content(
-                    model=self.config.model_name,
-                    contents=Part.from_uri(file_uri=media_file.uri, mime_type=media_file.mime_type),
-                    config=config,
-                ),
-            )
-
-            if not response.text:
-                raise RuntimeError("Empty response from Gemini API")
-
-            transcript = response.text.strip()
-
-            if self.config.verbose:
-                self.logger.info(f"✅ Transcription completed: {len(transcript)} characters")
-
-            return transcript
+            contents = Part.from_uri(file_uri=media_file.uri, mime_type=media_file.mime_type)
+            return await self._run_generation(contents, source=str(media_file_path), client=client)
 
         except ImportError:
             raise RuntimeError("Google GenAI SDK not installed. Please install with: pip install google-genai")
@@ -185,64 +120,90 @@ class GeminiTranscriber:
             self.logger.error(f"Gemini transcription failed: {str(e)}")
             raise RuntimeError(f"Gemini transcription failed: {str(e)}")
 
-    async def transcribe(
-        self,
-        audio_path: Union[str, Path],
-        output_dir: Union[str, Path],
-    ) -> dict:
-        """
-        Transcribe audio file (implements BaseTranscriber interface).
-
-        Args:
-            audio_path: Path to audio file or URL
-            output_dir: Directory for output files
-
-        Returns:
-            dict: Transcription results with metadata
-        """
-        audio_path_str = str(audio_path)
-        output_dir = Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Check if it's a URL or file path
-        if audio_path_str.startswith(("http://", "https://")):
-            transcript = await self.transcribe_url(audio_path_str)
-        else:
-            transcript = await self.transcribe_file(audio_path)
-
-        # Save transcript to file if output_dir provided
-        output_file = output_dir / f"{Path(audio_path).stem}_transcript.txt"
-        output_file.write_text(transcript, encoding="utf-8")
-
-        return {
-            "transcript": transcript,
-            "output_file": str(output_file),
-            "model": self.config.model_name,
-            "language": self.config.language,
-        }
-
     def _get_transcription_prompt(self) -> str:
-        """Get transcription system prompt."""
-        base_prompt = """You are an expert audio transcription assistant.
-Your task is to accurately transcribe the audio content from the provided media file.
+        """Get (and cache) transcription system prompt from prompts module."""
+        if self._system_prompt is not None:
+            return self._system_prompt
 
-Guidelines:
-- Transcribe exactly what is spoken
-- Include punctuation and proper formatting
-- Preserve speaker changes if multiple speakers
-- Indicate unclear audio with [inaudible]
-- Do NOT add commentary or interpretation
-"""
+        # Load prompt from prompts/gemini/transcription_gem.txt
+        prompt_loader = get_prompt_loader()
+        base_prompt = prompt_loader.get_gemini_transcription_prompt()
+
+        # Add language-specific instruction if configured
         if self.config.language:
-            base_prompt += f"\n- Transcribe in {self.config.language} language"
+            base_prompt += f"\n\n* Use {self.config.language} language for transcription."
 
-        return base_prompt
+        self._system_prompt = base_prompt
+        return self._system_prompt
 
     def get_gem_info(self) -> dict:
         """Get information about the Gem being used."""
         return {
-            "gem_name": "Audio Transcription Gem",
+            "gem_name": "Media Transcription Gem",
             "gem_url": self.GEM_URL,
             "model": self.config.model_name,
             "description": "Specialized Gem for media content transcription",
         }
+
+    def _build_result(self, transcript: str, output_file: Path) -> dict:
+        """Augment the base result with Gemini-specific metadata."""
+        base_result = super()._build_result(transcript, output_file)
+        base_result.update({"model": self.config.model_name, "language": self.config.language})
+        return base_result
+
+    def _get_client(self) -> genai.Client:
+        """Lazily create the Gemini client when first needed."""
+        if not self.config.gemini_api_key:
+            raise ValueError("Gemini API key is required for transcription")
+
+        if self._client is None:
+            self._client = genai.Client(api_key=self.config.gemini_api_key)
+        return self._client
+
+    def _get_generation_config(self) -> GenerateContentConfig:
+        """Lazily build the generation config since it rarely changes."""
+        if self._generation_config is None:
+            self._generation_config = GenerateContentConfig(
+                system_instruction=self._get_transcription_prompt(),
+                response_modalities=["TEXT"],
+                thinking_config=ThinkingConfig(
+                    include_thoughts=False,
+                    thinking_budget=-1,
+                ),
+            )
+        return self._generation_config
+
+    async def _run_generation(
+        self,
+        contents: Part,
+        *,
+        source: str,
+        client: Optional[genai.Client] = None,
+    ) -> str:
+        """
+        Shared helper for sending generation requests and handling the response.
+        """
+        client = client or self._get_client()
+        config = self._get_generation_config()
+
+        if self.config.verbose:
+            self.logger.info(f"🔄 Sending transcription request to {self.config.model_name} ({source})...")
+
+        response = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model=self.config.model_name,
+                contents=contents,
+                config=config,
+            ),
+        )
+
+        if not response.text:
+            raise RuntimeError("Empty response from Gemini API")
+
+        transcript = response.text.strip()
+
+        if self.config.verbose:
+            self.logger.info(f"✅ Transcription completed ({source}): {len(transcript)} characters")
+
+        return transcript

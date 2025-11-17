@@ -78,16 +78,10 @@ class FileExistenceManager:
                 existing_files["subtitle"].append(str(subtitle_file))
 
             # Pattern 2: With language/track suffix like {video_id}.en-trackid.vtt
-            for sub_file in output_path.glob(f"{video_id}.*.{ext}"):
+            for sub_file in output_path.glob(f"{video_id}*.{ext}"):
                 file_path = str(sub_file)
                 if file_path not in existing_files["subtitle"]:
                     existing_files["subtitle"].append(file_path)
-
-        if "md" in subtitle_formats:
-            # Gemini-specific pattern: {video_id}_Gemini.md
-            gemini_subtitle_file = output_path / f"{video_id}_Gemini.md"
-            if gemini_subtitle_file.exists():
-                existing_files["subtitle"].append(str(gemini_subtitle_file))
 
         return existing_files
 
@@ -120,20 +114,25 @@ class FileExistenceManager:
             file_paths.extend(existing_files["subtitle"])
 
         # Create display options with emojis
-        options = []
+        options, shift_length = [], 0
         for file_path in file_paths:
             # Determine emoji based on file type
             if has_media and file_path in existing_files["media"]:
                 display_text = f'{colorful.green("•")} 🎬 Media file: {file_path}'
+                shift_length = len("Media file:")
             else:
                 display_text = f'{colorful.green("•")} 📝 Subtitle file: {file_path}'
+                shift_length = len("Subtitle file:")
             options.append((display_text, file_path))
 
-        # Add overwrite and cancel options
+        # Add overwrite and cancel options with aligned spacing
         options.extend(
             [
-                ("                  Overwrite existing files (re-generate or download)", "overwrite"),
-                ("                  Cancel operation", "cancel"),
+                (
+                    f'{colorful.green("•")} 🔄 {" " * shift_length} Overwrite existing files (re-generate or download)',
+                    "overwrite",
+                ),
+                (f'{colorful.green("•")} ❌ {" " * shift_length} Cancel operation', "cancel"),
             ]
         )
 
@@ -177,18 +176,18 @@ class FileExistenceManager:
         for file_path in files:
             print(f'   {colorful.green("•")} {file_path}')
 
-        prompt_message = f"What would you like to do with {label.lower()} files?"
+        prompt_message = f"What would you like to do with {label} files?"
         options = [
-            (f"Use existing {label.lower()} files (skip {operation})", "use"),
-            (f"Overwrite {label.lower()} files (re-{operation})", "overwrite"),
+            (f"Use existing {label} files (skip {operation})", "use"),
+            (f"Overwrite {label} files (re-{operation})", "overwrite"),
             ("Cancel operation", "cancel"),
         ]
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default="use")
 
         if choice == "use":
-            print(f'{colorful.green(f"✅ Using existing {label.lower()} files")}')
+            print(f'{colorful.green(f"✅ Using existing {label} files")}')
         elif choice == "overwrite":
-            print(f'{colorful.yellow(f"🔄 Overwriting {label.lower()} files")}')
+            print(f'{colorful.yellow(f"🔄 Overwriting {label} files")}')
         elif choice == "cancel":
             print(f'{colorful.red("❌ Operation cancelled")}')
 

@@ -34,7 +34,7 @@ dependencies = [
     "questionary>=2.0",
     "yt-dlp",
     "pycryptodome",
-    "google-genai",
+    "google-genai>=1.22.0",
     # config
     "lattifai-run>=1.0.0rc1",
 ]
@@ -83,8 +83,8 @@ packages = [
     "lattifai.config",
     "lattifai.subtitle",
     "lattifai.transcription",
+    "lattifai.transcription.prompts",
     "lattifai.workflow",
-    "lattifai.workflow.prompts",
     "lattifai.cli",
 ]
 

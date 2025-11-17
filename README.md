@@ -15,11 +15,20 @@
 
 Advanced forced alignment and subtitle generation powered by [Lattice-1-Alpha](https://huggingface.co/Lattifai/Lattice-1-Alpha) model.
 
+## Roadmap
+
+Visit our [LattifAI roadmap](https://lattifai.com/roadmap) for the latest updates and planned features.
+
+| Date | Release | Key Features |
+|------|---------|--------------|
+| **Oct 7, 2024** | **Lattice-1-Alpha** | ✅ English-only forced alignment<br>✅ Multiple media&subtitle format support<br>✅ CPU/GPU optimization |
+| **Nov 30, 2024** | **Lattice-1** | 🚀 English + Chinese + German support<br>🚀 Mixed language alignment<br>🚀 Integrate Speaker Diarization technology<br>🚀 Support up to 20 hours of continuous audio/video processing |
+
 ## Installation
 
 ```bash
 pip install install-k2
-# The installation will automatically detect and use your already installed PyTorch version(up to 2.8).
+# The installation will automatically detect and use your already installed PyTorch version(up to 2.9).
 install-k2  # Install k2
 
 pip install lattifai
@@ -43,6 +52,40 @@ optional arguments:
 
 ## Quick Start
 
+### API Key Setup
+
+First, create your API key at [https://lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys)
+
+**Recommended: Using .env file**
+
+1. Copy the example environment file:
+```bash
+cp .env.example .env
+```
+
+2. Edit `.env` and add your API key:
+```bash
+# LattifAI API_KEY at: https://lattifai.com/dashboard/api-keys
+LATTIFAI_API_KEY=your_api_key_here  # lf_xxxx
+
+# Gemini API KEY at: https://aistudio.google.com/api-keys (Optional)
+# Only required if you choose to use Gemini for audio/video transcription
+# You can safely skip this if you're only doing alignment with existing subtitles
+GEMINI_API_KEY=your_gemini_api_key_here  # AIzaSyxxxx
+```
+
+The library automatically loads the `.env` file (python-dotenv is included as a dependency).
+
+**Alternative: Environment variable**
+```bash
+export LATTIFAI_API_KEY="your-api-key"
+export GEMINI_API_KEY="your_gemini_api_key_here"  # Optional, only for transcription
+```
+> **💡 Tip**: Get your free **LattifAI API key** at [https://lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys)
+
+> **💡 Tip**: Get your free **Gemini API key** at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey) (Optional - only needed for automatic transcription)
+
+
 ### Command Line Interface
 
 LattifAI provides a powerful CLI powered by [NeMo Run](https://github.com/lattifai/Run), offering flexible configuration management and execution capabilities.
@@ -54,12 +97,7 @@ lai alignment align media.input_path=audio.wav \
                     subtitle.output_path=output.srt
 
 # Download and align YouTube content
-lai alignment youtube media.input_path="https://youtube.com/watch?v=VIDEO_ID" \
-                      subtitle.input_path=subtitle.srt
-
-# Run intelligent YouTube workflow (download → transcribe → align → export)
-lai agent workflow media.input_path="https://youtube.com/watch?v=VIDEO_ID" \
-                   transcription.api_key=YOUR_GEMINI_KEY
+lai alignment youtube media.input_path="https://youtube.com/watch?v=VIDEO_ID"
 
 # Convert subtitle formats
 lai subtitle convert input_path=input.srt output_path=output.vtt
@@ -70,15 +108,28 @@ lai subtitle normalize input_path=input.srt output_path=output.srt
 
 > **💡 New to NeMo Run?** Check out the [Configuration Guide](#advanced-configuration-with-nemo-run) below to learn about powerful features like YAML configs, config reuse, and parameter sweeps.
 
+```bash
+lai alignment youtube \
+    media.input_path="https://www.youtube.com/watch?v=DQacCB9tDaw" \
+    media.output_dir=~/Downloads/lattifai_youtube \
+    subtitle.split_sentence=true subtitle.normalize_text=true \
+    subtitle.output_path=~/Downloads/lattifai_youtube/DQacCB9tDaw_LattifAI.srt
+```
+
+![CLI Demo](assets/cli.png)
+
+
 #### Command Quick Reference
 
 | Command | Use Case | Best For |
 |---------|----------|----------|
-| `lai alignment align` | Align existing audio + subtitle files | Local files, custom workflows |
-| `lai alignment youtube` | Download & align YouTube content | Quick YouTube processing with existing subtitles |
+| `lai alignment align` | Align existing audio/video + subtitle files | Local files, custom workflows |
+| `lai alignment youtube` | Download & align YouTube content | Quick YouTube processing with/without existing subtitles |
 | `lai subtitle convert` | Convert subtitle formats | Format conversion only |
 | `lai subtitle normalize` | Clean and normalize subtitle text | Text preprocessing |
-| `lai agent workflow(under construction)` | Intelligent YouTube workflow with transcription | Production, batch jobs, full automation |
+| ~~`lai agent workflow(under construction)`~~ | Intelligent YouTube workflow with transcription | Production, batch jobs, full automation |
+
+
 
 
 #### lai alignment align
@@ -90,21 +141,15 @@ Align audio/video with subtitle files using forced alignment.
 # Simple alignment
 lai alignment align media.input_path=audio.wav \
                     subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.srt
+                    subtitle.output_path=output.srt \
+                    alignment.device=cuda
 
-# With GPU acceleration and word_level alignment
-lai alignment align media.input_path=audio.mp4 \
-                    subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.json \
-                    alignment.device=cuda \
-                    subtitle.word_level=true
-
-# Smart sentence splitting with custom output format
+# Smart sentence splitting and normalize text
 lai alignment align media.input_path=audio.wav \
                     subtitle.input_path=subtitle.srt \
                     subtitle.output_path=output.vtt \
                     subtitle.split_sentence=true \
-                    subtitle.output_format=vtt
+                    subtitle.normalize_text=true
 ```
 
 **Common Options:**
@@ -112,7 +157,6 @@ lai alignment align media.input_path=audio.wav \
 - `subtitle.input_path`: Path to subtitle file (required)
 - `subtitle.output_path`: Output path for aligned subtitle
 - `subtitle.split_sentence`: Enable intelligent sentence splitting
-- `subtitle.word_level`: Include word_level timestamps
 - `alignment.device`: Device to use (`cpu`, `cuda`, or `mps`)
 - `alignment.model_name_or_path`: Model to use for alignment
 
@@ -123,11 +167,11 @@ Download media and optionally subtitles from YouTube, then perform forced alignm
 **Basic Usage:**
 ```bash
 # Basic YouTube alignment with existing subtitle
-lai alignment youtube media.input_path="https://youtu.be/VIDEO_ID" \
+lai alignment youtube media.input_path="https://youtube.com/watch?v=VIDEO_ID" \
                       subtitle.input_path=subtitle.srt
 
-# Full configuration with custom output
-lai alignment youtube media.input_path="https://youtu.be/VIDEO_ID" \
+# more configuration with custom output
+lai alignment youtube media.input_path="https://youtube.com/watch?v=VIDEO_ID" \
                       media.output_dir=/tmp/youtube \
                       media.output_format=wav \
                       subtitle.input_path=subtitle.srt \
@@ -150,45 +194,9 @@ Run the intelligent agentic YouTube workflow with automatic transcription, align
 
 This command provides a complete end-to-end pipeline:
 1. Download media from YouTube URL
-2. Transcribe audio using Gemini API (if no subtitle provided)
-3. Align transcription with audio
+2. Transcribe audio/video using Gemini API or Local Transcription model
+3. Align transcription with audio/video
 4. Export results in the desired format
-
-**Basic Usage:**
-```bash
-# Basic YouTube video processing
-lai agent workflow media.input_path="https://youtu.be/VIDEO_ID" \
-                   transcription.api_key=YOUR_GEMINI_KEY
-
-# Enable speaker diarization and sentence splitting
-lai agent workflow media.input_path="https://youtu.be/VIDEO_ID" \
-                   transcription.enable_diarization=true \
-                   subtitle.split_sentence=true \
-                   transcription.api_key=YOUR_GEMINI_KEY
-
-# Full configuration with retries
-lai agent workflow \
-    media.input_path="https://youtu.be/VIDEO_ID" \
-    media.output_dir=/tmp/youtube \
-    media.output_format=wav \
-    subtitle.output_format=json \
-    subtitle.word_level=true \
-    subtitle.split_sentence=true \
-    alignment.device=cuda \
-    transcription.api_key=YOUR_GEMINI_KEY \
-    transcription.enable_diarization=true \
-    max_retries=3
-```
-
-**Common Options:**
-_ `media.input_path`: YouTube URL (required)
-_ `transcription.api_key`: Gemini API key for transcription (required)
-_ `transcription.enable_diarization`: Enable speaker diarization
-_ `subtitle.word_level`: Include word_level timestamps
-_ `subtitle.split_sentence`: Enable smart sentence splitting
-_ `max_retries`: Maximum retries for failed operations
-
-> **� Tip**: Get your free Gemini API key at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
 #### lai subtitle convert
 
@@ -199,20 +207,15 @@ Convert subtitle files between different formats.
 # Basic format conversion
 lai subtitle convert input.srt output.vtt
 
-# Convert to TextGrid with speaker info
-lai subtitle convert input.srt output.TextGrid \
-    subtitle.include_speaker_in_text=true
-
 # Convert with text normalization
-lai subtitle convert input.json output.srt \
-    subtitle.normalize_text=true
+lai subtitle convert input.json output.srt normalize_text=true
 ```
 
 **Arguments:**
 - First argument: Input subtitle file path
 - Second argument: Output subtitle file path
-- `subtitle.include_speaker_in_text`: Include speaker labels in text
-- `subtitle.normalize_text`: Normalize text during conversion
+- `include_speaker_in_text=true`: Include speaker labels in text
+- `normalize_text=true`: Normalize text during conversion
 
 #### lai subtitle normalize
 
@@ -477,29 +480,6 @@ Two tiers created:
 - **Karaoke applications**: Highlight individual words as they are spoken
 - **Language learning**: Provide precise word boundaries for pronunciation practice
 
-**Usage**:
-```bash
-# Generate word_level aligned JSON
-lai alignment align subtitle.word_level=true \
-                 media.input_path=audio.wav \
-                 subtitle.input_path=subtitle.srt \
-                 subtitle.output_path=output.json
-
-# Create TextGrid file for Praat analysis
-lai alignment align subtitle.word_level=true \
-                 media.input_path=audio.wav \
-                 subtitle.input_path=subtitle.srt \
-                 subtitle.output_path=output.TextGrid
-```
-
-**Combined with split_sentence**:
-```bash
-# Optimal alignment: semantic splitting
-lai alignment align subtitle.split_sentence=true \
-                    media.input_path=audio.wav \
-                    subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.json
-```
 
 ### Advanced Configuration with LattifAI Run
 
@@ -512,6 +492,8 @@ LattifAI CLI is built on [NeMo Run](https://github.com/lattifai/Run), a powerful
 - **📦 Config Reuse**: Share configurations across different commands
 
 > **Note**: We use a customized version of [NVIDIA NeMo Run](https://github.com/NVIDIA-NeMo/Run) tailored for LattifAI's workflow requirements. For full documentation, visit [https://github.com/lattifai/Run](https://github.com/lattifai/Run).
+
+> **💡 All Configuration Options**: See [`src/lattifai/config`](https://github.com/lattifai/lattifai-python/tree/main/src/lattifai/config) for complete configuration schemas and available parameters.
 
 #### Using Configuration Files
 
@@ -554,131 +536,6 @@ lai alignment align media=config/media.yaml \
                     alignment.device=cuda
 ```
 
-#### Using Python Configuration Files
-
-Create reusable configuration objects in Python:
-
-```python
-# configs/my_config.py
-import nemo_run as run
-from lattifai.config import MediaConfig, SubtitleConfig, AlignmentConfig
-
-# Define configurations
-media_config = run.Config(
-    MediaConfig,
-    input_path="audio.wav",
-    output_dir="/tmp/output",
-    prefer_audio=True,
-)
-
-subtitle_config = run.Config(
-    SubtitleConfig,
-    input_path="subtitle.srt",
-    output_path="output.srt",
-    split_sentence=True,
-    word_level=True,
-)
-
-alignment_config = run.Config(
-    AlignmentConfig,
-    device="mps",
-    model_name_or_path="Lattifai/Lattice-1-Alpha",
-)
-```
-
-**Use the Python config:**
-
-```bash
-# Import configs from Python file
-lai alignment align media=configs.my_config.media_config \
-                    subtitle=configs.my_config.subtitle_config \
-                    alignment=configs.my_config.alignment_config
-```
-
-#### Configuration Composition
-
-Combine multiple configuration sources:
-
-```bash
-# Base config from YAML + overrides from command line
-lai alignment align media=config/base_media.yaml \
-                    media.input_path=new_audio.wav \
-                    subtitle.split_sentence=true \
-                    subtitle.word_level=true \
-                    alignment.device=cuda
-```
-
-#### Configuration for YouTube Workflow
-
-**Create a complete workflow configuration:**
-
-```yaml
-# config/youtube_workflow.yaml
-media:
-  input_path: "https://youtu.be/VIDEO_ID"
-  output_dir: "/tmp/youtube"
-  output_format: "wav"
-  prefer_audio: true
-
-subtitle:
-  output_format: "json"
-  split_sentence: true
-  word_level: true
-  include_speaker_in_text: true
-
-alignment:
-  device: "cuda"
-  model_name_or_path: "Lattifai/Lattice-1-Alpha"
-
-transcription:
-  api_key: "${GEMINI_API_KEY}"  # Reference environment variable
-  enable_diarization: true
-  language: "en"
-```
-
-**Run the workflow:**
-
-```bash
-# Use the complete workflow config
-lai agent workflow media=config/youtube_workflow.yaml
-
-# Or load from Python
-# configs/workflows.py
-import os
-import nemo_run as run
-from lattifai.config import (
-    MediaConfig,
-    SubtitleConfig,
-    AlignmentConfig,
-    TranscriptionConfig,
-)
-
-youtube_media = run.Config(
-    MediaConfig,
-    input_path="https://youtu.be/VIDEO_ID",
-    output_dir="/tmp/youtube",
-    prefer_audio=True,
-)
-
-youtube_subtitle = run.Config(
-    SubtitleConfig,
-    output_format="json",
-    split_sentence=True,
-    word_level=True,
-)
-
-youtube_transcription = run.Config(
-    TranscriptionConfig,
-    api_key=os.getenv("GEMINI_API_KEY"),
-    enable_diarization=True,
-)
-
-# Run with Python configs
-lai agent workflow media=configs.workflows.youtube_media \
-                      subtitle=configs.workflows.youtube_subtitle \
-                      transcription=configs.workflows.youtube_transcription
-```
-
 #### Benefits of Configuration Files
 
 1. **Reusability**: Define once, use across multiple experiments
@@ -698,9 +555,9 @@ client = LattifAI()
 alignments, output_path = client.alignment(
     input_media_path="audio.wav",
     input_subtitle_path="subtitle.srt",
+    output_subtitle_path="output.srt",
     input_subtitle_format=None,  # Optional: auto-detect from file extension
     split_sentence=None,  # Optional: uses config default if None
-    output_subtitle_path="output.srt",
 )
 ```
 
@@ -716,9 +573,9 @@ async def main():
         alignments, output_path = await client.alignment(
             input_media_path="audio.wav",
             input_subtitle_path="subtitle.srt",
+            output_subtitle_path="output.srt",
             input_subtitle_format=None,  # Optional: auto-detect from file extension
             split_sentence=None,  # Optional: uses config default if None
-            output_subtitle_path="output.srt",
         )
 
 
@@ -816,164 +673,6 @@ alignments, output_path = client.alignment(
 **Subtitle Input**: SRT, VTT, ASS, SSA, SUB, SBV, TXT (plain text), Gemini (Google Gemini transcript format)
 
 **Subtitle Output**: All input formats plus TextGrid (Praat format for linguistic analysis)
-
-## API Reference
-
-### LattifAI (sync)
-
-```python
-class LattifAI:
-    def __init__(
-        self,
-        client_config: Optional[ClientConfig] = None,
-        alignment_config: Optional[AlignmentConfig] = None,
-        subtitle_config: Optional[SubtitleConfig] = None,
-    ) -> None:
-        """
-        Initialize LattifAI synchronous client.
-
-        Args:
-            client_config: Client configuration (API key, base URL, timeout, retries).
-                          If None, uses defaults (reads API key from LATTIFAI_API_KEY env var).
-            alignment_config: Alignment model and behavior configuration.
-                            If None, uses defaults (Lattice-1 model, auto device selection).
-            subtitle_config: Subtitle I/O configuration for format handling.
-                           If None, uses defaults (auto-detect format).
-        """
-
-    def alignment(
-        self,
-        input_media_path: Pathlike,
-        input_subtitle_path: Pathlike,
-        input_subtitle_format: Optional[InputSubtitleFormat] = None,
-        split_sentence: Optional[bool] = None,
-        output_subtitle_path: Optional[Pathlike] = None,
-    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
-        """
-        Perform forced alignment on audio/video and subtitle/text.
-
-        Args:
-            input_media_path: Path to audio/video file (WAV, MP3, FLAC, MP4, etc.).
-            input_subtitle_path: Path to subtitle or plain text file to align.
-            input_subtitle_format: Input subtitle format ('srt', 'vtt', 'ass', 'txt').
-                                  If None, auto-detects from file extension.
-            split_sentence: Enable automatic sentence re-splitting for better accuracy.
-                          If None, uses config default.
-            output_subtitle_path: Optional path to write aligned subtitle file.
-
-        Returns:
-            Tuple of (List[Supervision], Optional[Pathlike]):
-                - List of Supervision objects with aligned timing information
-                - Output subtitle path (or None if not provided)
-
-        Raises:
-            SubtitleProcessingError: If subtitle file cannot be parsed or written.
-            LatticeEncodingError: If lattice graph generation fails.
-            AlignmentError: If audio alignment fails.
-            LatticeDecodingError: If lattice decoding fails.
-        """
-```
-
-### AsyncLattifAI (async)
-
-```python
-class AsyncLattifAI:
-    def __init__(
-        self,
-        client_config: Optional[ClientConfig] = None,
-        alignment_config: Optional[AlignmentConfig] = None,
-        subtitle_config: Optional[SubtitleConfig] = None,
-    ) -> None:
-        """
-        Initialize AsyncLattifAI asynchronous client.
-
-        Args:
-            client_config: Client configuration (API key, base URL, timeout, retries).
-            alignment_config: Alignment model and behavior configuration.
-            subtitle_config: Subtitle I/O configuration for format handling.
-        """
-
-    async def alignment(
-        self,
-        input_media_path: Pathlike,
-        input_subtitle_path: Pathlike,
-        input_subtitle_format: Optional[InputSubtitleFormat] = None,
-        split_sentence: Optional[bool] = None,
-        output_subtitle_path: Optional[Pathlike] = None,
-    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
-        """
-        Perform asynchronous forced alignment on audio/video and subtitle/text.
-
-        Same parameters and return type as LattifAI.alignment(), but runs asynchronously.
-        Ideal for batch alignment tasks or integration into async applications.
-
-        Args:
-            input_media_path: Path to audio/video file.
-            input_subtitle_path: Path to subtitle or plain text file.
-            input_subtitle_format: Input subtitle format (auto-detect if None).
-            split_sentence: Enable sentence re-splitting (uses config default if None).
-            output_subtitle_path: Optional output path.
-
-        Returns:
-            Tuple of (List[Supervision], Optional[Pathlike])
-        """
-```
-
-Use `async with AsyncLattifAI() as client:` or call `await client.close()` when you are done to release the underlying HTTP session.
-
-
-## Examples
-
-### GPU Acceleration
-
-```python
-from lattifai import LattifAI
-
-# NVIDIA GPU
-lai alignment align alignment.device=cuda:0 \
-                    media.input_path=audio.wav \
-                    subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.srt
-
-# Apple Silicon
-lai alignment align alignment.device=mps \
-                    media.input_path=audio.wav \
-                    subtitle.input_path=subtitle.srt \
-                    subtitle.output_path=output.srt
-```
-
-## Configuration
-
-### API Key Setup
-
-First, create your API key at [https://lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys)
-
-**Recommended: Using .env file**
-
-Create a `.env` file in your project root:
-```bash
-LATTIFAI_API_KEY=your-api-key
-```
-
-The library automatically loads the `.env` file (python-dotenv is included as a dependency).
-
-**Alternative: Environment variable**
-```bash
-export LATTIFAI_API_KEY="your-api-key"
-```
-
-## Model Information
-
-**[Lattice-1-Alpha](https://huggingface.co/Lattifai/Lattice-1-Alpha)** features:
-- State-of-the-art alignment precision
-- **Language Support**: Currently supports English only. The upcoming **Lattice-1** release will support English, Chinese, and mixed English-Chinese content.
-- Handles noisy audio and imperfect transcripts
-- Optimized for CPU and GPU (CUDA/MPS)
-
-**Requirements**:
-- Python 3.10 - 3.13 (3.14 support coming soon)
-- 4GB RAM recommended
-- ~2GB storage for model files
 
 ## Development
 

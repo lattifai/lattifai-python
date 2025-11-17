@@ -41,6 +41,9 @@ class SubtitleConfig:
     output_path: Optional[str] = None
     """Path to output subtitle file."""
 
+    include_speaker_in_text: bool = True
+    """Preserve speaker labels in subtitle text content."""
+
     normalize_text: bool = False
     """Clean HTML entities and normalize whitespace in subtitle text."""
 
@@ -50,11 +53,11 @@ class SubtitleConfig:
     word_level: bool = False
     """Include word-level timestamps in alignment results (useful for karaoke, dubbing)."""
 
-    include_speaker_in_text: bool = True
-    """Preserve speaker labels in subtitle text content."""
-
     encoding: str = "utf-8"
     """Character encoding for reading/writing subtitle files (default: utf-8)."""
+
+    use_transcription: bool = False
+    """Use transcription service (e.g., Gemini) instead of downloading YouTube subtitles."""
 
     def __post_init__(self):
         """Validate configuration after initialization."""

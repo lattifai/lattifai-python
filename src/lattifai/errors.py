@@ -8,15 +8,15 @@ import colorful
 # Error help messages
 LATTICE_DECODING_FAILURE_HELP = (
     "Failed to decode lattice alignment. Possible reasons:\n\n"
-    "1) Audio and text content mismatch:\n"
-    "   - The transcript/subtitle does not accurately match the audio content\n"
-    "   - Text may be from a different version or section of the audio\n"
-    "   ⚠️  Note: Gemini transcription may occasionally skip large segments of audio, causing alignment failures.\n"
+    "1) Media(Audio/Video) and text content mismatch:\n"
+    "   - The transcript/subtitle does not accurately match the media content\n"
+    "   - Text may be from a different version or section of the media\n"
+    "   ⚠️  Note: Gemini transcription may occasionally skip large segments of media, causing alignment failures.\n"
     "       We will detect and fix this issue in the next version.\n\n"
-    "2) Unsupported audio type:\n"
+    "2) Unsupported media type:\n"
     "   - Singing is not yet supported, this will be optimized in future versions\n\n"
     "💡 Troubleshooting tips:\n"
-    "   • Verify the transcript matches the audio by listening to a few segments\n"
+    "   • Verify the transcript matches the media by listening to a few segments\n"
     "   • For YouTube videos, manually check if auto-generated transcript are accurate\n"
     "       • Consider using a different transcription source if Gemini results are incomplete"
 )

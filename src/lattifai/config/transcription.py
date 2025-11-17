@@ -13,14 +13,14 @@ class TranscriptionConfig:
     Settings for audio/video transcription using various providers.
     """
 
+    model_name: str = "gemini-2.5-pro"
+    """Model name for transcription."""
+
     gemini_api_key: Optional[str] = None
     """Gemini API key. If None, reads from GEMINI_API_KEY environment variable."""
 
     device: Literal["cpu", "cuda", "mps"] = "cpu"
     """Computation device for transcription models."""
-
-    media_format: Literal["mp4", "mp3", "webm", "m4a"] = "mp4"
-    """Media download format for YouTube and other sources."""
 
     max_retries: int = 0
     """Maximum number of retry attempts for failed transcription requests."""
@@ -33,9 +33,6 @@ class TranscriptionConfig:
 
     language: Optional[str] = None
     """Target language code for transcription (e.g., 'en', 'zh', 'ja')."""
-
-    model_name: str = "gemini-2.5-pro"
-    """Gemini model name for transcription."""
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
@@ -58,8 +55,3 @@ class TranscriptionConfig:
         valid_devices = ["cpu", "cuda", "mps"]
         if self.device not in valid_devices:
             raise ValueError(f"device must be one of {valid_devices}, got '{self.device}'")
-
-        # Validate media_format
-        valid_formats = ["mp4", "mp3", "webm", "m4a"]
-        if self.media_format not in valid_formats:
-            raise ValueError(f"media_format must be one of {valid_formats}, got '{self.media_format}'")

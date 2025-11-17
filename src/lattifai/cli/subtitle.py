@@ -13,6 +13,7 @@ from lattifai.config import SubtitleConfig
 def convert(
     input_path: Path,
     output_path: Path,
+    include_speaker_in_text: bool = True,
     normalize_text: bool = False,
 ):
     """
@@ -27,26 +28,32 @@ def convert(
     Args:
         input_path: Path to input subtitle file (supports SRT, VTT, JSON, TextGrid formats)
         output_path: Path to output subtitle file (format determined by file extension)
+        include_speaker_in_text: Preserve speaker labels in subtitle text content.
         normalize_text: Whether to normalize subtitle text during conversion.
             This applies text cleaning such as removing HTML tags, decoding entities,
             collapsing whitespace, and standardizing punctuation.
 
     Examples:
-        # Basic format conversion
-        lai subtitle convert input.srt output.vtt
-
-        # Convert to TextGrid with speaker info
-        lai subtitle convert input.srt output.TextGrid
-
-        # Convert without speaker info
+        # Basic format conversion (positional arguments)
         lai subtitle convert input.srt output.vtt
 
         # Convert with text normalization
-        lai subtitle convert input.json output.srt
+        lai subtitle convert input.srt output.json normalize_text=true
+
+        # Mixing positional and keyword arguments
+        lai subtitle convert input.srt output.vtt \\
+            include_speaker_in_text=false \\
+            normalize_text=true
+
+        # Using keyword arguments (traditional syntax)
+        lai subtitle convert \\
+            input_path=input.srt \\
+            output_path=output.TextGrid
     """
     from lattifai.subtitle import Subtitler
 
     subtitle = SubtitleConfig(
+        include_speaker_in_text=include_speaker_in_text,
         normalize_text=normalize_text,
     )
 
@@ -86,18 +93,20 @@ def normalize(
                     encoding
 
     Examples:
-        # Normalize subtitle in-place
-        lai subtitle normalize input.srt
-
-        # Normalize and save to new file
+        # Normalize and save to new file (positional arguments)
         lai subtitle normalize input.srt output.srt
 
         # Normalize with format conversion
         lai subtitle normalize input.vtt output.srt
 
-        # Normalize and specify encoding
+        # Normalize with custom subtitle config
         lai subtitle normalize input.srt output.srt \\
-            --subtitle.encoding=utf-8
+            subtitle.encoding=utf-8
+
+        # Using keyword arguments (traditional syntax)
+        lai subtitle normalize \\
+            input_path=input.srt \\
+            output_path=output.srt
     """
     from lattifai.subtitle import Subtitler
 

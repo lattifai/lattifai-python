@@ -753,9 +753,9 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             # If user_choice == 'overwrite' or 'gemini', continue to transcription below
 
         # TODO: support other Transcriber options
-        self.logger.info("✨ Transcribing URL with Gemini 2.5 Pro...")
+        self.logger.info(f"✨ Transcribing URL with {self.transcriber.name}...")
         transcript = await self.transcriber.transcribe_url(url)
-        subtitle_path = output_dir / f"{video_id}_Gemini.md"
+        subtitle_path = output_dir / f"{video_id}_{self.transcriber.name}{self.transcriber.file_suffix}"
         with open(subtitle_path, "w", encoding="utf-8") as f:
             f.write(transcript)
         result = {"subtitle_path": str(subtitle_path)}
@@ -773,13 +773,16 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         self.logger.info("🎯 Aligning subtitle with video...")
 
-        if subtitle_path.endswith("_Gemini.md"):
-            is_gemini_format = True
+        # Check if subtitle is in markdown format (from transcriber)
+        if subtitle_path.endswith(self.transcriber.file_suffix):
+            is_transcriber_format = True
         else:
-            is_gemini_format = False
+            is_transcriber_format = False
         subtitle_path = Path(subtitle_path)
 
-        self.logger.info(f'📄 Subtitle format: {"Gemini" if is_gemini_format else f"{subtitle_path.suffix}"}')
+        self.logger.info(
+            f'📄 Subtitle format: {self.transcriber.name if is_transcriber_format else f"{subtitle_path.suffix}"}'
+        )
 
         original_subtitle_path = subtitle_path
         output_dir = result.get("output_dir")
@@ -791,7 +794,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         aligned_result = await self.aligner.alignment(
             audio=media_path,
             subtitle=str(subtitle_path),  # Use dialogue text for YouTube format, original for plain text
-            format="gemini" if is_gemini_format else "auto",
+            format="gemini" if is_transcriber_format else "auto",
             split_sentence=split_sentence,
             return_details=word_level,
             output_subtitle_path=str(output_path),
@@ -801,7 +804,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             "aligned_path": output_path,
             "alignment_result": aligned_result,
             "original_subtitle_path": original_subtitle_path,
-            "is_gemini_format": is_gemini_format,
+            "is_transcriber_format": is_transcriber_format,
         }
 
         self.logger.info("✅ Alignment completed")
@@ -812,7 +815,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         align_result = context.get("align_subtitle_result", {})
         aligned_path = align_result.get("aligned_path")
         original_subtitle_path = align_result.get("original_subtitle_path")
-        is_gemini_format = align_result.get("is_gemini_format", False)
+        is_transcriber_format = align_result.get("is_transcriber_format", False)
         metadata = context.get("process_youtube_url_result", {}).get("metadata", {})
 
         if not aligned_path:
@@ -825,8 +828,8 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         supervisions = SubtitleIO.read(aligned_path, format="ass")
         exported_files = {}
 
-        # Update original transcript file with aligned timestamps if YouTube format
-        if is_gemini_format:
+        # Update original transcript file with aligned timestamps if transcriber format
+        if is_transcriber_format:
             assert Path(original_subtitle_path).exists(), "Original subtitle path not found"
             self.logger.info("📝 Updating original transcript with aligned timestamps...")
 
@@ -850,7 +853,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
 
         # Export to requested subtitle format
         output_path = str(aligned_path).replace(
-            "_aligned.ass", f'{"_Gemini" if is_gemini_format else ""}_LattifAI.{output_format}'
+            "_aligned.ass", f'{"_Gemini" if is_transcriber_format else ""}_LattifAI.{output_format}'
         )
         SubtitleIO.write(supervisions, output_path=output_path, include_speaker_in_text=include_speaker_in_text)
         exported_files[output_format] = output_path
@@ -860,7 +863,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             "exported_files": exported_files,
             "metadata": metadata,
             "subtitle_count": len(supervisions),
-            "is_gemini_format": is_gemini_format,
+            "is_transcriber_format": is_transcriber_format,
             "original_subtitle_path": original_subtitle_path,
         }
 
