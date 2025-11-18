@@ -63,6 +63,11 @@ class SubtitleConfig:
 
     def __post_init__(self):
         """Validate configuration after initialization."""
+        self._normalize_paths()
+        self._validate_formats()
+
+    def _normalize_paths(self) -> None:
+        """Normalize and expand input/output paths."""
         # Expand and normalize input path if provided, but don't require it to exist yet
         # (it might be set later after downloading subtitles)
         if self.input_path is not None:
@@ -73,6 +78,8 @@ class SubtitleConfig:
             output_dir = Path(self.output_path).parent
             output_dir.mkdir(parents=True, exist_ok=True)
 
+    def _validate_formats(self) -> None:
+        """Validate input and output format fields."""
         if self.input_format not in INPUT_SUBTITLE_FORMATS:
             raise ValueError(f"input_format must be one of {INPUT_SUBTITLE_FORMATS}, got '{self.input_format}'")
 

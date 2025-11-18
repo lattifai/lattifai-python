@@ -79,34 +79,51 @@ class MediaConfig:
 
     def __post_init__(self) -> None:
         """Validate configuration and normalize paths/formats."""
+        self._setup_output_directory()
+        self._validate_default_formats()
+        self._normalize_media_format()
+        self._process_input_path()
+        self._process_output_path()
+
+    def _setup_output_directory(self) -> None:
+        """Ensure output directory exists and is valid."""
         resolved_output_dir = self._ensure_dir(self.output_dir)
         self.output_dir = resolved_output_dir
 
-        # Validate defaults
+    def _validate_default_formats(self) -> None:
+        """Validate default audio and video formats."""
         self.default_audio_format = self._normalize_format(self.default_audio_format)
         self.default_video_format = self._normalize_format(self.default_video_format)
 
-        # Normalize media format (allow "auto" during initialization)
+    def _normalize_media_format(self) -> None:
+        """Normalize media format, allowing 'auto' during initialization."""
         self.media_format = self._normalize_format(self.media_format, allow_auto=True)
 
-        if self.input_path is not None:
-            if self._is_url(self.input_path):
-                normalized_url = self._normalize_url(self.input_path)
-                self.input_path = normalized_url
-                if self.media_format == "auto":
-                    inferred_format = self._infer_format_from_source(normalized_url)
-                    if inferred_format:
-                        self.media_format = self._normalize_format(inferred_format)
-            else:
-                resolved_input = self._ensure_file(self.input_path)
-                self.input_path = str(resolved_input)
-                if self.media_format == "auto":
-                    inferred_format = resolved_input.suffix.lstrip(".").lower()
-                    if inferred_format:
-                        self.media_format = self._normalize_format(inferred_format)
-            # Validate input after setting
-            self.check_input_sanity()
+    def _process_input_path(self) -> None:
+        """Process and validate input path if provided."""
+        if self.input_path is None:
+            return
 
+        if self._is_url(self.input_path):
+            normalized_url = self._normalize_url(self.input_path)
+            self.input_path = normalized_url
+            if self.media_format == "auto":
+                inferred_format = self._infer_format_from_source(normalized_url)
+                if inferred_format:
+                    self.media_format = self._normalize_format(inferred_format)
+        else:
+            resolved_input = self._ensure_file(self.input_path)
+            self.input_path = str(resolved_input)
+            if self.media_format == "auto":
+                inferred_format = resolved_input.suffix.lstrip(".").lower()
+                if inferred_format:
+                    self.media_format = self._normalize_format(inferred_format)
+
+        # Validate input after setting
+        self.check_input_sanity()
+
+    def _process_output_path(self) -> None:
+        """Process output path and format."""
         if self.output_path is not None:
             self.set_output_path(self.output_path)
         elif self.output_format is not None:
@@ -215,8 +232,10 @@ class MediaConfig:
                         f"Invalid URL format for input_path: '{self.input_path}'. "
                         "URL must include scheme (http/https) and domain."
                     )
-            except Exception as e:
-                raise ValueError(f"Failed to parse input_path as URL: {e}")
+            except (ValueError, AttributeError) as e:
+                # ValueError: Invalid URL format
+                # AttributeError: urlparse issues with malformed input
+                raise ValueError(f"Failed to parse input_path as URL: {e}") from e
         else:
             # For local files, validate that the file exists and is accessible
             input_file = Path(self.input_path).expanduser()

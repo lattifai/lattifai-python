@@ -30,6 +30,7 @@ from .errors import (
     SubtitleParseError,
     SubtitleProcessingError,
 )
+from .logging import get_logger, set_log_level, setup_logger
 from .subtitle import SubtitleIO
 
 try:
@@ -88,6 +89,10 @@ __all__ = [
     "DependencyError",
     "APIError",
     "ConfigurationError",
+    # Logging
+    "setup_logger",
+    "get_logger",
+    "set_log_level",
     # I/O
     "SubtitleIO",
     # Version
