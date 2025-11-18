@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional
 
+from lhotse.utils import Pathlike
+
 # Supported subtitle formats for reading/writing
 SUBTITLE_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "md"]
 
@@ -76,6 +78,65 @@ class SubtitleConfig:
 
         if self.output_format not in OUTPUT_SUBTITLE_FORMATS:
             raise ValueError(f"output_format must be one of {OUTPUT_SUBTITLE_FORMATS}, got '{self.output_format}'")
+
+    def set_input_path(self, path: Pathlike) -> Path:
+        """
+        Set input subtitle path and validate it.
+
+        Args:
+            path: Path to input subtitle file (str or Path)
+
+        Returns:
+            Resolved path as Path object
+
+        Raises:
+            FileNotFoundError: If the file does not exist
+            ValueError: If the path is not a file
+        """
+        resolved = Path(path).expanduser().resolve()
+        if not resolved.exists():
+            raise FileNotFoundError(f"Input subtitle file does not exist: '{resolved}'")
+        if not resolved.is_file():
+            raise ValueError(f"Input subtitle path is not a file: '{resolved}'")
+        self.input_path = str(resolved)
+        self.check_input_sanity()
+        return resolved
+
+    def set_output_path(self, path: Pathlike) -> Path:
+        """
+        Set output subtitle path and create parent directories if needed.
+
+        Args:
+            path: Path to output subtitle file (str or Path)
+
+        Returns:
+            Resolved path as Path object
+        """
+        resolved = Path(path).expanduser().resolve()
+        resolved.parent.mkdir(parents=True, exist_ok=True)
+        self.output_path = str(resolved)
+        return resolved
+
+    def check_input_sanity(self) -> None:
+        """
+        Validate that input_path is properly configured and accessible.
+
+        Raises:
+            ValueError: If input_path is not set or is invalid
+            FileNotFoundError: If input_path does not exist
+        """
+        if not self.input_path:
+            raise ValueError("input_path is required but not set in SubtitleConfig")
+
+        input_file = Path(self.input_path).expanduser()
+        if not input_file.exists():
+            raise FileNotFoundError(
+                f"Input subtitle file does not exist: '{input_file}'. " "Please check the path and try again."
+            )
+        if not input_file.is_file():
+            raise ValueError(
+                f"Input subtitle path is not a file: '{input_file}'. " "Expected a valid subtitle file path."
+            )
 
     def check_sanity(self) -> bool:
         """Perform sanity checks on the configuration."""

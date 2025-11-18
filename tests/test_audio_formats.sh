@@ -1,6 +1,6 @@
 set -e
 
-lai alignment align -Y media.input_path=tests/data/SA1.m4a subtitle.input_path=tests/data/SA1.TXT subtitle.output_path=tests/data/SA1.TextGrid -W
+lai alignment align -Y media.input_path=tests/data/SA1.m4a subtitle.input_path=tests/data/SA1.TXT subtitle.output_path=tests/data/SA1.TextGrid
 lai alignment align -Y media.input_path=tests/data/SA1.mp4 subtitle.input_path=tests/data/SA1.TXT subtitle.output_path=tests/data/SA1.vtt
 
 lai alignment align -Y media.input_path=tests/data/SA1.ogg subtitle.input_path=tests/data/SA1.TXT subtitle.output_path=tests/data/SA1.vtt

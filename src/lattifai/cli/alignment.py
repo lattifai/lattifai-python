@@ -1,9 +1,9 @@
 """Alignment CLI entry point with nemo_run."""
 
-from pathlib import Path
 from typing import Optional
 
 import nemo_run as run
+from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
@@ -14,9 +14,9 @@ __all__ = ["align"]
 
 @run.cli.entrypoint(name="align", namespace="alignment")
 def align(
-    input_media_path: Optional[Path] = None,
-    input_subtitle_path: Optional[Path] = None,
-    output_subtitle_path: Optional[Path] = None,
+    input_media_path: Optional[Pathlike] = None,
+    input_subtitle_path: Optional[Pathlike] = None,
+    output_subtitle_path: Optional[Pathlike] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
@@ -75,17 +75,47 @@ def align(
             alignment.model_name_or_path=Lattifai/Lattice-1-Alpha
     """
     media_config = media or MediaConfig()
-    if not output_subtitle_path and not media_config.input_path:
-        raise ValueError("Provide an input media path via argument or media.input-path configuration.")
+
+    # Validate that input_media_path and media_config.input_path are not both provided
+    if input_media_path and media_config.input_path:
+        raise ValueError(
+            "Cannot specify both positional input_media_path and media.input_path. "
+            "Use either positional argument or config, not both."
+        )
+
+    # Assign input_media_path to media_config.input_path if provided
+    if input_media_path:
+        media_config.set_input_path(input_media_path)
 
     subtitle_config = subtitle or SubtitleConfig()
+
+    # Validate that input_subtitle_path and subtitle_config.input_path are not both provided
+    if input_subtitle_path and subtitle_config.input_path:
+        raise ValueError(
+            "Cannot specify both positional input_subtitle_path and subtitle.input_path. "
+            "Use either positional argument or config, not both."
+        )
+
+    # Validate that output_subtitle_path and subtitle_config.output_path are not both provided
+    if output_subtitle_path and subtitle_config.output_path:
+        raise ValueError(
+            "Cannot specify both positional output_subtitle_path and subtitle.output_path. "
+            "Use either positional argument or config, not both."
+        )
+
+    # Assign paths to subtitle_config if provided
+    if input_subtitle_path:
+        subtitle_config.set_input_path(input_subtitle_path)
+
+    if output_subtitle_path:
+        subtitle_config.set_output_path(output_subtitle_path)
 
     client = LattifAI(client_config=client, alignment_config=alignment, subtitle_config=subtitle_config)
 
     return client.alignment(
-        input_media_path=input_media_path or media_config.input_path,
-        input_subtitle_path=input_subtitle_path or subtitle_config.input_path,
-        output_subtitle_path=output_subtitle_path or subtitle_config.output_path,
+        input_media_path=media_config.input_path,
+        input_subtitle_path=subtitle_config.input_path,
+        output_subtitle_path=subtitle_config.output_path,
     )
 
 

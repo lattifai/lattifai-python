@@ -1,9 +1,9 @@
 """Subtitle CLI entry point with nemo_run."""
 
-from pathlib import Path
 from typing import Optional
 
 import nemo_run as run
+from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.config import SubtitleConfig
@@ -11,8 +11,8 @@ from lattifai.config import SubtitleConfig
 
 @run.cli.entrypoint(name="convert", namespace="subtitle")
 def convert(
-    input_path: Path,
-    output_path: Path,
+    input_path: Pathlike,
+    output_path: Pathlike,
     include_speaker_in_text: bool = True,
     normalize_text: bool = False,
 ):
@@ -68,8 +68,8 @@ def convert(
 
 @run.cli.entrypoint(name="normalize", namespace="subtitle")
 def normalize(
-    input_path: Path,
-    output_path: Path,
+    input_path: Pathlike,
+    output_path: Pathlike,
     subtitle: Annotated[Optional[SubtitleConfig], run.Config[SubtitleConfig]] = None,
 ):
     """
@@ -119,8 +119,12 @@ def normalize(
     subtitler = Subtitler(config=subtitle)
 
     # Read with normalization enabled
-    supervisions = subtitler.read(input_path.expanduser(), normalize_text=True)
-    output_path = subtitler.write(supervisions, output_path.expanduser())
+    from pathlib import Path
+
+    input_path = Path(input_path).expanduser()
+    output_path = Path(output_path).expanduser()
+    supervisions = subtitler.read(input_path, normalize_text=True)
+    output_path = subtitler.write(supervisions, output_path)
 
     if output_path == input_path:
         print(f"✅ Normalized {input_path} (in-place)")

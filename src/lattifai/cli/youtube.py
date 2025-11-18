@@ -76,9 +76,16 @@ def youtube(
     media_config = media or MediaConfig()
     subtitle_config = subtitle or SubtitleConfig()
 
-    # Validate input
-    if not yt_url:
-        raise ValueError("Provide a YouTube URL via the yt_url argument.")
+    # Validate that yt_url and media_config.input_path are not both provided
+    if yt_url and media_config.input_path:
+        raise ValueError(
+            "Cannot specify both positional yt_url and media.input_path. "
+            "Use either positional argument or config, not both."
+        )
+
+    # Assign yt_url to media_config.input_path if provided
+    if yt_url:
+        media_config.set_input_path(yt_url)
 
     # Create LattifAI client with all configurations
     lattifai_client = LattifAI(
@@ -90,7 +97,7 @@ def youtube(
 
     # Call the client's youtube method
     return lattifai_client.youtube(
-        url=yt_url or media_config.input_path,
+        url=media_config.input_path,
         output_dir=media_config.output_dir,
         output_subtitle_path=subtitle_config.output_path,
         media_format=media_config.normalize_format() if media_config.output_format else None,
