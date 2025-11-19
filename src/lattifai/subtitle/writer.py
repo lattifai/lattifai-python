@@ -84,14 +84,26 @@ class SubtitleWriter(ABCMeta):
                 if word_items:
                     for word in word_items:
                         subs.append(
-                            pysubs2.SSAEvent(start=int(word.start * 1000), end=int(word.end * 1000), text=word.symbol)
+                            pysubs2.SSAEvent(
+                                start=int(word.start * 1000),
+                                end=int(word.end * 1000),
+                                text=word.symbol,
+                                name=sup.speaker or "",
+                            )
                         )
                 else:
                     if include_speaker_in_text and sup.speaker is not None:
                         text = f"{sup.speaker} {sup.text}"
                     else:
                         text = sup.text
-                    subs.append(pysubs2.SSAEvent(start=int(sup.start * 1000), end=int(sup.end * 1000), text=text or ""))
+                    subs.append(
+                        pysubs2.SSAEvent(
+                            start=int(sup.start * 1000),
+                            end=int(sup.end * 1000),
+                            text=text or "",
+                            name=sup.speaker or "",
+                        )
+                    )
             subs.save(output_path)
 
         return output_path

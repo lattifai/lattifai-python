@@ -24,6 +24,7 @@ class Supervision(SupervisionSegment):
     """
 
     text: Optional[str] = None
+    speaker: Optional[str] = None
     id: str = ""
     recording_id: str = ""
     start: Seconds = 0.0

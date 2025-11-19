@@ -38,6 +38,25 @@ class SubtitleReader(ABCMeta):
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(subtitle)
+        elif format.lower() == "textgrid" or str(subtitle).lower().endswith("textgrid"):
+            # Internel usage
+            from tgt import read_textgrid
+
+            tgt = read_textgrid(subtitle)
+            supervisions = []
+            for tier in tgt.tiers:
+                supervisions.extend(
+                    [
+                        Supervision(
+                            text=interval.text,
+                            start=interval.start_time,
+                            duration=interval.end_time - interval.start_time,
+                            speaker=tier.name,
+                        )
+                        for interval in tier.intervals
+                    ]
+                )
+            supervisions = sorted(supervisions, key=lambda x: x.start)
         elif format == "txt" or (format == "auto" and str(subtitle)[-4:].lower() == ".txt"):
             if not Path(str(subtitle)).exists():  # str
                 lines = [line.strip() for line in str(subtitle).split("\n")]
