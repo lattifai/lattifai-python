@@ -11,7 +11,7 @@ from lattifai.config import AlignmentConfig, ClientConfig, MediaConfig, Subtitle
 
 @run.cli.entrypoint(name="youtube", namespace="alignment")
 def youtube(
-    yt_url: str,
+    yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
@@ -76,12 +76,15 @@ def youtube(
     media_config = media or MediaConfig()
     subtitle_config = subtitle or SubtitleConfig()
 
-    # Validate that yt_url and media_config.input_path are not both provided
+    # Validate URL input: require exactly one of yt_url or media.input_path
     if yt_url and media_config.input_path:
         raise ValueError(
             "Cannot specify both positional yt_url and media.input_path. "
             "Use either positional argument or config, not both."
         )
+
+    if not yt_url and not media_config.input_path:
+        raise ValueError("YouTube URL is required. Provide either positional yt_url or media.input_path parameter.")
 
     # Assign yt_url to media_config.input_path if provided
     if yt_url:

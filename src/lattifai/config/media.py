@@ -112,10 +112,11 @@ class MediaConfig:
                 if inferred_format:
                     self.media_format = self._normalize_format(inferred_format)
         else:
-            resolved_input = self._ensure_file(self.input_path)
-            self.input_path = str(resolved_input)
+            # For local paths, normalize to string without validation here
+            # Validation will be done in check_input_sanity()
+            self.input_path = str(Path(self.input_path).expanduser())
             if self.media_format == "auto":
-                inferred_format = resolved_input.suffix.lstrip(".").lower()
+                inferred_format = Path(self.input_path).suffix.lstrip(".").lower()
                 if inferred_format:
                     self.media_format = self._normalize_format(inferred_format)
 

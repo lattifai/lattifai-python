@@ -93,7 +93,7 @@ class TestYoutubeCommand:
     def test_youtube_model_name_option(self, tmp_path):
         """Test youtube command with custom model name"""
         args = [
-            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            "yt_url=https://www.youtube.com/watch?v=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
             "alignment.model_name_or_path=Lattifai/Lattice-1-Alpha",
             "alignment.device=cpu",
@@ -105,7 +105,7 @@ class TestYoutubeCommand:
     def test_youtube_invalid_url(self, tmp_path):
         """Test youtube command with invalid URL"""
         args = [
-            "media.input_path=not_a_valid_url",
+            "yt_url=not_a_valid_url",
             f"media.output_dir={tmp_path}",
             "alignment.device=cpu",
             "subtitle.input_path=dummy.srt",

@@ -62,7 +62,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         self,
         input_media_path: Pathlike,
         input_subtitle_path: Pathlike,
-        output_subtitle_path: Pathlike,
+        output_subtitle_path: Optional[Pathlike] = None,
         input_subtitle_format: Optional[InputSubtitleFormat] = None,
         split_sentence: Optional[bool] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
@@ -223,7 +223,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         self,
         input_media_path: Pathlike,
         input_subtitle_path: Pathlike,
-        output_subtitle_path: Pathlike,
+        output_subtitle_path: Optional[Pathlike] = None,
         input_subtitle_format: Optional[InputSubtitleFormat] = None,
         split_sentence: Optional[bool] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:

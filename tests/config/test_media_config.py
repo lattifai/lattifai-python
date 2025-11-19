@@ -20,10 +20,9 @@ class TestMediaConfigValidation:
         assert config.input_path == "https://example.com/video.mp4"
 
     def test_invalid_url_raises_error(self):
-        """Test that invalid URL format raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid URL format"):
-            config = MediaConfig(input_path="not-a-valid-url")
-            config.check_input_sanity()
+        """Test that string without scheme/netloc that doesn't exist raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError, match="Input media file does not exist"):
+            _ = MediaConfig(input_path="not-a-valid-url")
 
     def test_check_input_sanity_with_no_input_raises_error(self):
         """Test that check_input_sanity raises error when input_path is None."""
