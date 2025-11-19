@@ -29,11 +29,29 @@ Evaluate subtitle alignment quality using DER, JER, WER, SCA, and SCER metrics.
 | Model | DER ↓ | JER ↓ | WER ↓ | SCA ↑ | SCER ↓ |
 |--------|--------|--------|--------|--------|--------|
 | Ground Truth | 0.0000 (0.00%) | 0.0000 (0.00%) | 0.0000 (0.00%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+| Gemini 2.5 Pro | 0.6303 (63.03%) | 0.6532 (65.32%) | 0.2454 (24.54%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+| Gemini 2.5 Pro + LattifAI | 0.2280 (22.80%) | 0.3226 (32.26%) | 0.2465 (24.65%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
 
 **Command to reproduce:**
 ```bash
+# Ground Truth vs Ground Truth
 python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Ground Truth"
+
+# Gemini 2.5 Pro
+python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemini.ass \
+  --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 Pro"
+
+# Gemini 2.5 Pro + LattifAI alignment
+lai alignment youtube \
+    https://www.youtube.com/watch\?v\=DQacCB9tDaw \
+    media.output_dir=~/Downloads/lattifai_youtube \
+    subtitle.split_sentence=true subtitle.normalize_text=true subtitle.include_speaker_in_text=false \
+    subtitle.input_path=./data/Introducing_GPT-4o_Gemini.md \
+    subtitle.output_path=./data/Introducing_GPT-4o_Gemini_LattifAI.ass
+
+python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemini_LattifAI.ass \
+  --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 Pro + LattifAI"
 ```
 
 ## Installation

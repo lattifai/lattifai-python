@@ -342,8 +342,12 @@ Dialogue: 0,0:22:35.96,0:22:39.40,Default,Mark Chen,0,0,0,,I have a friend here 
 Dialogue: 0,0:22:39.71,0:22:42.92,Default,Mark Chen,0,0,0,,And every time you hear English, I want you to translate it to Italian.
 Dialogue: 0,0:22:42.96,0:22:45.38,Default,Mark Chen,0,0,0,,If you hear Italian, I want you to translate it back to English.
 Dialogue: 0,0:22:45.41,0:22:45.98,Default,Mark Chen,0,0,0,,Is that good?
+Dialogue: 0,0:22:47.11,0:22:47.81,Default,ChatGPT,0,0,0,,Perfetto.
+Dialogue: 0,0:22:50.89,0:22:55.96,Default,Mira Murati,0,0,0,,Mark, io mi chiedo se le balene potessero parlare, cosa ci direbbero?
 Dialogue: 0,0:22:57.03,0:23:01.18,Default,ChatGPT,0,0,0,,Mike, she wonders if wealths could talk, what would they tell us?
 Dialogue: 0,0:23:01.71,0:23:04.82,Default,Mark Chen,0,0,0,,Um, they might ask, uh, how do we solve linear equations?
+Dialogue: 0,0:23:06.23,0:23:11.89,Default,ChatGPT,0,0,0,,Potrebbero chiederci come risolviamo le equazioni lineari.
+Dialogue: 0,0:23:12.88,0:23:14.24,Default,Mira Murati,0,0,0,,Sicuramente, sì.
 Dialogue: 0,0:23:16.14,0:23:16.44,Default,Mira Murati,0,0,0,,Mm-hmm.
 Dialogue: 0,0:23:16.64,0:23:17.54,Default,ChatGPT,0,0,0,,Certainly, yes.
 Dialogue: 0,0:23:18.36,0:23:19.54,Default,Mark Chen,0,0,0,,Great, looks like it works.

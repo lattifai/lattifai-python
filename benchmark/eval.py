@@ -14,9 +14,14 @@ def subtitle_to_annotation(subtitle: pysubs2.SSAFile, uri: str = "default") -> A
     """Convert subtitle to pyannote Annotation for diarization metrics."""
     annotation = Annotation(uri=uri)
 
+    speaker = None
     for event in subtitle.events:
         segment = Segment(event.start / 1000.0, event.end / 1000.0)
-        annotation[segment] = event.name
+        if event.name:
+            event.name = event.name.rstrip(":").lstrip(">").strip()
+            speaker = event.name
+
+        annotation[segment] = event.name or speaker
 
     return annotation
 
