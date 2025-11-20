@@ -105,7 +105,7 @@ class SubtitleReader(ABCMeta):
             supervisions.append(
                 Supervision(
                     text=text,
-                    speaker=speaker,
+                    speaker=speaker or event.name,
                     start=event.start / 1000.0 if event.start is not None else None,
                     duration=(event.end - event.start) / 1000.0 if event.end is not None else None,
                 )
