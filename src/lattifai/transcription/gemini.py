@@ -15,7 +15,7 @@ from lattifai.transcription.prompts import get_prompt_loader
 
 class GeminiTranscriber(BaseTranscriber):
     """
-    Gemini 2.5 Pro audio transcription with config-driven architecture.
+    Gemini 2.5/3 Pro audio transcription with config-driven architecture.
 
     Uses TranscriptionConfig for all behavioral settings.
     """
@@ -169,6 +169,7 @@ class GeminiTranscriber(BaseTranscriber):
                 thinking_config=ThinkingConfig(
                     include_thoughts=False,
                     thinking_budget=-1,
+                    # thinking_level="high",  # "low", "medium"
                 ),
             )
         return self._generation_config
