@@ -8,6 +8,9 @@ import pysubs2
 from pyannote.core import Annotation, Segment
 from pyannote.metrics.diarization import DiarizationErrorRate, JaccardErrorRate
 from speaker_count_metrics import SpeakerCountAccuracy, SpeakerCountingErrorRate
+from whisper_normalizer.english import EnglishTextNormalizer
+
+english_normalizer = EnglishTextNormalizer()
 
 
 def subtitle_to_annotation(subtitle: pysubs2.SSAFile, uri: str = "default") -> Annotation:
@@ -30,9 +33,7 @@ def subtitle_to_text(
     subtitle: pysubs2.SSAFile,
 ) -> str:
     """Convert subtitle to text string for WER calculation."""
-    text = " ".join([event.text.strip() for event in subtitle.events])
-    # remove punctuation for WER calculation
-    text = jiwer.RemovePunctuation()(text)
+    text = " ".join([english_normalizer(event.text.replace("...", " ").strip()) for event in subtitle.events])
     return text
 
 
@@ -63,6 +64,75 @@ def evaluate_alignment(
     ref_text = subtitle_to_text(reference)
     hyp_text = subtitle_to_text(hypothesis)
 
+    if False:
+        with open(hypothesis_file[:-4] + ".txt", "w") as f:
+            words = hyp_text.split()
+            for word in words:
+                f.write(word + "\n")
+
+    # Perform detailed text alignment analysis
+    if False:  # Enable for debugging alignment issues
+        from kaldialign import align as kaldi_align
+
+        ali = kaldi_align(ref_text, hyp_text, "*", sclite_mode=True)
+
+        print("\n=== Text Alignment Diff ===\n")
+
+        # Split alignment into segments by spaces
+        segments = []
+        current_segment = []
+
+        for ref_token, hyp_token in ali:
+            if ref_token == " " and hyp_token == " ":
+                if current_segment:
+                    segments.append(current_segment)
+                    current_segment = []
+            else:
+                current_segment.append((ref_token, hyp_token))
+
+        if current_segment:
+            segments.append(current_segment)
+
+        # Print diff for each segment with context
+        context_size = 5  # Number of words before and after
+        for i, segment in enumerate(segments):
+            ref_word = "".join(r for r, h in segment)
+            hyp_word = "".join(h for r, h in segment)
+
+            if ref_word != hyp_word:
+                # Get context words
+                start_idx = max(0, i - context_size)
+                end_idx = min(len(segments), i + context_size + 1)
+
+                # Build context - need to get both ref and hyp for accurate display
+                context_before_ref = []
+                context_before_hyp = []
+                for j in range(start_idx, i):
+                    ref_w = "".join(r for r, h in segments[j] if r != "*")
+                    hyp_w = "".join(h for r, h in segments[j] if h != "*")
+                    context_before_ref.append(ref_w)
+                    context_before_hyp.append(hyp_w)
+
+                context_after_ref = []
+                context_after_hyp = []
+                for j in range(i + 1, end_idx):
+                    ref_w = "".join(r for r, h in segments[j] if r != "*")
+                    hyp_w = "".join(h for r, h in segments[j] if h != "*")
+                    context_after_ref.append(ref_w)
+                    context_after_hyp.append(hyp_w)
+
+                # Print with context
+                ref_before_str = " ".join(context_before_ref)
+                ref_after_str = " ".join(context_after_ref)
+                hyp_before_str = " ".join(context_before_hyp)
+                hyp_after_str = " ".join(context_after_hyp)
+
+                print(f"REF: ...{ref_before_str} [{ref_word}] {ref_after_str}...")
+                print(f"HYP: ...{hyp_before_str} [{hyp_word}] {hyp_after_str}...")
+                print("---\n")
+
+        print("\n" + "=" * 50 + "\n")
+
     results = {}
 
     for metric in metrics:
@@ -74,7 +144,7 @@ def evaluate_alignment(
             jer_metric = JaccardErrorRate(collar=collar)
             results["jer"] = jer_metric(ref_ann, hyp_ann)
         elif metric_lower == "wer":
-            results["wer"] = jiwer.wer(ref_text.lower(), hyp_text.lower())
+            results["wer"] = jiwer.wer(ref_text, hyp_text)
         elif metric_lower == "sca":
             sca_metric = SpeakerCountAccuracy()
             results["sca"] = sca_metric(ref_ann, hyp_ann)

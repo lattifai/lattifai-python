@@ -78,3 +78,4 @@ tests/data/SA1_*.*
 !SA1_24K.wav
 tests/data/SA1.TextGrid
 benchmark/data/*.TextGrid
+benchmark/data/*.txt

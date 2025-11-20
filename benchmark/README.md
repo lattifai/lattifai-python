@@ -29,10 +29,13 @@ Evaluate subtitle alignment quality using DER, JER, WER, SCA, and SCER metrics.
 | Model | DER ↓ | JER ↓ | WER ↓ | SCA ↑ | SCER ↓ |
 |--------|--------|--------|--------|--------|--------|
 | Ground Truth | 0.0000 (0.00%) | 0.0000 (0.00%) | 0.0000 (0.00%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
-| Gemini 2.5 Pro | 0.6303 (63.03%) | 0.6532 (65.32%) | 0.1851 (18.51%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
-| Gemini 2.5 Pro + LattifAI | 0.2280 (22.80%) | 0.3226 (32.26%) | 0.1867 (18.67%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
-| Gemini 3 Pro Preview | 0.6433 (64.33%) | 0.6637 (66.37%) | 0.0861 (8.61%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
-| Gemini 3 Pro Preview + LattifAI | 0.2177 (21.77%) | 0.3601 (36.01%) | 0.0876 (8.76%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+| Gemini 2.5 Pro | 0.6303 (63.03%) | 0.6532 (65.32%) | 0.1575 (15.75%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+| Gemini 2.5 Pro + LattifAI | 0.2280 (22.80%) | 0.3226 (32.26%) | 0.1590 (15.90%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+| Gemini 3 Pro Preview | 0.6433 (64.33%) | 0.6637 (66.37%) | 0.0579 (5.79%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+| Gemini 3 Pro Preview + LattifAI | 0.2177 (21.77%) | 0.3601 (36.01%) | 0.0594 (5.94%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+
+> [!NOTE] subtitle.split_sentence=true may cause slight WER increase due to text normalization
+> (e.g., "ChatGPT" may be split into "Chat GPT")
 
 **Command to reproduce:**
 ```bash
@@ -40,20 +43,24 @@ Evaluate subtitle alignment quality using DER, JER, WER, SCA, and SCER metrics.
 python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Ground Truth"
 
-# Gemini 2.5 Pro
-python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemini.ass \
-  --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 Pro"
-
 # Gemini 2.5 Pro + LattifAI alignment
+# Note: subtitle.split_sentence=true may cause slight WER increase due to text normalization
+# (e.g., "ChatGPT" may be split into "Chat GPT")
 lai alignment youtube \
     https://www.youtube.com/watch\?v\=DQacCB9tDaw \
     media.output_dir=~/Downloads/lattifai_youtube \
+    subtitle.include_speaker_in_text=false subtitle.split_sentence=true \
+    subtitle.input_path=./data/Introducing_GPT-4o_Gemini.md \
+    subtitle.output_path=./data/Introducing_GPT-4o_Gemini_LattifAI.ass \
     subtitle.use_transcription=true \
     transcription.model_name=gemini-2.5-pro \
-    subtitle.split_sentence=true subtitle.normalize_text=true subtitle.include_speaker_in_text=false \
-    subtitle.input_path=./data/Introducing_GPT-4o_Gemini.md \
-    subtitle.output_path=./data/Introducing_GPT-4o_Gemini_LattifAI.ass transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
+    transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
 
+# Gemini 2.5 Pro
+lai subtitle convert ./data/Introducing_GPT-4o_Gemini.md ./data/Introducing_GPT-4o_Gemini.ass include_speaker_in_text=false
+
+python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemini.ass \
+  --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 Pro"
 python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemini_LattifAI.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 Pro + LattifAI"
 
@@ -61,22 +68,29 @@ python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemin
 lai alignment youtube \
     https://www.youtube.com/watch\?v\=DQacCB9tDaw \
     media.output_dir=~/Downloads/lattifai_youtube_Gemini3 \
-    subtitle.split_sentence=true subtitle.normalize_text=true subtitle.include_speaker_in_text=false \
+    subtitle.include_speaker_in_text=false subtitle.split_sentence=true \
+    subtitle.input_path=./data/Introducing_GPT-4o_Gemini3.md \
+    subtitle.output_path=./data/Introducing_GPT-4o_Gemini3_LattifAI.ass \
     subtitle.use_transcription=true \
     transcription.model_name=gemini-3-pro-preview \
-    subtitle.output_path=./data/Introducing_GPT-4o_Gemini3_LattifAI.ass transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
+    transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
 
+lai subtitle convert ./data/Introducing_GPT-4o_Gemini3.md ./data/Introducing_GPT-4o_Gemini3.ass include_speaker_in_text=false
 
 python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemini3.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 3 Pro Preview"
 python eval.py -r data/Introducing_GPT-4o.ass -hyp data/Introducing_GPT-4o_Gemini3_LattifAI.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 3 Pro Preview + LattifAI"
+
+# python eval.py -r data/Introducing_GPT-4o_Gemini.ass -hyp data/Introducing_GPT-4o_Gemini3.ass \
+#   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 vs 3"
 ```
 
 ## Installation
 
 ```bash
 pip install pysubs2 pyannote.core pyannote.metrics jiwer
+pip install whisper-normalizer
 ```
 
 These dependencies are included with the `lattifai-python` package.
