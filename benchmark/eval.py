@@ -26,14 +26,14 @@ def subtitle_to_annotation(subtitle: pysubs2.SSAFile, uri: str = "default") -> A
     return annotation
 
 
-def subtitle_to_words(
+def subtitle_to_text(
     subtitle: pysubs2.SSAFile,
 ) -> str:
     """Convert subtitle to text string for WER calculation."""
-    words = []
-    for event in subtitle.events:
-        words.extend(event.text.strip().split())
-    return " ".join(words)
+    text = " ".join([event.text.strip() for event in subtitle.events])
+    # remove punctuation for WER calculation
+    text = jiwer.RemovePunctuation()(text)
+    return text
 
 
 def evaluate_alignment(
@@ -60,8 +60,8 @@ def evaluate_alignment(
 
     ref_ann = subtitle_to_annotation(reference)
     hyp_ann = subtitle_to_annotation(hypothesis)
-    ref_text = subtitle_to_words(reference)
-    hyp_text = subtitle_to_words(hypothesis)
+    ref_text = subtitle_to_text(reference)
+    hyp_text = subtitle_to_text(hypothesis)
 
     results = {}
 
@@ -74,7 +74,7 @@ def evaluate_alignment(
             jer_metric = JaccardErrorRate(collar=collar)
             results["jer"] = jer_metric(ref_ann, hyp_ann)
         elif metric_lower == "wer":
-            results["wer"] = jiwer.wer(ref_text, hyp_text)
+            results["wer"] = jiwer.wer(ref_text.lower(), hyp_text.lower())
         elif metric_lower == "sca":
             sca_metric = SpeakerCountAccuracy()
             results["sca"] = sca_metric(ref_ann, hyp_ann)
