@@ -26,6 +26,28 @@ Visit our [LattifAI roadmap](https://lattifai.com/roadmap) for the latest update
 
 ## Installation
 
+### Recommended: Using uv (Fast & Modern)
+
+[uv](https://github.com/astral-sh/uv) is a fast Python package installer and resolver written in Rust. It's **10-100x faster** than pip and provides better dependency resolution.
+
+```bash
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create a new project with uv
+uv init my-project
+cd my-project
+
+# Install LattifAI
+uv add lattifai
+
+# Install k2 (required dependency)
+uv pip install install-k2
+uv run install-k2
+```
+
+### Alternative: Using pip
+
 ```bash
 pip install install-k2
 # The installation will automatically detect and use your already installed PyTorch version(up to 2.9).
@@ -33,6 +55,7 @@ install-k2  # Install k2
 
 pip install lattifai
 ```
+
 > **⚠️ Important**: You must run `install-k2` before using the lattifai library.
 ```
 > install-k2 help
@@ -673,6 +696,30 @@ alignments, output_path = client.alignment(
 ## Development
 
 ### Setup
+
+We recommend using [uv](https://github.com/astral-sh/uv) for development:
+
+```bash
+# Clone the repository
+git clone https://github.com/lattifai/lattifai-python.git
+cd lattifai-python
+
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Sync dependencies (creates .venv automatically)
+uv sync
+
+# Activate the virtual environment
+source .venv/bin/activate  # On macOS/Linux
+# or
+.venv\Scripts\activate  # On Windows
+
+# Install pre-commit hooks
+pre-commit install
+```
+
+**Alternative with pip:**
 
 ```bash
 git clone https://github.com/lattifai/lattifai-python.git

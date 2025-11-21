@@ -1,0 +1,56 @@
+name: test
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore: '**.md'
+    tags:
+      - 'v*.*.*'  # Trigger on release tags like v0.2.5, v1.0.0, etc.
+  pull_request:
+    branches: [ main ]
+    paths-ignore: '**.md'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python-version: ['3.10']  # , '3.14'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install Dependencies
+        run: |
+          uv sync --all-extras
+
+      - name: Install k2
+        run: |
+          uv pip install install-k2>=0.1.0
+          uv run install-k2
+
+      - name: Build and Test
+        env:
+          LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
+        run: |
+          uv run python tests/test_basic.py  # Run basic tests
+          uv run pytest tests/io/test_text_parser.py -v
+          uv run bash tests/test_audio_formats.sh  # Run audio format tests

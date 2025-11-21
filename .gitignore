@@ -22,6 +22,9 @@ sdist
 develop-eggs
 .installed.cfg
 
+# uv
+.venv/
+
 # Installer logs
 pip-log.txt
 
