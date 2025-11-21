@@ -33,7 +33,12 @@ def subtitle_to_text(
     subtitle: pysubs2.SSAFile,
 ) -> str:
     """Convert subtitle to text string for WER calculation."""
-    text = " ".join([english_normalizer(event.text.replace("...", " ").strip()) for event in subtitle.events])
+    text = " ".join(
+        [
+            english_normalizer(event.text.replace("...", " ").strip()).replace("chatgpt", "chat gpt")
+            for event in subtitle.events
+        ]
+    )
     return text
 
 
