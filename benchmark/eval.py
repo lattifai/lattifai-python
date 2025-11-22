@@ -48,6 +48,7 @@ def evaluate_alignment(
     metrics: List[str] = ["der", "jer", "wer", "sca", "scer"],
     collar: float = 0.0,
     skip_overlap: bool = False,
+    verbose: bool = False,
 ) -> dict:
     """Evaluate alignment quality using specified metrics.
 
@@ -76,68 +77,41 @@ def evaluate_alignment(
                 f.write(word + "\n")
 
     # Perform detailed text alignment analysis
-    if False:  # Enable for debugging alignment issues
+    if verbose:  # Enable for debugging alignment issues
         from kaldialign import align as kaldi_align
 
-        ali = kaldi_align(ref_text, hyp_text, "*", sclite_mode=True)
+        ref_timelines = [(event.start / 1000.0, event.end / 1000.0) for event in reference.events]
+        hyp_timelines = [(event.start / 1000.0, event.end / 1000.0) for event in hypothesis.events]
+        ref_sentences = [event.text for event in reference.events]
+        hyp_sentences = [event.text for event in hypothesis.events]
 
-        print("\n=== Text Alignment Diff ===\n")
+        sent_symbol = "❅"
+        eps_symbol = "-"
+        alignments = kaldi_align(
+            sent_symbol.join(ref_sentences), sent_symbol.join(hyp_sentences), eps_symbol, sclite_mode=True
+        )
 
-        # Split alignment into segments by spaces
-        segments = []
-        current_segment = []
+        idx = 0
+        rstart, hstart = 0, 0
+        rend, hend = 0, 0
+        for k, ali in enumerate(alignments):
+            ref_sym, hyp_sym = ali
+            if ref_sym == sent_symbol:
+                rend += 1
+            if hyp_sym == sent_symbol:
+                hend += 1
 
-        for ref_token, hyp_token in ali:
-            if ref_token == " " and hyp_token == " ":
-                if current_segment:
-                    segments.append(current_segment)
-                    current_segment = []
-            else:
-                current_segment.append((ref_token, hyp_token))
+            if ref_sym == sent_symbol and hyp_sym == sent_symbol:
+                isdiff = any(_ali[0].lower() != _ali[1].lower() for _ali in alignments[idx:k])
+                if isdiff:
+                    # fmt: off
+                    print(f"[{ref_timelines[rstart][0]:.2f}, {ref_timelines[rend - 1][1]:.2f}] REF: {''.join(_ali[0] for _ali in alignments[idx:k])}")  # noqa: E501
+                    print(f"[{hyp_timelines[hstart][0]:.2f}, {hyp_timelines[hend - 1][1]:.2f}] HYP: {''.join(_ali[1] for _ali in alignments[idx:k])}\n")  # noqa: E501
+                    # fmt: on
 
-        if current_segment:
-            segments.append(current_segment)
-
-        # Print diff for each segment with context
-        context_size = 5  # Number of words before and after
-        for i, segment in enumerate(segments):
-            ref_word = "".join(r for r, h in segment)
-            hyp_word = "".join(h for r, h in segment)
-
-            if ref_word != hyp_word:
-                # Get context words
-                start_idx = max(0, i - context_size)
-                end_idx = min(len(segments), i + context_size + 1)
-
-                # Build context - need to get both ref and hyp for accurate display
-                context_before_ref = []
-                context_before_hyp = []
-                for j in range(start_idx, i):
-                    ref_w = "".join(r for r, h in segments[j] if r != "*")
-                    hyp_w = "".join(h for r, h in segments[j] if h != "*")
-                    context_before_ref.append(ref_w)
-                    context_before_hyp.append(hyp_w)
-
-                context_after_ref = []
-                context_after_hyp = []
-                for j in range(i + 1, end_idx):
-                    ref_w = "".join(r for r, h in segments[j] if r != "*")
-                    hyp_w = "".join(h for r, h in segments[j] if h != "*")
-                    context_after_ref.append(ref_w)
-                    context_after_hyp.append(hyp_w)
-
-                # Print with context
-                ref_before_str = " ".join(context_before_ref)
-                ref_after_str = " ".join(context_after_ref)
-                hyp_before_str = " ".join(context_before_hyp)
-                hyp_after_str = " ".join(context_after_hyp)
-
-                print(f"REF: ...{ref_before_str} [{ref_word}] {ref_after_str}...")
-                print(f"HYP: ...{hyp_before_str} [{hyp_word}] {hyp_after_str}...")
-                print("---\n")
-
-        print("\n" + "=" * 50 + "\n")
-
+                idx = k + 1
+                rstart = rend
+                hstart = hend
     results = {}
 
     for metric in metrics:
@@ -218,6 +192,7 @@ Examples:
         metrics=args.metrics,
         collar=args.collar,
         skip_overlap=args.skip_overlap,
+        verbose=args.verbose,
     )
 
     if args.format == "json":

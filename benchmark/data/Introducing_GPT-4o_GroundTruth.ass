@@ -18,19 +18,19 @@ Dialogue: 0,0:00:16.41,0:00:17.49,Default,Mira Murati,0,0,0,,Thank you, thank yo
 Dialogue: 0,0:00:18.34,0:00:20.07,Default,Mira Murati,0,0,0,,It's great to have you here today.
 Dialogue: 0,0:00:20.79,0:00:23.02,Default,Mira Murati,0,0,0,,Today, I am going to talk about three things.
 Dialogue: 0,0:00:23.51,0:00:23.98,Default,Mira Murati,0,0,0,,That's it.
-Dialogue: 0,0:00:24.63,0:00:33.43,Default,Mira Murati,0,0,0,,We will start with why it's so important to us to have a product that we can make truly available and broadly available to everyone.
+Dialogue: 0,0:00:24.63,0:00:33.43,Default,Mira Murati,0,0,0,,We will start with why it's so important to us to have a product that we can make freely available and broadly available to everyone.
 Dialogue: 0,0:00:34.25,0:00:38.10,Default,Mira Murati,0,0,0,,And we're always trying to find out ways to reduce friction.
 Dialogue: 0,0:00:38.39,0:00:41.10,Default,Mira Murati,0,0,0,,So everyone can use ChatGPT wherever they're.
-Dialogue: 0,0:00:41.50,0:00:51.75,Default,Mira Murati,0,0,0,,So today, we'll be releasing the desktop version of ChatGPT and refresh your eye, to make it simpler to use and much more natural as well.
+Dialogue: 0,0:00:41.50,0:00:51.75,Default,Mira Murati,0,0,0,,So today, we'll be releasing the desktop version of ChatGPT and the refreshed UI, that makes it simpler to use much more natural as well.
 Dialogue: 0,0:00:53.18,0:00:57.71,Default,Mira Murati,0,0,0,,But the big news today is that we're launching our new flagship model.
 Dialogue: 0,0:00:58.58,0:01:00.87,Default,Mira Murati,0,0,0,,And we're calling it GPT-4o.
 Dialogue: 0,0:01:02.03,0:01:11.05,Default,Mira Murati,0,0,0,,The special thing about GPT-4o is that it brings GPT-4 level intelligence to everyone including our free users.
 Dialogue: 0,0:01:11.94,0:01:18.17,Default,Mira Murati,0,0,0,,We'll be showing some live demos today to show the full extent of the capabilities of our new model.
 Dialogue: 0,0:01:18.82,0:01:22.61,Default,Mira Murati,0,0,0,,And we'll be rolling them out iteratively over the next few weeks.
-Dialogue: 0,0:01:23.71,0:01:25.90,Default,Mira Murati,0,0,0,,Alright. Solet's get started.
+Dialogue: 0,0:01:23.71,0:01:25.90,Default,Mira Murati,0,0,0,,All right. So let's get started.
 Dialogue: 0,0:01:27.35,0:01:35.59,Default,Mira Murati,0,0,0,,A very important part of our mission is to be able to make our advanced AI tools available to everyone for free.
 Dialogue: 0,0:01:36.72,0:01:42.92,Default,Mira Murati,0,0,0,,We think it's very, very important that people have an intuitive feel for what the technology can do.
-Dialogue: 0,0:01:43.36,0:01:47.79,Default,Mira Murati,0,0,0,,And so we really want to pair it with its broader understanding.
+Dialogue: 0,0:01:43.36,0:01:47.79,Default,Mira Murati,0,0,0,,And so we really want to pair it with this broader understanding.
 Dialogue: 0,0:01:48.71,0:01:55.85,Default,Mira Murati,0,0,0,,And we're always finding ways to reduce the friction and recently, we made ChatGPT available without the sign-up flow.
 Dialogue: 0,0:01:57.14,0:02:05.56,Default,Mira Murati,0,0,0,,And today, we're also bringing the desktop app to ChatGPT, because we want you to be able to use it wherever you're.
 Dialogue: 0,0:02:05.95,0:02:11.84,Default,Mira Murati,0,0,0,,As you can see it's easy, it's simple, it integrates very, very easily in your workflow.
@@ -45,7 +45,7 @@ Dialogue: 0,0:03:05.78,0:03:10.97,Default,Mira Murati,0,0,0,,For the past couple
 Dialogue: 0,0:03:11.37,0:03:13.06,Default,Mira Murati,0,0,0,,And they've gotten pretty good.
 Dialogue: 0,0:03:14.07,0:03:20.50,Default,Mira Murati,0,0,0,,But this is the first time that we're really making a huge step forward when it comes to the ease of use.
 Dialogue: 0,0:03:22.87,0:03:30.20,Default,Mira Murati,0,0,0,,And this is incredibly important, because we're looking at the future of interaction between ourselves and the machines.
-Dialogue: 0,0:03:30.68,0:03:42.60,Default,Mira Murati,0,0,0,,And we think that GPT-4o is really shifting the paradigm into the future of collaboration, where this interaction becomes much more natural and far, far easier.
+Dialogue: 0,0:03:30.68,0:03:42.60,Default,Mira Murati,0,0,0,,And we think that GPT-4o is really shifting that paradigm into the future of collaboration, where this interaction becomes much more natural and far, far easier.
 Dialogue: 0,0:03:44.42,0:03:52.53,Default,Mira Murati,0,0,0,,But you know, making this happen is actually quite complex, because when we interact with one another there's a lot of stuff that we take for granted.
 Dialogue: 0,0:03:52.90,0:04:05.76,Default,Mira Murati,0,0,0,,You know the ease of our dialog when we interrupt one another, the background noises, the multiple voices in a conversation, or, you know, understanding the tone of voice.
 Dialogue: 0,0:04:06.46,0:04:10.32,Default,Mira Murati,0,0,0,,All of these things are actually quite complex for, for these models.
@@ -57,13 +57,13 @@ Dialogue: 0,0:04:38.00,0:04:42.11,Default,Mira Murati,0,0,0,,But now, with GPT-4
 Dialogue: 0,0:04:43.04,0:04:48.70,Default,Mira Murati,0,0,0,,GPT-4o reasons across voice, text, and vision.
 Dialogue: 0,0:04:50.41,0:04:59.31,Default,Mira Murati,0,0,0,,And with these incredible efficiencies, it also allows us to bring the GPT-4o class intelligence to our free users.
 Dialogue: 0,0:04:59.80,0:05:03.48,Default,Mira Murati,0,0,0,,This is something that we've been trying to do for many, many months.
-Dialogue: 0,0:05:03.93,0:05:09.74,Default,Mira Murati,0,0,0,,And we're very, very excited to finally bringGPT-4o to all of our users.
+Dialogue: 0,0:05:03.93,0:05:09.74,Default,Mira Murati,0,0,0,,And we're very, very excited to finally bring GPT-4o to all of our users.
 Dialogue: 0,0:05:12.23,0:05:21.03,Default,Mira Murati,0,0,0,,Today, we have 100 million people, more than 100 million in fact, they use ChatGPT to create work, learn.
 Dialogue: 0,0:05:22.01,0:05:30.32,Default,Mira Murati,0,0,0,,And we have these advanced tools that are only available to our paid, paid users, at least until now.
 Dialogue: 0,0:05:30.89,0:05:35.17,Default,Mira Murati,0,0,0,,With the efficiencies of 4o, we can bring these tools to everyone.
-Dialogue: 0,0:05:36.09,0:05:41.07,Default,Mira Murati,0,0,0,,So starting today,you can use GPTs and the GPT store.
+Dialogue: 0,0:05:36.09,0:05:41.07,Default,Mira Murati,0,0,0,,So starting today, you can use GPTs and the GPT store.
 Dialogue: 0,0:05:42.91,0:05:48.94,Default,Mira Murati,0,0,0,,So far, we've had more than a million users create amazing experiences with GPTs.
-Dialogue: 0,0:05:49.02,0:05:53.93,Default,Mira Murati,0,0,0,,These are customed ChatGPTs for specific use cases that are available in the store.
+Dialogue: 0,0:05:49.02,0:05:53.93,Default,Mira Murati,0,0,0,,These are custom ChatGPTs for specific use cases they are available in the store.
 Dialogue: 0,0:05:54.54,0:06:06.44,Default,Mira Murati,0,0,0,,And now our builders have a much bigger audience where, you know, university professors can create content for their students, or podcasters can create content for their listeners.
 Dialogue: 0,0:06:08.55,0:06:10.77,Default,Mira Murati,0,0,0,,And you can also use Vision.
 Dialogue: 0,0:06:11.01,0:06:19.33,Default,Mira Murati,0,0,0,,So now you can upload, um, screenshots, photos, documents containing both text and images.
@@ -72,20 +72,20 @@ Dialogue: 0,0:06:25.00,0:06:35.11,Default,Mira Murati,0,0,0,,You can also use Me
 Dialogue: 0,0:06:36.08,0:06:41.23,Default,Mira Murati,0,0,0,,And you can use Browse, where you can search for real-time information in your conversation.
 Dialogue: 0,0:06:41.83,0:06:50.98,Default,Mira Murati,0,0,0,,And Advanced Data Analysis where you can upload charts or any information, and it will analyze this information.
 Dialogue: 0,0:06:50.98,0:06:53.24,Default,Mira Murati,0,0,0,,It will give you answers and so on.
-Dialogue: 0,0:06:55.59,0:07:05.20,Default,Mira Murati,0,0,0,,Lastly, we have also improved on the quality and speed in 50 different languagesfor, ChatGPT.
+Dialogue: 0,0:06:55.59,0:07:05.20,Default,Mira Murati,0,0,0,,Lastly, we have also improved on the quality and speed in 50 different languages for, ChatGPT.
 Dialogue: 0,0:07:05.27,0:07:12.19,Default,Mira Murati,0,0,0,,And this is very, very important, because we want to be able to bring this experience to as many people out there as possible.
 Dialogue: 0,0:07:13.63,0:07:20.20,Default,Mira Murati,0,0,0,,So we're very, very excited to bring GPT-4o to all of our free users out there.
-Dialogue: 0,0:07:20.40,0:07:28.04,Default,Mira Murati,0,0,0,,And for the paid users, they will continue to haveup to five times the capacity limits of our free users.
+Dialogue: 0,0:07:20.40,0:07:28.04,Default,Mira Murati,0,0,0,,And for the paid users, they will continue to have up to five times the capacity limits of our free users.
 Dialogue: 0,0:07:29.79,0:07:33.73,Default,Mira Murati,0,0,0,,But, GPT-4o is not only available in ChatGPT.
 Dialogue: 0,0:07:34.21,0:07:36.11,Default,Mira Murati,0,0,0,,We're also bringing it to the API.
 Dialogue: 0,0:07:37.30,0:07:37.65,Default,Mira Murati,0,0,0,,So...
 Dialogue: 0,0:07:43.68,0:07:51.58,Default,Mira Murati,0,0,0,,So our developers can start building today with GPT-4o and making amazing AI applications, deploying them at scale.
-Dialogue: 0,0:07:52.33,0:08:01.00,Default,Mira Murati,0,0,0,,4o is available a, at 2x faster, 50% cheaper, and five times higher rate limits to GPT-4 Turbo.
+Dialogue: 0,0:07:52.33,0:08:01.00,Default,Mira Murati,0,0,0,,4o is available a , at 2x faster, 50% cheaper, and five times higher rate limits compared to GPT-4 Turbo.
 Dialogue: 0,0:08:03.93,0:08:16.21,Default,Mira Murati,0,0,0,,But, you know, as we bring these technologies into the world, it's quite challenging to figure out how to do so in a way that's both useful and also safe.
 Dialogue: 0,0:08:16.98,0:08:25.84,Default,Mira Murati,0,0,0,,And GPT-4o presents new challenges for us when it comes to safety because we're dealing with real time audio, real-time vision.
 Dialogue: 0,0:08:27.17,0:08:33.57,Default,Mira Murati,0,0,0,,And our team has been hard at work figuring out how to build in mitigations against misuse.
-Dialogue: 0,0:08:34.78,0:08:49.32,Default,Mira Murati,0,0,0,,We continue to work with different stakeholders out there from government, media, entertainment, all industries, red teamers, civil societies to figure out how to best bring this technologies into the world.
-Dialogue: 0,0:08:49.35,0:08:56.58,Default,Mira Murati,0,0,0,,So, over the next few weeks,we will continue our iterative deployment to bring out all of the capabilities to you.
+Dialogue: 0,0:08:34.78,0:08:49.32,Default,Mira Murati,0,0,0,,We continue to work with different stakeholders out there from government, media, entertainment, all industries, red teamers , civil society to figure out how to best bring this technologies into the world.
+Dialogue: 0,0:08:49.35,0:08:56.58,Default,Mira Murati,0,0,0,,So, over the next few weeks, we will continue our iterative deployment to bring out all of the capabilities to you.
 Dialogue: 0,0:08:57.49,0:09:01.13,Default,Mira Murati,0,0,0,,But today, I want to show you all of these capabilities.
 Dialogue: 0,0:09:01.72,0:09:03.47,Default,Mira Murati,0,0,0,,So we'll do some live demos.
 Dialogue: 0,0:09:04.37,0:09:10.64,Default,Mira Murati,0,0,0,,I will bring on two of our research leads Mark Chen and Barrett Zoph to join us.
@@ -116,11 +116,11 @@ Dialogue: 0,0:10:27.07,0:10:27.51,Default,ChatGPT,0,0,0,,Breathe in...
 Dialogue: 0,0:10:28.85,0:10:29.61,Default,ChatGPT,0,0,0,,until you count to four.
 Dialogue: 0,0:10:30.17,0:10:30.50,Default,Mark Chen,0,0,0,,Okay.
 Dialogue: 0,0:10:30.71,0:10:31.76,Default,Mark Chen,0,0,0,,Ahh, let me try again.
-Dialogue: 0,0:10:31.87,0:10:36.94,Default,Mark Chen,0,0,0,,So I'm gonna breathe in deeplyand breathe out.
+Dialogue: 0,0:10:31.87,0:10:36.94,Default,Mark Chen,0,0,0,,So I'm gonna breathe in deeply and breathe out .
 Dialogue: 0,0:10:34.92,0:10:35.43,Default,ChatGPT,0,0,0,,And then...
 Dialogue: 0,0:10:36.98,0:10:39.98,Default,ChatGPT,0,0,0,,for four and then exhale slowly.
 Dialogue: 0,0:10:41.26,0:10:42.12,Default,Mark Chen,0,0,0,,Okay, I'll try again.
-Dialogue: 0,0:10:42.27,0:10:44.79,Default,Mark Chen,0,0,0,,Breathing inand breathe out.
+Dialogue: 0,0:10:42.27,0:10:44.79,Default,Mark Chen,0,0,0,,Breathing in and breathe out.
 Dialogue: 0,0:10:45.96,0:10:46.90,Default,ChatGPT,0,0,0,,That's it.
 Dialogue: 0,0:10:47.72,0:10:48.32,Default,ChatGPT,0,0,0,,How do you feel?
 Dialogue: 0,0:10:48.54,0:10:50.18,Default,Mark Chen,0,0,0,,I feel a lot better, thank you so much.
@@ -235,7 +235,7 @@ Dialogue: 0,0:16:37.24,0:16:38.50,Default,ChatGPT,0,0,0,,That's a fair question.
 Dialogue: 0,0:16:38.74,0:16:43.90,Default,ChatGPT,0,0,0,,Linear equations pop up in a lot of everyday situations even if we don't realize it.
 Dialogue: 0,0:16:44.29,0:16:51.71,Default,ChatGPT,0,0,0,,For example, calculating expenses, planning travel, cooking, and even in business for profit and loss calculations.
 Dialogue: 0,0:16:52.16,0:16:56.37,Default,ChatGPT,0,0,0,,It's basically a way to solve problems when you need to find an unknown value.
-Dialogue: 0,0:16:56.76,0:16:57.77,Default,ChatGPT,0,0,0,,Plus, it is g.
+Dialogue: 0,0:16:56.76,0:16:57.77,Default,ChatGPT,0,0,0,,Plus, it is g .
 Dialogue: 0,0:16:57.04,0:16:59.72,Default,Mark Chen,0,0,0,,Wow, okay, you know I have a lot of unknown values in my life.
 Dialogue: 0,0:17:00.11,0:17:01.72,Default,Mark Chen,0,0,0,,I'm totally convinced.
 Dialogue: 0,0:17:01.72,0:17:03.32,Default,Mark Chen,0,0,0,,We sh... I'm gonna learn math now.
@@ -326,7 +326,7 @@ Dialogue: 0,0:22:08.27,0:22:08.75,Default,Mira Murati,0,0,0,,Ok.
 Dialogue: 0,0:22:09.56,0:22:15.37,Default,Mira Murati,0,0,0,,Bob de Gasker wants to know if GPT-4o is capable of real-time translation?
 Dialogue: 0,0:22:16.27,0:22:17.44,Default,Mira Murati,0,0,0,,Mark do you want to try this one?
 Dialogue: 0,0:22:17.54,0:22:18.55,Default,Mark Chen,0,0,0,,Sure, yeah, let's do it.
-Dialogue: 0,0:22:18.35,0:22:21.90,Default,Mira Murati,0,0,0,,Alright, I, I speak Italian, so we can just do English-Italian
+Dialogue: 0,0:22:18.35,0:22:21.90,Default,Mira Murati,0,0,0,,All right, I, I speak Italian, so we can just do English-Italian
 Dialogue: 0,0:22:18.90,0:22:19.45,Default,Mark Chen,0,0,0,,Uh, Mister
 Dialogue: 0,0:22:20.54,0:22:21.35,Default,Mark Chen,0,0,0,,Oh, okay, cool.
 Dialogue: 0,0:22:21.91,0:22:23.01,Default,Mark Chen,0,0,0,,Try to do English-Italian.
@@ -351,8 +351,8 @@ Dialogue: 0,0:23:12.88,0:23:14.24,Default,Mira Murati,0,0,0,,Sicuramente, sì.
 Dialogue: 0,0:23:16.14,0:23:16.44,Default,Mira Murati,0,0,0,,Mm-hmm.
 Dialogue: 0,0:23:16.64,0:23:17.54,Default,ChatGPT,0,0,0,,Certainly, yes.
 Dialogue: 0,0:23:18.36,0:23:19.54,Default,Mark Chen,0,0,0,,Great, looks like it works.
-Dialogue: 0,0:23:25.33,0:23:25.82,Default,Mira Murati,0,0,0,,Alright.
-Dialogue: 0,0:23:26.40,0:23:34.55,Default,Mira Murati,0,0,0,,So the next one is from Britto John 78, who asks can you tellwhat you're feeling just by looking at your face?
+Dialogue: 0,0:23:25.33,0:23:25.82,Default,Mira Murati,0,0,0,,All right.
+Dialogue: 0,0:23:26.40,0:23:34.55,Default,Mira Murati,0,0,0,,So the next one is from Britto John 78, who asks can you tell what you're feeling just by looking at your face?
 Dialogue: 0,0:23:35.05,0:23:36.93,Default,Mira Murati,0,0,0,,Barrett, do you wanna give this one a try?
 Dialogue: 0,0:23:37.18,0:23:38.22,Default,Barrett Zoph,0,0,0,,Absolutely, let's try it up.
 Dialogue: 0,0:23:39.52,0:23:39.68,Default,Barrett Zoph,0,0,0,,Emm.
