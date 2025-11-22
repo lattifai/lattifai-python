@@ -202,41 +202,42 @@ Examples:
         for metric, value in results.items():
             if not isinstance(value, float):
                 assert metric == "der", f"Detailed output only supported for DER, got: {metric}"
-                if args.verbose:
-                    model_display = args.model_name if args.model_name else "-"
-                    print("\nDetailed DER Components:")
 
-                    # Build header and values with custom order
-                    sorted_items = sorted(value.items(), key=lambda x: x[0])
+                model_display = args.model_name if args.model_name else "-"
+                print("\nDetailed DER Components:")
 
-                    # Define the desired column order
-                    column_order = [
-                        "diarization error rate",
-                        "false alarm",
-                        "missed detection",
-                        "confusion",
-                        "correct",
-                        "total",
-                    ]
+                # Build header and values with custom order
+                sorted_items = sorted(value.items(), key=lambda x: x[0])
 
-                    # Reorder items according to column_order
-                    ordered_items = []
-                    value_dict = dict(sorted_items)
-                    for key in column_order:
-                        if key in value_dict:
-                            ordered_items.append((key, value_dict[key]))
+                # Define the desired column order
+                column_order = [
+                    "diarization error rate",
+                    "false alarm",
+                    "missed detection",
+                    "confusion",
+                    "correct",
+                    "total",
+                ]
 
-                    header = ["Model"] + [
-                        "DER" if key == "diarization error rate" else f"{key} (s)" for key, _ in ordered_items
-                    ]
-                    values = [model_display] + [f"{val:.2f}" for _, val in ordered_items]
+                # Reorder items according to column_order
+                ordered_items = []
+                value_dict = dict(sorted_items)
+                for key in column_order:
+                    if key in value_dict:
+                        ordered_items.append((key, value_dict[key]))
 
-                    # Print table
-                    print("Metric Details:")
-                    print("| " + " | ".join(header) + " |")
-                    print("|" + "|".join(["--------"] * len(header)) + "|")
-                    print("| " + " | ".join(values) + " |")
-                    print()
+                header = ["Model"] + [
+                    "DER" if key == "diarization error rate" else f"{key} (s)" for key, _ in ordered_items
+                ]
+                values = [model_display] + [f"{val:.2f}" for _, val in ordered_items]
+
+                # Print table
+                print("Metric Details:")
+                print("| " + " | ".join(header) + " |")
+                print("|" + "|".join(["--------"] * len(header)) + "|")
+                print("| " + " | ".join(values) + " |")
+                print()
+
                 value = value["diarization error rate"]
                 results[metric] = value
 
