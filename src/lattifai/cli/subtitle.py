@@ -23,7 +23,7 @@ def convert(
     preserving all timing information, text content, and speaker labels (if present).
     Supports common subtitle formats including SRT, VTT, JSON, and Praat TextGrid.
 
-    Shortcut: invoking ``lai-subtitle-convert`` is equivalent to running ``lai subtitle convert``.
+    Shortcut: invoking ``laisub-convert`` is equivalent to running ``lai subtitle convert``.
 
     Args:
         input_path: Path to input subtitle file (supports SRT, VTT, JSON, TextGrid formats)
@@ -83,7 +83,7 @@ def normalize(
     - Convert curly apostrophes to straight ones in contractions
     - Strip leading and trailing whitespace from each segment
 
-    Shortcut: invoking ``lai-subtitle-normalize`` is equivalent to running ``lai subtitle normalize``.
+    Shortcut: invoking ``laisub-normalize`` is equivalent to running ``lai subtitle normalize``.
 
     Args:
         input_path: Path to input subtitle file to normalize
@@ -134,12 +134,91 @@ def normalize(
     return output_path
 
 
+@run.cli.entrypoint(name="shift", namespace="subtitle")
+def shift(
+    input_path: Pathlike,
+    output_path: Pathlike,
+    seconds: float,
+    subtitle: Annotated[Optional[SubtitleConfig], run.Config[SubtitleConfig]] = None,
+):
+    """
+    Shift subtitle timestamps by a specified number of seconds.
+
+    This command reads a subtitle file and adjusts all timestamps by adding or
+    subtracting a specified offset. Use positive values to delay subtitles and
+    negative values to make them appear earlier.
+
+    Shortcut: invoking ``laisub-shift`` is equivalent to running ``lai subtitle shift``.
+
+    Args:
+        input_path: Path to input subtitle file
+        output_path: Path to output subtitle file (can be same as input for in-place modification)
+        seconds: Number of seconds to shift timestamps. Positive values delay subtitles,
+                negative values make them appear earlier.
+        subtitle: Subtitle configuration for reading/writing.
+            Fields: input_format, output_format, encoding
+
+    Examples:
+        # Delay subtitles by 2 seconds (positional arguments)
+        lai subtitle shift input.srt output.srt 2.0
+
+        # Make subtitles appear 1.5 seconds earlier
+        lai subtitle shift input.srt output.srt -1.5
+
+        # Shift and convert format
+        lai subtitle shift input.vtt output.srt seconds=0.5
+
+        # Using keyword arguments (traditional syntax)
+        lai subtitle shift \\
+            input_path=input.srt \\
+            output_path=output.srt \\
+            seconds=3.0
+    """
+    from pathlib import Path
+
+    from lattifai.subtitle import Subtitler
+
+    if subtitle is None:
+        subtitle = SubtitleConfig()
+
+    subtitler = Subtitler(config=subtitle)
+
+    input_path = Path(input_path).expanduser()
+    output_path = Path(output_path).expanduser()
+
+    # Read subtitles
+    supervisions = subtitler.read(input_path)
+
+    # Shift timestamps
+    for sup in supervisions:
+        sup.start = max(0.0, sup.start + seconds)
+
+    # Write shifted subtitles
+    output_path = subtitler.write(supervisions, output_path)
+
+    if seconds >= 0:
+        direction = f"delayed by {seconds}s"
+    else:
+        direction = f"advanced by {abs(seconds)}s"
+
+    if output_path == input_path:
+        print(f"✅ Shifted timestamps {direction} in {input_path} (in-place)")
+    else:
+        print(f"✅ Shifted timestamps {direction}: {input_path} -> {output_path}")
+
+    return output_path
+
+
 def main_convert():
     run.cli.main(convert)
 
 
 def main_normalize():
     run.cli.main(normalize)
+
+
+def main_shift():
+    run.cli.main(shift)
 
 
 if __name__ == "__main__":

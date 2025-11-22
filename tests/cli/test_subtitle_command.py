@@ -14,10 +14,15 @@ def run_subtitle_command(args, env=None, dryrun: bool = True):
     cmd = ["lai", "subtitle"]
 
     if dryrun and os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false").lower() == "true":
-        if args[0] in ["convert", "normalize"]:
+        if args[0] in ["convert", "normalize", "shift"]:
             cmd.append(args[0])
             args = args[1:]
         cmd.append("--dryrun")
+    else:
+        if args[0] in ["convert", "normalize", "shift"]:
+            cmd.append(args[0])
+            args = args[1:]
+        cmd.append("-Y")
 
     cmd.extend(args)
     try:
@@ -33,7 +38,7 @@ def run_subtitle_command(args, env=None, dryrun: bool = True):
     except subprocess.TimeoutExpired:
         return None
     except subprocess.CalledProcessError as e:
-        print(" ".join(cmd))
+        print(f"Command: {' '.join(cmd)} failed with exit code {e.returncode}")
         raise e
 
 
@@ -116,3 +121,70 @@ class TestSubtitleNormalizeCommand:
             if result.returncode == 0:
                 help_text = result.stdout + result.stderr
                 assert "subtitle" in help_text.lower()
+
+
+class TestSubtitleShiftCommand:
+    """Test cases for subtitle shift command"""
+
+    def test_subtitle_shift_positive(self, sample_subtitle_file, tmp_path):
+        """Test subtitle shift command with positive offset (delay)"""
+        output_file = tmp_path / "output_shifted_positive.srt"
+
+        args = [
+            "shift",
+            f"input_path={sample_subtitle_file}",
+            f"output_path={output_file}",
+            "seconds=2.0",
+        ]
+
+        run_subtitle_command(args)
+
+    def test_subtitle_shift_negative(self, sample_subtitle_file, tmp_path):
+        """Test subtitle shift command with negative offset (advance)"""
+        output_file = tmp_path / "output_shifted_negative.srt"
+
+        args = [
+            "shift",
+            f"input_path={sample_subtitle_file}",
+            f"output_path={output_file}",
+            "seconds=-1.5",
+        ]
+
+        run_subtitle_command(args)
+
+    def test_subtitle_shift_zero(self, sample_subtitle_file, tmp_path):
+        """Test subtitle shift command with zero offset (no change)"""
+        output_file = tmp_path / "output_shifted_zero.srt"
+
+        args = [
+            "shift",
+            f"input_path={sample_subtitle_file}",
+            f"output_path={output_file}",
+            "seconds=0.0",
+        ]
+
+        run_subtitle_command(args)
+
+    def test_subtitle_shift_with_format_conversion(self, sample_subtitle_file, tmp_path):
+        """Test subtitle shift command with format conversion"""
+        output_file = tmp_path / "output_shifted.vtt"
+
+        args = [
+            "shift",
+            f"input_path={sample_subtitle_file}",
+            f"output_path={output_file}",
+            "seconds=1.5",
+        ]
+
+        run_subtitle_command(args)
+
+    def test_subtitle_shift_help(self):
+        """Test subtitle shift command help output"""
+        args = ["shift", "--help"]
+        result = run_subtitle_command(args)
+
+        if result is not None:
+            assert result.returncode == 0 or "usage:" in result.stdout or "help" in result.stdout
+            if result.returncode == 0:
+                help_text = result.stdout + result.stderr
+                assert "shift" in help_text.lower()

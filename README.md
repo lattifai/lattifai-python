@@ -125,6 +125,9 @@ lai subtitle convert input.srt output.vtt
 
 # Normalize subtitle text (clean HTML entities)
 lai subtitle normalize input.srt output.srt
+
+# Shift subtitle timestamps
+lai subtitle shift input.srt output.srt 2.0
 ```
 
 > **💡 New to NeMo Run?** Check out the [Configuration Guide](#advanced-configuration-with-nemo-run) below to learn about powerful features like YAML configs, config reuse, and parameter sweeps.
@@ -148,6 +151,7 @@ lai alignment youtube "https://www.youtube.com/watch?v=DQacCB9tDaw" \
 | `lai alignment youtube` | Download & align YouTube content | Quick YouTube processing with/without existing subtitles |
 | `lai subtitle convert` | Convert subtitle formats | Format conversion only |
 | `lai subtitle normalize` | Clean and normalize subtitle text | Text preprocessing |
+| `lai subtitle shift` | Shift subtitle timestamps | Adjust timing offset |
 | ~~`lai agent workflow(under construction)`~~ | Intelligent YouTube workflow with transcription | Production, batch jobs, full automation |
 
 
@@ -255,6 +259,34 @@ lai subtitle normalize input.vtt output.srt
 **Arguments:**
 - First argument: Input subtitle file path
 - Second argument: Output subtitle file path
+
+#### lai subtitle shift
+
+Shift subtitle timestamps by a specified number of seconds.
+
+**Basic Usage:**
+```bash
+# Delay subtitles by 2 seconds
+lai subtitle shift input.srt output.srt 2.0
+
+# Make subtitles appear 1.5 seconds earlier
+lai subtitle shift input.srt output.srt -1.5
+
+# Shift in-place
+lai subtitle shift input.srt input.srt -0.5
+
+# Using shortcut command
+laisub-shift input.srt output.srt 3.0
+
+# Shift and convert format
+lai subtitle shift input.vtt output.srt seconds=0.5
+```
+
+**Arguments:**
+- First argument: Input subtitle file path
+- Second argument: Output subtitle file path
+- Third argument: Seconds to shift (positive = delay, negative = advance)
+- `seconds=N`: Alternative way to specify the shift amount
 
 #### Understanding split_sentence
 
