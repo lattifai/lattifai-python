@@ -5,23 +5,24 @@ Evaluate subtitle alignment quality using DER, JER, WER, SCA, and SCER metrics.
 ## Metrics
 
 **DER (Diarization Error Rate)** - Speaker diarization quality
-- Formula: `(False Alarm + Missed Speech + Speaker Error) / Total Speech Time`
+- Formula: $\text{DER} = \frac{\text{false alarm} + \text{missed detection} + \text{confusion}}{\text{total}}$
+- Components measured in seconds: false alarm, missed detection, confusion, correct, total
 - Lower is better, < 20% is good
 
 **JER (Jaccard Error Rate)** - Temporal overlap of speaker segments
-- Formula: `1 - (Intersection / Union)`
+- Formula: $\text{JER} = 1 - \frac{\text{Intersection}}{\text{Union}}$
 - Lower is better
 
 **WER (Word Error Rate)** - Transcription accuracy
-- Formula: `(Substitutions + Deletions + Insertions) / Total Words`
+- Formula: $\text{WER} = \frac{\text{Substitutions} + \text{Deletions} + \text{Insertions}}{\text{Total Words}}$
 - Lower is better, < 10% is good
 
 **SCA (Speaker Count Accuracy)** - Speaker counting accuracy
-- Formula: `Correct Predictions / Total Samples`
+- Formula: $\text{SCA} = \frac{\text{Correct Predictions}}{\text{Total Samples}}$
 - Higher is better
 
 **SCER (Speaker Counting Error Rate)** - Relative error in speaker count
-- Formula: `|Hypothesis Count - Reference Count| / Reference Count`
+- Formula: $\text{SCER} = \frac{|\text{Hypothesis Count} - \text{Reference Count}|}{\text{Reference Count}}$
 - Lower is better
 
 ## Benchmarks
