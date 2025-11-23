@@ -1,71 +1,17 @@
 import json
 import time
 from collections import defaultdict
-from pathlib import Path
-from typing import Any, BinaryIO, Dict, Iterable, Optional, Tuple, Union
+from typing import Any, Dict, Tuple
 
 import numpy as np
 import onnxruntime as ort
-import soundfile as sf
 import torch
 from lhotse import FbankConfig
-from lhotse.augmentation import get_or_create_resampler
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
 
-from lattifai.errors import AlignmentError, AudioFormatError, AudioLoadError, DependencyError, ModelLoadError
-
-ChannelSelectorType = Union[int, Iterable[int], str]
-
-
-def resample_audio(
-    audio_sr: Tuple[torch.Tensor, int],
-    sampling_rate: int,
-    device: Optional[str],
-    channel_selector: Optional[ChannelSelectorType] = "average",
-) -> torch.Tensor:
-    """
-    return:
-        (1, T)
-    """
-    audio, sr = audio_sr
-
-    if channel_selector is None:
-        # keep the original multi-channel signal
-        tensor = audio
-    elif isinstance(channel_selector, int):
-        assert audio.shape[0] >= channel_selector, f"Invalid channel: {channel_selector}"
-        tensor = audio[channel_selector : channel_selector + 1].clone()
-        del audio
-    elif isinstance(channel_selector, str):
-        assert channel_selector == "average"
-        tensor = torch.mean(audio.to(device), dim=0, keepdim=True)
-        del audio
-    else:
-        assert isinstance(channel_selector, Iterable)
-        num_channels = audio.shape[0]
-        print(f"Selecting channels {channel_selector} from the signal with {num_channels} channels.")
-        assert isinstance(channel_selector, Iterable)
-        if max(channel_selector) >= num_channels:
-            raise ValueError(
-                f"Cannot select channel subset {channel_selector} from a signal with {num_channels} channels."
-            )
-        tensor = audio[channel_selector]
-
-    tensor = tensor.to(device)
-    if sr != sampling_rate:
-        resampler = get_or_create_resampler(sr, sampling_rate).to(device=device)
-        length = tensor.size(-1)
-        chunk_size = sampling_rate * 3600
-        if length > chunk_size:
-            resampled_chunks = []
-            for i in range(0, length, chunk_size):
-                resampled_chunks.append(resampler(tensor[..., i : i + chunk_size]))
-            tensor = torch.cat(resampled_chunks, dim=-1)
-        else:
-            tensor = resampler(tensor)
-
-    return tensor
+from lattifai.audio2 import AudioData
+from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
 
 
 class Lattice1AlphaWorker:
@@ -139,71 +85,11 @@ class Lattice1AlphaWorker:
         self.timings["emission"] += time.time() - _start
         return emission  # (1, T, vocab_size) torch
 
-    def load_audio(
-        self, audio: Union[Pathlike, BinaryIO], channel_selector: Optional[ChannelSelectorType] = "average"
-    ) -> Tuple[torch.Tensor, int]:
-        if isinstance(audio, Pathlike):
-            audio = str(Path(audio).expanduser())
-
-        # load audio
-        try:
-            waveform, sample_rate = sf.read(audio, always_2d=True, dtype="float32")  # numpy array
-            waveform = waveform.T  # (channels, samples)
-        except Exception as primary_error:
-            # Fallback to PyAV for formats not supported by soundfile
-            try:
-                import av
-            except ImportError:
-                raise DependencyError(
-                    "av (PyAV)", install_command="pip install av", context={"primary_error": str(primary_error)}
-                )
-
-            try:
-                container = av.open(audio)
-                audio_stream = next((s for s in container.streams if s.type == "audio"), None)
-
-                if audio_stream is None:
-                    raise AudioFormatError(str(audio), "No audio stream found in file")
-
-                # Resample to target sample rate during decoding
-                audio_stream.codec_context.format = av.AudioFormat("flt")  # 32-bit float
-
-                frames = []
-                for frame in container.decode(audio_stream):
-                    # Convert frame to numpy array
-                    array = frame.to_ndarray()
-                    # Ensure shape is (channels, samples)
-                    if array.ndim == 1:
-                        array = array.reshape(1, -1)
-                    elif array.ndim == 2 and array.shape[0] > array.shape[1]:
-                        array = array.T
-                    frames.append(array)
-
-                container.close()
-
-                if not frames:
-                    raise AudioFormatError(str(audio), "No audio data found in file")
-
-                # Concatenate all frames
-                waveform = np.concatenate(frames, axis=1)
-                sample_rate = audio_stream.codec_context.sample_rate
-            except Exception as e:
-                raise AudioLoadError(str(audio), original_error=e)
-
-        return resample_audio(
-            (torch.from_numpy(waveform), sample_rate),
-            self.config.get("sampling_rate", 16000),
-            device=self.device.type,
-            channel_selector=channel_selector,
-        )
-
-    def alignment(
-        self, audio: Union[Union[Pathlike, BinaryIO], torch.tensor], lattice_graph: Tuple[str, int, float]
-    ) -> Dict[str, Any]:
+    def alignment(self, audio: AudioData, lattice_graph: Tuple[str, int, float]) -> Dict[str, Any]:
         """Process audio with LatticeGraph.
 
         Args:
-            audio: Audio file path or binary data
+            audio: AudioData object
             lattice_graph: LatticeGraph data
 
         Returns:
@@ -214,15 +100,9 @@ class Lattice1AlphaWorker:
             DependencyError: If required dependencies are missing
             AlignmentError: If alignment process fails
         """
-        # load audio
-        if isinstance(audio, torch.Tensor):
-            waveform = audio
-        else:
-            waveform = self.load_audio(audio)  # (1, L)
-
         _start = time.time()
         try:
-            emission = self.emission(waveform.to(self.device))  # (1, T, vocab_size)
+            emission = self.emission(audio.tensor.to(self.device))  # (1, T, vocab_size)
         except Exception as e:
             raise AlignmentError(
                 "Failed to compute acoustic features from audio",

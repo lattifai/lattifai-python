@@ -7,6 +7,7 @@ import colorful
 from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner
+from lattifai.audio2 import AudioLoader
 from lattifai.base_client import AsyncAPIClient, LattifAIClientMixin, SyncAPIClient
 from lattifai.config import AlignmentConfig, ClientConfig, SubtitleConfig, TranscriptionConfig
 from lattifai.errors import (
@@ -52,6 +53,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Initialize base API client
         super().__init__(config=client_config)
 
+        # audio loader
+        self.audio_loader = AudioLoader(device=alignment_config.device)
+
         # aligner
         self.aligner = Lattice1Aligner(self, config=alignment_config)
 
@@ -80,9 +84,14 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             output_subtitle_path = output_subtitle_path or self.subtitler.config.output_path
+            audio = self.audio_loader(
+                input_media_path,
+                channel_selector="average",
+            )
+
             # Step 2-4: Align using Lattice1Aligner
             supervisions, alignments = self.aligner.alignment(
-                input_media_path,
+                audio,
                 supervisions,
                 split_sentence=split_sentence or self.subtitler.config.split_sentence,
                 return_details=self.subtitler.config.word_level
@@ -216,6 +225,9 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         # aligner (will be async version in future)
         self.aligner = Lattice1Aligner(self, config=alignment_config)
 
+        # audio loader
+        self.audio_loader = AudioLoader(device=alignment_config.device)
+
         # Initialize shared components (subtitler, transcriber, downloader)
         self._init_shared_components(subtitle_config, transcription_config)
 
@@ -244,11 +256,17 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
 
             output_subtitle_path = output_subtitle_path or self.subtitler.config.output_path
 
+            audio = await asyncio.to_thread(
+                self.audio_loader,
+                input_media_path,
+                channel_selector="average",
+            )
+
             # Step 2-4: Align using Lattice1Aligner (will be async in future)
             # For now, we wrap the sync aligner in asyncio.to_thread
             supervisions, alignments = await asyncio.to_thread(
                 self.aligner.alignment,
-                input_media_path,
+                audio,
                 supervisions,
                 split_sentence=split_sentence or self.subtitler.config.split_sentence,
                 return_details=self.subtitler.config.word_level

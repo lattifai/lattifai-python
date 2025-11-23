@@ -1,11 +1,11 @@
 """LattifAI client implementation with config-driven architecture."""
 
-import asyncio
 from typing import Any, List, Optional, Tuple
 
 import colorful
 from lhotse.utils import Pathlike
 
+from lattifai.audio2 import AudioData
 from lattifai.config import AlignmentConfig
 from lattifai.errors import (
     AlignmentError,
@@ -16,7 +16,7 @@ from lattifai.subtitle import Supervision
 from lattifai.utils import _resolve_model_path
 
 from .lattice1_alpha import _load_worker
-from .tokenizer import AsyncLatticeTokenizer, LatticeTokenizer, _load_tokenizer
+from .tokenizer import _load_tokenizer
 
 ClientType = Any
 
@@ -41,7 +41,7 @@ class Lattice1Aligner(object):
 
     def alignment(
         self,
-        audio: Pathlike,
+        audio: AudioData,
         supervisions: List[Supervision],
         split_sentence: Optional[bool] = False,
         return_details: Optional[bool] = False,
