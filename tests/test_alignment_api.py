@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from lattifai.caption import Supervision
+from lattifai.caption import Caption, Supervision
 
 
 class TestAlignmentAPISignature:
@@ -154,15 +154,15 @@ Second caption
         srt_file.write_text(srt_content)
 
         # Read the file
-        supervisions = CaptionIO.read(srt_file)
+        caption = CaptionIO.read(srt_file)
 
-        assert isinstance(supervisions, list)
-        assert len(supervisions) == 2
-        assert all(hasattr(s, "text") for s in supervisions)
-        assert all(hasattr(s, "start") for s in supervisions)
-        assert all(hasattr(s, "duration") for s in supervisions)
+        assert isinstance(caption, Caption)
+        assert len(caption.supervisions) == 2
+        assert all(hasattr(s, "text") for s in caption.supervisions)
+        assert all(hasattr(s, "start") for s in caption.supervisions)
+        assert all(hasattr(s, "duration") for s in caption.supervisions)
 
-        print(f"✓ CaptionIO.read() works correctly, parsed {len(supervisions)} segments")
+        print(f"✓ CaptionIO.read() works correctly, parsed {len(caption.supervisions)} segments")
 
     def test_caption_io_write(self, tmp_path):
         """Test CaptionIO.write() method."""
@@ -212,8 +212,8 @@ Second caption
             file_path.write_text(content)
 
             # Read with auto-detection
-            supervisions = CaptionIO.read(file_path, format=None)
-            assert isinstance(supervisions, list)
+            caption = CaptionIO.read(file_path, format=None)
+            assert isinstance(caption, Caption)
             print(f"✓ Auto-detected format for {filename}")
 
 
