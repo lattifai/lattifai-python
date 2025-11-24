@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from typing import Literal, Optional
 
+from ..utils import _select_device
+
 SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",
     "gemini-3-pro-preview",
@@ -27,7 +29,7 @@ class TranscriptionConfig:
     gemini_api_key: Optional[str] = None
     """Gemini API key. If None, reads from GEMINI_API_KEY environment variable."""
 
-    device: Literal["cpu", "cuda", "mps"] = "cpu"
+    device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device for transcription models."""
 
     max_retries: int = 0
@@ -66,6 +68,8 @@ class TranscriptionConfig:
             raise ValueError("max_retries must be non-negative")
 
         # Validate device
-        valid_devices = ["cpu", "cuda", "mps"]
-        if self.device not in valid_devices:
-            raise ValueError(f"device must be one of {valid_devices}, got '{self.device}'")
+        if self.device not in ("cpu", "cuda", "mps", "auto"):
+            raise ValueError(f"device must be one of ('cpu', 'cuda', 'mps', 'auto'), got '{self.device}'")
+
+        if self.device == "auto":
+            self.device = _select_device(self.device)

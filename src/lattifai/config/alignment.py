@@ -18,7 +18,7 @@ class AlignmentConfig:
     model_name_or_path: str = "Lattifai/Lattice-1-Alpha"
     """Model identifier or path to local model directory (e.g., 'Lattifai/Lattice-1-Alpha')."""
 
-    device: Literal["cpu", "cuda", "mps"] = "cpu"
+    device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""
 
     batch_size: int = 1
@@ -32,4 +32,5 @@ class AlignmentConfig:
         if self.device not in ("cpu", "cuda", "mps", "auto"):
             raise ValueError(f"device must be one of ('cpu', 'cuda', 'mps', 'auto'), got {self.device}")
 
-        self.device = _select_device(self.device)
+        if self.device == "auto":
+            self.device = _select_device(self.device)
