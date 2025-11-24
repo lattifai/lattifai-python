@@ -1,13 +1,13 @@
 """LattifAI client implementation with config-driven architecture."""
 
 import asyncio
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import colorful
 from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner
-from lattifai.audio2 import AudioLoader
+from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.base_client import AsyncAPIClient, LattifAIClientMixin, SyncAPIClient
 from lattifai.config import AlignmentConfig, ClientConfig, SubtitleConfig, TranscriptionConfig
 from lattifai.errors import (
@@ -64,7 +64,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
     def alignment(
         self,
-        input_media_path: Pathlike,
+        input_media_path: Union[Pathlike, AudioData],
         input_subtitle_path: Pathlike,
         output_subtitle_path: Optional[Pathlike] = None,
         input_subtitle_format: Optional[InputSubtitleFormat] = None,
@@ -84,14 +84,17 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             output_subtitle_path = output_subtitle_path or self.subtitler.config.output_path
-            audio = self.audio_loader(
-                input_media_path,
-                channel_selector="average",
-            )
+            if isinstance(input_media_path, AudioData):
+                media_audio = input_media_path
+            else:
+                media_audio = self.audio_loader(
+                    input_media_path,
+                    channel_selector="average",
+                )
 
             # Step 2-4: Align using Lattice1Aligner
             supervisions, alignments = self.aligner.alignment(
-                audio,
+                media_audio,
                 supervisions,
                 split_sentence=split_sentence or self.subtitler.config.split_sentence,
                 return_details=self.subtitler.config.word_level
@@ -143,9 +146,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Step 1: Download media
         media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite)
 
+        media_audio = self.audio_loader(media_file, channel_selector="average")
+
         # Step 2: Get or create subtitles (download or transcribe)
         subtitle_file = self._get_or_create_subtitles(
-            url, output_dir, media_file, force_overwrite, subtitle_lang, is_async=False
+            url, output_dir, media_audio, force_overwrite, subtitle_lang, is_async=False
         )
 
         # Step 3: Generate output path if not provided
@@ -154,7 +159,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Step 4: Perform alignment
         print(colorful.cyan("🔗 Performing forced alignment..."))
         return self.alignment(
-            input_media_path=media_file,
+            input_media_path=media_audio,
             input_subtitle_path=subtitle_file,
             output_subtitle_path=output_subtitle_path,
             **alignment_kwargs,
@@ -233,7 +238,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
 
     async def alignment(
         self,
-        input_media_path: Pathlike,
+        input_media_path: Union[Pathlike, AudioData],
         input_subtitle_path: Pathlike,
         output_subtitle_path: Optional[Pathlike] = None,
         input_subtitle_format: Optional[InputSubtitleFormat] = None,
@@ -256,17 +261,20 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
 
             output_subtitle_path = output_subtitle_path or self.subtitler.config.output_path
 
-            audio = await asyncio.to_thread(
-                self.audio_loader,
-                input_media_path,
-                channel_selector="average",
-            )
+            if isinstance(input_media_path, AudioData):
+                media_audio = input_media_path
+            else:
+                media_audio = await asyncio.to_thread(
+                    self.audio_loader,
+                    input_media_path,
+                    channel_selector="average",
+                )
 
             # Step 2-4: Align using Lattice1Aligner (will be async in future)
             # For now, we wrap the sync aligner in asyncio.to_thread
             supervisions, alignments = await asyncio.to_thread(
                 self.aligner.alignment,
-                audio,
+                media_audio,
                 supervisions,
                 split_sentence=split_sentence or self.subtitler.config.split_sentence,
                 return_details=self.subtitler.config.word_level
@@ -318,9 +326,15 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         # Step 1: Download media
         media_file = await self._download_media(url, output_dir, media_format, force_overwrite)
 
+        media_audio = await asyncio.to_thread(
+            self.audio_loader,
+            media_file,
+            channel_selector="average",
+        )
+
         # Step 2: Get or create subtitles (download or transcribe)
         subtitle_file = await self._get_or_create_subtitles(
-            url, output_dir, media_file, force_overwrite, subtitle_lang, is_async=True
+            url, output_dir, media_audio, force_overwrite, subtitle_lang, is_async=True
         )
 
         # Step 3: Generate output path if not provided
@@ -329,7 +343,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         # Step 4: Perform alignment
         print(colorful.cyan("🔗 Performing forced alignment..."))
         return await self.alignment(
-            input_media_path=media_file,
+            input_media_path=media_audio,
             input_subtitle_path=subtitle_file,
             output_subtitle_path=output_subtitle_path,
             **alignment_kwargs,

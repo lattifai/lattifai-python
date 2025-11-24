@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Union  # noqa: F401
 
 import httpx
+from lhotse.utils import Pathlike
+
+from lattifai.audio2 import AudioData
 
 from .config import ClientConfig
 
@@ -13,8 +16,6 @@ from .config import ClientConfig
 from .errors import APIError, ConfigurationError
 
 if TYPE_CHECKING:
-    from lhotse.utils import Pathlike
-
     from .config import AlignmentConfig, SubtitleConfig, TranscriptionConfig
 
 
@@ -210,10 +211,9 @@ class LattifAIClientMixin:
     def transcriber(self):
         """Lazy load transcriber based on config."""
         if self._transcriber is None and self.transcription_config:
-            if self.transcription_config.gemini_api_key:
-                from .transcription import GeminiTranscriber
+            from .transcription import create_transcriber
 
-                self._transcriber = GeminiTranscriber(transcription_config=self.transcription_config)
+            self._transcriber = create_transcriber(transcription_config=self.transcription_config)
         return self._transcriber
 
     @property
@@ -273,7 +273,7 @@ class LattifAIClientMixin:
             media_format=media_format,
             force_overwrite=force_overwrite,
         )
-        print(colorful.green(f"         ✓ Media downloaded: {media_file}"))
+        print(colorful.green(f"    ✓ Media downloaded: {media_file}"))
         return media_file
 
     def _download_media_sync(
@@ -292,7 +292,7 @@ class LattifAIClientMixin:
         self,
         url: str,
         output_dir: Path,
-        media_file: str,
+        media_file: Union[str, Path, AudioData],
         force_overwrite: bool,
         subtitle_lang: Optional[str],
         is_async: bool = False,
@@ -331,7 +331,7 @@ class LattifAIClientMixin:
 
                 # Generate transcript file path
                 transcript_file = (
-                    output_dir / f"{Path(media_file).stem}_{self.transcriber.name}{self.transcriber.file_suffix}"
+                    output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.name}{self.transcriber.file_suffix}"
                 )
 
                 # Check if transcript file already exists
@@ -354,9 +354,12 @@ class LattifAIClientMixin:
                     # elif choice == "overwrite": continue to transcribe below
 
                 print(colorful.cyan(f"🎤 Transcribing media with {self.transcriber.name}..."))
-                transcript_text = await self.transcriber.transcribe_url(url)
+                if self.transcriber.supports_url:
+                    transcription = await self.transcriber.transcribe(url)
+                else:
+                    transcription = await self.transcriber.transcribe_file(media_file)
 
-                await asyncio.to_thread(transcript_file.write_text, transcript_text, encoding="utf-8")
+                await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
                 subtitle_file = str(transcript_file)
                 print(colorful.green(f"         ✓ Transcription completed: {subtitle_file}"))
             else:

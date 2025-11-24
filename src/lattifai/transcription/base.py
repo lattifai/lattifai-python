@@ -1,10 +1,11 @@
 """Base transcriber abstractions for LattifAI."""
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import List, Union
+
+from lattifai.audio2 import AudioData
+from lattifai.subtitle import Supervision
 
 
 class BaseTranscriber(ABC):
@@ -19,35 +20,24 @@ class BaseTranscriber(ABC):
     # Subclasses should override these properties
     name: str = "Transcriber"
     file_suffix: str = ".txt"
+    supports_url: bool = True
+    """Whether this transcriber supports direct URL transcription."""
 
-    async def transcribe(
-        self,
-        media_path: Union[str, Path],
-        output_dir: Union[str, Path],
-    ) -> Dict[str, Any]:
-        """
-        Transcribe an audio/video source and persist the transcript.
+    async def __call__(self, url_or_data: Union[str, AudioData]) -> str:
+        """Main entry point for transcription."""
+        return await self.transcribe(url_or_data)
 
-        Args:
-            media_path: Path to audio file or URL.
-            output_dir: Directory for output files.
-
-        Returns:
-            dict: Transcription results with metadata.
-        """
-        media_path_str = str(media_path)
-        output_dir_path = Path(output_dir)
-        output_dir_path.mkdir(parents=True, exist_ok=True)
-
-        if self._is_url(media_path_str):
-            transcript = await self.transcribe_url(media_path_str)
-            media_source_for_name = media_path_str
-        else:
-            transcript = await self.transcribe_file(Path(media_path))
-            media_source_for_name = str(media_path)
-
-        output_file = self._write_transcript(output_dir_path, media_source_for_name, transcript)
-        return self._build_result(transcript, output_file)
+    async def transcribe(self, url_or_data: Union[str, AudioData]) -> str:
+        if isinstance(url_or_data, AudioData):
+            return await self.transcribe_file(url_or_data)
+        elif self._is_url(url_or_data):
+            if not self.supports_url:
+                raise NotImplementedError(
+                    f"{self.__class__.__name__} does not support URL transcription. "
+                    f"Please download the file first and use transcribe_file()."
+                )
+            return await self.transcribe_url(url_or_data)  # URL
+        return await self.transcribe_file(url_or_data)  # file path
 
     @abstractmethod
     async def transcribe_url(self, url: str) -> str:
@@ -56,25 +46,16 @@ class BaseTranscriber(ABC):
         """
 
     @abstractmethod
-    async def transcribe_file(self, media_file_path: Union[str, Path]) -> str:
+    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Union[str, List[Supervision]]:
         """
         Transcribe audio from a local media file.
         """
 
-    def _build_result(self, transcript: str, output_file: Path) -> Dict[str, Any]:
-        """
-        Compose the result dictionary. Subclasses can override to add metadata.
-        """
-        return {"transcript": transcript, "output_file": str(output_file)}
-
-    def _write_transcript(self, output_dir: Path, media_source: str, transcript: str) -> Path:
+    @abstractmethod
+    def write(self, transcript: Union[str, List[Supervision]], output_file: Path, encoding: str = "utf-8") -> Path:
         """
         Persist transcript text to disk and return the file path.
         """
-        file_stem = Path(media_source).stem or "transcript"
-        output_file = output_dir / f"{file_stem}_{self.name}{self.file_suffix}"
-        output_file.write_text(transcript, encoding="utf-8")
-        return output_file
 
     @staticmethod
     def _is_url(value: str) -> bool:

@@ -14,7 +14,7 @@ from lattifai.config import (
     SubtitleConfig,
     TranscriptionConfig,
 )
-from lattifai.transcription.gemini import GeminiTranscriber
+from lattifai.transcription import create_transcriber
 from lattifai.workflow.youtube import YouTubeDownloader, YouTubeSubtitleAgent
 
 
@@ -38,7 +38,7 @@ def _create_agent(
     max_retries: int,
 ) -> YouTubeSubtitleAgent:
     downloader = YouTubeDownloader()
-    transcriber = GeminiTranscriber(transcription_config=transcription_config)
+    transcriber = create_transcriber(transcription_config=transcription_config)
     aligner = _build_async_client(client_config, alignment_config, subtitle_config)
     return YouTubeSubtitleAgent(
         downloader=downloader,

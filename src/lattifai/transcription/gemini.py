@@ -8,6 +8,7 @@ from typing import Optional, Union
 from google import genai
 from google.genai.types import GenerateContentConfig, Part, ThinkingConfig
 
+from lattifai.audio2 import AudioData
 from lattifai.config import TranscriptionConfig
 from lattifai.transcription.base import BaseTranscriber
 from lattifai.transcription.prompts import get_prompt_loader
@@ -53,10 +54,6 @@ class GeminiTranscriber(BaseTranscriber):
                 "⚠️ Gemini API key not provided. API key will be required when calling transcription methods."
             )
 
-    async def __call__(self, youtube_url: str) -> str:
-        """Main entry point for transcription."""
-        return await self.transcribe_url(youtube_url)
-
     async def transcribe_url(self, url: str) -> str:
         """
         Transcribe audio from URL using Gemini 2.5 Pro.
@@ -84,12 +81,12 @@ class GeminiTranscriber(BaseTranscriber):
             self.logger.error(f"Gemini transcription failed: {str(e)}")
             raise RuntimeError(f"Gemini transcription failed: {str(e)}")
 
-    async def transcribe_file(self, media_file_path: Union[str, Path]) -> str:
+    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> str:
         """
         Transcribe audio/video from local file using Gemini 2.5 Pro.
 
         Args:
-            media_file_path: Path to local audio/video file
+            media_file: Path to local audio/video file
 
         Returns:
             Transcribed text
@@ -98,10 +95,10 @@ class GeminiTranscriber(BaseTranscriber):
             ValueError: If API key not provided
             RuntimeError: If transcription fails
         """
-        media_file_path = Path(media_file_path)
+        media_file = str(media_file)
 
         if self.config.verbose:
-            self.logger.info(f"🎤 Starting Gemini transcription for file: {media_file_path}")
+            self.logger.info(f"🎤 Starting Gemini transcription for file: {media_file}")
 
         try:
             client = self._get_client()
@@ -109,10 +106,10 @@ class GeminiTranscriber(BaseTranscriber):
             # Upload audio file
             if self.config.verbose:
                 self.logger.info("📤 Uploading audio file to Gemini...")
-            media_file = client.files.upload(path=str(media_file_path))
+            media_file = client.files.upload(path=media_file)
 
             contents = Part.from_uri(file_uri=media_file.uri, mime_type=media_file.mime_type)
-            return await self._run_generation(contents, source=str(media_file_path), client=client)
+            return await self._run_generation(contents, source=media_file, client=client)
 
         except ImportError:
             raise RuntimeError("Google GenAI SDK not installed. Please install with: pip install google-genai")
@@ -208,3 +205,12 @@ class GeminiTranscriber(BaseTranscriber):
             self.logger.info(f"✅ Transcription completed ({source}): {len(transcript)} characters")
 
         return transcript
+
+    def write(self, transcript: str, output_file: Path, encoding: str = "utf-8") -> Path:
+        """
+        Persist transcript text to disk and return the file path.
+        """
+        if isinstance(output_file, str):
+            output_file = Path(output_file)
+        output_file.write_text(transcript, encoding=encoding)
+        return output_file

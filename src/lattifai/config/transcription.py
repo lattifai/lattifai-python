@@ -4,6 +4,14 @@ import os
 from dataclasses import dataclass
 from typing import Literal, Optional
 
+SUPPORTED_TRANSCRIPTION_MODELS = Literal[
+    "gemini-2.5-pro",
+    "gemini-3-pro-preview",
+    "nvidia/parakeet-tdt-0.6b-v3",
+    "nvidia/canary-1b-v2",
+    "iic/SenseVoiceSmall",
+]
+
 
 @dataclass
 class TranscriptionConfig:
@@ -13,7 +21,7 @@ class TranscriptionConfig:
     Settings for audio/video transcription using various providers.
     """
 
-    model_name: str = "gemini-2.5-pro"
+    model_name: SUPPORTED_TRANSCRIPTION_MODELS = "gemini-2.5-pro"  # gemini-3-pro-preview
     """Model name for transcription."""
 
     gemini_api_key: Optional[str] = None
@@ -37,6 +45,12 @@ class TranscriptionConfig:
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
+        if self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__:
+            raise ValueError(
+                f"Unsupported model_name: '{self.model_name}'. "
+                f"Supported models are: {SUPPORTED_TRANSCRIPTION_MODELS.__args__}"
+            )
+
         # Load environment variables from .env file
         from dotenv import find_dotenv, load_dotenv
 
@@ -45,7 +59,7 @@ class TranscriptionConfig:
 
         # Auto-load Gemini API key from environment if not provided
         if self.gemini_api_key is None:
-            object.__setattr__(self, "gemini_api_key", os.environ.get("GEMINI_API_KEY"))
+            self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
 
         # Validate max_retries
         if self.max_retries < 0:

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from ..client import AsyncLattifAI
 from ..config.subtitle import SUBTITLE_FORMATS
 from ..subtitle import GeminiWriter, SubtitleIO
-from ..transcription import GeminiTranscriber
+from ..transcription.base import BaseTranscriber
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
 from .file_manager import FileExistenceManager
 
@@ -589,7 +589,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
     def __init__(
         self,
         downloader: YouTubeDownloader,
-        transcriber: GeminiTranscriber,
+        transcriber: BaseTranscriber,
         aligner: AsyncLattifAI,
         max_retries: int = 0,
     ):
