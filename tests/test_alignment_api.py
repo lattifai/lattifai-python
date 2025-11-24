@@ -41,7 +41,7 @@ class TestAlignmentAPISignature:
         params = sig.parameters
 
         # Check required parameters
-        assert "input_media_path" in params, "alignment() should have input_media_path parameter"
+        assert "input_media" in params, "alignment() should have input_media parameter"
         assert "input_subtitle_path" in params, "alignment() should have input_subtitle_path parameter"
 
         # Check optional parameters

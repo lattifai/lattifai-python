@@ -162,7 +162,7 @@ from lattifai import LattifAI
 
 client = LattifAI()
 alignments, output_path = client.alignment(
-    input_media_path="audio.wav",
+    input_media="audio.wav",
     input_subtitle_path="subtitle.srt",
     output_subtitle_path="output.srt",
     input_subtitle_format=None,  # Optional: auto-detect from file extension

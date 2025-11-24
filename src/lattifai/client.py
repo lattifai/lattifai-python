@@ -64,7 +64,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
     def alignment(
         self,
-        input_media_path: Union[Pathlike, AudioData],
+        input_media: Union[Pathlike, AudioData],
         input_subtitle_path: Pathlike,
         output_subtitle_path: Optional[Pathlike] = None,
         input_subtitle_format: Optional[InputSubtitleFormat] = None,
@@ -84,11 +84,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             output_subtitle_path = output_subtitle_path or self.subtitler.config.output_path
-            if isinstance(input_media_path, AudioData):
-                media_audio = input_media_path
+            if isinstance(input_media, AudioData):
+                media_audio = input_media
             else:
                 media_audio = self.audio_loader(
-                    input_media_path,
+                    input_media,
                     channel_selector="average",
                 )
 
@@ -122,7 +122,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             # Catch any unexpected errors and wrap them
             raise AlignmentError(
                 "Unexpected error during alignment process",
-                media_path=str(input_media_path),
+                media_path=str(input_media),
                 subtitle_path=str(input_subtitle_path),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
@@ -159,7 +159,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Step 4: Perform alignment
         print(colorful.cyan("🔗 Performing forced alignment..."))
         return self.alignment(
-            input_media_path=media_audio,
+            input_media=media_audio,
             input_subtitle_path=subtitle_file,
             output_subtitle_path=output_subtitle_path,
             **alignment_kwargs,
@@ -182,7 +182,7 @@ LattifAI.alignment.__doc__ = LattifAIClientMixin._ALIGNMENT_DOC.format(
     timing_note=" (start, duration, text)",
     example_imports="client = LattifAI()",
     example_code="""alignments, output_path = client.alignment(
-        ...     input_media_path="speech.wav",
+        ...     input_media="speech.wav",
         ...     input_subtitle_path="transcript.srt",
         ...     output_subtitle_path="aligned.srt"
         ... )
@@ -238,7 +238,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
 
     async def alignment(
         self,
-        input_media_path: Union[Pathlike, AudioData],
+        input_media: Union[Pathlike, AudioData],
         input_subtitle_path: Pathlike,
         output_subtitle_path: Optional[Pathlike] = None,
         input_subtitle_format: Optional[InputSubtitleFormat] = None,
@@ -261,12 +261,12 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
 
             output_subtitle_path = output_subtitle_path or self.subtitler.config.output_path
 
-            if isinstance(input_media_path, AudioData):
-                media_audio = input_media_path
+            if isinstance(input_media, AudioData):
+                media_audio = input_media
             else:
                 media_audio = await asyncio.to_thread(
                     self.audio_loader,
-                    input_media_path,
+                    input_media,
                     channel_selector="average",
                 )
 
@@ -302,7 +302,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
             # Catch any unexpected errors and wrap them
             raise AlignmentError(
                 "Unexpected error during alignment process",
-                media_path=str(input_media_path),
+                media_path=str(input_media),
                 subtitle_path=str(input_subtitle_path),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
@@ -343,7 +343,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         # Step 4: Perform alignment
         print(colorful.cyan("🔗 Performing forced alignment..."))
         return await self.alignment(
-            input_media_path=media_audio,
+            input_media=media_audio,
             input_subtitle_path=subtitle_file,
             output_subtitle_path=output_subtitle_path,
             **alignment_kwargs,
@@ -366,7 +366,7 @@ AsyncLattifAI.alignment.__doc__ = LattifAIClientMixin._ALIGNMENT_DOC.format(
     timing_note="",
     example_imports="import asyncio\n        >>> async def main():\n        ...     client = AsyncLattifAI()",
     example_code="""alignments, output_path = await client.alignment(
-        ...         input_media_path="speech.wav",
+        ...         input_media="speech.wav",
         ...         input_subtitle_path="transcript.srt",
         ...         output_subtitle_path="aligned.srt"
         ...     )
@@ -394,7 +394,7 @@ if __name__ == "__main__":
         split_sentence = False
 
     (alignments, output_subtitle_path) = client.alignment(
-        input_media_path=audio,
+        input_media=audio,
         input_subtitle_path=subtitle,
         output_subtitle_path=output,
         split_sentence=split_sentence,

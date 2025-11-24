@@ -14,7 +14,7 @@ __all__ = ["align"]
 
 @run.cli.entrypoint(name="align", namespace="alignment")
 def align(
-    input_media_path: Optional[Pathlike] = None,
+    input_media: Optional[Pathlike] = None,
     input_subtitle_path: Optional[Pathlike] = None,
     output_subtitle_path: Optional[Pathlike] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
@@ -61,7 +61,7 @@ def align(
 
         # Using keyword arguments (traditional syntax)
         lai alignment align \\
-            input_media_path=audio.wav \\
+            input_media=audio.wav \\
             input_subtitle_path=subtitle.srt \\
             output_subtitle_path=output.srt
 
@@ -76,16 +76,16 @@ def align(
     """
     media_config = media or MediaConfig()
 
-    # Validate that input_media_path and media_config.input_path are not both provided
-    if input_media_path and media_config.input_path:
+    # Validate that input_media and media_config.input_path are not both provided
+    if input_media and media_config.input_path:
         raise ValueError(
-            "Cannot specify both positional input_media_path and media.input_path. "
+            "Cannot specify both positional input_media and media.input_path. "
             "Use either positional argument or config, not both."
         )
 
-    # Assign input_media_path to media_config.input_path if provided
-    if input_media_path:
-        media_config.set_input_path(input_media_path)
+    # Assign input_media to media_config.input_path if provided
+    if input_media:
+        media_config.set_input_path(input_media)
 
     subtitle_config = subtitle or SubtitleConfig()
 
@@ -113,7 +113,7 @@ def align(
     client = LattifAI(client_config=client, alignment_config=alignment, subtitle_config=subtitle_config)
 
     return client.alignment(
-        input_media_path=media_config.input_path,
+        input_media=media_config.input_path,
         input_subtitle_path=subtitle_config.input_path,
         output_subtitle_path=subtitle_config.output_path,
     )

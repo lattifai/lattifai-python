@@ -176,7 +176,7 @@ lai alignment align audio.wav subtitle.srt output.vtt \
 ```
 
 **Common Options:**
-- First argument: Path to audio/video file (or use `input_media_path=`)
+- First argument: Path to audio/video file (or use `input_media=`)
 - Second argument: Path to subtitle file (or use `input_subtitle_path=`)
 - Third argument: Output path for aligned subtitle (or use `output_subtitle_path=`)
 - `subtitle.split_sentence=true`: Enable intelligent sentence splitting
@@ -604,7 +604,7 @@ from lattifai import LattifAI
 
 client = LattifAI()
 alignments, output_path = client.alignment(
-    input_media_path="audio.wav",
+    input_media="audio.wav",
     input_subtitle_path="subtitle.srt",
     output_subtitle_path="output.srt",
     input_subtitle_format=None,  # Optional: auto-detect from file extension
@@ -622,7 +622,7 @@ from lattifai import AsyncLattifAI
 async def main():
     async with AsyncLattifAI() as client:
         alignments, output_path = await client.alignment(
-            input_media_path="audio.wav",
+            input_media="audio.wav",
             input_subtitle_path="subtitle.srt",
             output_subtitle_path="output.srt",
             input_subtitle_format=None,  # Optional: auto-detect from file extension
@@ -709,7 +709,7 @@ client = LattifAI(
 )
 
 alignments, output_path = client.alignment(
-    input_media_path="audio.wav",
+    input_media="audio.wav",
     input_subtitle_path="subtitle.srt",
     output_subtitle_path="output.json",
 )

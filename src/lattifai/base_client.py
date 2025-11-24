@@ -53,7 +53,7 @@ class LattifAIClientMixin:
         >>>
         >>> # Perform alignment
         >>> {await_keyword}alignments, output_path = {await_keyword}client.alignment(
-        ...     input_media_path="audio.wav",
+        ...     input_media="audio.wav",
         ...     input_subtitle_path="subtitle.srt",
         ...     output_subtitle_path="aligned.srt"
         ... )
@@ -94,7 +94,7 @@ class LattifAIClientMixin:
         5. Export aligned subtitles (if output path provided{async_suffix5})
 
         Args:
-            input_media_path: Path to audio/video file (WAV, MP3, FLAC, MP4, etc.). Must be readable by ffmpeg.
+            input_media: Path to audio/video file (WAV, MP3, FLAC, MP4, etc.). Must be readable by ffmpeg.
             input_subtitle_path: Path to subtitle or plain text file to align with audio.
             input_subtitle_format: Input subtitle format ('srt', 'vtt', 'ass', 'txt'). If None, {format_default}
                    from file extension or uses config default.

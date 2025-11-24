@@ -166,7 +166,7 @@ class TestTranscriptionConfig:
             force_overwrite=True,
             verbose=True,
             language="en",
-            model_name="gemini-pro",
+            model_name="gemini-2.5-pro",
         )
         assert config.gemini_api_key == "test-key"
         assert config.device == "cuda"
@@ -174,7 +174,7 @@ class TestTranscriptionConfig:
         assert config.force_overwrite is True
         assert config.verbose is True
         assert config.language == "en"
-        assert config.model_name == "gemini-pro"
+        assert config.model_name == "gemini-2.5-pro"
 
     def test_invalid_max_retries(self):
         """Test validation of max_retries parameter."""
