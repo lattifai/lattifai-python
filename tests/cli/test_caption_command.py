@@ -1,4 +1,4 @@
-"""Tests for lattifai subtitle commands"""
+"""Tests for lattifai caption commands"""
 
 import os
 import subprocess
@@ -9,9 +9,9 @@ from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv(usecwd=True))
 
 
-def run_subtitle_command(args, env=None, dryrun: bool = True):
-    """Helper function to run the subtitle command and return result"""
-    cmd = ["lai", "subtitle"]
+def run_caption_command(args, env=None, dryrun: bool = True):
+    """Helper function to run the caption command and return result"""
+    cmd = ["lai", "caption"]
 
     if dryrun and os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false").lower() == "true":
         if args[0] in ["convert", "normalize", "shift"]:
@@ -43,44 +43,44 @@ def run_subtitle_command(args, env=None, dryrun: bool = True):
 
 
 @pytest.fixture
-def sample_subtitle_file():
+def sample_caption_file():
     return "tests/data/SA1.srt"
 
 
-class TestSubtitleConvertCommand:
-    """Test cases for subtitle convert command"""
+class TestCaptionConvertCommand:
+    """Test cases for caption convert command"""
 
     @pytest.mark.parametrize(
         "output_ext",
         ["srt", "vtt", "json"],  # Only formats supported by actual implementation
     )
-    def test_subtitle_convert_formats(self, sample_subtitle_file, tmp_path, output_ext):
-        """Test subtitle convert command with different output formats"""
+    def test_caption_convert_formats(self, sample_caption_file, tmp_path, output_ext):
+        """Test caption convert command with different output formats"""
         output_file = tmp_path / f"output.{output_ext}"
 
         args = [
             "convert",
-            f"input_path={sample_subtitle_file}",
+            f"input_path={sample_caption_file}",
             f"output_path={output_file}",
         ]
 
-        run_subtitle_command(args)
+        run_caption_command(args)
 
-    def test_subtitle_convert_with_normalize_flag(self, sample_subtitle_file, tmp_path):
-        """Test subtitle convert command with normalize flag"""
+    def test_caption_convert_with_normalize_flag(self, sample_caption_file, tmp_path):
+        """Test caption convert command with normalize flag"""
         output_file = tmp_path / "output_normalized.srt"
 
         args = [
             "convert",
-            f"input_path={sample_subtitle_file}",
+            f"input_path={sample_caption_file}",
             f"output_path={output_file}",
             "normalize_text=true",
         ]
 
-        run_subtitle_command(args)
+        run_caption_command(args)
 
-    def test_subtitle_convert_missing_input(self, tmp_path):
-        """Test subtitle convert command with missing input file"""
+    def test_caption_convert_missing_input(self, tmp_path):
+        """Test caption convert command with missing input file"""
         args = [
             "convert",
             "input_path=nonexistent_file.srt",
@@ -88,100 +88,100 @@ class TestSubtitleConvertCommand:
         ]
 
         with pytest.raises(subprocess.CalledProcessError):
-            run_subtitle_command(args, dryrun=False)
+            run_caption_command(args, dryrun=False)
 
-    def test_subtitle_convert_help(self):
-        """Test subtitle convert command help output"""
+    def test_caption_convert_help(self):
+        """Test caption convert command help output"""
         args = ["--help"]
-        run_subtitle_command(args)
+        run_caption_command(args)
 
 
-class TestSubtitleNormalizeCommand:
-    """Test cases for subtitle normalize command"""
+class TestCaptionNormalizeCommand:
+    """Test cases for caption normalize command"""
 
-    def test_subtitle_normalize_basic(self, sample_subtitle_file, tmp_path):
-        """Test subtitle normalize command"""
+    def test_caption_normalize_basic(self, sample_caption_file, tmp_path):
+        """Test caption normalize command"""
         output_file = tmp_path / "output_normalized.srt"
 
         args = [
             "normalize",
-            f"input_path={sample_subtitle_file}",
+            f"input_path={sample_caption_file}",
             f"output_path={output_file}",
         ]
 
-        run_subtitle_command(args)
+        run_caption_command(args)
 
-    def test_subtitle_normalize_help(self):
-        """Test subtitle normalize command help output"""
+    def test_caption_normalize_help(self):
+        """Test caption normalize command help output"""
         args = ["normalize", "--help"]
-        result = run_subtitle_command(args)
+        result = run_caption_command(args)
 
         if result is not None:
             assert result.returncode == 0 or "usage:" in result.stdout or "help" in result.stdout
             if result.returncode == 0:
                 help_text = result.stdout + result.stderr
-                assert "subtitle" in help_text.lower()
+                assert "caption" in help_text.lower()
 
 
-class TestSubtitleShiftCommand:
-    """Test cases for subtitle shift command"""
+class TestCaptionShiftCommand:
+    """Test cases for caption shift command"""
 
-    def test_subtitle_shift_positive(self, sample_subtitle_file, tmp_path):
-        """Test subtitle shift command with positive offset (delay)"""
+    def test_caption_shift_positive(self, sample_caption_file, tmp_path):
+        """Test caption shift command with positive offset (delay)"""
         output_file = tmp_path / "output_shifted_positive.srt"
 
         args = [
             "shift",
-            f"input_path={sample_subtitle_file}",
+            f"input_path={sample_caption_file}",
             f"output_path={output_file}",
             "seconds=2.0",
         ]
 
-        run_subtitle_command(args)
+        run_caption_command(args)
 
-    def test_subtitle_shift_negative(self, sample_subtitle_file, tmp_path):
-        """Test subtitle shift command with negative offset (advance)"""
+    def test_caption_shift_negative(self, sample_caption_file, tmp_path):
+        """Test caption shift command with negative offset (advance)"""
         output_file = tmp_path / "output_shifted_negative.srt"
 
         args = [
             "shift",
-            f"input_path={sample_subtitle_file}",
+            f"input_path={sample_caption_file}",
             f"output_path={output_file}",
             "seconds=-1.5",
         ]
 
-        run_subtitle_command(args)
+        run_caption_command(args)
 
-    def test_subtitle_shift_zero(self, sample_subtitle_file, tmp_path):
-        """Test subtitle shift command with zero offset (no change)"""
+    def test_caption_shift_zero(self, sample_caption_file, tmp_path):
+        """Test caption shift command with zero offset (no change)"""
         output_file = tmp_path / "output_shifted_zero.srt"
 
         args = [
             "shift",
-            f"input_path={sample_subtitle_file}",
+            f"input_path={sample_caption_file}",
             f"output_path={output_file}",
             "seconds=0.0",
         ]
 
-        run_subtitle_command(args)
+        run_caption_command(args)
 
-    def test_subtitle_shift_with_format_conversion(self, sample_subtitle_file, tmp_path):
-        """Test subtitle shift command with format conversion"""
+    def test_caption_shift_with_format_conversion(self, sample_caption_file, tmp_path):
+        """Test caption shift command with format conversion"""
         output_file = tmp_path / "output_shifted.vtt"
 
         args = [
             "shift",
-            f"input_path={sample_subtitle_file}",
+            f"input_path={sample_caption_file}",
             f"output_path={output_file}",
             "seconds=1.5",
         ]
 
-        run_subtitle_command(args)
+        run_caption_command(args)
 
-    def test_subtitle_shift_help(self):
-        """Test subtitle shift command help output"""
+    def test_caption_shift_help(self):
+        """Test caption shift command help output"""
         args = ["shift", "--help"]
-        result = run_subtitle_command(args)
+        result = run_caption_command(args)
 
         if result is not None:
             assert result.returncode == 0 or "usage:" in result.stdout or "help" in result.stdout

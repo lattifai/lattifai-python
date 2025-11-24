@@ -1,4 +1,4 @@
-"""Subtitle I/O configuration for LattifAI."""
+"""Caption I/O configuration for LattifAI."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,60 +6,60 @@ from typing import TYPE_CHECKING, Literal, Optional
 
 from lhotse.utils import Pathlike
 
-# Supported subtitle formats for reading/writing
-SUBTITLE_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "md"]
+# Supported caption formats for reading/writing
+CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "md"]
 
-# Input subtitle formats (includes special formats like 'auto' and 'gemini')
-INPUT_SUBTITLE_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "auto", "gemini"]
+# Input caption formats (includes special formats like 'auto' and 'gemini')
+INPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "auto", "gemini"]
 
-# Output subtitle formats (includes special formats like 'TextGrid' and 'json')
-OUTPUT_SUBTITLE_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
+# Output caption formats (includes special formats like 'TextGrid' and 'json')
+OUTPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
 
-# All subtitle formats combined (for file detection)
-ALL_SUBTITLE_FORMATS = list(set(SUBTITLE_FORMATS + ["TextGrid", "json", "gemini"]))
+# All caption formats combined (for file detection)
+ALL_CAPTION_FORMATS = list(set(CAPTION_FORMATS + ["TextGrid", "json", "gemini"]))
 
 # Type aliases for better type hints
-InputSubtitleFormat = Literal["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "gemini"]
-OutputSubtitleFormat = Literal["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
+InputCaptionFormat = Literal["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "gemini"]
+OutputCaptionFormat = Literal["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
 
 
 @dataclass
-class SubtitleConfig:
+class CaptionConfig:
     """
-    Subtitle I/O configuration.
+    Caption I/O configuration.
 
-    Controls subtitle file reading, writing, and formatting options.
+    Controls caption file reading, writing, and formatting options.
     """
 
-    input_format: InputSubtitleFormat = "auto"
-    """Input subtitle format: 'auto', 'srt', 'vtt', 'ass', 'txt', or 'json'."""
+    input_format: InputCaptionFormat = "auto"
+    """Input caption format: 'auto', 'srt', 'vtt', 'ass', 'txt', or 'json'."""
 
     input_path: Optional[str] = None
-    """Path to input subtitle file."""
+    """Path to input caption file."""
 
-    output_format: OutputSubtitleFormat = "srt"
-    """Output subtitle format: 'srt', 'vtt', 'ass', 'txt', or 'json'."""
+    output_format: OutputCaptionFormat = "srt"
+    """Output caption format: 'srt', 'vtt', 'ass', 'txt', or 'json'."""
 
     output_path: Optional[str] = None
-    """Path to output subtitle file."""
+    """Path to output caption file."""
 
     include_speaker_in_text: bool = True
-    """Preserve speaker labels in subtitle text content."""
+    """Preserve speaker labels in caption text content."""
 
     normalize_text: bool = False
-    """Clean HTML entities and normalize whitespace in subtitle text."""
+    """Clean HTML entities and normalize whitespace in caption text."""
 
     split_sentence: bool = False
-    """Re-segment subtitles intelligently based on punctuation and semantics."""
+    """Re-segment captions intelligently based on punctuation and semantics."""
 
     word_level: bool = False
     """Include word-level timestamps in alignment results (useful for karaoke, dubbing)."""
 
     encoding: str = "utf-8"
-    """Character encoding for reading/writing subtitle files (default: utf-8)."""
+    """Character encoding for reading/writing caption files (default: utf-8)."""
 
     use_transcription: bool = False
-    """Use transcription service (e.g., Gemini) instead of downloading YouTube subtitles."""
+    """Use transcription service (e.g., Gemini) instead of downloading YouTube captions."""
 
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -69,7 +69,7 @@ class SubtitleConfig:
     def _normalize_paths(self) -> None:
         """Normalize and expand input/output paths."""
         # Expand and normalize input path if provided, but don't require it to exist yet
-        # (it might be set later after downloading subtitles)
+        # (it might be set later after downloading captions)
         if self.input_path is not None:
             self.input_path = str(Path(self.input_path).expanduser())
 
@@ -80,18 +80,18 @@ class SubtitleConfig:
 
     def _validate_formats(self) -> None:
         """Validate input and output format fields."""
-        if self.input_format not in INPUT_SUBTITLE_FORMATS:
-            raise ValueError(f"input_format must be one of {INPUT_SUBTITLE_FORMATS}, got '{self.input_format}'")
+        if self.input_format not in INPUT_CAPTION_FORMATS:
+            raise ValueError(f"input_format must be one of {INPUT_CAPTION_FORMATS}, got '{self.input_format}'")
 
-        if self.output_format not in OUTPUT_SUBTITLE_FORMATS:
-            raise ValueError(f"output_format must be one of {OUTPUT_SUBTITLE_FORMATS}, got '{self.output_format}'")
+        if self.output_format not in OUTPUT_CAPTION_FORMATS:
+            raise ValueError(f"output_format must be one of {OUTPUT_CAPTION_FORMATS}, got '{self.output_format}'")
 
     def set_input_path(self, path: Pathlike) -> Path:
         """
-        Set input subtitle path and validate it.
+        Set input caption path and validate it.
 
         Args:
-            path: Path to input subtitle file (str or Path)
+            path: Path to input caption file (str or Path)
 
         Returns:
             Resolved path as Path object
@@ -102,19 +102,19 @@ class SubtitleConfig:
         """
         resolved = Path(path).expanduser().resolve()
         if not resolved.exists():
-            raise FileNotFoundError(f"Input subtitle file does not exist: '{resolved}'")
+            raise FileNotFoundError(f"Input caption file does not exist: '{resolved}'")
         if not resolved.is_file():
-            raise ValueError(f"Input subtitle path is not a file: '{resolved}'")
+            raise ValueError(f"Input caption path is not a file: '{resolved}'")
         self.input_path = str(resolved)
         self.check_input_sanity()
         return resolved
 
     def set_output_path(self, path: Pathlike) -> Path:
         """
-        Set output subtitle path and create parent directories if needed.
+        Set output caption path and create parent directories if needed.
 
         Args:
-            path: Path to output subtitle file (str or Path)
+            path: Path to output caption file (str or Path)
 
         Returns:
             Resolved path as Path object
@@ -133,24 +133,24 @@ class SubtitleConfig:
             FileNotFoundError: If input_path does not exist
         """
         if not self.input_path:
-            raise ValueError("input_path is required but not set in SubtitleConfig")
+            raise ValueError("input_path is required but not set in CaptionConfig")
 
         input_file = Path(self.input_path).expanduser()
         if not input_file.exists():
             raise FileNotFoundError(
-                f"Input subtitle file does not exist: '{input_file}'. " "Please check the path and try again."
+                f"Input caption file does not exist: '{input_file}'. " "Please check the path and try again."
             )
         if not input_file.is_file():
             raise ValueError(
-                f"Input subtitle path is not a file: '{input_file}'. " "Expected a valid subtitle file path."
+                f"Input caption path is not a file: '{input_file}'. " "Expected a valid caption file path."
             )
 
     def check_sanity(self) -> bool:
         """Perform sanity checks on the configuration."""
-        assert self.is_input_path_existed(), "Input subtitle path must be provided and exist."
+        assert self.is_input_path_existed(), "Input caption path must be provided and exist."
 
     def is_input_path_existed(self) -> bool:
-        """Check if input subtitle path is provided and exists."""
+        """Check if input caption path is provided and exists."""
         if self.input_path is None:
             return False
 

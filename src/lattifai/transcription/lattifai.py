@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from lattifai.audio2 import AudioData
+from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
-from lattifai.subtitle import Supervision
 from lattifai.transcription.base import BaseTranscriber
 from lattifai.transcription.prompts import get_prompt_loader  # noqa: F401
 
@@ -63,9 +63,9 @@ class LattifAITranscriber(BaseTranscriber):
         """
         Persist transcript text to disk and return the file path.
         """
-        from lattifai.subtitle import SubtitleIO
+        from lattifai.caption import CaptionIO
 
-        SubtitleIO.write(
+        CaptionIO.write(
             transcript,
             output_path=output_file,
             include_speaker_in_text=False,

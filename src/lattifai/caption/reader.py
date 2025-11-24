@@ -4,19 +4,19 @@ from typing import List, Literal, Optional, Union
 
 from lhotse.utils import Pathlike
 
-from ..config.subtitle import InputSubtitleFormat, OutputSubtitleFormat
+from ..config.caption import InputCaptionFormat, OutputCaptionFormat
 from .supervision import Supervision
 from .text_parser import NORMALIZE_TEXT
 from .text_parser import normalize_text as normalize_text_fn
 from .text_parser import parse_speaker_text
 
 
-class SubtitleReader(ABCMeta):
-    """Parser for converting different subtitle formats to List[Supervision]."""
+class CaptionReader(ABCMeta):
+    """Parser for converting different caption formats to List[Supervision]."""
 
     @classmethod
     def read(
-        cls, subtitle: Pathlike, format: Optional[InputSubtitleFormat] = None, normalize_text: Optional[bool] = False
+        cls, caption: Pathlike, format: Optional[InputCaptionFormat] = None, normalize_text: Optional[bool] = False
     ) -> List[Supervision]:
         """Parse text and convert to Lhotse List[Supervision].
 
@@ -29,20 +29,20 @@ class SubtitleReader(ABCMeta):
         Returns:
             Parsed text in Lhotse Cut
         """
-        if not format and Path(str(subtitle)).exists():
-            format = Path(str(subtitle)).suffix.lstrip(".").lower()
+        if not format and Path(str(caption)).exists():
+            format = Path(str(caption)).suffix.lstrip(".").lower()
         elif format:
             format = format.lower()
 
-        if format == "gemini" or str(subtitle).endswith("Gemini.md"):
+        if format == "gemini" or str(caption).endswith("Gemini.md"):
             from .gemini_reader import GeminiReader
 
-            supervisions = GeminiReader.extract_for_alignment(subtitle)
-        elif format.lower() == "textgrid" or str(subtitle).lower().endswith("textgrid"):
+            supervisions = GeminiReader.extract_for_alignment(caption)
+        elif format.lower() == "textgrid" or str(caption).lower().endswith("textgrid"):
             # Internel usage
             from tgt import read_textgrid
 
-            tgt = read_textgrid(subtitle)
+            tgt = read_textgrid(caption)
             supervisions = []
             for tier in tgt.tiers:
                 supervisions.extend(
@@ -57,11 +57,11 @@ class SubtitleReader(ABCMeta):
                     ]
                 )
             supervisions = sorted(supervisions, key=lambda x: x.start)
-        elif format == "txt" or (format == "auto" and str(subtitle)[-4:].lower() == ".txt"):
-            if not Path(str(subtitle)).exists():  # str
-                lines = [line.strip() for line in str(subtitle).split("\n")]
+        elif format == "txt" or (format == "auto" and str(caption)[-4:].lower() == ".txt"):
+            if not Path(str(caption)).exists():  # str
+                lines = [line.strip() for line in str(caption).split("\n")]
             else:  # file
-                path_str = str(subtitle)
+                path_str = str(caption)
                 with open(path_str, encoding="utf-8") as f:
                     lines = [line.strip() for line in f.readlines()]
                     if NORMALIZE_TEXT or normalize_text:
@@ -69,33 +69,33 @@ class SubtitleReader(ABCMeta):
             supervisions = [Supervision(text=line) for line in lines if line]
         else:
             try:
-                supervisions = cls._parse_subtitle(subtitle, format=format, normalize_text=normalize_text)
+                supervisions = cls._parse_caption(caption, format=format, normalize_text=normalize_text)
             except Exception as e:
-                print(f"Failed to parse subtitle with Format: {format}, Exception: {e}, trying 'gemini' parser.")
+                print(f"Failed to parse caption with Format: {format}, Exception: {e}, trying 'gemini' parser.")
                 from .gemini_reader import GeminiReader
 
-                supervisions = GeminiReader.extract_for_alignment(subtitle)
+                supervisions = GeminiReader.extract_for_alignment(caption)
 
         return supervisions
 
     @classmethod
-    def _parse_subtitle(
-        cls, subtitle: Pathlike, format: Optional[OutputSubtitleFormat], normalize_text: Optional[bool] = False
+    def _parse_caption(
+        cls, caption: Pathlike, format: Optional[OutputCaptionFormat], normalize_text: Optional[bool] = False
     ) -> List[Supervision]:
         import pysubs2
 
         try:
             subs: pysubs2.SSAFile = pysubs2.load(
-                subtitle, encoding="utf-8", format_=format if format != "auto" else None
+                caption, encoding="utf-8", format_=format if format != "auto" else None
             )  # file
         except IOError:
             try:
                 subs: pysubs2.SSAFile = pysubs2.SSAFile.from_string(
-                    subtitle, format_=format if format != "auto" else None
+                    caption, format_=format if format != "auto" else None
                 )  # str
             except Exception as e:
                 del e
-                subs: pysubs2.SSAFile = pysubs2.load(subtitle, encoding="utf-8")  # auto detect format
+                subs: pysubs2.SSAFile = pysubs2.load(caption, encoding="utf-8")  # auto detect format
 
         supervisions = []
         for event in subs.events:

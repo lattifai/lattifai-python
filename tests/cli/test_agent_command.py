@@ -49,7 +49,7 @@ class TestAgentCommand:
         args = [
             "media.input_path=https://www.youtube.com/shorts/wX9ybkEYDc0",
             f"media.output_dir={tmp_path}",
-            f"subtitle.output_format={output_format}",
+            f"caption.output_format={output_format}",
         ]
         run_agent_command(args)
 
@@ -78,7 +78,7 @@ class TestAgentCommand:
         args = [
             "media.input_path=https://www.youtube.com/shorts/wX9ybkEYDc0",
             f"media.output_dir={tmp_path}",
-            "subtitle.split_sentence=true",
+            "caption.split_sentence=true",
             "transcription.gemini_api_key=test_api_key",
         ]
 
@@ -157,7 +157,7 @@ class TestAgentCommand:
         args = [
             "media.input_path=https://www.youtube.com/shorts/wX9ybkEYDc0",
             f"media.output_dir={tmp_path}",
-            "subtitle.normalize_text=true",
+            "caption.normalize_text=true",
             "transcription.gemini_api_key=test_api_key",
         ]
 

@@ -10,9 +10,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..caption import CaptionIO, GeminiWriter
 from ..client import AsyncLattifAI
-from ..config.subtitle import SUBTITLE_FORMATS
-from ..subtitle import GeminiWriter, SubtitleIO
+from ..config.caption import CAPTION_FORMATS
 from ..transcription.base import BaseTranscriber
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
 from .file_manager import FileExistenceManager
@@ -334,23 +334,23 @@ class YouTubeDownloader:
             url, target_dir, video_format, is_audio=False, force_overwrite=force_overwrite
         )
 
-    async def download_subtitles(
+    async def download_captions(
         self,
         url: str,
         output_dir: str,
         force_overwrite: bool = False,
-        subtitle_lang: Optional[str] = None,
+        caption_lang: Optional[str] = None,
         enable_gemini_option: bool = False,
     ) -> Optional[str]:
         """
-        Download video subtitles using yt-dlp
+        Download video captions using yt-dlp
 
         Args:
             url: YouTube URL
             output_dir: Output directory
             force_overwrite: Skip user confirmation and overwrite existing files
-            subtitle_lang: Specific subtitle language/track to download (e.g., 'en')
-                          If None, downloads all available subtitles
+            caption_lang: Specific caption language/track to download (e.g., 'en')
+                          If None, downloads all available captions
             enable_gemini_option: Whether to show Gemini transcription as an option in interactive mode
 
         Returns:
@@ -361,47 +361,47 @@ class YouTubeDownloader:
         # Create output directory if it doesn't exist
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        # Extract video ID and check for existing subtitle files
+        # Extract video ID and check for existing caption files
         video_id = self.extract_video_id(url)
         if not force_overwrite:
             existing_files = FileExistenceManager.check_existing_files(
-                video_id, str(target_dir), subtitle_formats=SUBTITLE_FORMATS
+                video_id, str(target_dir), caption_formats=CAPTION_FORMATS
             )
 
-            # Handle existing subtitle files
-            if existing_files["subtitle"] and not force_overwrite:
+            # Handle existing caption files
+            if existing_files["caption"] and not force_overwrite:
                 if FileExistenceManager.is_interactive_mode():
                     user_choice = FileExistenceManager.prompt_user_confirmation(
-                        {"subtitle": existing_files["subtitle"]}, "subtitle download"
+                        {"caption": existing_files["caption"]}, "caption download"
                     )
 
                     if user_choice == "cancel":
-                        raise RuntimeError("Subtitle download cancelled by user")
+                        raise RuntimeError("Caption download cancelled by user")
                     elif user_choice == "overwrite":
                         # Continue with download
                         pass
-                    elif user_choice in existing_files["subtitle"]:
+                    elif user_choice in existing_files["caption"]:
                         # User selected a specific file
-                        subtitle_file = Path(user_choice)
-                        self.logger.info(f"✅ Using selected subtitle file: {subtitle_file}")
-                        return str(subtitle_file)
+                        caption_file = Path(user_choice)
+                        self.logger.info(f"✅ Using selected caption file: {caption_file}")
+                        return str(caption_file)
                     else:
                         # Fallback: use first file
-                        subtitle_file = Path(existing_files["subtitle"][0])
-                        self.logger.info(f"✅ Using existing subtitle file: {subtitle_file}")
-                        return str(subtitle_file)
+                        caption_file = Path(existing_files["caption"][0])
+                        self.logger.info(f"✅ Using existing caption file: {caption_file}")
+                        return str(caption_file)
                 else:
-                    subtitle_file = Path(existing_files["subtitle"][0])
-                    self.logger.info(f"🔍 Found existing subtitle: {subtitle_file}")
-                    return str(subtitle_file)
+                    caption_file = Path(existing_files["caption"][0])
+                    self.logger.info(f"🔍 Found existing caption: {caption_file}")
+                    return str(caption_file)
 
-        self.logger.info(f"📥 Downloading subtitle for: {url}")
-        if subtitle_lang:
-            self.logger.info(f"🎯 Targeting specific subtitle track: {subtitle_lang}")
+        self.logger.info(f"📥 Downloading caption for: {url}")
+        if caption_lang:
+            self.logger.info(f"🎯 Targeting specific caption track: {caption_lang}")
 
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
-        # Configure yt-dlp options for subtitle download
+        # Configure yt-dlp options for caption download
         ytdlp_options = [
             "yt-dlp",
             "--skip-download",  # Don't download video/audio
@@ -411,11 +411,11 @@ class YouTubeDownloader:
             "best",  # Prefer best available format
         ]
 
-        # Add subtitle language selection if specified
-        if subtitle_lang:
-            ytdlp_options.extend(["--write-sub", "--write-auto-sub", "--sub-langs", f"{subtitle_lang}.*"])
+        # Add caption language selection if specified
+        if caption_lang:
+            ytdlp_options.extend(["--write-sub", "--write-auto-sub", "--sub-langs", f"{caption_lang}.*"])
         else:
-            # Download only manual subtitles (not auto-generated) in English to avoid rate limiting
+            # Download only manual captions (not auto-generated) in English to avoid rate limiting
             ytdlp_options.extend(["--write-sub", "--write-auto-sub"])
 
         ytdlp_options.append(url)
@@ -430,7 +430,7 @@ class YouTubeDownloader:
             self.logger.info(f"yt-dlp transcript output: {result.stdout.strip()}")
 
             # Find the downloaded transcript file
-            subtitle_patterns = [
+            caption_patterns = [
                 f"{video_id}.*vtt",
                 f"{video_id}.*srt",
                 f"{video_id}.*sub",
@@ -439,71 +439,71 @@ class YouTubeDownloader:
                 f"{video_id}.*ass",
             ]
 
-            subtitle_files = []
-            for pattern in subtitle_patterns:
-                _subtitle_files = list(target_dir.glob(pattern))
-                for subtitle_file in _subtitle_files:
-                    self.logger.info(f"📥 Downloaded subtitle: {subtitle_file}")
-                subtitle_files.extend(_subtitle_files)
+            caption_files = []
+            for pattern in caption_patterns:
+                _caption_files = list(target_dir.glob(pattern))
+                for caption_file in _caption_files:
+                    self.logger.info(f"📥 Downloaded caption: {caption_file}")
+                caption_files.extend(_caption_files)
 
-            if not subtitle_files:
-                self.logger.warning("No subtitle available for this video")
+            if not caption_files:
+                self.logger.warning("No caption available for this video")
                 return None
 
-            # If only one subtitle file, return it directly
-            if len(subtitle_files) == 1:
-                self.logger.info(f"✅ Using subtitle: {subtitle_files[0]}")
-                return str(subtitle_files[0])
+            # If only one caption file, return it directly
+            if len(caption_files) == 1:
+                self.logger.info(f"✅ Using caption: {caption_files[0]}")
+                return str(caption_files[0])
 
-            # Multiple subtitle files found, let user choose
+            # Multiple caption files found, let user choose
             if FileExistenceManager.is_interactive_mode():
-                self.logger.info(f"📋 Found {len(subtitle_files)} subtitle files")
+                self.logger.info(f"📋 Found {len(caption_files)} caption files")
                 # Use the enable_gemini_option parameter passed by caller
-                subtitle_choice = FileExistenceManager.prompt_file_selection(
-                    file_type="subtitle",
-                    files=[str(f) for f in subtitle_files],
+                caption_choice = FileExistenceManager.prompt_file_selection(
+                    file_type="caption",
+                    files=[str(f) for f in caption_files],
                     operation="use",
                     enable_gemini=enable_gemini_option,
                 )
 
-                if subtitle_choice == "cancel":
-                    raise RuntimeError("Subtitle selection cancelled by user")
-                elif subtitle_choice == "gemini":
-                    # User chose to transcribe with Gemini instead of using downloaded subtitles
+                if caption_choice == "cancel":
+                    raise RuntimeError("Caption selection cancelled by user")
+                elif caption_choice == "gemini":
+                    # User chose to transcribe with Gemini instead of using downloaded captions
                     self.logger.info("✨ User selected Gemini transcription")
                     return "gemini"  # Return special value to indicate Gemini transcription
-                elif subtitle_choice:
-                    self.logger.info(f"✅ Selected subtitle: {subtitle_choice}")
-                    return subtitle_choice
+                elif caption_choice:
+                    self.logger.info(f"✅ Selected caption: {caption_choice}")
+                    return caption_choice
                 else:
                     # Fallback to first file
-                    self.logger.info(f"✅ Using first subtitle: {subtitle_files[0]}")
-                    return str(subtitle_files[0])
+                    self.logger.info(f"✅ Using first caption: {caption_files[0]}")
+                    return str(caption_files[0])
             else:
                 # Non-interactive mode: use first file
-                self.logger.info(f"✅ Using first subtitle: {subtitle_files[0]}")
-                return str(subtitle_files[0])
+                self.logger.info(f"✅ Using first caption: {caption_files[0]}")
+                return str(caption_files[0])
 
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.strip() if e.stderr else str(e)
-            if "No automatic or manual subtitles found" in error_msg:
-                self.logger.warning("No subtitles available for this video")
+            if "No automatic or manual captions found" in error_msg:
+                self.logger.warning("No captions available for this video")
                 return None
             else:
                 self.logger.error(f"Failed to download transcript: {error_msg}")
                 raise RuntimeError(f"Failed to download transcript: {error_msg}")
 
-    async def list_available_subtitles(self, url: str) -> List[Dict[str, Any]]:
+    async def list_available_captions(self, url: str) -> List[Dict[str, Any]]:
         """
-        List all available subtitle tracks for a YouTube video
+        List all available caption tracks for a YouTube video
 
         Args:
             url: YouTube URL
 
         Returns:
-            List of subtitle track information dictionaries
+            List of caption track information dictionaries
         """
-        self.logger.info(f"📋 Listing available subtitles for: {url}")
+        self.logger.info(f"📋 Listing available captions for: {url}")
 
         cmd = ["yt-dlp", "--list-subs", "--no-download", url]
 
@@ -514,25 +514,25 @@ class YouTubeDownloader:
                 None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
             )
 
-            # Parse the subtitle list output
-            subtitle_info = []
+            # Parse the caption list output
+            caption_info = []
             lines = result.stdout.strip().split("\n")
 
-            # Look for the subtitle section (not automatic captions)
-            in_subtitle_section = False
+            # Look for the caption section (not automatic captions)
+            in_caption_section = False
             for line in lines:
-                if "Available subtitles for" in line:
-                    in_subtitle_section = True
+                if "Available captions for" in line:
+                    in_caption_section = True
                     continue
                 elif "Available automatic captions for" in line:
-                    in_subtitle_section = False
+                    in_caption_section = False
                     continue
-                elif in_subtitle_section and line.strip():
+                elif in_caption_section and line.strip():
                     # Skip header lines
                     if "Language" in line and "Name" in line and "Formats" in line:
                         continue
 
-                    # Parse subtitle information
+                    # Parse caption information
                     # Format: "Language Name Formats" where formats are comma-separated
                     # Example: "en-uYU-mmqFLq8 English - CC1    vtt, srt, ttml, srv3, srv2, srv1, json3"
 
@@ -559,18 +559,18 @@ class YouTubeDownloader:
                             # Parse formats - they are comma-separated
                             formats = [f.strip() for f in formats_str.split(",") if f.strip()]
 
-                            subtitle_info.append({"language": language, "name": name, "formats": formats})
+                            caption_info.append({"language": language, "name": name, "formats": formats})
 
-            self.logger.info(f"✅ Found {len(subtitle_info)} subtitle tracks")
-            return subtitle_info
+            self.logger.info(f"✅ Found {len(caption_info)} caption tracks")
+            return caption_info
 
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to list subtitles: {e.stderr}")
-            raise RuntimeError(f"Failed to list subtitles: {e.stderr}")
+            self.logger.error(f"Failed to list captions: {e.stderr}")
+            raise RuntimeError(f"Failed to list captions: {e.stderr}")
 
 
-class YouTubeSubtitleAgent(WorkflowAgent):
-    """Agent for YouTube URL to aligned subtitles workflow
+class YouTubeCaptionAgent(WorkflowAgent):
+    """Agent for YouTube URL to aligned captions workflow
 
     Configuration (in __init__):
         - downloader, transcriber, aligner: Component instances (dependency injection)
@@ -581,8 +581,8 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         - output_dir: Where to save files
         - media_format: Video/audio format (mp3, mp4, etc.)
         - force_overwrite: Whether to overwrite existing files
-        - output_format: Subtitle output format (srt, vtt, etc.)
-        - split_sentence: Re-segment subtitles semantically
+        - output_format: Caption output format (srt, vtt, etc.)
+        - split_sentence: Re-segment captions semantically
         - word_level: Include word-level timestamps
     """
 
@@ -593,7 +593,7 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         aligner: AsyncLattifAI,
         max_retries: int = 0,
     ):
-        super().__init__("YouTube Subtitle Agent", max_retries)
+        super().__init__("YouTube Caption Agent", max_retries)
 
         # Components (injected)
         self.downloader = downloader
@@ -608,12 +608,12 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             ),
             WorkflowStep(
                 name="Transcribe Media",
-                description="Download subtitle if available or transcribe the media file",
+                description="Download caption if available or transcribe the media file",
                 required=True,
             ),
-            WorkflowStep(name="Align Subtitle", description="Align Subtitle with media using LattifAI", required=True),
+            WorkflowStep(name="Align Caption", description="Align Caption with media using LattifAI", required=True),
             WorkflowStep(
-                name="Export Results", description="Export aligned subtitles in specified formats", required=True
+                name="Export Results", description="Export aligned captions in specified formats", required=True
             ),
         ]
 
@@ -626,8 +626,8 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         elif step.name == "Transcribe Media":
             return await self._transcribe_media(context)
 
-        elif step.name == "Align Subtitle":
-            return await self._align_subtitle(context)
+        elif step.name == "Align Caption":
+            return await self._align_caption(context)
 
         elif step.name == "Export Results":
             return await self._export_results(context)
@@ -659,22 +659,22 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             force_overwrite=force_overwrite,
         )
 
-        # Try to download subtitles if available
-        subtitle_path = None
+        # Try to download captions if available
+        caption_path = None
         try:
-            subtitle_path = await self.downloader.download_subtitles(
+            caption_path = await self.downloader.download_captions(
                 url=url,
                 output_dir=str(output_dir),
                 force_overwrite=force_overwrite,
                 enable_gemini_option=bool(self.transcriber.api_key),
             )
-            if subtitle_path:
-                self.logger.info(f"✅ Subtitle downloaded: {subtitle_path}")
+            if caption_path:
+                self.logger.info(f"✅ Caption downloaded: {caption_path}")
             else:
-                self.logger.info("ℹ️  No subtitles available for this video")
+                self.logger.info("ℹ️  No captions available for this video")
         except Exception as e:
-            self.logger.warning(f"⚠️  Failed to download subtitles: {e}")
-            # Continue without subtitles - will transcribe later if needed
+            self.logger.warning(f"⚠️  Failed to download captions: {e}")
+            # Continue without captions - will transcribe later if needed
 
         # Get video metadata
         metadata = await self.downloader.get_video_info(url)
@@ -687,104 +687,104 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             "video_format": media_format,
             "output_dir": output_dir,
             "force_overwrite": force_overwrite,
-            "downloaded_subtitle_path": subtitle_path,  # Store downloaded subtitle path
+            "downloaded_caption_path": caption_path,  # Store downloaded caption path
         }
 
         self.logger.info(f"✅ Media downloaded: {media_path}")
         return result
 
     async def _transcribe_media(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 2: Transcribe video using Gemini 2.5 Pro or use downloaded subtitle"""
+        """Step 2: Transcribe video using Gemini 2.5 Pro or use downloaded caption"""
         url = context.get("url")
         result = context.get("process_youtube_url_result", {})
         video_path = result.get("video_path")
         output_dir = result.get("output_dir")
         force_overwrite = result.get("force_overwrite", False)
-        downloaded_subtitle_path = result.get("downloaded_subtitle_path")
+        downloaded_caption_path = result.get("downloaded_caption_path")
 
         if not url or not video_path:
             raise ValueError("URL and video path not found in context")
 
         video_id = self.downloader.extract_video_id(url)
 
-        # If subtitle was already downloaded in step 1 and user selected it, use it directly
-        if downloaded_subtitle_path and downloaded_subtitle_path != "gemini":
-            self.logger.info(f"📥 Using subtitle: {downloaded_subtitle_path}")
-            return {"subtitle_path": downloaded_subtitle_path}
+        # If caption was already downloaded in step 1 and user selected it, use it directly
+        if downloaded_caption_path and downloaded_caption_path != "gemini":
+            self.logger.info(f"📥 Using caption: {downloaded_caption_path}")
+            return {"caption_path": downloaded_caption_path}
 
-        # Check for existing subtitles if subtitle was not downloaded yet
-        self.logger.info("📥 Checking for existing subtitles...")
+        # Check for existing captions if caption was not downloaded yet
+        self.logger.info("📥 Checking for existing captions...")
 
-        # Check for existing subtitle files (all formats including Gemini transcripts)
+        # Check for existing caption files (all formats including Gemini transcripts)
         existing_files = FileExistenceManager.check_existing_files(
             video_id,
             str(output_dir),
-            subtitle_formats=SUBTITLE_FORMATS,  # Check all subtitle formats including Markdown
+            caption_formats=CAPTION_FORMATS,  # Check all caption formats including Markdown
         )
 
-        # Prompt user if subtitle exists and force_overwrite is not set
-        if existing_files["subtitle"] and not force_overwrite:
-            # Let user choose which subtitle file to use
+        # Prompt user if caption exists and force_overwrite is not set
+        if existing_files["caption"] and not force_overwrite:
+            # Let user choose which caption file to use
             # Enable Gemini option if API key is available (check transcriber's api_key)
             has_gemini_key = bool(self.transcriber.api_key)
-            subtitle_choice = FileExistenceManager.prompt_file_selection(
-                file_type="subtitle",
-                files=existing_files["subtitle"],
+            caption_choice = FileExistenceManager.prompt_file_selection(
+                file_type="caption",
+                files=existing_files["caption"],
                 operation="transcribe",
                 enable_gemini=has_gemini_key,
             )
 
-            if subtitle_choice == "cancel":
+            if caption_choice == "cancel":
                 raise RuntimeError("Transcription cancelled by user")
-            elif subtitle_choice in ("overwrite", "gemini"):
+            elif caption_choice in ("overwrite", "gemini"):
                 # Continue to transcription below
                 # For 'gemini', user explicitly chose to transcribe with Gemini
                 pass
-            elif subtitle_choice == "use":
-                # User chose to use existing subtitle files (use first one)
-                subtitle_path = Path(existing_files["subtitle"][0])
-                self.logger.info(f"🔁 Using existing subtitle: {subtitle_path}")
-                return {"subtitle_path": str(subtitle_path)}
-            elif subtitle_choice:  # User selected a specific file path
-                # Use selected subtitle
-                subtitle_path = Path(subtitle_choice)
-                self.logger.info(f"🔁 Using existing subtitle: {subtitle_path}")
-                return {"subtitle_path": str(subtitle_path)}
+            elif caption_choice == "use":
+                # User chose to use existing caption files (use first one)
+                caption_path = Path(existing_files["caption"][0])
+                self.logger.info(f"🔁 Using existing caption: {caption_path}")
+                return {"caption_path": str(caption_path)}
+            elif caption_choice:  # User selected a specific file path
+                # Use selected caption
+                caption_path = Path(caption_choice)
+                self.logger.info(f"🔁 Using existing caption: {caption_path}")
+                return {"caption_path": str(caption_path)}
             # If user_choice == 'overwrite' or 'gemini', continue to transcription below
 
         # TODO: support other Transcriber options
         self.logger.info(f"✨ Transcribing URL with {self.transcriber.name}...")
         transcript = await self.transcriber.transcribe_url(url)
-        subtitle_path = output_dir / f"{video_id}_{self.transcriber.name}{self.transcriber.file_suffix}"
-        with open(subtitle_path, "w", encoding="utf-8") as f:
+        caption_path = output_dir / f"{video_id}_{self.transcriber.name}{self.transcriber.file_suffix}"
+        with open(caption_path, "w", encoding="utf-8") as f:
             f.write(transcript)
-        result = {"subtitle_path": str(subtitle_path)}
+        result = {"caption_path": str(caption_path)}
         self.logger.info(f"✅   Transcript generated: {len(transcript)} characters")
         return result
 
-    async def _align_subtitle(self, context: Dict[str, Any]) -> Dict[str, Any]:
+    async def _align_caption(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Step 3: Align transcript with video using LattifAI"""
         result = context["process_youtube_url_result"]
         media_path = result.get("video_path", result.get("audio_path"))
-        subtitle_path = context.get("transcribe_media_result", {}).get("subtitle_path")
+        caption_path = context.get("transcribe_media_result", {}).get("caption_path")
 
-        if not media_path or not subtitle_path:
-            raise ValueError("Video path and subtitle path are required")
+        if not media_path or not caption_path:
+            raise ValueError("Video path and caption path are required")
 
-        self.logger.info("🎯 Aligning subtitle with video...")
+        self.logger.info("🎯 Aligning caption with video...")
 
-        # Check if subtitle is in markdown format (from transcriber)
-        if subtitle_path.endswith(self.transcriber.file_suffix):
+        # Check if caption is in markdown format (from transcriber)
+        if caption_path.endswith(self.transcriber.file_suffix):
             is_transcriber_format = True
         else:
             is_transcriber_format = False
-        subtitle_path = Path(subtitle_path)
+        caption_path = Path(caption_path)
 
         self.logger.info(
-            f'📄 Subtitle format: {self.transcriber.name if is_transcriber_format else f"{subtitle_path.suffix}"}'
+            f'📄 Caption format: {self.transcriber.name if is_transcriber_format else f"{caption_path.suffix}"}'
         )
 
-        original_subtitle_path = subtitle_path
+        original_caption_path = caption_path
         output_dir = result.get("output_dir")
         split_sentence = context.get("split_sentence", False)
         word_level = context.get("word_level", False)
@@ -793,17 +793,17 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         # Perform alignment with LattifAI (split_sentence and word_level passed as function parameters)
         aligned_result = await self.aligner.alignment(
             audio=media_path,
-            subtitle=str(subtitle_path),  # Use dialogue text for YouTube format, original for plain text
+            caption=str(caption_path),  # Use dialogue text for YouTube format, original for plain text
             format="gemini" if is_transcriber_format else "auto",
             split_sentence=split_sentence,
             return_details=word_level,
-            output_subtitle_path=str(output_path),
+            output_caption_path=str(output_path),
         )
 
         result = {
             "aligned_path": output_path,
             "alignment_result": aligned_result,
-            "original_subtitle_path": original_subtitle_path,
+            "original_caption_path": original_caption_path,
             "is_transcriber_format": is_transcriber_format,
         }
 
@@ -811,60 +811,60 @@ class YouTubeSubtitleAgent(WorkflowAgent):
         return result
 
     async def _export_results(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 4: Export results in specified format and update subtitle file"""
-        align_result = context.get("align_subtitle_result", {})
+        """Step 4: Export results in specified format and update caption file"""
+        align_result = context.get("align_caption_result", {})
         aligned_path = align_result.get("aligned_path")
-        original_subtitle_path = align_result.get("original_subtitle_path")
+        original_caption_path = align_result.get("original_caption_path")
         is_transcriber_format = align_result.get("is_transcriber_format", False)
         metadata = context.get("process_youtube_url_result", {}).get("metadata", {})
 
         if not aligned_path:
-            raise ValueError("Aligned subtitle path not found")
+            raise ValueError("Aligned caption path not found")
 
         output_format = context.get("output_format", "srt")
         include_speaker_in_text = context.get("include_speaker_in_text", True)
         self.logger.info(f"📤 Exporting results in format: {output_format}")
 
-        supervisions = SubtitleIO.read(aligned_path, format="ass")
+        supervisions = CaptionIO.read(aligned_path, format="ass")
         exported_files = {}
 
         # Update original transcript file with aligned timestamps if transcriber format
         if is_transcriber_format:
-            assert Path(original_subtitle_path).exists(), "Original subtitle path not found"
+            assert Path(original_caption_path).exists(), "Original caption path not found"
             self.logger.info("📝 Updating original transcript with aligned timestamps...")
 
             try:
                 # Generate updated transcript file path
-                original_path = Path(original_subtitle_path)
-                updated_subtitle_path = original_path.parent / f"{original_path.stem}_LattifAI.md"
+                original_path = Path(original_caption_path)
+                updated_caption_path = original_path.parent / f"{original_path.stem}_LattifAI.md"
 
                 # Update timestamps in original transcript
                 GeminiWriter.update_timestamps(
-                    original_transcript=original_subtitle_path,
+                    original_transcript=original_caption_path,
                     aligned_supervisions=supervisions,
-                    output_path=str(updated_subtitle_path),
+                    output_path=str(updated_caption_path),
                 )
 
-                exported_files["updated_transcript"] = str(updated_subtitle_path)
-                self.logger.info(f"✅ Updated transcript: {updated_subtitle_path}")
+                exported_files["updated_transcript"] = str(updated_caption_path)
+                self.logger.info(f"✅ Updated transcript: {updated_caption_path}")
 
             except Exception as e:
                 self.logger.warning(f"⚠️  Failed to update transcript timestamps: {e}")
 
-        # Export to requested subtitle format
+        # Export to requested caption format
         output_path = str(aligned_path).replace(
             "_aligned.ass", f'{"_Gemini" if is_transcriber_format else ""}_LattifAI.{output_format}'
         )
-        SubtitleIO.write(supervisions, output_path=output_path, include_speaker_in_text=include_speaker_in_text)
+        CaptionIO.write(supervisions, output_path=output_path, include_speaker_in_text=include_speaker_in_text)
         exported_files[output_format] = output_path
         self.logger.info(f"✅ Exported {output_format.upper()}: {output_path}")
 
         result = {
             "exported_files": exported_files,
             "metadata": metadata,
-            "subtitle_count": len(supervisions),
+            "caption_count": len(supervisions),
             "is_transcriber_format": is_transcriber_format,
-            "original_subtitle_path": original_subtitle_path,
+            "original_caption_path": original_caption_path,
         }
 
         return result
@@ -908,8 +908,8 @@ class YouTubeSubtitleAgent(WorkflowAgent):
             output_dir: Directory to save output files
             media_format: Media format for download (mp3, mp4, etc.)
             force_overwrite: Force overwrite existing files
-            output_format: Subtitle output format (srt, vtt, ass, etc.)
-            split_sentence: Re-segment subtitles by semantics
+            output_format: Caption output format (srt, vtt, ass, etc.)
+            split_sentence: Re-segment captions by semantics
             word_level: Include word-level alignment timestamps
 
         Returns:

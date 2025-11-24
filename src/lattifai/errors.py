@@ -9,7 +9,7 @@ import colorful
 LATTICE_DECODING_FAILURE_HELP = (
     "Failed to decode lattice alignment. Possible reasons:\n\n"
     "1) Media(Audio/Video) and text content mismatch:\n"
-    "   - The transcript/subtitle does not accurately match the media content\n"
+    "   - The transcript/caption does not accurately match the media content\n"
     "   - Text may be from a different version or section of the media\n"
     "   ⚠️  Note: Gemini transcription may occasionally skip large segments of media, causing alignment failures.\n"
     "       We will detect and fix this issue in the next version.\n\n"
@@ -45,7 +45,7 @@ class LattifAIError(Exception):
             f'   1. 📝 Create a GitHub issue: {colorful.green("https://github.com/lattifai/lattifai-python/issues")}\n'
             "      Please include:\n"
             "      - Your audio file format and duration\n"
-            "      - The text/subtitle content you're trying to align\n"
+            "      - The text/caption content you're trying to align\n"
             "      - This error message and stack trace\n"
             f'   2. 💬 Join our Discord community: {colorful.green("https://discord.gg/vzmTzzZgNu")}\n'
             "      Our team and community can help you troubleshoot\n"
@@ -105,37 +105,37 @@ class AudioFormatError(AudioProcessingError):
         super().__init__(message, media_path=media_path, **kwargs)
 
 
-class SubtitleProcessingError(LattifAIError):
-    """Error during subtitle/text processing operations."""
+class CaptionProcessingError(LattifAIError):
+    """Error during caption/text processing operations."""
 
-    def __init__(self, message: str, subtitle_path: Optional[str] = None, **kwargs):
+    def __init__(self, message: str, caption_path: Optional[str] = None, **kwargs):
         context = kwargs.get("context", {})
-        if subtitle_path:
-            context["subtitle_path"] = subtitle_path
+        if caption_path:
+            context["caption_path"] = caption_path
         kwargs["context"] = context
         super().__init__(message, **kwargs)
 
 
-class SubtitleParseError(SubtitleProcessingError):
-    """Error parsing subtitle or text file."""
+class CaptionParseError(CaptionProcessingError):
+    """Error parsing caption or text file."""
 
-    def __init__(self, subtitle_path: str, parse_issue: str, **kwargs):
-        message = f"Failed to parse subtitle file {subtitle_path}: {parse_issue}"
+    def __init__(self, caption_path: str, parse_issue: str, **kwargs):
+        message = f"Failed to parse caption file {caption_path}: {parse_issue}"
         context = kwargs.get("context", {})
-        context.update({"subtitle_path": subtitle_path, "parse_issue": parse_issue})
+        context.update({"caption_path": caption_path, "parse_issue": parse_issue})
         kwargs["context"] = context
-        super().__init__(message, subtitle_path=subtitle_path, **kwargs)
+        super().__init__(message, caption_path=caption_path, **kwargs)
 
 
 class AlignmentError(LattifAIError):
     """Error during audio-text alignment process."""
 
-    def __init__(self, message: str, media_path: Optional[str] = None, subtitle_path: Optional[str] = None, **kwargs):
+    def __init__(self, message: str, media_path: Optional[str] = None, caption_path: Optional[str] = None, **kwargs):
         context = kwargs.get("context", {})
         if media_path:
             context["media_path"] = media_path
-        if subtitle_path:
-            context["subtitle_path"] = subtitle_path
+        if caption_path:
+            context["caption_path"] = caption_path
         kwargs["context"] = context
         super().__init__(message, **kwargs)
 

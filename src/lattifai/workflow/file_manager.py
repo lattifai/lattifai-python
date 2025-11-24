@@ -24,37 +24,37 @@ class FileExistenceManager:
         "media": ("🎬", "Media"),
         # 'audio': ('📱', 'Audio'),
         # 'video': ('🎬', 'Video'),
-        "subtitle": ("📝", "Subtitle"),
+        "caption": ("📝", "Caption"),
     }
 
     @staticmethod
     def check_existing_files(
         video_id: str,
-        output_dir: str,
+        output_path: str,
         media_formats: List[str] = None,
-        subtitle_formats: List[str] = None,
+        caption_formats: List[str] = None,
     ) -> Dict[str, List[str]]:
         """
         Enhanced version to check for existing media files with customizable formats
 
         Args:
             video_id: Video ID from any platform
-            output_dir: Output directory to check
+            output_path: Output directory to check
             media_formats: List of media formats to check (audio and video combined)
-            subtitle_formats: List of subtitle formats to check
+            caption_formats: List of caption formats to check
 
         Returns:
-            Dictionary with 'media', 'subtitle' keys containing lists of existing files
+            Dictionary with 'media', 'caption' keys containing lists of existing files
         """
-        output_path = Path(output_dir).expanduser()
-        existing_files = {"media": [], "subtitle": []}
+        output_path = Path(output_path).expanduser()
+        existing_files = {"media": [], "caption": []}
 
         if not output_path.exists():
             return existing_files
 
         # Default formats - combine audio and video formats
         media_formats = media_formats or ["mp3", "wav", "m4a", "aac", "opus", "mp4", "webm", "mkv", "avi"]
-        subtitle_formats = subtitle_formats or ["md", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt"]
+        caption_formats = caption_formats or ["md", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt"]
 
         # Check for media files (audio and video)
         for ext in set(media_formats):  # Remove duplicates
@@ -69,19 +69,19 @@ class FileExistenceManager:
                 if file_path not in existing_files["media"]:
                     existing_files["media"].append(file_path)
 
-        # Check for subtitle files
-        for ext in set(subtitle_formats):  # Remove duplicates
-            # Check multiple naming patterns for subtitle files
+        # Check for caption files
+        for ext in set(caption_formats):  # Remove duplicates
+            # Check multiple naming patterns for caption files
             # Pattern 1: Simple pattern like {video_id}.vtt
-            subtitle_file = output_path / f"{video_id}.{ext}"
-            if subtitle_file.exists():
-                existing_files["subtitle"].append(str(subtitle_file))
+            caption_file = output_path / f"{video_id}.{ext}"
+            if caption_file.exists():
+                existing_files["caption"].append(str(caption_file))
 
             # Pattern 2: With language/track suffix like {video_id}.en-trackid.vtt
             for sub_file in output_path.glob(f"{video_id}*.{ext}"):
                 file_path = str(sub_file)
-                if file_path not in existing_files["subtitle"]:
-                    existing_files["subtitle"].append(file_path)
+                if file_path not in existing_files["caption"]:
+                    existing_files["caption"].append(file_path)
 
         return existing_files
 
@@ -98,9 +98,9 @@ class FileExistenceManager:
             User choice: 'use' (use existing), 'overwrite' (regenerate), or 'cancel'
         """
         has_media = bool(existing_files.get("media", []))
-        has_subtitle = bool(existing_files.get("subtitle", []))
+        has_caption = bool(existing_files.get("caption", []))
 
-        if not has_media and not has_subtitle:
+        if not has_media and not has_caption:
             return "proceed"  # No existing files, proceed normally
 
         # Header with warning color
@@ -110,8 +110,8 @@ class FileExistenceManager:
         file_paths = []
         if has_media:
             file_paths.extend(existing_files["media"])
-        if has_subtitle:
-            file_paths.extend(existing_files["subtitle"])
+        if has_caption:
+            file_paths.extend(existing_files["caption"])
 
         # Create display options with emojis
         options, shift_length = [], 0
@@ -121,8 +121,8 @@ class FileExistenceManager:
                 display_text = f'{colorful.green("•")} 🎬 Media file: {file_path}'
                 shift_length = len("Media file:")
             else:
-                display_text = f'{colorful.green("•")} 📝 Subtitle file: {file_path}'
-                shift_length = len("Subtitle file:")
+                display_text = f'{colorful.green("•")} 📝 Caption file: {file_path}'
+                shift_length = len("Caption file:")
             options.append((display_text, file_path))
 
         # Add overwrite and cancel options with aligned spacing
@@ -157,7 +157,7 @@ class FileExistenceManager:
         Prompt user for confirmation for a specific file type
 
         Args:
-            file_type: Type of file ('audio', 'video', 'subtitle', 'gemini')
+            file_type: Type of file ('audio', 'video', 'caption', 'gemini')
             files: List of existing files of this type
             operation: Type of operation (e.g., "download", "generate")
 
@@ -201,7 +201,7 @@ class FileExistenceManager:
         Prompt user to select a specific file from a list, or choose to overwrite/cancel
 
         Args:
-            file_type: Type of file (e.g., 'gemini transcript', 'subtitle')
+            file_type: Type of file (e.g., 'gemini transcript', 'caption')
             files: List of existing files to choose from
             operation: Type of operation (e.g., "transcribe", "download")
             enable_gemini: If True, adds "Transcribe with Gemini" option
@@ -268,7 +268,7 @@ class FileExistenceManager:
             Dictionary mapping file type to user choice ('use', 'overwrite', 'proceed', or 'cancel')
         """
         ordered_types = []
-        for preferred in ["media", "audio", "video", "subtitle"]:
+        for preferred in ["media", "audio", "video", "caption"]:
             if preferred not in ordered_types:
                 ordered_types.append(preferred)
         for file_type in existing_files.keys():

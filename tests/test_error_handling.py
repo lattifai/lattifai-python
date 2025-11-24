@@ -9,13 +9,13 @@ from lattifai.errors import (
     APIError,
     AudioFormatError,
     AudioLoadError,
+    CaptionProcessingError,
     ConfigurationError,
     DependencyError,
     LatticeDecodingError,
     LatticeEncodingError,
     LattifAIError,
     ModelLoadError,
-    SubtitleProcessingError,
 )
 
 
@@ -56,7 +56,7 @@ def test_error_inheritance():
     error_classes = [
         AudioLoadError,
         AudioFormatError,
-        SubtitleProcessingError,
+        CaptionProcessingError,
         AlignmentError,
         LatticeEncodingError,
         LatticeDecodingError,
@@ -89,7 +89,7 @@ def test_support_info():
 
     # Check for guidance text
     assert "audio file format" in support_info, "Audio format guidance not found"
-    assert "text/subtitle content" in support_info, "Text content guidance not found"
+    assert "text/caption content" in support_info, "Text content guidance not found"
 
     print("✓ Support information included in get_support_info()")
     print("✅ Support information tests passed!\n")

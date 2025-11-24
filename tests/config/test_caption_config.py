@@ -1,47 +1,47 @@
-"""Unit tests for SubtitleConfig."""
+"""Unit tests for CaptionConfig."""
 
 import pytest
 
-from lattifai.config import SubtitleConfig
+from lattifai.config import CaptionConfig
 
 
-class TestSubtitleConfigValidation:
-    """Test SubtitleConfig validation."""
+class TestCaptionConfigValidation:
+    """Test CaptionConfig validation."""
 
     def test_invalid_input_format_raises_error(self):
         """Test that invalid input format raises ValueError."""
         with pytest.raises(ValueError, match="input_format must be one of"):
-            SubtitleConfig(input_format="invalid")
+            CaptionConfig(input_format="invalid")
 
     def test_invalid_output_format_raises_error(self):
         """Test that invalid output format raises ValueError."""
         with pytest.raises(ValueError, match="output_format must be one of"):
-            SubtitleConfig(output_format="invalid")
+            CaptionConfig(output_format="invalid")
 
     def test_valid_input_formats(self):
         """Test that all valid input formats are accepted."""
         valid_formats = ["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "gemini"]
         for fmt in valid_formats:
-            config = SubtitleConfig(input_format=fmt)
+            config = CaptionConfig(input_format=fmt)
             assert config.input_format == fmt
 
     def test_valid_output_formats(self):
         """Test that all valid output formats are accepted."""
         valid_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
         for fmt in valid_formats:
-            config = SubtitleConfig(output_format=fmt)
+            config = CaptionConfig(output_format=fmt)
             assert config.output_format == fmt
 
 
-class TestSubtitleConfigPaths:
-    """Test SubtitleConfig path handling."""
+class TestCaptionConfigPaths:
+    """Test CaptionConfig path handling."""
 
     def test_set_input_path_with_valid_file(self, tmp_path):
         """Test setting input path with existing file."""
         test_file = tmp_path / "test.srt"
         test_file.touch()
 
-        config = SubtitleConfig()
+        config = CaptionConfig()
         result = config.set_input_path(test_file)
 
         assert result.exists()
@@ -49,7 +49,7 @@ class TestSubtitleConfigPaths:
 
     def test_set_input_path_with_nonexistent_file_raises_error(self, tmp_path):
         """Test that setting input path to nonexistent file raises FileNotFoundError."""
-        config = SubtitleConfig()
+        config = CaptionConfig()
         nonexistent = tmp_path / "nonexistent.srt"
 
         with pytest.raises(FileNotFoundError):
@@ -57,7 +57,7 @@ class TestSubtitleConfigPaths:
 
     def test_set_output_path_creates_parent_dir(self, tmp_path):
         """Test that set_output_path creates parent directory."""
-        config = SubtitleConfig()
+        config = CaptionConfig()
         output_file = tmp_path / "subdir" / "output.srt"
 
         result = config.set_output_path(output_file)
@@ -71,16 +71,16 @@ class TestSubtitleConfigPaths:
         test_file.touch()
 
         # Use relative path with ~
-        config = SubtitleConfig(input_path=str(test_file))
+        config = CaptionConfig(input_path=str(test_file))
         assert config.input_path == str(test_file)
 
 
-class TestSubtitleConfigMethods:
-    """Test SubtitleConfig utility methods."""
+class TestCaptionConfigMethods:
+    """Test CaptionConfig utility methods."""
 
     def test_check_input_sanity_with_no_input_raises_error(self):
         """Test that check_input_sanity raises error when input_path is None."""
-        config = SubtitleConfig()
+        config = CaptionConfig()
         with pytest.raises(ValueError, match="input_path is required"):
             config.check_input_sanity()
 
@@ -89,13 +89,13 @@ class TestSubtitleConfigMethods:
         test_file = tmp_path / "test.srt"
         test_file.touch()
 
-        config = SubtitleConfig(input_path=str(test_file))
+        config = CaptionConfig(input_path=str(test_file))
         # Should not raise any error
         config.check_input_sanity()
 
     def test_is_input_path_existed_returns_false_for_none(self):
         """Test is_input_path_existed returns False when input_path is None."""
-        config = SubtitleConfig()
+        config = CaptionConfig()
         assert config.is_input_path_existed() is False
 
     def test_is_input_path_existed_returns_true_for_valid_file(self, tmp_path):
@@ -103,16 +103,16 @@ class TestSubtitleConfigMethods:
         test_file = tmp_path / "test.srt"
         test_file.touch()
 
-        config = SubtitleConfig(input_path=str(test_file))
+        config = CaptionConfig(input_path=str(test_file))
         assert config.is_input_path_existed() is True
 
 
-class TestSubtitleConfigDefaults:
-    """Test SubtitleConfig default values."""
+class TestCaptionConfigDefaults:
+    """Test CaptionConfig default values."""
 
     def test_default_values(self):
         """Test that default configuration values are set correctly."""
-        config = SubtitleConfig()
+        config = CaptionConfig()
 
         assert config.input_format == "auto"
         assert config.output_format == "srt"
@@ -125,7 +125,7 @@ class TestSubtitleConfigDefaults:
 
     def test_custom_values_override_defaults(self):
         """Test that custom values override defaults."""
-        config = SubtitleConfig(
+        config = CaptionConfig(
             input_format="vtt",
             output_format="json",
             normalize_text=True,

@@ -4,9 +4,9 @@ import pytest
 
 from lattifai.config import (
     AlignmentConfig,
+    CaptionConfig,
     ClientConfig,
     MediaConfig,
-    SubtitleConfig,
     TranscriptionConfig,
 )
 
@@ -44,8 +44,8 @@ class TestAlignmentConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = AlignmentConfig()
-        # Alignment defaults
-        assert config.device == "cpu"
+        # Alignment defaults - device is auto-selected based on hardware
+        assert config.device in ["cpu", "cuda", "mps"]
         assert config.model_name_or_path == "Lattifai/Lattice-1-Alpha"
         assert config.batch_size == 1
 
@@ -99,12 +99,12 @@ class TestAlignmentConfig:
             AlignmentConfig(device="invalid")
 
 
-class TestSubtitleConfig:
-    """Test SubtitleConfig class."""
+class TestCaptionConfig:
+    """Test CaptionConfig class."""
 
     def test_default_values(self):
         """Test default configuration values."""
-        config = SubtitleConfig()
+        config = CaptionConfig()
         assert config.input_format == "auto"
         assert config.output_format == "srt"
         assert config.normalize_text is False
@@ -114,7 +114,7 @@ class TestSubtitleConfig:
 
     def test_custom_values(self, tmp_path):
         """Test custom configuration values."""
-        config = SubtitleConfig(
+        config = CaptionConfig(
             input_format="vtt",
             output_format="json",
             normalize_text=True,
@@ -130,12 +130,12 @@ class TestSubtitleConfig:
     def test_invalid_input_format(self):
         """Test validation of input_format parameter."""
         with pytest.raises(ValueError, match="input_format must be one of"):
-            SubtitleConfig(input_format="invalid")
+            CaptionConfig(input_format="invalid")
 
     def test_invalid_output_format(self):
         """Test validation of output_format parameter."""
         with pytest.raises(ValueError, match="output_format must be one of"):
-            SubtitleConfig(output_format="invalid")
+            CaptionConfig(output_format="invalid")
 
 
 class TestTranscriptionConfig:
@@ -144,7 +144,8 @@ class TestTranscriptionConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = TranscriptionConfig()
-        assert config.device == "cpu"
+        # Device is auto-selected based on hardware
+        assert config.device in ["cpu", "cuda", "mps"]
         assert config.max_retries == 0
         assert config.force_overwrite is False
         assert config.verbose is False

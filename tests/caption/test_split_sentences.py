@@ -3,14 +3,14 @@ import sys
 import types
 from typing import List, Optional, Tuple
 
-from lattifai import SubtitleIO
+from lattifai import CaptionIO
 
 if "k2" not in sys.modules:
     sys.modules["k2"] = types.ModuleType("k2")
 
 
 from lattifai.alignment.tokenizer import LatticeTokenizer
-from lattifai.subtitle import Supervision
+from lattifai.caption import Supervision
 
 
 class FakeSplitter:
@@ -227,23 +227,23 @@ def test_split_sentences_text_integrity():
 
     tokenizer = LatticeTokenizer(client_wrapper=None)
 
-    for subtitle_file in [
-        "tests/data/subtitles/7nv1snJRCEI.en.vtt.zip",
-        "tests/data/subtitles/eIUqw3_YcCI.en.vtt.zip",
-        "tests/data/subtitles/_xYSQe9oq6c.en.vtt.zip",
+    for caption_file in [
+        "tests/data/captions/7nv1snJRCEI.en.vtt.zip",
+        "tests/data/captions/eIUqw3_YcCI.en.vtt.zip",
+        "tests/data/captions/_xYSQe9oq6c.en.vtt.zip",
     ]:
-        # Unzip the subtitle file
+        # Unzip the caption file
         with tempfile.TemporaryDirectory() as tmpdir:
-            with zipfile.ZipFile(subtitle_file, "r") as zip_ref:
+            with zipfile.ZipFile(caption_file, "r") as zip_ref:
                 zip_ref.extractall(tmpdir)
 
             # Find the extracted .vtt file
             vtt_files = list(Path(tmpdir).glob("*.vtt"))
             if not vtt_files:
-                raise FileNotFoundError(f"No .vtt file found in {subtitle_file}")
+                raise FileNotFoundError(f"No .vtt file found in {caption_file}")
 
             extracted_file = str(vtt_files[0])
-            supervisions = SubtitleIO.read(extracted_file)
+            supervisions = CaptionIO.read(extracted_file)
 
             tokenizer.init_sentence_splitter()
             splits = tokenizer.split_sentences(supervisions)
@@ -252,14 +252,14 @@ def test_split_sentences_text_integrity():
             split_text = "".join([(sup.speaker or "").strip() + sup.text for sup in splits]).replace(" ", "")
 
             if origin_text != split_text:
-                open(str(subtitle_file) + ".debug.supervisions.txt", "w", encoding="utf-8").write(
+                open(str(caption_file) + ".debug.supervisions.txt", "w", encoding="utf-8").write(
                     "\n".join([f"[{sup.speaker}] {sup.text}" for sup in supervisions])
                 )
-                open(str(subtitle_file) + ".debug.splits.txt", "w", encoding="utf-8").write(
+                open(str(caption_file) + ".debug.splits.txt", "w", encoding="utf-8").write(
                     "\n".join([f"[{sup.speaker}] {sup.text}" for sup in splits])
                 )
 
-                open(str(subtitle_file) + ".debug.supervisions_text", "w", encoding="utf-8").write(origin_text)
-                open(str(subtitle_file) + ".debug.splits_text", "w", encoding="utf-8").write(split_text)
+                open(str(caption_file) + ".debug.supervisions_text", "w", encoding="utf-8").write(origin_text)
+                open(str(caption_file) + ".debug.splits_text", "w", encoding="utf-8").write(split_text)
 
             assert origin_text == split_text, "Text integrity check failed after sentence splitting."

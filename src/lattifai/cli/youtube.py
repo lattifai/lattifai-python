@@ -6,7 +6,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
-from lattifai.config import AlignmentConfig, ClientConfig, MediaConfig, SubtitleConfig, TranscriptionConfig
+from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, MediaConfig, TranscriptionConfig
 
 
 @run.cli.entrypoint(name="youtube", namespace="alignment")
@@ -15,20 +15,20 @@ def youtube(
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
-    subtitle: Annotated[Optional[SubtitleConfig], run.Config[SubtitleConfig]] = None,
+    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
 ):
     """
-    Download media from YouTube (when needed) and align subtitles.
+    Download media from YouTube (when needed) and align captions.
 
-    This command provides a convenient workflow for aligning subtitles with YouTube videos.
+    This command provides a convenient workflow for aligning captions with YouTube videos.
     It can automatically download media from YouTube URLs and optionally transcribe audio
-    using Gemini or download available subtitles from YouTube.
+    using Gemini or download available captions from YouTube.
 
     When a YouTube URL is provided:
     1. Downloads media in the specified format (audio or video)
-    2. Optionally transcribes audio with Gemini OR downloads YouTube subtitles
-    3. Performs forced alignment with the provided or generated subtitles
+    2. Optionally transcribes audio with Gemini OR downloads YouTube captions
+    3. Performs forced alignment with the provided or generated captions
 
     Shortcut: invoking ``lai-youtube`` is equivalent to running ``lai alignment youtube``.
 
@@ -39,7 +39,7 @@ def youtube(
             Fields: api_key, base_url, timeout, max_retries
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name_or_path, device, batch_size
-        subtitle: Subtitle configuration for reading/writing subtitle files.
+        caption: Caption configuration for reading/writing caption files.
             Fields: use_transcription, output_format, output_path, normalize_text,
                     split_sentence, word_level, encoding
         transcription: Transcription service configuration (enables Gemini transcription).
@@ -56,14 +56,14 @@ def youtube(
 
         # Full configuration with smart splitting and word-level alignment
         lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            subtitle.output_path=aligned.srt \\
-            subtitle.split_sentence=true \\
-            subtitle.word_level=true \\
+            caption.output_path=aligned.srt \\
+            caption.split_sentence=true \\
+            caption.word_level=true \\
             alignment.device=cuda
 
         # Use Gemini transcription (requires API key)
         lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            subtitle.use_transcription=true \\
+            caption.use_transcription=true \\
             transcription.gemini_api_key=YOUR_KEY \\
             transcription.model_name=gemini-2.0-flash
 
@@ -74,7 +74,7 @@ def youtube(
     """
     # Initialize configs with defaults
     media_config = media or MediaConfig()
-    subtitle_config = subtitle or SubtitleConfig()
+    caption_config = caption or CaptionConfig()
 
     # Validate URL input: require exactly one of yt_url or media.input_path
     if yt_url and media_config.input_path:
@@ -94,7 +94,7 @@ def youtube(
     lattifai_client = LattifAI(
         client_config=client,
         alignment_config=alignment,
-        subtitle_config=subtitle_config,
+        caption_config=caption_config,
         transcription_config=transcription,
     )
 
@@ -102,10 +102,10 @@ def youtube(
     return lattifai_client.youtube(
         url=media_config.input_path,
         output_dir=media_config.output_dir,
-        output_subtitle_path=subtitle_config.output_path,
+        output_caption_path=caption_config.output_path,
         media_format=media_config.normalize_format() if media_config.output_format else None,
         force_overwrite=media_config.force_overwrite,
-        split_sentence=subtitle_config.split_sentence,
+        split_sentence=caption_config.split_sentence,
     )
 
 

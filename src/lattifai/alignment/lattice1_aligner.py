@@ -5,13 +5,13 @@ from typing import Any, List, Optional, Tuple
 import colorful
 
 from lattifai.audio2 import AudioData
+from lattifai.caption import Supervision
 from lattifai.config import AlignmentConfig
 from lattifai.errors import (
     AlignmentError,
     LatticeDecodingError,
     LatticeEncodingError,
 )
-from lattifai.subtitle import Supervision
 from lattifai.utils import _resolve_model_path
 
 from .lattice1_alpha import _load_worker

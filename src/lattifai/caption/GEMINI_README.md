@@ -63,9 +63,9 @@ from lattifai import LattifAI
 client = LattifAI()
 aligned, output_path = client.alignment(
     audio='video.wav',
-    subtitle='videoid_Gemini.md',
+    caption='videoid_Gemini.md',
     format='gemini',
-    output_subtitle_path='aligned.srt'
+    output_caption_path='aligned.srt'
 )
 ```
 

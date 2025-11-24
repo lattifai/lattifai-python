@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from lattifai.subtitle import Supervision
+from lattifai.caption import Supervision
 
 
 class TestAlignmentAPISignature:
@@ -42,17 +42,17 @@ class TestAlignmentAPISignature:
 
         # Check required parameters
         assert "input_media" in params, "alignment() should have input_media parameter"
-        assert "input_subtitle_path" in params, "alignment() should have input_subtitle_path parameter"
+        assert "input_caption_path" in params, "alignment() should have input_caption_path parameter"
 
         # Check optional parameters
-        assert "input_subtitle_format" in params, "alignment() should have input_subtitle_format parameter"
+        assert "input_caption_format" in params, "alignment() should have input_caption_format parameter"
         assert "split_sentence" in params, "alignment() should have split_sentence parameter"
-        assert "output_subtitle_path" in params, "alignment() should have output_subtitle_path parameter"
+        assert "output_caption_path" in params, "alignment() should have output_caption_path parameter"
 
         # Check parameter defaults
-        assert params["input_subtitle_format"].default is None, "input_subtitle_format should default to None"
+        assert params["input_caption_format"].default is None, "input_caption_format should default to None"
         assert params["split_sentence"].default is None, "split_sentence should default to None"
-        assert params["output_subtitle_path"].default is None, "output_subtitle_path should default to None"
+        assert params["output_caption_path"].default is None, "output_caption_path should default to None"
 
         print("✓ alignment() has correct parameters with correct defaults")
 
@@ -69,10 +69,10 @@ class TestAlignmentAPISignature:
         assert LattifAIError is not None, "LattifAIError should be importable"
 
         # Test I/O types
-        from lattifai import SubtitleIO
+        from lattifai import CaptionIO
 
         assert Supervision is not None, "Supervision should be importable"
-        assert SubtitleIO is not None, "SubtitleIO should be importable"
+        assert CaptionIO is not None, "CaptionIO should be importable"
 
         print("✓ All required types can be imported")
 
@@ -97,7 +97,7 @@ class TestAlignmentReturnValue:
         """Test that alignment() returns a tuple with correct structure."""
         from lattifai import LattifAI
 
-        # This test would require actual audio and subtitle files
+        # This test would require actual audio and caption files
         # and a valid API key, so we skip it in CI
         # But the signature is documented here for reference
 
@@ -106,8 +106,8 @@ class TestAlignmentReturnValue:
         # Example usage (would run with real files):
         # alignments, output_path = client.alignment(
         #     audio='test.wav',
-        #     subtitle='test.srt',
-        #     output_subtitle_path='output.srt'
+        #     caption='test.srt',
+        #     output_caption_path='output.srt'
         # )
         #
         # assert isinstance(alignments, list)
@@ -125,7 +125,7 @@ class TestAlignmentReturnValue:
 
         # Check for key information in docstring
         assert "media" in docstring.lower(), "Docstring should document media parameter"
-        assert "subtitle" in docstring.lower(), "Docstring should document subtitle parameter"
+        assert "caption" in docstring.lower(), "Docstring should document caption parameter"
         assert "format" in docstring.lower(), "Docstring should document format parameter"
         assert "split_sentence" in docstring.lower(), "Docstring should document split_sentence parameter"
         assert "returns" in docstring.lower() or "return" in docstring.lower(), "Docstring should document return value"
@@ -134,27 +134,27 @@ class TestAlignmentReturnValue:
         print(f"Docstring preview: {docstring[:200]}...")
 
 
-class TestSubtitleIOAPI:
-    """Test SubtitleIO API."""
+class TestCaptionIOAPI:
+    """Test CaptionIO API."""
 
-    def test_subtitle_io_read(self, tmp_path):
-        """Test SubtitleIO.read() method."""
-        from lattifai import SubtitleIO
+    def test_caption_io_read(self, tmp_path):
+        """Test CaptionIO.read() method."""
+        from lattifai import CaptionIO
 
         # Create a simple SRT file
         srt_content = """1
 00:00:01,000 --> 00:00:03,000
-First subtitle
+First caption
 
 2
 00:00:04,000 --> 00:00:06,000
-Second subtitle
+Second caption
 """
         srt_file = tmp_path / "test.srt"
         srt_file.write_text(srt_content)
 
         # Read the file
-        supervisions = SubtitleIO.read(srt_file)
+        supervisions = CaptionIO.read(srt_file)
 
         assert isinstance(supervisions, list)
         assert len(supervisions) == 2
@@ -162,11 +162,11 @@ Second subtitle
         assert all(hasattr(s, "start") for s in supervisions)
         assert all(hasattr(s, "duration") for s in supervisions)
 
-        print(f"✓ SubtitleIO.read() works correctly, parsed {len(supervisions)} segments")
+        print(f"✓ CaptionIO.read() works correctly, parsed {len(supervisions)} segments")
 
-    def test_subtitle_io_write(self, tmp_path):
-        """Test SubtitleIO.write() method."""
-        from lattifai import SubtitleIO
+    def test_caption_io_write(self, tmp_path):
+        """Test CaptionIO.write() method."""
+        from lattifai import CaptionIO
 
         # Create supervisions
         supervisions = [
@@ -176,7 +176,7 @@ Second subtitle
 
         # Write to file
         output_file = tmp_path / "output.srt"
-        result_path = SubtitleIO.write(supervisions, output_file)
+        result_path = CaptionIO.write(supervisions, output_file)
 
         assert output_file.exists()
         assert result_path == output_file
@@ -186,11 +186,11 @@ Second subtitle
         assert "First line" in content
         assert "Second line" in content
 
-        print(f"✓ SubtitleIO.write() works correctly, wrote to {output_file}")
+        print(f"✓ CaptionIO.write() works correctly, wrote to {output_file}")
 
-    def test_subtitle_format_auto_detection(self, tmp_path):
+    def test_caption_format_auto_detection(self, tmp_path):
         """Test that format auto-detection works."""
-        from lattifai import SubtitleIO
+        from lattifai import CaptionIO
 
         # Test with different extensions
         formats = {
@@ -212,7 +212,7 @@ Second subtitle
             file_path.write_text(content)
 
             # Read with auto-detection
-            supervisions = SubtitleIO.read(file_path, format=None)
+            supervisions = CaptionIO.read(file_path, format=None)
             assert isinstance(supervisions, list)
             print(f"✓ Auto-detected format for {filename}")
 
@@ -230,7 +230,7 @@ class TestAPIConsistency:
         params = sig.parameters
 
         # Check parameter names - LattifAI uses config objects
-        expected_params = ["client_config", "alignment_config", "subtitle_config"]
+        expected_params = ["client_config", "alignment_config", "caption_config"]
         for param in expected_params:
             assert param in params, f"{param} should be a parameter of LattifAI.__init__"
 
@@ -271,15 +271,15 @@ def run_tests():
     test_ret = TestAlignmentReturnValue()
     test_ret.test_alignment_docstring()
 
-    # Test SubtitleIO API
-    print("\n📄 Testing SubtitleIO API...")
+    # Test CaptionIO API
+    print("\n📄 Testing CaptionIO API...")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
-        test_io = TestSubtitleIOAPI()
-        test_io.test_subtitle_io_read(tmp_path)
-        test_io.test_subtitle_io_write(tmp_path)
-        test_io.test_subtitle_format_auto_detection(tmp_path)
+        test_io = TestCaptionIOAPI()
+        test_io.test_caption_io_read(tmp_path)
+        test_io.test_caption_io_write(tmp_path)
+        test_io.test_caption_format_auto_detection(tmp_path)
 
     # Test API consistency
     print("\n🔍 Testing API Consistency...")
@@ -292,7 +292,7 @@ def run_tests():
     print("\n📝 API Summary:")
     print("   • alignment() returns Tuple[List[Supervision], Optional[Pathlike]]")
     print("   • Supervision has text, start, and duration attributes")
-    print("   • SubtitleIO.read() and write() work correctly")
+    print("   • CaptionIO.read() and write() work correctly")
     print("   • All error types inherit from LattifAIError")
 
 

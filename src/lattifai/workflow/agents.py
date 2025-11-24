@@ -1,5 +1,5 @@
 """
-Subtitle Agents
+Caption Agents
 
 An agentic workflow for processing YouTube(or more) videos through:
 1. URL processing and audio download
@@ -7,6 +7,6 @@ An agentic workflow for processing YouTube(or more) videos through:
 3. LattifAI alignment
 """
 
-from .youtube import YouTubeSubtitleAgent
+from .youtube import YouTubeCaptionAgent
 
-__all__ = ["YouTubeSubtitleAgent"]
+__all__ = ["YouTubeCaptionAgent"]

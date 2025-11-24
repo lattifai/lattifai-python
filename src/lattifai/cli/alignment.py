@@ -7,7 +7,7 @@ from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
-from lattifai.config import AlignmentConfig, ClientConfig, MediaConfig, SubtitleConfig
+from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, MediaConfig
 
 __all__ = ["align"]
 
@@ -15,18 +15,18 @@ __all__ = ["align"]
 @run.cli.entrypoint(name="align", namespace="alignment")
 def align(
     input_media: Optional[Pathlike] = None,
-    input_subtitle_path: Optional[Pathlike] = None,
-    output_subtitle_path: Optional[Pathlike] = None,
+    input_caption_path: Optional[Pathlike] = None,
+    output_caption_path: Optional[Pathlike] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
-    subtitle: Annotated[Optional[SubtitleConfig], run.Config[SubtitleConfig]] = None,
+    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
 ):
     """
-    Align audio/video with subtitle file.
+    Align audio/video with caption file.
 
-    This command performs forced alignment between audio/video media and subtitle text,
-    generating accurate timestamps for each subtitle segment and optionally word-level
+    This command performs forced alignment between audio/video media and caption text,
+    generating accurate timestamps for each caption segment and optionally word-level
     timestamps. The alignment engine uses advanced speech recognition models to ensure
     precise synchronization between audio and text.
 
@@ -41,36 +41,36 @@ def align(
             Fields: api_key, base_url, timeout, max_retries, default_headers
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name_or_path, device, batch_size
-        subtitle: Subtitle I/O configuration (file reading/writing and formatting).
+        caption: Caption I/O configuration (file reading/writing and formatting).
             Fields: input_format, input_path, output_format, output_path,
                     normalize_text, split_sentence, word_level,
                     include_speaker_in_text, encoding
 
     Examples:
         # Basic usage with positional arguments
-        lai alignment align audio.wav subtitle.srt output.srt
+        lai alignment align audio.wav caption.srt output.srt
 
         # Mixing positional and keyword arguments
-        lai alignment align audio.mp4 subtitle.srt output.json \\
+        lai alignment align audio.mp4 caption.srt output.json \\
             alignment.device=cuda \\
-            subtitle.word_level=true
+            caption.word_level=true
 
         # Smart sentence splitting with custom output format
-        lai alignment align audio.wav subtitle.srt output.vtt \\
-            subtitle.split_sentence=true
+        lai alignment align audio.wav caption.srt output.vtt \\
+            caption.split_sentence=true
 
         # Using keyword arguments (traditional syntax)
         lai alignment align \\
             input_media=audio.wav \\
-            input_subtitle_path=subtitle.srt \\
-            output_subtitle_path=output.srt
+            input_caption_path=caption.srt \\
+            output_caption_path=output.srt
 
         # Full configuration with nested config objects
-        lai alignment align audio.wav subtitle.srt aligned.json \\
+        lai alignment align audio.wav caption.srt aligned.json \\
             media.output_dir=/tmp/output \\
-            subtitle.split_sentence=true \\
-            subtitle.word_level=true \\
-            subtitle.normalize_text=true \\
+            caption.split_sentence=true \\
+            caption.word_level=true \\
+            caption.normalize_text=true \\
             alignment.device=mps \\
             alignment.model_name_or_path=Lattifai/Lattice-1-Alpha
     """
@@ -87,35 +87,35 @@ def align(
     if input_media:
         media_config.set_input_path(input_media)
 
-    subtitle_config = subtitle or SubtitleConfig()
+    caption_config = caption or CaptionConfig()
 
-    # Validate that input_subtitle_path and subtitle_config.input_path are not both provided
-    if input_subtitle_path and subtitle_config.input_path:
+    # Validate that input_caption_path and caption_config.input_path are not both provided
+    if input_caption_path and caption_config.input_path:
         raise ValueError(
-            "Cannot specify both positional input_subtitle_path and subtitle.input_path. "
+            "Cannot specify both positional input_caption_path and caption.input_path. "
             "Use either positional argument or config, not both."
         )
 
-    # Validate that output_subtitle_path and subtitle_config.output_path are not both provided
-    if output_subtitle_path and subtitle_config.output_path:
+    # Validate that output_caption_path and caption_config.output_path are not both provided
+    if output_caption_path and caption_config.output_path:
         raise ValueError(
-            "Cannot specify both positional output_subtitle_path and subtitle.output_path. "
+            "Cannot specify both positional output_caption_path and caption.output_path. "
             "Use either positional argument or config, not both."
         )
 
-    # Assign paths to subtitle_config if provided
-    if input_subtitle_path:
-        subtitle_config.set_input_path(input_subtitle_path)
+    # Assign paths to caption_config if provided
+    if input_caption_path:
+        caption_config.set_input_path(input_caption_path)
 
-    if output_subtitle_path:
-        subtitle_config.set_output_path(output_subtitle_path)
+    if output_caption_path:
+        caption_config.set_output_path(output_caption_path)
 
-    client = LattifAI(client_config=client, alignment_config=alignment, subtitle_config=subtitle_config)
+    client = LattifAI(client_config=client, alignment_config=alignment, caption_config=caption_config)
 
     return client.alignment(
         input_media=media_config.input_path,
-        input_subtitle_path=subtitle_config.input_path,
-        output_subtitle_path=subtitle_config.output_path,
+        input_caption_path=caption_config.input_path,
+        output_caption_path=caption_config.output_path,
     )
 
 

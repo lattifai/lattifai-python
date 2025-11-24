@@ -1,4 +1,4 @@
-"""Evaluation metrics for subtitle alignment quality: DER, JER, WER, and SCA."""
+"""Evaluation metrics for caption alignment quality: DER, JER, WER, and SCA."""
 
 from pathlib import Path
 from typing import List, Union
@@ -13,12 +13,12 @@ from whisper_normalizer.english import EnglishTextNormalizer
 english_normalizer = EnglishTextNormalizer()
 
 
-def subtitle_to_annotation(subtitle: pysubs2.SSAFile, uri: str = "default") -> Annotation:
-    """Convert subtitle to pyannote Annotation for diarization metrics."""
+def caption_to_annotation(caption: pysubs2.SSAFile, uri: str = "default") -> Annotation:
+    """Convert caption to pyannote Annotation for diarization metrics."""
     annotation = Annotation(uri=uri)
 
     speaker = None
-    for event in subtitle.events:
+    for event in caption.events:
         segment = Segment(event.start / 1000.0, event.end / 1000.0)
         if event.name:
             event.name = event.name.rstrip(":").lstrip(">").strip()
@@ -29,14 +29,14 @@ def subtitle_to_annotation(subtitle: pysubs2.SSAFile, uri: str = "default") -> A
     return annotation
 
 
-def subtitle_to_text(
-    subtitle: pysubs2.SSAFile,
+def caption_to_text(
+    caption: pysubs2.SSAFile,
 ) -> str:
-    """Convert subtitle to text string for WER calculation."""
+    """Convert caption to text string for WER calculation."""
     text = " ".join(
         [
             english_normalizer(event.text.replace("...", " ").strip()).replace("chatgpt", "chat gpt")
-            for event in subtitle.events
+            for event in caption.events
         ]
     )
     return text
@@ -53,8 +53,8 @@ def evaluate_alignment(
     """Evaluate alignment quality using specified metrics.
 
     Args:
-        reference_file: Path to reference subtitle file
-        hypothesis_file: Path to hypothesis subtitle file
+        reference_file: Path to reference caption file
+        hypothesis_file: Path to hypothesis caption file
         metrics: List of metrics to compute (der, jer, wer, sca, scer)
         collar: Collar size in seconds for diarization metrics
         skip_overlap: Skip overlapping speech regions for DER
@@ -65,10 +65,10 @@ def evaluate_alignment(
     reference = pysubs2.load(reference_file)
     hypothesis = pysubs2.load(hypothesis_file)
 
-    ref_ann = subtitle_to_annotation(reference)
-    hyp_ann = subtitle_to_annotation(hypothesis)
-    ref_text = subtitle_to_text(reference)
-    hyp_text = subtitle_to_text(hypothesis)
+    ref_ann = caption_to_annotation(reference)
+    hyp_ann = caption_to_annotation(hypothesis)
+    ref_text = caption_to_text(reference)
+    hyp_text = caption_to_text(hypothesis)
 
     if False:
         with open(hypothesis_file[:-4] + ".txt", "w") as f:
@@ -143,7 +143,7 @@ def main():
     import sys
 
     parser = argparse.ArgumentParser(
-        description="Evaluate subtitle alignment quality",
+        description="Evaluate caption alignment quality",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -154,8 +154,8 @@ Examples:
         """,
     )
 
-    parser.add_argument("--reference", "-r", required=True, help="Reference subtitle file")
-    parser.add_argument("--hypothesis", "-hyp", required=True, help="Hypothesis subtitle file")
+    parser.add_argument("--reference", "-r", required=True, help="Reference caption file")
+    parser.add_argument("--hypothesis", "-hyp", required=True, help="Hypothesis caption file")
     parser.add_argument("--model-name", "--model_name", "-n", default="", help="Model name to display in results")
     parser.add_argument(
         "--metrics",

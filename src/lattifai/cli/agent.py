@@ -9,24 +9,24 @@ from typing_extensions import Annotated
 from lattifai.client import AsyncLattifAI
 from lattifai.config import (
     AlignmentConfig,
+    CaptionConfig,
     ClientConfig,
     MediaConfig,
-    SubtitleConfig,
     TranscriptionConfig,
 )
 from lattifai.transcription import create_transcriber
-from lattifai.workflow.youtube import YouTubeDownloader, YouTubeSubtitleAgent
+from lattifai.workflow.youtube import YouTubeCaptionAgent, YouTubeDownloader
 
 
 def _build_async_client(
     client_config: ClientConfig,
     alignment_config: AlignmentConfig,
-    subtitle_config: SubtitleConfig,
+    caption_config: CaptionConfig,
 ) -> AsyncLattifAI:
     return AsyncLattifAI(
         client_config=client_config,
         alignment_config=alignment_config,
-        subtitle_config=subtitle_config,
+        caption_config=caption_config,
     )
 
 
@@ -34,13 +34,13 @@ def _create_agent(
     transcription_config: TranscriptionConfig,
     client_config: ClientConfig,
     alignment_config: AlignmentConfig,
-    subtitle_config: SubtitleConfig,
+    caption_config: CaptionConfig,
     max_retries: int,
-) -> YouTubeSubtitleAgent:
+) -> YouTubeCaptionAgent:
     downloader = YouTubeDownloader()
     transcriber = create_transcriber(transcription_config=transcription_config)
-    aligner = _build_async_client(client_config, alignment_config, subtitle_config)
-    return YouTubeSubtitleAgent(
+    aligner = _build_async_client(client_config, alignment_config, caption_config)
+    return YouTubeCaptionAgent(
         downloader=downloader,
         transcriber=transcriber,
         aligner=aligner,
@@ -53,7 +53,7 @@ def agent(
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
-    subtitle: Annotated[Optional[SubtitleConfig], run.Config[SubtitleConfig]] = None,
+    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
     max_retries: int = 0,
 ):
@@ -75,7 +75,7 @@ def agent(
             Fields: api_key, base_url, timeout, max_retries, default_headers
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name_or_path, device, batch_size
-        subtitle: Subtitle I/O configuration (file reading/writing and formatting).
+        caption: Caption I/O configuration (file reading/writing and formatting).
             Fields: input_format, input_path, output_format, output_path,
                     normalize_text, split_sentence, word_level,
                     include_speaker_in_text, encoding
@@ -91,13 +91,13 @@ def agent(
         # Download as audio only with word-level alignment
         lai agent workflow media.input_path="https://youtu.be/VIDEO_ID" \\
                           --media.prefer-audio=true \\
-                          --subtitle.word-level=true \\
+                          --caption.word-level=true \\
                           transcription.api_key=YOUR_GEMINI_KEY
 
         # Enable speaker diarization and sentence splitting
         lai agent workflow media.input_path="https://youtu.be/VIDEO_ID" \\
                           --transcription.enable-diarization=true \\
-                          subtitle.split_sentence=true \\
+                          caption.split_sentence=true \\
                           transcription.api_key=YOUR_GEMINI_KEY
 
         # Full configuration with custom output directory
@@ -105,9 +105,9 @@ def agent(
             media.input_path="https://youtu.be/VIDEO_ID" \\
             media.output_dir=/tmp/youtube \\
             --media.output-format=wav \\
-            --subtitle.output-format=json \\
-            --subtitle.word-level=true \\
-            subtitle.split_sentence=true \\
+            --caption.output-format=json \\
+            --caption.word-level=true \\
+            caption.split_sentence=true \\
             --alignment.device=cuda \\
             --alignment.model-name-or-path=Lattifai/Lattice-1-Alpha \\
             transcription.api_key=YOUR_GEMINI_KEY \\
@@ -116,7 +116,7 @@ def agent(
     """
 
     media_config = media or MediaConfig()
-    subtitle_config = subtitle or SubtitleConfig()
+    caption_config = caption or CaptionConfig()
     transcription_config = transcription or TranscriptionConfig()
     client_config = client or ClientConfig()
     alignment_config = alignment or AlignmentConfig()
@@ -129,7 +129,7 @@ def agent(
         transcription_config=transcription_config,
         client_config=client_config,
         alignment_config=alignment_config,
-        subtitle_config=subtitle_config,
+        caption_config=caption_config,
         max_retries=max_retries,
     )
 
@@ -139,10 +139,10 @@ def agent(
             output_dir=str(output_dir),
             media_format=media_format,
             force_overwrite=media_config.force_overwrite,
-            output_format=subtitle_config.output_format,
-            split_sentence=subtitle_config.split_sentence,
-            word_level=subtitle_config.word_level,
-            include_speaker_in_text=subtitle_config.include_speaker_in_text,
+            output_format=caption_config.output_format,
+            split_sentence=caption_config.split_sentence,
+            word_level=caption_config.word_level,
+            include_speaker_in_text=caption_config.include_speaker_in_text,
         )
     )
 

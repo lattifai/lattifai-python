@@ -2,6 +2,9 @@ import sys
 import warnings
 from importlib.metadata import version
 
+# Re-export I/O classes
+from .caption import CaptionIO
+
 # Re-export client classes
 from .client import AsyncLattifAI, LattifAI
 
@@ -11,9 +14,9 @@ from .config import (
     MEDIA_FORMATS,
     VIDEO_FORMATS,
     AlignmentConfig,
+    CaptionConfig,
     ClientConfig,
     MediaConfig,
-    SubtitleConfig,
 )
 from .errors import (
     AlignmentError,
@@ -21,17 +24,16 @@ from .errors import (
     AudioFormatError,
     AudioLoadError,
     AudioProcessingError,
+    CaptionParseError,
+    CaptionProcessingError,
     ConfigurationError,
     DependencyError,
     LatticeDecodingError,
     LatticeEncodingError,
     LattifAIError,
     ModelLoadError,
-    SubtitleParseError,
-    SubtitleProcessingError,
 )
 from .logging import get_logger, set_log_level, setup_logger
-from .subtitle import SubtitleIO
 
 try:
     __version__ = version("lattifai")
@@ -70,7 +72,7 @@ __all__ = [
     # Config classes
     "AlignmentConfig",
     "ClientConfig",
-    "SubtitleConfig",
+    "CaptionConfig",
     "MediaConfig",
     "AUDIO_FORMATS",
     "VIDEO_FORMATS",
@@ -80,8 +82,8 @@ __all__ = [
     "AudioProcessingError",
     "AudioLoadError",
     "AudioFormatError",
-    "SubtitleProcessingError",
-    "SubtitleParseError",
+    "CaptionProcessingError",
+    "CaptionParseError",
     "AlignmentError",
     "LatticeEncodingError",
     "LatticeDecodingError",
@@ -94,7 +96,7 @@ __all__ = [
     "get_logger",
     "set_log_level",
     # I/O
-    "SubtitleIO",
+    "CaptionIO",
     # Version
     "__version__",
 ]

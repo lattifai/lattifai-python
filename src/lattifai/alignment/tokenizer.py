@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 import torch
 
 from lattifai.alignment.phonemizer import G2Phonemizer
+from lattifai.caption import Supervision
+from lattifai.caption import normalize_text as normalize_html_text
 from lattifai.errors import LATTICE_DECODING_FAILURE_HELP, LatticeDecodingError, ModelLoadError
-from lattifai.subtitle import Supervision
-from lattifai.subtitle import normalize_text as normalize_html_text
 
 PUNCTUATION = '!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~'
 END_PUNCTUATION = '.!?"]。！？”】'

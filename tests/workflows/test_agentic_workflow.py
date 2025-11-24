@@ -14,12 +14,12 @@ def test_imports():
     print("🧪 Testing imports...")
 
     from lattifai.transcription.gemini import GeminiTranscriber
-    from lattifai.workflow import YouTubeSubtitleAgent
+    from lattifai.workflow import YouTubeCaptionAgent
     from lattifai.workflow.base import WorkflowAgent
     from lattifai.workflow.youtube import YouTubeDownloader
 
     print("✅ All workflow modules imported successfully")
-    assert YouTubeSubtitleAgent is not None
+    assert YouTubeCaptionAgent is not None
     assert WorkflowAgent is not None
     assert GeminiTranscriber is not None
     assert YouTubeDownloader is not None
@@ -75,14 +75,14 @@ def test_workflow_setup():
 
     from unittest.mock import MagicMock
 
-    from lattifai.workflow import YouTubeSubtitleAgent
+    from lattifai.workflow import YouTubeCaptionAgent
 
     # Test agent creation with mock components
     mock_downloader = MagicMock()
     mock_transcriber = MagicMock()
     mock_aligner = MagicMock()
 
-    agent = YouTubeSubtitleAgent(
+    agent = YouTubeCaptionAgent(
         downloader=mock_downloader, transcriber=mock_transcriber, aligner=mock_aligner, max_retries=1
     )
 

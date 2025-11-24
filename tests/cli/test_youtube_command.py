@@ -46,9 +46,9 @@ class TestYoutubeCommand:
         args = [
             "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
-            f"subtitle.output_format={output_format}",
+            f"caption.output_format={output_format}",
             "alignment.device=cpu",
-            "subtitle.input_path=dummy.srt",
+            "caption.input_path=dummy.srt",
         ]
 
         run_youtube_command(args)
@@ -60,7 +60,7 @@ class TestYoutubeCommand:
             "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
             f"alignment.device={device}",
-            "subtitle.input_path=dummy.srt",
+            "caption.input_path=dummy.srt",
         ]
 
         run_youtube_command(args)
@@ -70,9 +70,9 @@ class TestYoutubeCommand:
         args = [
             "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
-            "subtitle.split_sentence=true",
+            "caption.split_sentence=true",
             "alignment.device=cpu",
-            "subtitle.input_path=dummy.srt",
+            "caption.input_path=dummy.srt",
         ]
 
         run_youtube_command(args)
@@ -85,7 +85,7 @@ class TestYoutubeCommand:
             "media.output_format=mp3",
             "media.prefer_audio=true",
             "alignment.device=cpu",
-            "subtitle.input_path=dummy.srt",
+            "caption.input_path=dummy.srt",
         ]
 
         run_youtube_command(args)
@@ -97,7 +97,7 @@ class TestYoutubeCommand:
             f"media.output_dir={tmp_path}",
             "alignment.model_name_or_path=Lattifai/Lattice-1-Alpha",
             "alignment.device=cpu",
-            "subtitle.input_path=dummy.srt",
+            "caption.input_path=dummy.srt",
         ]
 
         run_youtube_command(args)
@@ -108,7 +108,7 @@ class TestYoutubeCommand:
             "yt_url=not_a_valid_url",
             f"media.output_dir={tmp_path}",
             "alignment.device=cpu",
-            "subtitle.input_path=dummy.srt",
+            "caption.input_path=dummy.srt",
         ]
 
         result = run_youtube_command(args)
@@ -126,5 +126,5 @@ class TestYoutubeCommand:
             if result.returncode == 0:
                 help_text = result.stdout + result.stderr
                 assert "media" in help_text
-                assert "subtitle" in help_text
+                assert "caption" in help_text
                 assert "alignment" in help_text

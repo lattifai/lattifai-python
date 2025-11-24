@@ -47,7 +47,7 @@ def test_prompt_choice_falls_back_to_numeric_input():
 
 
 def test_prompt_per_file_type_combined_questionary_overwrite():
-    existing_files = {"media": ["/tmp/video.mp4"], "subtitle": ["/tmp/video.srt"]}
+    existing_files = {"media": ["/tmp/video.mp4"], "caption": ["/tmp/video.srt"]}
 
     with (
         patch.object(file_manager.FileExistenceManager, "is_interactive_mode", return_value=True),
@@ -62,12 +62,12 @@ def test_prompt_per_file_type_combined_questionary_overwrite():
         choices = FileExistenceManager.prompt_per_file_type_confirmation(existing_files, "download")
 
     assert choices["media"] == "overwrite"
-    assert choices["subtitle"] == "use"
+    assert choices["caption"] == "use"
     assert choices["audio"] == "proceed"
 
 
 def test_prompt_per_file_type_combined_questionary_cancel():
-    existing_files = {"media": ["/tmp/video.mp4"], "subtitle": ["/tmp/video.srt"]}
+    existing_files = {"media": ["/tmp/video.mp4"], "caption": ["/tmp/video.srt"]}
 
     with (
         patch.object(file_manager.FileExistenceManager, "is_interactive_mode", return_value=True),
@@ -82,7 +82,7 @@ def test_prompt_per_file_type_combined_questionary_cancel():
         choices = FileExistenceManager.prompt_per_file_type_confirmation(existing_files, "download")
 
     assert choices["media"] == "cancel"
-    assert choices["subtitle"] == "cancel"
+    assert choices["caption"] == "cancel"
 
 
 def test_prompt_per_file_type_sequential_fallback():
@@ -100,4 +100,4 @@ def test_prompt_per_file_type_sequential_fallback():
 
     mock_prompt.assert_called_once()
     assert choices["media"] == "use"
-    assert choices["subtitle"] == "proceed"
+    assert choices["caption"] == "proceed"

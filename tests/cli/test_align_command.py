@@ -40,7 +40,7 @@ def sample_audio_file():
 
 
 @pytest.fixture
-def sample_subtitle_file():
+def sample_caption_file():
     return "tests/data/SA1.srt"
 
 
@@ -51,56 +51,56 @@ class TestAlignCommand:
         "input_format",
         ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "auto", "gemini"],
     )
-    def test_align_input_formats(self, sample_audio_file, sample_subtitle_file, tmp_path, input_format):
-        """Test align command with different subtitle formats"""
+    def test_align_input_formats(self, sample_audio_file, sample_caption_file, tmp_path, input_format):
+        """Test align command with different caption formats"""
         output_file = tmp_path / f"output_{input_format}.srt"
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"subtitle.input_path={sample_subtitle_file}",
-            f"subtitle.output_path={output_file}",
-            f"subtitle.input_format={input_format}",
+            f"caption.input_path={sample_caption_file}",
+            f"caption.output_path={output_file}",
+            f"caption.input_format={input_format}",
             "alignment.device=cpu",
         ]
 
         run_align_command(args)
 
     @pytest.mark.parametrize("device", ["cpu", "cuda", "mps"])
-    def test_align_device_options(self, sample_audio_file, sample_subtitle_file, tmp_path, device):
+    def test_align_device_options(self, sample_audio_file, sample_caption_file, tmp_path, device):
         """Test align command with different device options"""
         output_file = tmp_path / f"output_{device}.srt"
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"subtitle.input_path={sample_subtitle_file}",
-            f"subtitle.output_path={output_file}",
+            f"caption.input_path={sample_caption_file}",
+            f"caption.output_path={output_file}",
             f"alignment.device={device}",
         ]
 
         run_align_command(args)
 
-    def test_align_split_sentence_option(self, sample_audio_file, sample_subtitle_file, tmp_path):
+    def test_align_split_sentence_option(self, sample_audio_file, sample_caption_file, tmp_path):
         """Test align command with split-sentence option"""
         output_file = tmp_path / "output_split.srt"
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"subtitle.input_path={sample_subtitle_file}",
-            f"subtitle.output_path={output_file}",
-            "subtitle.split_sentence=true",
+            f"caption.input_path={sample_caption_file}",
+            f"caption.output_path={output_file}",
+            "caption.split_sentence=true",
             "alignment.device=cpu",
         ]
 
         run_align_command(args)
 
-    def test_align_model_name_option(self, sample_audio_file, sample_subtitle_file, tmp_path):
+    def test_align_model_name_option(self, sample_audio_file, sample_caption_file, tmp_path):
         """Test align command with custom model name"""
         output_file = tmp_path / "output_model.srt"
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"subtitle.input_path={sample_subtitle_file}",
-            f"subtitle.output_path={output_file}",
+            f"caption.input_path={sample_caption_file}",
+            f"caption.output_path={output_file}",
             "alignment.model_name_or_path=Lattifai/Lattice-1-Alpha",
             "alignment.device=cpu",
         ]
@@ -111,8 +111,8 @@ class TestAlignCommand:
         """Test align command with missing input files"""
         args = [
             "media.input_path=nonexistent_audio.wav",
-            "subtitle.input_path=nonexistent_subtitle.srt",
-            f"subtitle.output_path={tmp_path / 'output.srt'}",
+            "caption.input_path=nonexistent_caption.srt",
+            f"caption.output_path={tmp_path / 'output.srt'}",
         ]
 
         result = run_align_command(args)
@@ -130,18 +130,18 @@ class TestAlignCommand:
             if result.returncode == 0:
                 help_text = result.stdout + result.stderr
                 assert "media" in help_text
-                assert "subtitle" in help_text
+                assert "caption" in help_text
                 assert "alignment" in help_text
 
-    def test_align_normalize_text_flag(self, sample_audio_file, sample_subtitle_file, tmp_path):
+    def test_align_normalize_text_flag(self, sample_audio_file, sample_caption_file, tmp_path):
         """Test align command accepts normalize-text flag"""
         output_file = tmp_path / "output_normalized.srt"
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"subtitle.input_path={sample_subtitle_file}",
-            f"subtitle.output_path={output_file}",
-            "subtitle.normalize_text=true",
+            f"caption.input_path={sample_caption_file}",
+            f"caption.output_path={output_file}",
+            "caption.normalize_text=true",
             "alignment.device=cpu",
         ]
 

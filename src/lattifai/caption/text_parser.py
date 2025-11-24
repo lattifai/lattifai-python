@@ -26,7 +26,7 @@ def set_normalize_text(enabled: bool) -> None:
 
 
 def normalize_text(text: str) -> str:
-    """Normalize subtitle text by:
+    """Normalize caption text by:
     - Decoding common HTML entities
     - Removing HTML tags (e.g., <i>, <font>, <b>, <br>)
     - Collapsing multiple whitespace into a single space

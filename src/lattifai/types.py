@@ -5,14 +5,14 @@ from typing import List, TypeAlias, Union
 
 from lhotse.utils import Pathlike
 
-from .subtitle import Supervision
+from .caption import Supervision
 
 # Path-like types
 PathLike: TypeAlias = Pathlike  # Re-export for convenience (str | Path)
 
-# Subtitle types
+# Caption types
 SupervisionList: TypeAlias = List[Supervision]
-"""List of subtitle segments with timing and text information."""
+"""List of caption segments with timing and text information."""
 
 # Media format types
 MediaFormat: TypeAlias = str

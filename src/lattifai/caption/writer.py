@@ -9,8 +9,8 @@ from lhotse.utils import Pathlike
 from .reader import Supervision
 
 
-class SubtitleWriter(ABCMeta):
-    """Class for writing subtitle files with optional word-level alignment."""
+class CaptionWriter(ABCMeta):
+    """Class for writing caption files with optional word-level alignment."""
 
     @classmethod
     def write(
@@ -79,7 +79,7 @@ class SubtitleWriter(ABCMeta):
         else:
             subs = pysubs2.SSAFile()
             for sup in alignments:
-                # Add word-level timing as metadata in the subtitle text
+                # Add word-level timing as metadata in the caption text
                 word_items = parse_alignment_from_supervision(sup)
                 if word_items:
                     for word in word_items:

@@ -1,12 +1,12 @@
-"""Tests for subtitle shift functionality"""
+"""Tests for caption shift functionality"""
 
 import pytest  # noqa: F401
 
-from lattifai.subtitle import Supervision
+from lattifai.caption import Supervision
 
 
-class TestSubtitleShift:
-    """Test cases for subtitle timestamp shifting"""
+class TestCaptionShift:
+    """Test cases for caption timestamp shifting"""
 
     def test_shift_positive(self):
         """Test shifting timestamps forward (delay)"""

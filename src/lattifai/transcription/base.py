@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Union
 
 from lattifai.audio2 import AudioData
-from lattifai.subtitle import Supervision
+from lattifai.caption import Supervision
 
 
 class BaseTranscriber(ABC):

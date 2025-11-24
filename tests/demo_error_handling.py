@@ -115,7 +115,7 @@ def demonstrate_text_processing_error():
     from lattifai.errors import LatticeEncodingError
 
     # Create a long text to show truncation
-    long_text = "This is a very long subtitle text that contains many words and sentences. " * 20
+    long_text = "This is a very long caption text that contains many words and sentences. " * 20
 
     try:
         raise LatticeEncodingError(
