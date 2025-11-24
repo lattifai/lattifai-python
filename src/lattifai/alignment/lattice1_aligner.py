@@ -1,9 +1,8 @@
-"""LattifAI client implementation with config-driven architecture."""
+"""Lattice-1 Aligner implementation."""
 
 from typing import Any, List, Optional, Tuple
 
 import colorful
-from lhotse.utils import Pathlike
 
 from lattifai.audio2 import AudioData
 from lattifai.config import AlignmentConfig
@@ -103,9 +102,3 @@ class Lattice1Aligner(object):
             raise
         except Exception as e:
             raise e
-
-            # raise AlignmentError(
-            #     "Unexpected error during alignment process",
-            #     media_path=str(audio),
-            #     context={"original_error": str(e), "error_type": e.__class__.__name__},
-            # )
