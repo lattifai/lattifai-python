@@ -50,17 +50,10 @@ def convert(
             input_path=input.srt \\
             output_path=output.TextGrid
     """
-    from lattifai.caption import Captioner
+    from lattifai.caption import Caption
 
-    caption = CaptionConfig(
-        include_speaker_in_text=include_speaker_in_text,
-        normalize_text=normalize_text,
-    )
-
-    captioner = Captioner(config=caption)
-
-    supervisions = captioner.read(input_path)
-    output_path = captioner.write(supervisions, output_path)
+    caption = Caption.read(input_path, normalize_text=normalize_text)
+    caption.write(output_path, include_speaker_in_text=include_speaker_in_text)
 
     print(f"✅ Converted {input_path} -> {output_path}")
     return output_path
@@ -108,23 +101,15 @@ def normalize(
             input_path=input.srt \\
             output_path=output.srt
     """
-    from lattifai.caption import Captioner
-
-    # Create config with normalize_text enabled
-    if caption is None:
-        caption = CaptionConfig(normalize_text=True)
-    else:
-        caption.normalize_text = True
-
-    captioner = Captioner(config=caption)
-
-    # Read with normalization enabled
     from pathlib import Path
+
+    from lattifai.caption import Caption
 
     input_path = Path(input_path).expanduser()
     output_path = Path(output_path).expanduser()
-    supervisions = captioner.read(input_path, normalize_text=True)
-    output_path = captioner.write(supervisions, output_path)
+
+    caption_obj = Caption.read(input_path, normalize_text=True)
+    caption_obj.write(output_path, include_speaker_in_text=True)
 
     if output_path == input_path:
         print(f"✅ Normalized {input_path} (in-place)")
@@ -176,25 +161,19 @@ def shift(
     """
     from pathlib import Path
 
-    from lattifai.caption import Captioner
-
-    if caption is None:
-        caption = CaptionConfig()
-
-    captioner = Captioner(config=caption)
+    from lattifai.caption import Caption
 
     input_path = Path(input_path).expanduser()
     output_path = Path(output_path).expanduser()
 
     # Read captions
-    supervisions = captioner.read(input_path)
+    caption_obj = Caption.read(input_path)
 
     # Shift timestamps
-    for sup in supervisions:
-        sup.start = max(0.0, sup.start + seconds)
+    shifted_caption = caption_obj.shift_time(seconds)
 
     # Write shifted captions
-    output_path = captioner.write(supervisions, output_path)
+    shifted_caption.write(output_path, include_speaker_in_text=True)
 
     if seconds >= 0:
         direction = f"delayed by {seconds}s"

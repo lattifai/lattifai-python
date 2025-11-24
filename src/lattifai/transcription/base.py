@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Union
 
 from lattifai.audio2 import AudioData
-from lattifai.caption import Supervision
+from lattifai.caption import Caption
 
 
 class BaseTranscriber(ABC):
@@ -46,13 +46,13 @@ class BaseTranscriber(ABC):
         """
 
     @abstractmethod
-    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Union[str, List[Supervision]]:
+    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Union[str, Caption]:
         """
         Transcribe audio from a local media file.
         """
 
     @abstractmethod
-    def write(self, transcript: Union[str, List[Supervision]], output_file: Path, encoding: str = "utf-8") -> Path:
+    def write(self, transcript: Union[str, Caption], output_file: Path, encoding: str = "utf-8") -> Path:
         """
         Persist transcript text to disk and return the file path.
         """

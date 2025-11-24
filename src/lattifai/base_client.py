@@ -9,6 +9,7 @@ import httpx
 from lhotse.utils import Pathlike
 
 from lattifai.audio2 import AudioData
+from lattifai.caption import Caption
 
 from .config import ClientConfig
 
@@ -189,17 +190,9 @@ class LattifAIClientMixin:
 
     def _init_shared_components(
         self,
-        caption_config: Optional["CaptionConfig"],
         transcription_config: Optional["TranscriptionConfig"],
     ) -> None:
-        """Initialize shared components (captioner, transcriber, downloader)."""
-        from .caption import Captioner
-        from .config import CaptionConfig
-
-        # captioner IO
-        caption_config = caption_config or CaptionConfig()
-        self.captioner = Captioner(config=caption_config)
-
+        """Initialize shared components (transcriber, downloader)."""
         # transcriber (optional, lazy loaded when needed)
         self.transcription_config = transcription_config
         self._transcriber = None
@@ -244,13 +237,13 @@ class LattifAIClientMixin:
         """Generate output caption path if not provided."""
         if not output_caption_path:
             media_name = Path(media_file).stem
-            output_format = self.captioner.config.output_format or "srt"
+            output_format = self.caption_config.output_format or "srt"
             output_caption_path = output_dir / f"{media_name}_LattifAI.{output_format}"
         return Path(output_caption_path)
 
     def _validate_transcription_setup(self) -> None:
         """Validate that transcription is properly configured if requested."""
-        if self.captioner.config.use_transcription and not self.transcriber:
+        if self.caption_config.use_transcription and not self.transcriber:
             raise ValueError(
                 "Transcription requested but transcriber not configured. "
                 "Provide TranscriptionConfig with valid API key."
@@ -288,7 +281,7 @@ class LattifAIClientMixin:
 
         return asyncio.run(self._download_media(url, output_dir, media_format, force_overwrite))
 
-    def _get_or_create_captions(
+    def _download_or_transcribe_caption(
         self,
         url: str,
         output_dir: Path,
@@ -296,7 +289,7 @@ class LattifAIClientMixin:
         force_overwrite: bool,
         caption_lang: Optional[str],
         is_async: bool = False,
-    ) -> Union[str, Awaitable[str]]:
+    ) -> Union[Union[str, Caption], Awaitable[Union[str, Caption]]]:
         """
         Get captions by downloading or transcribing.
 
@@ -317,15 +310,15 @@ class LattifAIClientMixin:
 
         async def _async_impl():
             # First check if caption input_path is already provided
-            if self.captioner.config.input_path:
-                caption_path = Path(self.captioner.config.input_path)
+            if self.caption_config.input_path:
+                caption_path = Path(self.caption_config.input_path)
                 if caption_path.exists():
                     print(colorful.green(f"📄 Using provided caption file: {caption_path}"))
                     return str(caption_path)
                 else:
                     raise FileNotFoundError(f"Provided caption path does not exist: {caption_path}")
 
-            if self.captioner.config.use_transcription:
+            if self.caption_config.use_transcription:
                 # Transcription mode: use Transcriber to transcribe
                 self._validate_transcription_setup()
 
@@ -359,8 +352,11 @@ class LattifAIClientMixin:
                 else:
                     transcription = await self.transcriber.transcribe_file(media_file)
 
-                await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
-                caption_file = str(transcript_file)
+                if isinstance(transcription, Caption):
+                    caption_file = transcription
+                else:
+                    await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
+                    caption_file = str(transcript_file)
                 print(colorful.green(f"         ✓ Transcription completed: {caption_file}"))
             else:
                 # Download YouTube captions

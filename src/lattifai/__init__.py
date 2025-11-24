@@ -3,7 +3,7 @@ import warnings
 from importlib.metadata import version
 
 # Re-export I/O classes
-from .caption import CaptionIO
+from .caption import Caption
 
 # Re-export client classes
 from .client import AsyncLattifAI, LattifAI
@@ -96,7 +96,7 @@ __all__ = [
     "get_logger",
     "set_log_level",
     # I/O
-    "CaptionIO",
+    "Caption",
     # Version
     "__version__",
 ]

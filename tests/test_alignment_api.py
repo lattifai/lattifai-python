@@ -4,12 +4,9 @@ Test suite for LattifAI alignment API
 Tests the actual alignment() method signature and return types
 """
 
-import tempfile
-from pathlib import Path
-
 import pytest
 
-from lattifai.caption import Caption, Supervision
+from lattifai.caption import Supervision
 
 
 class TestAlignmentAPISignature:
@@ -42,7 +39,7 @@ class TestAlignmentAPISignature:
 
         # Check required parameters
         assert "input_media" in params, "alignment() should have input_media parameter"
-        assert "input_caption_path" in params, "alignment() should have input_caption_path parameter"
+        assert "input_caption" in params, "alignment() should have input_caption parameter"
 
         # Check optional parameters
         assert "input_caption_format" in params, "alignment() should have input_caption_format parameter"
@@ -68,11 +65,7 @@ class TestAlignmentAPISignature:
 
         assert LattifAIError is not None, "LattifAIError should be importable"
 
-        # Test I/O types
-        from lattifai import CaptionIO
-
         assert Supervision is not None, "Supervision should be importable"
-        assert CaptionIO is not None, "CaptionIO should be importable"
 
         print("✓ All required types can be imported")
 
@@ -134,89 +127,6 @@ class TestAlignmentReturnValue:
         print(f"Docstring preview: {docstring[:200]}...")
 
 
-class TestCaptionIOAPI:
-    """Test CaptionIO API."""
-
-    def test_caption_io_read(self, tmp_path):
-        """Test CaptionIO.read() method."""
-        from lattifai import CaptionIO
-
-        # Create a simple SRT file
-        srt_content = """1
-00:00:01,000 --> 00:00:03,000
-First caption
-
-2
-00:00:04,000 --> 00:00:06,000
-Second caption
-"""
-        srt_file = tmp_path / "test.srt"
-        srt_file.write_text(srt_content)
-
-        # Read the file
-        caption = CaptionIO.read(srt_file)
-
-        assert isinstance(caption, Caption)
-        assert len(caption.supervisions) == 2
-        assert all(hasattr(s, "text") for s in caption.supervisions)
-        assert all(hasattr(s, "start") for s in caption.supervisions)
-        assert all(hasattr(s, "duration") for s in caption.supervisions)
-
-        print(f"✓ CaptionIO.read() works correctly, parsed {len(caption.supervisions)} segments")
-
-    def test_caption_io_write(self, tmp_path):
-        """Test CaptionIO.write() method."""
-        from lattifai import CaptionIO
-
-        # Create supervisions
-        supervisions = [
-            Supervision(text="First line", start=1.0, duration=2.0),
-            Supervision(text="Second line", start=4.0, duration=2.0),
-        ]
-
-        # Write to file
-        output_file = tmp_path / "output.srt"
-        result_path = CaptionIO.write(supervisions, output_file)
-
-        assert output_file.exists()
-        assert result_path == output_file
-
-        # Read back and verify
-        content = output_file.read_text()
-        assert "First line" in content
-        assert "Second line" in content
-
-        print(f"✓ CaptionIO.write() works correctly, wrote to {output_file}")
-
-    def test_caption_format_auto_detection(self, tmp_path):
-        """Test that format auto-detection works."""
-        from lattifai import CaptionIO
-
-        # Test with different extensions
-        formats = {
-            "test.srt": "srt",
-            "test.vtt": "vtt",
-            "test.ass": "ass",
-            "test.txt": "txt",
-        }
-
-        for filename, expected_format in formats.items():
-            file_path = tmp_path / filename
-
-            # Create a simple file with basic content
-            if expected_format == "txt":
-                content = "Line 1\nLine 2\n"
-            else:
-                content = "1\n00:00:01,000 --> 00:00:03,000\nTest\n"
-
-            file_path.write_text(content)
-
-            # Read with auto-detection
-            caption = CaptionIO.read(file_path, format=None)
-            assert isinstance(caption, Caption)
-            print(f"✓ Auto-detected format for {filename}")
-
-
 class TestAPIConsistency:
     """Test API consistency across the codebase."""
 
@@ -271,16 +181,6 @@ def run_tests():
     test_ret = TestAlignmentReturnValue()
     test_ret.test_alignment_docstring()
 
-    # Test CaptionIO API
-    print("\n📄 Testing CaptionIO API...")
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_path = Path(tmp_dir)
-        test_io = TestCaptionIOAPI()
-        test_io.test_caption_io_read(tmp_path)
-        test_io.test_caption_io_write(tmp_path)
-        test_io.test_caption_format_auto_detection(tmp_path)
-
     # Test API consistency
     print("\n🔍 Testing API Consistency...")
     test_consistency = TestAPIConsistency()
@@ -292,7 +192,6 @@ def run_tests():
     print("\n📝 API Summary:")
     print("   • alignment() returns Tuple[List[Supervision], Optional[Pathlike]]")
     print("   • Supervision has text, start, and duration attributes")
-    print("   • CaptionIO.read() and write() work correctly")
     print("   • All error types inherit from LattifAIError")
 
 

@@ -9,7 +9,7 @@ from lhotse.utils import Pathlike
 from lattifai.alignment import Lattice1Aligner
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.base_client import AsyncAPIClient, LattifAIClientMixin, SyncAPIClient
-from lattifai.caption import InputCaptionFormat, Supervision
+from lattifai.caption import Caption, InputCaptionFormat, Supervision
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, TranscriptionConfig
 from lattifai.errors import (
     AlignmentError,
@@ -53,37 +53,47 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Initialize base API client
         super().__init__(config=client_config)
 
+        # Store caption config
+        self.caption_config = caption_config
+
         # audio loader
         self.audio_loader = AudioLoader(device=alignment_config.device)
 
         # aligner
         self.aligner = Lattice1Aligner(self, config=alignment_config)
 
-        # Initialize shared components (captioner, transcriber, downloader)
-        self._init_shared_components(caption_config, transcription_config)
+        # Initialize shared components (transcriber, downloader)
+        self._init_shared_components(transcription_config)
 
     def alignment(
         self,
         input_media: Union[Pathlike, AudioData],
-        input_caption_path: Pathlike,
+        input_caption: Union[Pathlike, Caption],
         output_caption_path: Optional[Pathlike] = None,
         input_caption_format: Optional[InputCaptionFormat] = None,
         split_sentence: Optional[bool] = None,
-    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
+    ) -> Tuple[Caption, Optional[Pathlike]]:
         try:
             # Step 1: Parse caption file
-            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption_path}"))
+            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
             try:
-                supervisions = self.captioner.read(input_path=input_caption_path, format=input_caption_format)
-                print(colorful.green(f"         ✓ Parsed {len(supervisions)} caption segments"))
+                if isinstance(input_caption, Caption):
+                    caption = input_caption
+                else:
+                    caption = Caption.read(
+                        input_caption,
+                        format=input_caption_format,
+                        normalize_text=self.caption_config.normalize_text,
+                    )
+                print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
             except Exception as e:
                 raise CaptionProcessingError(
-                    f"Failed to parse caption file: {input_caption_path}",
-                    caption_path=str(input_caption_path),
+                    f"Failed to parse caption file: {input_caption}",
+                    caption_path=str(input_caption),
                     context={"original_error": str(e)},
                 )
 
-            output_caption_path = output_caption_path or self.captioner.config.output_path
+            output_caption_path = output_caption_path or self.caption_config.output_path
             if isinstance(input_media, AudioData):
                 media_audio = input_media
             else:
@@ -95,16 +105,22 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             # Step 2-4: Align using Lattice1Aligner
             supervisions, alignments = self.aligner.alignment(
                 media_audio,
-                supervisions,
-                split_sentence=split_sentence or self.captioner.config.split_sentence,
-                return_details=self.captioner.config.word_level
+                caption.supervisions,
+                split_sentence=split_sentence or self.caption_config.split_sentence,
+                return_details=self.caption_config.word_level
                 or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
             )
+
+            caption.supervisions = supervisions
+            caption.alignments = alignments
 
             # Step 5: Export alignments
             if output_caption_path:
                 try:
-                    _ = self.captioner.write(alignments, output_path=output_caption_path)
+                    caption.write(
+                        output_caption_path,
+                        include_speaker_in_text=self.caption_config.include_speaker_in_text,
+                    )
                     print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
                 except Exception as e:
                     raise CaptionProcessingError(
@@ -113,7 +129,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         context={"original_error": str(e)},
                     )
 
-            return (alignments, output_caption_path)
+            return (caption, output_caption_path)
 
         except (CaptionProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
             # Re-raise our specific errors as-is
@@ -123,7 +139,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             raise AlignmentError(
                 "Unexpected error during alignment process",
                 media_path=str(input_media),
-                caption_path=str(input_caption_path),
+                caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
 
@@ -135,7 +151,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         caption_lang: Optional[str] = None,
         force_overwrite: bool = False,
         output_caption_path: Optional[Pathlike] = None,
-        **alignment_kwargs,
+        split_sentence: Optional[bool] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
         # Prepare output directory and media format
         output_dir = self._prepare_youtube_output_dir(output_dir)
@@ -149,7 +165,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         media_audio = self.audio_loader(media_file, channel_selector="average")
 
         # Step 2: Get or create captions (download or transcribe)
-        caption_file = self._get_or_create_captions(
+        input_caption = self._download_or_transcribe_caption(
             url, output_dir, media_audio, force_overwrite, caption_lang, is_async=False
         )
 
@@ -160,9 +176,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         print(colorful.cyan("🔗 Performing forced alignment..."))
         return self.alignment(
             input_media=media_audio,
-            input_caption_path=caption_file,
+            input_caption=input_caption,
             output_caption_path=output_caption_path,
-            **alignment_kwargs,
+            split_sentence=split_sentence,
         )
 
 
@@ -183,7 +199,7 @@ LattifAI.alignment.__doc__ = LattifAIClientMixin._ALIGNMENT_DOC.format(
     example_imports="client = LattifAI()",
     example_code="""alignments, output_path = client.alignment(
         ...     input_media="speech.wav",
-        ...     input_caption_path="transcript.srt",
+        ...     input_caption="transcript.srt",
         ...     output_caption_path="aligned.srt"
         ... )
         >>> for seg in alignments:
@@ -227,39 +243,48 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         # Initialize base API client
         super().__init__(config=client_config)
 
+        # Store caption config
+        self.caption_config = caption_config
+
         # aligner (will be async version in future)
         self.aligner = Lattice1Aligner(self, config=alignment_config)
 
         # audio loader
         self.audio_loader = AudioLoader(device=alignment_config.device)
 
-        # Initialize shared components (captioner, transcriber, downloader)
-        self._init_shared_components(caption_config, transcription_config)
+        # Initialize shared components (transcriber, downloader)
+        self._init_shared_components(transcription_config)
 
     async def alignment(
         self,
         input_media: Union[Pathlike, AudioData],
-        input_caption_path: Pathlike,
+        input_caption: Union[Pathlike, Caption],
         output_caption_path: Optional[Pathlike] = None,
         input_caption_format: Optional[InputCaptionFormat] = None,
         split_sentence: Optional[bool] = None,
-    ) -> Tuple[List[Supervision], Optional[Pathlike]]:
+    ) -> Tuple[Caption, Optional[Pathlike]]:
         try:
             # Step 1: Parse caption file (async)
-            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption_path}"))
+            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
             try:
-                supervisions = await asyncio.to_thread(
-                    self.captioner.read, input_path=input_caption_path, format=input_caption_format
-                )
-                print(colorful.green(f"         ✓ Parsed {len(supervisions)} caption segments"))
+                if isinstance(input_caption, Caption):
+                    caption = input_caption
+                else:
+                    caption = await asyncio.to_thread(
+                        Caption.read,
+                        input_caption,
+                        format=input_caption_format,
+                        normalize_text=self.caption_config.normalize_text,
+                    )
+                print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
             except Exception as e:
                 raise CaptionProcessingError(
-                    f"Failed to parse caption file: {input_caption_path}",
-                    caption_path=str(input_caption_path),
+                    f"Failed to parse caption file: {input_caption}",
+                    caption_path=str(input_caption),
                     context={"original_error": str(e)},
                 )
 
-            output_caption_path = output_caption_path or self.captioner.config.output_path
+            output_caption_path = output_caption_path or self.caption_config.output_path
 
             if isinstance(input_media, AudioData):
                 media_audio = input_media
@@ -275,16 +300,23 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
             supervisions, alignments = await asyncio.to_thread(
                 self.aligner.alignment,
                 media_audio,
-                supervisions,
-                split_sentence=split_sentence or self.captioner.config.split_sentence,
-                return_details=self.captioner.config.word_level
+                caption.supervisions,
+                split_sentence=split_sentence or self.caption_config.split_sentence,
+                return_details=self.caption_config.word_level
                 or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
             )
+
+            caption.supervisions = supervisions
+            caption.alignments = alignments
 
             # Step 5: Export alignments (async)
             if output_caption_path:
                 try:
-                    await asyncio.to_thread(self.captioner.write, alignments, output_path=output_caption_path)
+                    await asyncio.to_thread(
+                        caption.write,
+                        output_caption_path,
+                        include_speaker_in_text=self.caption_config.include_speaker_in_text,
+                    )
                     print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
                 except Exception as e:
                     raise CaptionProcessingError(
@@ -293,7 +325,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
                         context={"original_error": str(e)},
                     )
 
-            return (alignments, output_caption_path)
+            return (caption, output_caption_path)
 
         except (CaptionProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
             # Re-raise our specific errors as-is
@@ -303,7 +335,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
             raise AlignmentError(
                 "Unexpected error during alignment process",
                 media_path=str(input_media),
-                caption_path=str(input_caption_path),
+                caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
 
@@ -315,7 +347,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         caption_lang: Optional[str] = None,
         force_overwrite: bool = False,
         output_caption_path: Optional[Pathlike] = None,
-        **alignment_kwargs,
+        split_sentence: Optional[bool] = None,
     ) -> Tuple[List[Supervision], Optional[Pathlike]]:
         # Prepare output directory and media format
         output_dir = self._prepare_youtube_output_dir(output_dir)
@@ -333,7 +365,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         )
 
         # Step 2: Get or create captions (download or transcribe)
-        caption_file = await self._get_or_create_captions(
+        input_caption = await self._download_or_transcribe_caption(
             url, output_dir, media_audio, force_overwrite, caption_lang, is_async=True
         )
 
@@ -344,9 +376,9 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         print(colorful.cyan("🔗 Performing forced alignment..."))
         return await self.alignment(
             input_media=media_audio,
-            input_caption_path=caption_file,
+            input_caption=input_caption,
             output_caption_path=output_caption_path,
-            **alignment_kwargs,
+            split_sentence=split_sentence,
         )
 
 
@@ -367,7 +399,7 @@ AsyncLattifAI.alignment.__doc__ = LattifAIClientMixin._ALIGNMENT_DOC.format(
     example_imports="import asyncio\n        >>> async def main():\n        ...     client = AsyncLattifAI()",
     example_code="""alignments, output_path = await client.alignment(
         ...         input_media="speech.wav",
-        ...         input_caption_path="transcript.srt",
+        ...         input_caption="transcript.srt",
         ...         output_caption_path="aligned.srt"
         ...     )
         ...     for seg in alignments:
@@ -395,7 +427,7 @@ if __name__ == "__main__":
 
     (alignments, output_caption_path) = client.alignment(
         input_media=audio,
-        input_caption_path=caption,
+        input_caption=caption,
         output_caption_path=output,
         split_sentence=split_sentence,
     )

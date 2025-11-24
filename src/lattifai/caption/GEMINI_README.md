@@ -1,6 +1,6 @@
 # Gemini Transcript Reader/Writer (YouTube)
 
-## Transcript Format 示例
+## Transcript Format
 
 ```
 ## [HH:MM:SS] Section Title
@@ -76,7 +76,7 @@ from lattifai.io import GeminiWriter
 GeminiWriter.update_timestamps(
 	original_transcript='videoid_Gemini.md',
 	aligned_supervisions=aligned,
-	output_path='transcript_aligned.txt'
+	output_path='videoid_aligned_Gemini.md'
 )
 ```
 

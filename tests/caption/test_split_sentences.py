@@ -3,7 +3,7 @@ import sys
 import types
 from typing import List, Optional, Tuple
 
-from lattifai import CaptionIO
+from lattifai import Caption
 
 if "k2" not in sys.modules:
     sys.modules["k2"] = types.ModuleType("k2")
@@ -243,7 +243,8 @@ def test_split_sentences_text_integrity():
                 raise FileNotFoundError(f"No .vtt file found in {caption_file}")
 
             extracted_file = str(vtt_files[0])
-            supervisions = CaptionIO.read(extracted_file)
+            caption = Caption.read(extracted_file)
+            supervisions = caption.supervisions
 
             tokenizer.init_sentence_splitter()
             splits = tokenizer.split_sentences(supervisions)

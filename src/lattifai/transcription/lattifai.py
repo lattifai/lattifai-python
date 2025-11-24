@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 from lattifai.audio2 import AudioData
-from lattifai.caption import Supervision
+from lattifai.caption import Caption
 from lattifai.config import TranscriptionConfig
 from lattifai.transcription.base import BaseTranscriber
 from lattifai.transcription.prompts import get_prompt_loader  # noqa: F401
@@ -55,19 +55,21 @@ class LattifAITranscriber(BaseTranscriber):
             f"Please download the file first and use transcribe_file()."
         )
 
-    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> List[Supervision]:
+    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Caption:
         supervisions = self._transcriber.transcribe(media_file, num_workers=2)
-        return supervisions
+        return Caption.from_supervisions(supervisions)
 
-    def write(self, transcript: List[Supervision], output_file: Path, encoding: str = "utf-8") -> Path:
+    def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8") -> Path:
         """
         Persist transcript text to disk and return the file path.
         """
-        from lattifai.caption import CaptionIO
+        raise NotImplementedError("Caption writing not yet implemented in LattifAITranscriber.")
 
-        CaptionIO.write(
-            transcript,
-            output_path=output_file,
+        from lattifai.caption import Caption
+
+        caption = Caption.from_supervisions(transcript)
+        caption.write(
+            output_file,
             include_speaker_in_text=False,
         )
 

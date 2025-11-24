@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..caption import CaptionIO, GeminiWriter
+from ..caption import Caption, GeminiWriter
 from ..client import AsyncLattifAI
 from ..config.caption import CAPTION_FORMATS
 from ..transcription.base import BaseTranscriber
@@ -825,7 +825,8 @@ class YouTubeCaptionAgent(WorkflowAgent):
         include_speaker_in_text = context.get("include_speaker_in_text", True)
         self.logger.info(f"📤 Exporting results in format: {output_format}")
 
-        supervisions = CaptionIO.read(aligned_path, format="ass")
+        caption = Caption.read(aligned_path, format="ass")
+        supervisions = caption.supervisions
         exported_files = {}
 
         # Update original transcript file with aligned timestamps if transcriber format
@@ -855,7 +856,8 @@ class YouTubeCaptionAgent(WorkflowAgent):
         output_path = str(aligned_path).replace(
             "_aligned.ass", f'{"_Gemini" if is_transcriber_format else ""}_LattifAI.{output_format}'
         )
-        CaptionIO.write(supervisions, output_path=output_path, include_speaker_in_text=include_speaker_in_text)
+        aligned_caption = Caption.from_supervisions(supervisions)
+        aligned_caption.write(output_path=output_path, include_speaker_in_text=include_speaker_in_text)
         exported_files[output_format] = output_path
         self.logger.info(f"✅ Exported {output_format.upper()}: {output_path}")
 

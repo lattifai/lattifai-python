@@ -16,15 +16,6 @@ SPEAKER_LATTIFAI = re.compile(r"(^\[SPEAKER_.*?\][:：])\s*(.*)")
 SPEAKER_PATTERN2 = re.compile(r"^([A-Z]{1,15}(?:\s+[A-Z]{1,15})?[:：])\s*(.*)$")
 
 
-NORMALIZE_TEXT = False  # Global toggle controlled by CLI
-
-
-def set_normalize_text(enabled: bool) -> None:
-    """Enable or disable HTML text normalization globally."""
-    global NORMALIZE_TEXT
-    NORMALIZE_TEXT = bool(enabled)
-
-
 def normalize_text(text: str) -> str:
     """Normalize caption text by:
     - Decoding common HTML entities
