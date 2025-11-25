@@ -69,14 +69,12 @@ class Segmenter:
             prev_sup = supervisions[i - 1]
 
             gap = sup.start - prev_sup.end
-            next_gap = 0.0 if i + 1 >= len(supervisions) else supervisions[i + 1].start - sup.end
             # Always split on large gaps (natural breaks)
             exclude_max_gap = False
             if gap > self.config.segment_max_gap:
                 exclude_max_gap = True
 
-            endswith_punc = any(sup.text.endswith(punc) for punc in END_PUNCTUATION)  # and next_gap >= 0.24
-            long_and_multisents = len(sup.text) > 20 and any(punc in sup.text for punc in END_PUNCTUATION)
+            endswith_punc = any(sup.text.endswith(punc) for punc in END_PUNCTUATION)
 
             # Adaptive duration control
             segment_duration = sup.end - current_start
@@ -95,17 +93,9 @@ class Segmenter:
                 # Close current segment
                 segment_end = prev_sup.end + gap / 2.0
                 segments.append((current_start, segment_end, current_segment_sups))
-
-                if not exclude_max_gap and long_and_multisents and not endswith_punc:
-                    segments.append(
-                        (sup.start - min(gap / 2.0, 2.0), sup.end + min(next_gap / 2.0, 2.0), sup)
-                    )  # will align this supervision to separately
-                    current_start = sup.end
-                    current_segment_sups = []
-                else:
-                    # Start new segment
-                    current_start = sup.start - gap / 2.0
-                    current_segment_sups = [sup]
+                # Start new segment
+                current_start = sup.start - gap / 2.0
+                current_segment_sups = [sup]
             else:
                 current_segment_sups.append(sup)
 

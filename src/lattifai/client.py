@@ -101,12 +101,6 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
                 segmenter.print_segment_info(segments, media_audio.duration)
 
-                # First pass
-                for i, (start, end, _supervisions) in enumerate(segments, 1):
-                    if not isinstance(_supervisions, list):
-                        print(colorful.yellow(f"Segment {i} contains a single supervision: {_supervisions}."))
-                        pass
-
                 # Align each segment
                 supervisions, alignments = [], []
                 for i, (start, end, _supervisions) in enumerate(segments, 1):
