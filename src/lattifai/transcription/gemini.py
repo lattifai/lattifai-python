@@ -22,7 +22,6 @@ class GeminiTranscriber(BaseTranscriber):
     """
 
     # Transcriber metadata
-    name = "Gemini"
     file_suffix = ".md"
 
     # The specific Gem URL
@@ -53,6 +52,11 @@ class GeminiTranscriber(BaseTranscriber):
             self.logger.warning(
                 "⚠️ Gemini API key not provided. API key will be required when calling transcription methods."
             )
+
+    @property
+    def name(self) -> str:
+        """Human-readable name of the transcriber."""
+        return f"Gemini_{self.config.model_name.replace('/', '_')}"
 
     async def transcribe_url(self, url: str) -> str:
         """

@@ -18,10 +18,14 @@ class BaseTranscriber(ABC):
     """
 
     # Subclasses should override these properties
-    name: str = "Transcriber"
     file_suffix: str = ".txt"
     supports_url: bool = True
     """Whether this transcriber supports direct URL transcription."""
+
+    @abstractmethod
+    @property
+    def name(self) -> str:
+        """Human-readable name of the transcriber."""
 
     async def __call__(self, url_or_data: Union[str, AudioData]) -> str:
         """Main entry point for transcription."""

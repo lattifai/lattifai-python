@@ -20,7 +20,6 @@ class LattifAITranscriber(BaseTranscriber):
     """
 
     # Transcriber metadata
-    name = "LattifAI"
     file_suffix = ".ass"
     supports_url = False
 
@@ -41,6 +40,10 @@ class LattifAITranscriber(BaseTranscriber):
         from lattifai_core.transcription import LattifAITranscriber as CoreLattifAITranscriber
 
         self._transcriber = CoreLattifAITranscriber.from_pretrained(model_config=self.config)
+
+    @property
+    def name(self) -> str:
+        return f"LattifAI_{self.config.model_name.replace('/', '_')}"
 
     async def transcribe_url(self, url: str) -> str:
         """
