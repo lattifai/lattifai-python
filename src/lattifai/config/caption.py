@@ -61,19 +61,6 @@ class CaptionConfig:
     use_transcription: bool = False
     """Use transcription service (e.g., Gemini) instead of downloading YouTube captions."""
 
-    # Speaker Diarization
-    speaker_diarization: bool = False
-    """Apply diarization to assign speaker labels to each segment."""
-
-    num_speakers: Optional[int] = None
-    """Number of speakers, when known. If not set, diarization will attempt to infer the number of speakers."""
-
-    min_speakers: Optional[int] = None
-    """Minimum number of speakers. Has no effect when `num_speakers` is provided."""
-
-    max_speakers: Optional[int] = None
-    """Maximum number of speakers. Has no effect when `num_speakers` is provided."""
-
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._normalize_paths()
