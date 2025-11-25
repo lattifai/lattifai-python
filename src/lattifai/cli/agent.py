@@ -6,7 +6,7 @@ from typing import Optional
 import nemo_run as run
 from typing_extensions import Annotated
 
-from lattifai.client import AsyncLattifAI
+from lattifai.client import LattifAI
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -18,12 +18,12 @@ from lattifai.transcription import create_transcriber
 from lattifai.workflow.youtube import YouTubeCaptionAgent, YouTubeDownloader
 
 
-def _build_async_client(
+def _build_client(
     client_config: ClientConfig,
     alignment_config: AlignmentConfig,
     caption_config: CaptionConfig,
-) -> AsyncLattifAI:
-    return AsyncLattifAI(
+) -> LattifAI:
+    return LattifAI(
         client_config=client_config,
         alignment_config=alignment_config,
         caption_config=caption_config,
@@ -39,7 +39,7 @@ def _create_agent(
 ) -> YouTubeCaptionAgent:
     downloader = YouTubeDownloader()
     transcriber = create_transcriber(transcription_config=transcription_config)
-    aligner = _build_async_client(client_config, alignment_config, caption_config)
+    aligner = _build_client(client_config, alignment_config, caption_config)
     return YouTubeCaptionAgent(
         downloader=downloader,
         transcriber=transcriber,

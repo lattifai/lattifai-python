@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..caption import Caption, GeminiWriter
-from ..client import AsyncLattifAI
+from ..client import LattifAI
 from ..config.caption import CAPTION_FORMATS
 from ..transcription.base import BaseTranscriber
 from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
@@ -590,7 +590,7 @@ class YouTubeCaptionAgent(WorkflowAgent):
         self,
         downloader: YouTubeDownloader,
         transcriber: BaseTranscriber,
-        aligner: AsyncLattifAI,
+        aligner: LattifAI,
         max_retries: int = 0,
     ):
         super().__init__("YouTube Caption Agent", max_retries)
@@ -791,7 +791,8 @@ class YouTubeCaptionAgent(WorkflowAgent):
         output_path = output_dir / f"{Path(media_path).stem}_aligned.ass"
 
         # Perform alignment with LattifAI (split_sentence and word_level passed as function parameters)
-        aligned_result = await self.aligner.alignment(
+        aligned_result = await asyncio.to_thread(
+            self.aligner.alignment,
             audio=media_path,
             caption=str(caption_path),  # Use dialogue text for YouTube format, original for plain text
             format="gemini" if is_transcriber_format else "auto",

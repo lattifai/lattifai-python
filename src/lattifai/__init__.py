@@ -6,7 +6,7 @@ from importlib.metadata import version
 from .caption import Caption
 
 # Re-export client classes
-from .client import AsyncLattifAI, LattifAI
+from .client import LattifAI
 
 # Re-export config classes
 from .config import (
@@ -68,7 +68,6 @@ _check_and_install_k2()
 __all__ = [
     # Client classes
     "LattifAI",
-    "AsyncLattifAI",
     # Config classes
     "AlignmentConfig",
     "ClientConfig",
