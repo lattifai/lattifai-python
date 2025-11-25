@@ -356,6 +356,7 @@ class LattifAIClientMixin:
         force_overwrite: bool,
         caption_lang: Optional[str],
         is_async: bool = False,
+        use_transcription: bool = False,
     ) -> Union[Union[str, Caption], Awaitable[Union[str, Caption]]]:
         """
         Get captions by downloading or transcribing.
@@ -383,7 +384,7 @@ class LattifAIClientMixin:
                 else:
                     raise FileNotFoundError(f"Provided caption path does not exist: {caption_path}")
 
-            if self.caption_config.use_transcription:
+            if use_transcription or self.caption_config.use_transcription:
                 # Transcription mode: use Transcriber to transcribe
                 self._validate_transcription_setup()
 
@@ -417,10 +418,11 @@ class LattifAIClientMixin:
                 else:
                     transcription = await self.transcriber.transcribe_file(media_file)
 
+                await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
+
                 if isinstance(transcription, Caption):
                     caption_file = transcription
                 else:
-                    await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
                     caption_file = str(transcript_file)
                 print(colorful.green(f"         ✓ Transcription completed: {caption_file}"))
             else:

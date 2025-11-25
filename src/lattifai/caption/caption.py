@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
+from tgt import TextGrid
 
 from ..config.caption import InputCaptionFormat, OutputCaptionFormat
 from .supervision import Supervision
@@ -32,8 +33,17 @@ class Caption:
         metadata: Additional custom metadata as key-value pairs
     """
 
+    # read from subtitle file
     supervisions: List[Supervision] = field(default_factory=list)
+    # Transcription results
+    transcription: List[Supervision] = field(default_factory=list)
+    # Audio Event Detection results
+    audio_events: Optional[TextGrid] = None
+    # Speaker Diarization results
+    speaker_diarization: Optional[TextGrid] = None
+    # Alignment results
     alignments: List[Supervision] = field(default_factory=list)
+
     language: Optional[str] = None
     kind: Optional[str] = None
     source_format: Optional[str] = None
@@ -42,7 +52,7 @@ class Caption:
 
     def __len__(self) -> int:
         """Return the number of supervision segments."""
-        return len(self.supervisions)
+        return len(self.supervisions) or len(self.transcripts)
 
     def __iter__(self):
         """Iterate over supervision segments."""
@@ -211,6 +221,41 @@ class Caption:
         )
 
     @classmethod
+    def from_transcription_results(
+        cls,
+        transcription: List[Supervision],
+        audio_events: Optional[TextGrid] = None,
+        speaker_diarization: Optional[TextGrid] = None,
+        language: Optional[str] = None,
+        source_path: Optional[Pathlike] = None,
+        metadata: Optional[Dict[str, str]] = None,
+    ) -> "Caption":
+        """
+        Create Caption from transcription results including audio events and diarization.
+
+        Args:
+            transcription: List of transcription supervision segments
+            audio_events: Optional TextGrid with audio event detection results
+            speaker_diarization: Optional TextGrid with speaker diarization results
+            language: Language code
+            source_path: Source file path
+            metadata: Additional metadata
+
+        Returns:
+            New Caption instance with transcription data
+        """
+        return cls(
+            transcription=transcription,
+            audio_events=audio_events,
+            speaker_diarization=speaker_diarization,
+            language=language,
+            kind="transcription",
+            source_format="asr",
+            source_path=source_path,
+            metadata=metadata or {},
+        )
+
+    @classmethod
     def read(
         cls,
         path: Pathlike,
@@ -279,6 +324,9 @@ class Caption:
             alignments = self.alignments
         else:
             alignments = self.supervisions
+
+        if not alignments:
+            alignments = self.transcription
 
         return self._write_caption(alignments, path, include_speaker_in_text)
 

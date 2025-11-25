@@ -340,7 +340,7 @@ class LatticeTokenizer:
 
         if return_details:
             # Add emission confidence scores for segments and word-level alignments
-            _add_confidence_scores(alignments, emission, labels[0], frame_shift)
+            _add_confidence_scores(alignments, emission, labels[0], frame_shift, offset)
 
         alignments = _update_alignments_speaker(supervisions, alignments)
 
@@ -416,7 +416,7 @@ class AsyncLatticeTokenizer(LatticeTokenizer):
 
         if return_details:
             # Add emission confidence scores for segments and word-level alignments
-            _add_confidence_scores(alignments, emission, labels[0], frame_shift)
+            _add_confidence_scores(alignments, emission, labels[0], frame_shift, offset)
 
         alignments = _update_alignments_speaker(supervisions, alignments)
 
@@ -428,6 +428,7 @@ def _add_confidence_scores(
     emission: torch.Tensor,
     labels: List[int],
     frame_shift: float,
+    offset: float = 0.0,
 ) -> None:
     """
     Add confidence scores to supervisions and their word-level alignments.
@@ -445,8 +446,8 @@ def _add_confidence_scores(
     tokens = torch.tensor(labels, dtype=torch.int64, device=emission.device)
 
     for supervision in supervisions:
-        start_frame = int(supervision.start / frame_shift)
-        end_frame = int(supervision.end / frame_shift)
+        start_frame = int((supervision.start - offset) / frame_shift)
+        end_frame = int((supervision.end - offset) / frame_shift)
 
         # Compute segment-level confidence
         probabilities = emission[0, start_frame:end_frame].softmax(dim=-1)
@@ -458,8 +459,8 @@ def _add_confidence_scores(
         if hasattr(supervision, "alignment") and supervision.alignment:
             words = supervision.alignment.get("word", [])
             for w, item in enumerate(words):
-                start = int(item.start / frame_shift) - start_frame
-                end = int(item.end / frame_shift) - start_frame
+                start = int((item.start - offset) / frame_shift) - start_frame
+                end = int((item.end - offset) / frame_shift) - start_frame
                 words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean().item(), ndigits=4))
 
 

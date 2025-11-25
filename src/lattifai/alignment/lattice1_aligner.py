@@ -3,6 +3,7 @@
 from typing import Any, List, Optional, Tuple
 
 import colorful
+import torch
 
 from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
@@ -38,12 +39,19 @@ class Lattice1Aligner(object):
         self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.device)
         self.worker = _load_worker(model_path, config.device)
 
+        self.frame_shift = self.worker.frame_shift
+
+    def emission(self, audio: torch.Tensor) -> torch.Tensor:
+        return self.worker.emission(audio.to(self.worker.device))
+
     def alignment(
         self,
         audio: AudioData,
         supervisions: List[Supervision],
         split_sentence: Optional[bool] = False,
         return_details: Optional[bool] = False,
+        emission: Optional[torch.Tensor] = None,
+        offset: float = 0.0,
         verbose: bool = True,
     ) -> Tuple[List[Supervision], List[Supervision]]:
         """
@@ -78,7 +86,7 @@ class Lattice1Aligner(object):
             if verbose:
                 print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
             try:
-                lattice_results = self.worker.alignment(audio, lattice_graph)
+                lattice_results = self.worker.alignment(audio, lattice_graph, emission=emission, offset=offset)
                 if verbose:
                     print(colorful.green("         ✓ Lattice search completed"))
             except Exception as e:

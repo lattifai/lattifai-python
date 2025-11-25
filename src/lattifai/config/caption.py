@@ -74,45 +74,15 @@ class CaptionConfig:
     max_speakers: Optional[int] = None
     """Maximum number of speakers. Has no effect when `num_speakers` is provided."""
 
-    # Segmented Alignment for Long Audio
-    trust_input_timestamps: bool = False
-    """When True, use original caption timestamps as strong reference constraints during alignment.
-    The alignment process will still adjust timestamps but stay close to the input timing.
-    Use this when you want to re-segment caption sentence boundaries (split_sentence=True)
-    while preserving the approximate timing from the original captions.
-    When False (default), performs unconstrained forced alignment based purely on media-caption matching.
-    """
-
-    segment_strategy: Literal["caption", "adaptive", "none"] = "none"
-    """Segmentation strategy for long audio alignment:
-    - 'none': Process entire audio as single alignment (default, suitable for <30 min)
-    - 'caption': Split based on existing caption boundaries and gaps (segment_max_gap)
-    - 'adaptive': Hybrid - respect caption boundaries while limiting segment duration
-
-    Use segmentation for long audio (>30 min) to reduce memory usage and improve performance.
-    """
-
-    segment_duration: float = 300.0
-    """Target duration (in seconds) for each alignment segment when using 'time' or 'adaptive' strategy.
-    Default: 300.0 (5 minutes). Typical range: 30-600 seconds (30s-10min).
-    Shorter segments = lower memory, longer segments = better context for alignment.
-    """
-
-    segment_max_gap: float = 4.0
-    """Maximum gap (in seconds) between captions to consider them part of the same segment.
-    Used by 'caption' and 'adaptive' strategies. Gaps larger than this trigger segment splitting.
-    Default: 4.0 seconds. Useful for detecting scene changes or natural breaks in content.
-    """
-
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._normalize_paths()
         self._validate_formats()
 
     @property
-    def need_alignment(self) -> bool:
+    def need_alignment(self, trust_timestamps: bool) -> bool:
         """Determine if alignment is needed based on configuration."""
-        if self.trust_input_timestamps and not self.split_sentence:
+        if trust_timestamps and not self.split_sentence:
             if not self.word_level:
                 return False
             if self.normalize_text:

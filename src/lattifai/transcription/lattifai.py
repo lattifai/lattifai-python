@@ -59,19 +59,19 @@ class LattifAITranscriber(BaseTranscriber):
         )
 
     async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Caption:
-        supervisions = self._transcriber.transcribe(media_file, num_workers=2)
-        return Caption.from_supervisions(supervisions)
+        transcription, audio_events = self._transcriber.transcribe(media_file, num_workers=2)
+        caption = Caption.from_transcription_results(
+            transcription=transcription,
+            audio_events=audio_events,
+        )
+
+        return caption
 
     def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8") -> Path:
         """
         Persist transcript text to disk and return the file path.
         """
-        raise NotImplementedError("Caption writing not yet implemented in LattifAITranscriber.")
-
-        from lattifai.caption import Caption
-
-        caption = Caption.from_supervisions(transcript)
-        caption.write(
+        transcript.write(
             output_file,
             include_speaker_in_text=False,
         )

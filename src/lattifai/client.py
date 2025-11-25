@@ -90,21 +90,38 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             segment_strategy = self.caption_config.segment_strategy
             use_segmentation = segment_strategy != "none"
 
-            if use_segmentation:
+            if use_segmentation or caption.transcription:
                 print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
 
-                # Create segmenter
-                segmenter = Segmenter(self.caption_config)
+                if caption.transcription:
+                    segments = [(sup.start, sup.end, [sup], False) for sup in caption.transcription]
+                elif self.caption_config.trust_input_timestamps:
+                    # Create segmenter
+                    segmenter = Segmenter(self.caption_config)
+                    # Create segments from caption
+                    segments = segmenter(caption)
+                else:
+                    raise NotImplementedError(
+                        "Segmented alignment without trusting input timestamps is not yet implemented."
+                    )
 
-                # Create segments from caption
-                segments = segmenter(caption)
-
-                segmenter.print_segment_info(segments, media_audio.duration)
-
-                # Align each segment
+                # align each segment
                 supervisions, alignments = [], []
-                for i, (start, end, _supervisions) in enumerate(segments, 1):
-                    print(colorful.cyan(f"  ⏩ Aligning segment {i}/{len(segments)}: {start:.1f}s - {end:.1f}s"))
+                for i, (start, end, _supervisions, skipalign) in enumerate(segments, 1):
+                    print(
+                        colorful.cyan(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
+                    )
+                    if skipalign:
+                        supervisions.extend(_supervisions)
+                        alignments.extend(_supervisions)  # may overlap with supervisions, but harmless
+                        continue
+
+                    offset = round(start, 4)
+                    emission = self.aligner.emission(
+                        media_audio.tensor[
+                            :, int(start * media_audio.sampling_rate) : int(end * media_audio.sampling_rate)
+                        ]
+                    )
 
                     # Align segment
                     _supervisions, _alignments = self.aligner.alignment(
@@ -113,6 +130,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         split_sentence=split_sentence or self.caption_config.split_sentence,
                         return_details=self.caption_config.word_level
                         or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                        emission=emission,
+                        offset=offset,
+                        verbose=False,
                     )
 
                     supervisions.extend(_supervisions)
@@ -344,7 +364,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
                 )
 
             # Step 2: Check if segmented alignment is needed
-            segment_strategy = self.caption_config.segment_strategy
+            segment_strategy = self.aligner.config.segment_strategy
             use_segmentation = segment_strategy != "none"
 
             if use_segmentation:
@@ -352,7 +372,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
                     print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
 
                 # Create segmented aligner
-                segmenter = Segmenter(self.caption_config)
+                segmenter = Segmenter(self.aligner.config)
 
                 # Create segments from caption (in thread to avoid blocking)
                 segments = await asyncio.to_thread(

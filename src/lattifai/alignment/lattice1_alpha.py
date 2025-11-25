@@ -1,7 +1,7 @@
 import json
 import time
 from collections import defaultdict
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import onnxruntime as ort
@@ -56,6 +56,10 @@ class Lattice1AlphaWorker:
         self.device = torch.device(device)
         self.timings = defaultdict(lambda: 0.0)
 
+    @property
+    def frame_shift(self) -> float:
+        return 0.02  # 20 ms
+
     @torch.inference_mode()
     def emission(self, audio: torch.Tensor) -> torch.Tensor:
         _start = time.time()
@@ -85,7 +89,13 @@ class Lattice1AlphaWorker:
         self.timings["emission"] += time.time() - _start
         return emission  # (1, T, vocab_size) torch
 
-    def alignment(self, audio: AudioData, lattice_graph: Tuple[str, int, float]) -> Dict[str, Any]:
+    def alignment(
+        self,
+        audio: AudioData,
+        lattice_graph: Tuple[str, int, float],
+        emission: Optional[torch.Tensor] = None,
+        offset: float = 0.0,
+    ) -> Dict[str, Any]:
         """Process audio with LatticeGraph.
 
         Args:
@@ -100,16 +110,15 @@ class Lattice1AlphaWorker:
             DependencyError: If required dependencies are missing
             AlignmentError: If alignment process fails
         """
-        _start = time.time()
-        try:
-            emission = self.emission(audio.tensor.to(self.device))  # (1, T, vocab_size)
-        except Exception as e:
-            raise AlignmentError(
-                "Failed to compute acoustic features from audio",
-                media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
-                context={"original_error": str(e)},
-            )
-        self.timings["emission"] += time.time() - _start
+        if emission is None:
+            try:
+                emission = self.emission(audio.tensor.to(self.device))  # (1, T, vocab_size)
+            except Exception as e:
+                raise AlignmentError(
+                    "Failed to compute acoustic features from audio",
+                    media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
+                    context={"original_error": str(e)},
+                )
 
         try:
             import k2
@@ -165,7 +174,7 @@ class Lattice1AlphaWorker:
         self.timings["align_segments"] += time.time() - _start
 
         channel = 0
-        return emission, results, labels, 0.02, 0.0, channel  # frame_shift=20ms, offset=0.0s
+        return emission, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
 
 
 def _load_worker(model_path: str, device: str) -> Lattice1AlphaWorker:

@@ -24,6 +24,36 @@ class AlignmentConfig:
     batch_size: int = 1
     """Batch size for inference (number of samples processed simultaneously)."""
 
+    # Segmented Alignment for Long Audio
+    trust_caption_timestamps: bool = False
+    """When True, use original caption timestamps as strong reference constraints during alignment.
+    The alignment process will still adjust timestamps but stay close to the input timing.
+    Use this when you want to re-segment caption sentence boundaries (split_sentence=True)
+    while preserving the approximate timing from the original captions.
+    When False (default), performs unconstrained forced alignment based purely on media-caption matching.
+    """
+
+    segment_strategy: Literal["caption", "transcription", "none"] = "none"
+    """Segmentation strategy for long audio alignment:
+    - 'none': Process entire audio as single alignment (default, suitable for <30 min)
+    - 'caption': Split based on existing caption boundaries and gaps (segment_max_gap)
+    - 'transcription': Align caption with transcription first, then segment based on transcription gaps
+
+    Use segmentation for long audio (>30 min) to reduce memory usage and improve performance.
+    """
+
+    segment_duration: float = 300.0
+    """Target duration (in seconds) for each alignment segment when using 'caption' strategy.
+    Default: 300.0 (5 minutes). Typical range: 30-600 seconds (30s-10min).
+    Shorter segments = lower memory, longer segments = better context for alignment.
+    """
+
+    segment_max_gap: float = 4.0
+    """Maximum gap (in seconds) between captions to consider them part of the same segment.
+    Used by 'caption' and 'adaptive' strategies. Gaps larger than this trigger segment splitting.
+    Default: 4.0 seconds. Useful for detecting scene changes or natural breaks in content.
+    """
+
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
         # Validate alignment parameters
