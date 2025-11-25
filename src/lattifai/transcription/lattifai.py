@@ -33,13 +33,12 @@ class LattifAITranscriber(BaseTranscriber):
         Args:
             transcription_config: Transcription configuration. If None, uses default.
         """
-        self.config = transcription_config
-        self.logger = logging.getLogger(__name__)
+        super().__init__(
+            config=transcription_config,
+        )
+
         self._system_prompt: Optional[str] = None
-
-        from lattifai_core.transcription import LattifAITranscriber as CoreLattifAITranscriber
-
-        self._transcriber = CoreLattifAITranscriber.from_pretrained(model_config=self.config)
+        self._transcriber = None
 
     @property
     def name(self) -> str:
@@ -59,6 +58,11 @@ class LattifAITranscriber(BaseTranscriber):
         )
 
     async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Caption:
+        if self._transcriber is None:
+            from lattifai_core.transcription import LattifAITranscriber as CoreLattifAITranscriber
+
+            self._transcriber = CoreLattifAITranscriber.from_pretrained(model_config=self.config)
+
         transcription, audio_events = self._transcriber.transcribe(media_file, num_workers=2)
         caption = Caption.from_transcription_results(
             transcription=transcription,

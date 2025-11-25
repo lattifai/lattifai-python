@@ -11,6 +11,7 @@ from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
     ClientConfig,
+    DiarizationConfig,
     MediaConfig,
     TranscriptionConfig,
 )
@@ -22,11 +23,13 @@ def _build_client(
     client_config: ClientConfig,
     alignment_config: AlignmentConfig,
     caption_config: CaptionConfig,
+    diarization_config: Optional[DiarizationConfig] = None,
 ) -> LattifAI:
     return LattifAI(
         client_config=client_config,
         alignment_config=alignment_config,
         caption_config=caption_config,
+        diarization_config=diarization_config,
     )
 
 
@@ -35,11 +38,12 @@ def _create_agent(
     client_config: ClientConfig,
     alignment_config: AlignmentConfig,
     caption_config: CaptionConfig,
+    diarization_config: Optional[DiarizationConfig],
     max_retries: int,
 ) -> YouTubeCaptionAgent:
     downloader = YouTubeDownloader()
     transcriber = create_transcriber(transcription_config=transcription_config)
-    aligner = _build_client(client_config, alignment_config, caption_config)
+    aligner = _build_client(client_config, alignment_config, caption_config, diarization_config)
     return YouTubeCaptionAgent(
         downloader=downloader,
         transcriber=transcriber,
@@ -55,6 +59,7 @@ def agent(
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
+    diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
     max_retries: int = 0,
 ):
     """
@@ -120,6 +125,7 @@ def agent(
     transcription_config = transcription or TranscriptionConfig()
     client_config = client or ClientConfig()
     alignment_config = alignment or AlignmentConfig()
+    diarization_config = diarization or DiarizationConfig()
 
     # Normalize media preferences before launching the workflow
     media_format = media_config.normalize_format()
@@ -130,6 +136,7 @@ def agent(
         client_config=client_config,
         alignment_config=alignment_config,
         caption_config=caption_config,
+        diarization_config=diarization_config,
         max_retries=max_retries,
     )
 

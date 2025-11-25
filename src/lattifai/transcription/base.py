@@ -2,10 +2,12 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Union
+from typing import Optional, Union
 
 from lattifai.audio2 import AudioData
 from lattifai.caption import Caption
+from lattifai.config import TranscriptionConfig
+from lattifai.logging import get_logger
 
 
 class BaseTranscriber(ABC):
@@ -21,6 +23,20 @@ class BaseTranscriber(ABC):
     file_suffix: str = ".txt"
     supports_url: bool = True
     """Whether this transcriber supports direct URL transcription."""
+
+    def __init__(self, config: Optional[TranscriptionConfig] = None):
+        """
+        Initialize base transcriber.
+
+        Args:
+            config: Transcription configuration.
+        """
+        # Initialize config with default if not provided
+        if config is None:
+            config = TranscriptionConfig()
+
+        self.config = config
+        self.logger = get_logger("transcription")
 
     @property
     def name(self) -> str:

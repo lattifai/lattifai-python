@@ -6,17 +6,26 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
-from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, MediaConfig, TranscriptionConfig
+from lattifai.config import (
+    AlignmentConfig,
+    CaptionConfig,
+    ClientConfig,
+    DiarizationConfig,
+    MediaConfig,
+    TranscriptionConfig,
+)
 
 
 @run.cli.entrypoint(name="youtube", namespace="alignment")
 def youtube(
     yt_url: Optional[str] = None,
+    use_transcription: bool = False,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
+    diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
 ):
     """
     Download media from YouTube (when needed) and align captions.
@@ -33,6 +42,8 @@ def youtube(
     Shortcut: invoking ``lai-youtube`` is equivalent to running ``lai alignment youtube``.
 
     Args:
+        yt_url: YouTube video URL (can be provided as positional argument)
+        use_transcription: Use transcription service instead of downloading YouTube captions
         media: Media configuration for controlling formats and output directories.
             Fields: input_path (YouTube URL), output_dir, output_format, force_overwrite
         client: API client configuration.
@@ -40,10 +51,12 @@ def youtube(
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name_or_path, device, batch_size
         caption: Caption configuration for reading/writing caption files.
-            Fields: use_transcription, output_format, output_path, normalize_text,
+            Fields: output_format, output_path, normalize_text,
                     split_sentence, word_level, encoding
         transcription: Transcription service configuration (enables Gemini transcription).
             Fields: gemini_api_key, model_name, language, device
+        diarization: Speaker diarization configuration.
+            Fields: enabled, num_speakers, min_speakers, max_speakers, device
 
     Examples:
         # Download from YouTube and align (positional argument)
@@ -63,7 +76,7 @@ def youtube(
 
         # Use Gemini transcription (requires API key)
         lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            caption.use_transcription=true \\
+            use_transcription=true \\
             transcription.gemini_api_key=YOUR_KEY \\
             transcription.model_name=gemini-2.0-flash
 
@@ -96,8 +109,8 @@ def youtube(
         alignment_config=alignment,
         caption_config=caption_config,
         transcription_config=transcription,
+        diarization_config=diarization,
     )
-
     # Call the client's youtube method
     return lattifai_client.youtube(
         url=media_config.input_path,
@@ -106,6 +119,7 @@ def youtube(
         media_format=media_config.normalize_format() if media_config.output_format else None,
         force_overwrite=media_config.force_overwrite,
         split_sentence=caption_config.split_sentence,
+        use_transcription=use_transcription,
     )
 
 

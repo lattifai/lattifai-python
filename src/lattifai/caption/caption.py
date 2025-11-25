@@ -52,7 +52,7 @@ class Caption:
 
     def __len__(self) -> int:
         """Return the number of supervision segments."""
-        return len(self.supervisions) or len(self.transcripts)
+        return len(self.supervisions or self.transcripts)
 
     def __iter__(self):
         """Iterate over supervision segments."""
@@ -64,7 +64,7 @@ class Caption:
 
     def __bool__(self) -> bool:
         """Return True if caption has supervisions."""
-        return len(self.supervisions) > 0
+        return self.__len__() > 0
 
     @property
     def is_empty(self) -> bool:
@@ -329,6 +329,33 @@ class Caption:
             alignments = self.transcription
 
         return self._write_caption(alignments, path, include_speaker_in_text)
+
+    def read_speaker_diarization(
+        self,
+        path: Pathlike,
+    ) -> TextGrid:
+        """
+        Read speaker diarization TextGrid from file.
+        """
+        from tgt import read_textgrid
+
+        self.speaker_diarization = read_textgrid(path)
+        return self.speaker_diarization
+
+    def write_speaker_diarization(
+        self,
+        path: Pathlike,
+    ) -> Pathlike:
+        """
+        Write speaker diarization TextGrid to file.
+        """
+        if not self.speaker_diarization:
+            raise ValueError("No speaker diarization data to write.")
+
+        from tgt import write_to_file
+
+        write_to_file(self.speaker_diarization, path, format="long")
+        return path
 
     @staticmethod
     def _parse_alignment_from_supervision(supervision: Any) -> Optional[List[AlignmentItem]]:

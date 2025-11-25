@@ -58,9 +58,6 @@ class CaptionConfig:
     encoding: str = "utf-8"
     """Character encoding for reading/writing caption files (default: utf-8)."""
 
-    use_transcription: bool = False
-    """Use transcription service (e.g., Gemini) instead of downloading YouTube captions."""
-
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._normalize_paths()

@@ -115,7 +115,7 @@ class FileExistenceManager:
 
         # Create display options with emojis
         options, shift_length = [], 0
-        for file_path in file_paths:
+        for file_path in sorted(file_paths):
             # Determine emoji based on file type
             if has_media and file_path in existing_files["media"]:
                 display_text = f'{colorful.green("•")} 🎬 Media file: {file_path}'
@@ -173,7 +173,7 @@ class FileExistenceManager:
         # Header with warning color
         print(f'\n{colorful.bold_yellow(f"⚠️  Existing {label} files found:")}')
 
-        for file_path in files:
+        for file_path in sorted(files):
             print(f'   {colorful.green("•")} {file_path}')
 
         prompt_message = f"What would you like to do with {label} files?"
@@ -227,7 +227,7 @@ class FileExistenceManager:
 
         # Create options with full file paths
         options = []
-        for i, file_path in enumerate(files, 1):
+        for i, file_path in enumerate(sorted(files), 1):
             # Display full path for clarity
             options.append((f"{colorful.cyan(file_path)}", file_path))
 

@@ -23,7 +23,7 @@ class TranscriptionConfig:
     Settings for audio/video transcription using various providers.
     """
 
-    model_name: SUPPORTED_TRANSCRIPTION_MODELS = "gemini-2.5-pro"  # gemini-3-pro-preview
+    model_name: SUPPORTED_TRANSCRIPTION_MODELS = "nvidia/parakeet-tdt-0.6b-v3"
     """Model name for transcription."""
 
     gemini_api_key: Optional[str] = None
@@ -43,19 +43,6 @@ class TranscriptionConfig:
 
     language: Optional[str] = None
     """Target language code for transcription (e.g., 'en', 'zh', 'ja')."""
-
-    # Speaker Diarization
-    speaker_diarization: bool = False
-    """Apply diarization to assign speaker labels to each segment."""
-
-    num_speakers: Optional[int] = None
-    """Number of speakers, when known. If not set, diarization will attempt to infer the number of speakers."""
-
-    min_speakers: Optional[int] = None
-    """Minimum number of speakers. Has no effect when `num_speakers` is provided."""
-
-    max_speakers: Optional[int] = None
-    """Maximum number of speakers. Has no effect when `num_speakers` is provided."""
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""

@@ -16,6 +16,7 @@ from .config import (
     AlignmentConfig,
     CaptionConfig,
     ClientConfig,
+    DiarizationConfig,
     MediaConfig,
 )
 from .errors import (
@@ -72,6 +73,7 @@ __all__ = [
     "AlignmentConfig",
     "ClientConfig",
     "CaptionConfig",
+    "DiarizationConfig",
     "MediaConfig",
     "AUDIO_FORMATS",
     "VIDEO_FORMATS",

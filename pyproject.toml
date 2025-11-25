@@ -18,7 +18,7 @@ maintainers = [
 requires-python = '>=3.10,<3.15'
 
 dependencies = [
-    "lattifai-core>=0.2.1",
+    "lattifai-core>=0.4.0",
     "httpx",
     "python-dotenv",
     "lhotse>=1.26.0",

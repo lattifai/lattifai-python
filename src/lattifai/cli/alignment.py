@@ -7,7 +7,14 @@ from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
-from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, MediaConfig
+from lattifai.config import (
+    AlignmentConfig,
+    CaptionConfig,
+    ClientConfig,
+    DiarizationConfig,
+    MediaConfig,
+    TranscriptionConfig,
+)
 
 __all__ = ["align"]
 
@@ -18,9 +25,11 @@ def align(
     input_caption_path: Optional[Pathlike] = None,
     output_caption_path: Optional[Pathlike] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
+    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
-    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
+    transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
+    diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
 ):
     """
     Align audio/video with caption file.
@@ -110,8 +119,13 @@ def align(
     if output_caption_path:
         caption_config.set_output_path(output_caption_path)
 
-    client = LattifAI(client_config=client, alignment_config=alignment, caption_config=caption_config)
-
+    client = LattifAI(
+        client_config=client,
+        alignment_config=alignment,
+        caption_config=caption_config,
+        transcription_config=transcription,
+        diarization_config=diarization,
+    )
     return client.alignment(
         input_media=media_config.input_path,
         input_caption=caption_config.input_path,

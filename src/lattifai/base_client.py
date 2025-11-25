@@ -164,9 +164,9 @@ class LattifAIClientMixin:
             >>> # With Gemini transcription
             >>> config = TranscriptionConfig(gemini_api_key="YOUR_KEY")
             >>> client = {client_class}(transcription_config=config)
-            >>> client.captionr.config.use_transcription = True
             >>> {await_keyword}alignments, path = {await_keyword}client.youtube(
-            ...     url="https://youtube.com/watch?v=VIDEO_ID"
+            ...     url="https://youtube.com/watch?v=VIDEO_ID",
+            ...     use_transcription=True
             ... )
         """
 
@@ -244,7 +244,7 @@ class LattifAIClientMixin:
 
     def _validate_transcription_setup(self) -> None:
         """Validate that transcription is properly configured if requested."""
-        if self.caption_config.use_transcription and not self.transcriber:
+        if not self.transcriber:
             raise ValueError(
                 "Transcription requested but transcriber not configured. "
                 "Provide TranscriptionConfig with valid API key."
@@ -254,6 +254,7 @@ class LattifAIClientMixin:
         self,
         input_caption: Union[Pathlike, Caption],
         input_caption_format: Optional[str] = None,
+        normalize_text: Optional[bool] = None,
     ) -> Caption:
         """
         Read caption file or return Caption object directly.
@@ -276,8 +277,13 @@ class LattifAIClientMixin:
             caption = Caption.read(
                 input_caption,
                 format=input_caption_format,
-                normalize_text=self.caption_config.normalize_text,
+                normalize_text=normalize_text if normalize_text is not None else self.caption_config.normalize_text,
             )
+            diarization_file = Path(str(input_caption)).with_suffix(".SpkDiar")
+            if diarization_file.exists():
+                print(colorful.cyan(f"📖 Step 1b: Reading speaker diarization from {diarization_file}"))
+                caption.read_speaker_diarization(diarization_file)
+
             print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
             return caption
         except Exception as e:
@@ -306,11 +312,17 @@ class LattifAIClientMixin:
             CaptionProcessingError: If caption cannot be written
         """
         try:
-            return caption.write(
+            result = caption.write(
                 output_caption_path,
                 include_speaker_in_text=self.caption_config.include_speaker_in_text,
             )
+            diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
+            if not diarization_file.exists() and caption.speaker_diarization:
+                print(colorful.green(f"    Writing speaker diarization to: {diarization_file}"))
+                caption.write_speaker_diarization(diarization_file)
+
             print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
+            return result
         except Exception as e:
             raise CaptionProcessingError(
                 f"Failed to write output file: {output_caption_path}",
@@ -384,14 +396,14 @@ class LattifAIClientMixin:
                 else:
                     raise FileNotFoundError(f"Provided caption path does not exist: {caption_path}")
 
-            if use_transcription or self.caption_config.use_transcription:
+            # Generate transcript file path
+            transcript_file = (
+                output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.name}{self.transcriber.file_suffix}"
+            )
+
+            if use_transcription:
                 # Transcription mode: use Transcriber to transcribe
                 self._validate_transcription_setup()
-
-                # Generate transcript file path
-                transcript_file = (
-                    output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.name}{self.transcriber.file_suffix}"
-                )
 
                 # Check if transcript file already exists
                 if transcript_file.exists() and not force_overwrite:
@@ -409,7 +421,14 @@ class LattifAIClientMixin:
                         raise RuntimeError("Transcription cancelled by user")
                     elif choice == "use" or choice == str(transcript_file):
                         # User chose to use existing file (handles both "use" and file path)
-                        return str(transcript_file)
+                        if "gemini" in self.transcriber.name.lower():
+                            return str(transcript_file)
+
+                        caption = self._read_caption(transcript_file, normalize_text=False)
+                        caption.transcription = caption.supervisions
+                        caption.supervisions = None
+                        return caption
+
                     # elif choice == "overwrite": continue to transcribe below
 
                 print(colorful.cyan(f"🎤 Transcribing media with {self.transcriber.name}..."))
@@ -434,8 +453,47 @@ class LattifAIClientMixin:
                     caption_lang=caption_lang,
                     enable_gemini_option=True,
                 )
+
+                if str(caption_file) == str(transcript_file):
+                    # Transcription was used
+                    caption = self._read_caption(transcript_file, normalize_text=False)
+                    caption.transcription = caption.supervisions
+                    caption.supervisions = None
+                    return caption
+
                 if not caption_file:
-                    raise RuntimeError("No caption file available. Either download captions or enable transcription.")
+                    # No captions available, ask user if they want to transcribe
+                    print(colorful.yellow("\n⚠️  No captions available for this video."))
+
+                    if not self.transcriber:
+                        raise RuntimeError(
+                            "No captions found and transcription is not configured. "
+                            "Please provide TranscriptionConfig to enable transcription."
+                        )
+
+                    # Prompt user for transcription
+                    print(colorful.cyan(f"\n🎤 Transcriber available: {self.transcriber.name}"))
+                    print(colorful.white("   Would you like to transcribe the audio?"))
+                    print(colorful.white("   [y] Yes, transcribe now"))
+                    print(colorful.white("   [N] No, cancel operation"))
+
+                    choice = await asyncio.to_thread(input, colorful.cyan("   Your choice: "))
+                    choice = choice.strip().lower()
+
+                    if choice == "y" or choice == "yes":
+                        print(colorful.cyan(f"🎤 Starting transcription with {self.transcriber.name}..."))
+
+                        return await self._download_or_transcribe_caption(
+                            url=url,
+                            output_dir=output_dir,
+                            media_file=media_file,
+                            force_overwrite=force_overwrite,
+                            caption_lang=caption_lang,
+                            is_async=True,
+                            use_transcription=True,
+                        )
+                    else:
+                        raise RuntimeError("No caption file available and transcription was declined by user.")
 
             return caption_file
 

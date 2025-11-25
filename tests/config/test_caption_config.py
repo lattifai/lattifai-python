@@ -121,7 +121,6 @@ class TestCaptionConfigDefaults:
         assert config.split_sentence is False
         assert config.word_level is False
         assert config.encoding == "utf-8"
-        assert config.use_transcription is False
 
     def test_custom_values_override_defaults(self):
         """Test that custom values override defaults."""

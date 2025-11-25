@@ -150,7 +150,7 @@ class TestTranscriptionConfig:
         assert config.force_overwrite is False
         assert config.verbose is False
         assert config.language is None
-        assert config.model_name == "gemini-2.5-pro"
+        assert config.model_name == "nvidia/parakeet-tdt-0.6b-v3"
 
     def test_api_key_from_env(self, monkeypatch):
         """Test API key loaded from environment."""

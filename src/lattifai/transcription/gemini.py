@@ -1,7 +1,6 @@
 """Gemini 2.5 Pro transcription module with config-driven architecture."""
 
 import asyncio
-import logging
 from pathlib import Path
 from typing import Optional, Union
 
@@ -37,12 +36,8 @@ class GeminiTranscriber(BaseTranscriber):
         Args:
             transcription_config: Transcription configuration. If None, uses default.
         """
-        # Initialize config with default if not provided
-        if transcription_config is None:
-            transcription_config = TranscriptionConfig()
+        super().__init__(config=transcription_config)
 
-        self.config = transcription_config
-        self.logger = logging.getLogger(__name__)
         self._client: Optional[genai.Client] = None
         self._generation_config: Optional[GenerateContentConfig] = None
         self._system_prompt: Optional[str] = None

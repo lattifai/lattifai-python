@@ -247,7 +247,7 @@ Examples:
         for metric, value in results.items():
             arrow = "↓" if metric.lower() in ["der", "jer", "wer", "scer"] else "↑"
             metric_names.append(f"{metric.upper()} {arrow}")
-            metric_values.append(f"{value:.4f} ({value:.2%})")
+            metric_values.append(f"{value:.4f} ({value * 100:5.2f}%)")
 
         print("| " + " | ".join(metric_names) + " |")
         print("|" + "|".join(["--------"] * len(metric_names)) + "|")

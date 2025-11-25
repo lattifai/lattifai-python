@@ -1,5 +1,6 @@
 """LattifAI client implementation with config-driven architecture."""
 
+from pathlib import Path
 from typing import Optional, Union
 
 import colorful
@@ -9,7 +10,8 @@ from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.base_client import LattifAIClientMixin, SyncAPIClient
 from lattifai.caption import Caption, InputCaptionFormat
-from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, TranscriptionConfig
+from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
+from lattifai.diarization import LattifAIDiarizer
 from lattifai.errors import (
     AlignmentError,
     CaptionProcessingError,
@@ -34,6 +36,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         alignment_config: Optional[AlignmentConfig] = None,
         caption_config: Optional[CaptionConfig] = None,
         transcription_config: Optional[TranscriptionConfig] = None,
+        diarization_config: Optional[DiarizationConfig] = None,
     ) -> None:
         __doc__ = LattifAIClientMixin._INIT_DOC.format(
             client_class="LattifAI",
@@ -52,14 +55,20 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Initialize base API client
         super().__init__(config=client_config)
 
-        # Store caption config
+        # Store configs
         self.caption_config = caption_config
+        self.diarization_config = diarization_config or DiarizationConfig()
 
         # audio loader
         self.audio_loader = AudioLoader(device=alignment_config.device)
 
         # aligner
         self.aligner = Lattice1Aligner(self, config=alignment_config)
+
+        # Initialize diarizer if enabled
+        self.diarizer = None
+        if self.diarization_config.enabled:
+            self.diarizer = LattifAIDiarizer(config=self.diarization_config)
 
         # Initialize shared components (transcriber, downloader)
         self._init_shared_components(transcription_config)
@@ -86,17 +95,17 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             # Step 2: Check if segmented alignment is needed
-            segment_strategy = self.caption_config.segment_strategy
-            use_segmentation = segment_strategy != "none"
+            alignment_strategy = self.aligner.config.strategy
+            use_segmentation = alignment_strategy != "none"
 
             if use_segmentation or caption.transcription:
-                print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
+                print(colorful.cyan(f"🔄 Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.transcription:
                     segments = [(sup.start, sup.end, [sup], False) for sup in caption.transcription]
-                elif self.caption_config.trust_input_timestamps:
+                elif self.aligner.config.trust_caption_timestamps:
                     # Create segmenter
-                    segmenter = Segmenter(self.caption_config)
+                    segmenter = Segmenter(self.aligner.config)
                     # Create segments from caption
                     segments = segmenter(caption)
                 else:
@@ -108,7 +117,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 supervisions, alignments = [], []
                 for i, (start, end, _supervisions, skipalign) in enumerate(segments, 1):
                     print(
-                        colorful.cyan(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
+                        colorful.green(
+                            f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s"
+                        )
                     )
                     if skipalign:
                         supervisions.extend(_supervisions)
@@ -150,8 +161,15 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             caption.supervisions = supervisions
             caption.alignments = alignments
 
-            # Step 5: Export alignments
-            if output_caption_path:
+            # Step 5: Speaker diarization
+            if self.diarization_config.enabled and self.diarizer:
+                print(colorful.cyan("🗣️  Performing speaker diarization..."))
+                caption = self.speaker_diarization(
+                    input_media=media_audio,
+                    caption=caption,
+                    output_caption_path=output_caption_path,
+                )
+            elif output_caption_path:
                 self._write_caption(caption, output_caption_path)
 
             return caption
@@ -168,7 +186,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
 
-    def diarization(
+    def speaker_diarization(
         self,
         input_media: AudioData,
         caption: Caption,
@@ -186,29 +204,74 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             Caption object with speaker labels assigned
 
         Raises:
-            ImportError: If lattifai_core diarization module is not available
-            RuntimeError: If diarization fails
+            RuntimeError: If diarizer is not initialized or diarization fails
         """
-        try:
-            from lattifai_core.diarization import perform_diarization
-        except ImportError:
-            raise ImportError(
-                "lattifai_core.diarization module not found. " "Please install lattifai-core with diarization support."
-            )
+        if not self.diarizer:
+            raise RuntimeError("Diarizer not initialized. Set diarization_config.enabled=True")
 
-        # Load audio if needed
-        if isinstance(input_media, AudioData):
-            media_audio = input_media
-        else:
-            media_audio = self.audio_loader(input_media, channel_selector="average")
+        # Perform diarization and assign speaker labels to caption alignments
+        if output_caption_path:
+            diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
+            if diarization_file.exists():
+                print(colorful.cyan(f"Reading existing speaker diarization from {diarization_file}"))
+                caption.read_speaker_diarization(diarization_file)
 
-        # Perform diarization
-        diarized_supervisions = perform_diarization(media_audio, caption.supervisions)
-        caption.supervisions = diarized_supervisions
+        diarization, alignments = self.diarizer.diarize_with_alignments(
+            input_media, caption.alignments, diarization=caption.speaker_diarization
+        )
+        caption.alignments = alignments
+        caption.speaker_diarization = diarization
 
         # Write output if requested
         if output_caption_path:
             self._write_caption(caption, output_caption_path)
+
+            if self.diarizer.config.debug:
+                # debug
+                from tgt import Interval, IntervalTier, TextGrid, write_to_file
+
+                debug_tg = TextGrid()
+                transcript_tier = IntervalTier(
+                    start_time=0,
+                    end_time=input_media.duration,
+                    name="transcript",
+                    objects=[Interval(sup.start, sup.end, sup.text) for sup in caption.alignments],
+                )
+                debug_tg.add_tier(transcript_tier)
+
+                speaker_tier = IntervalTier(
+                    start_time=0,
+                    end_time=input_media.duration,
+                    name="speaker",
+                    objects=[Interval(sup.start, sup.end, sup.speaker) for sup in caption.alignments],
+                )
+                debug_tg.add_tier(speaker_tier)
+
+                from collections import defaultdict
+
+                spk2intervals = defaultdict(lambda: [])
+                num_multispk = 0
+                for supervision in caption.alignments:
+                    if supervision.custom.get("speaker", []):
+                        num_multispk += 1
+
+                    for speaker in supervision.custom.get("speaker", []):
+                        for name, start_time, end_time in speaker:
+                            spk2intervals[name].append(Interval(start_time, end_time, name))
+                print(f"Number of multi-speaker segments: {num_multispk}/{len(caption.alignments)}")
+
+                for speaker, intervals in spk2intervals.items():
+                    speaker_tier = IntervalTier(
+                        start_time=0, end_time=input_media.duration, name=speaker, objects=intervals
+                    )
+                    debug_tg.add_tier(speaker_tier)
+
+                for tier in caption.speaker_diarization.tiers:
+                    tier.name = f"Diarization-{tier.name}"
+                    debug_tg.add_tier(tier)
+
+                debug_tgt_file = Path(str(output_caption_path)).with_suffix(".DiarizationDebug.TextGrid")
+                write_to_file(debug_tg, debug_tgt_file, format="long")
 
         return caption
 
@@ -221,6 +284,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         force_overwrite: bool = False,
         output_caption_path: Optional[Pathlike] = None,
         split_sentence: Optional[bool] = None,
+        use_transcription: bool = False,
     ) -> Caption:
         # Prepare output directory and media format
         output_dir = self._prepare_youtube_output_dir(output_dir)
@@ -235,7 +299,13 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Step 2: Get or create captions (download or transcribe)
         caption = self._download_or_transcribe_caption(
-            url, output_dir, media_audio, force_overwrite, caption_lang, is_async=False
+            url,
+            output_dir,
+            media_audio,
+            force_overwrite,
+            caption_lang,
+            is_async=False,
+            use_transcription=use_transcription,
         )
 
         # Step 3: Generate output path if not provided
@@ -247,17 +317,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         caption: Caption = self.alignment(
             input_media=media_audio,
             input_caption=caption,
-            output_caption_path=output_caption_path if not self.caption_config.speaker_diarization else None,
+            output_caption_path=output_caption_path,
             split_sentence=split_sentence,
         )
-
-        if self.caption_config.speaker_diarization:
-            print(colorful.cyan("🗣️  Performing speaker diarization..."))
-            caption = self.diarization(
-                input_media=media_audio,
-                caption=caption,
-                output_caption_path=output_caption_path,
-            )
 
         return caption
 
