@@ -14,7 +14,7 @@ from lattifai.caption import Caption
 from .config import ClientConfig
 
 # Import from errors module for consistency
-from .errors import APIError, ConfigurationError
+from .errors import APIError, CaptionProcessingError, ConfigurationError
 
 if TYPE_CHECKING:
     from .config import AlignmentConfig, CaptionConfig, TranscriptionConfig
@@ -247,6 +247,70 @@ class LattifAIClientMixin:
             raise ValueError(
                 "Transcription requested but transcriber not configured. "
                 "Provide TranscriptionConfig with valid API key."
+            )
+
+    def _read_caption(
+        self,
+        input_caption: Union[Pathlike, Caption],
+        input_caption_format: Optional[str] = None,
+    ) -> Caption:
+        """
+        Read caption file or return Caption object directly.
+
+        Args:
+            input_caption: Path to caption file or Caption object
+            input_caption_format: Optional format hint for parsing
+
+        Returns:
+            Caption object
+
+        Raises:
+            CaptionProcessingError: If caption cannot be read
+        """
+        if isinstance(input_caption, Caption):
+            return input_caption
+
+        try:
+            return Caption.read(
+                input_caption,
+                format=input_caption_format,
+                normalize_text=self.caption_config.normalize_text,
+            )
+        except Exception as e:
+            raise CaptionProcessingError(
+                f"Failed to parse caption file: {input_caption}",
+                caption_path=str(input_caption),
+                context={"original_error": str(e)},
+            )
+
+    def _write_caption(
+        self,
+        caption: Caption,
+        output_caption_path: Pathlike,
+    ) -> Pathlike:
+        """
+        Write caption to file.
+
+        Args:
+            caption: Caption object to write
+            output_caption_path: Output file path
+
+        Returns:
+            Path to written file
+
+        Raises:
+            CaptionProcessingError: If caption cannot be written
+        """
+        try:
+            return caption.write(
+                output_caption_path,
+                include_speaker_in_text=self.caption_config.include_speaker_in_text,
+            )
+        except Exception as e:
+            raise CaptionProcessingError(
+                f"Failed to write output file: {output_caption_path}",
+                caption_path=str(output_caption_path),
+                context={"original_error": str(e)},
             )
 
     async def _download_media(
