@@ -5,6 +5,7 @@ from abc import ABC
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional, Union  # noqa: F401
 
+import colorful
 import httpx
 from lhotse.utils import Pathlike
 
@@ -271,11 +272,14 @@ class LattifAIClientMixin:
             return input_caption
 
         try:
-            return Caption.read(
+            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
+            caption = Caption.read(
                 input_caption,
                 format=input_caption_format,
                 normalize_text=self.caption_config.normalize_text,
             )
+            print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
+            return caption
         except Exception as e:
             raise CaptionProcessingError(
                 f"Failed to parse caption file: {input_caption}",
@@ -302,8 +306,6 @@ class LattifAIClientMixin:
             CaptionProcessingError: If caption cannot be written
         """
         try:
-            import colorful
-
             return caption.write(
                 output_caption_path,
                 include_speaker_in_text=self.caption_config.include_speaker_in_text,
@@ -324,8 +326,6 @@ class LattifAIClientMixin:
         force_overwrite: bool,
     ) -> str:
         """Download media from YouTube (async implementation)."""
-        import colorful
-
         print(colorful.cyan("📥 Downloading media from YouTube..."))
         media_file = await self.downloader.download_media(
             url=url,
@@ -372,8 +372,6 @@ class LattifAIClientMixin:
             Caption file path (str) or coroutine that returns str
         """
         import asyncio
-
-        import colorful
 
         async def _async_impl():
             # First check if caption input_path is already provided

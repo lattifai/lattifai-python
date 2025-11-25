@@ -7,6 +7,7 @@ import colorful
 from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner
+from lattifai.alignment.segmented_aligner import SegmentedAligner
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.base_client import AsyncAPIClient, LattifAIClientMixin, SyncAPIClient
 from lattifai.caption import Caption, InputCaptionFormat
@@ -75,9 +76,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
     ) -> Caption:
         try:
             # Step 1: Parse caption file
-            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
             caption = self._read_caption(input_caption, input_caption_format)
-            print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
 
             output_caption_path = output_caption_path or self.caption_config.output_path
             if isinstance(input_media, AudioData):
@@ -88,17 +87,58 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     channel_selector="average",
                 )
 
-            # Step 2-4: Align using Lattice1Aligner
-            supervisions, alignments = self.aligner.alignment(
-                media_audio,
-                caption.supervisions,
-                split_sentence=split_sentence or self.caption_config.split_sentence,
-                return_details=self.caption_config.word_level
-                or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
-            )
+            # Step 2: Check if segmented alignment is needed
+            segment_strategy = self.caption_config.segment_strategy
+            use_segmentation = segment_strategy != "none"
 
-            caption.supervisions = supervisions
-            caption.alignments = alignments
+            if use_segmentation:
+                if self.alignment_config.verbose:
+                    print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
+
+                # Create segmented aligner
+                segmenter = SegmentedAligner(self.caption_config)
+
+                # Create segments from caption
+                segments = segmenter.create_segments(caption, media_audio)
+
+                if self.alignment_config.verbose:
+                    segmenter.print_segment_info(segments, media_audio.duration)
+
+                # Align each segment
+                aligned_segments = []
+                for i, (start, end, segment_supervisions) in enumerate(segments, 1):
+                    if self.alignment_config.verbose:
+                        print(colorful.cyan(f"  ⏩ Aligning segment {i}/{len(segments)}: {start:.1f}s - {end:.1f}s"))
+
+                    # Extract audio segment
+                    segment_audio = media_audio.cut(start=start, end=end)
+
+                    # Align segment
+                    aligned_supervisions, aligned_items = self.aligner.alignment(
+                        segment_audio,
+                        segment_supervisions,
+                        split_sentence=split_sentence or self.caption_config.split_sentence,
+                        return_details=self.caption_config.word_level
+                        or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                    )
+
+                    aligned_segments.append((start, end, aligned_supervisions, aligned_items))
+
+                # Merge aligned segments
+                caption.supervisions, caption.alignments = segmenter.merge_aligned_segments(aligned_segments)
+
+            else:
+                # Step 2-4: Standard single-pass alignment
+                supervisions, alignments = self.aligner.alignment(
+                    media_audio,
+                    caption.supervisions,
+                    split_sentence=split_sentence or self.caption_config.split_sentence,
+                    return_details=self.caption_config.word_level
+                    or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                )
+
+                caption.supervisions = supervisions
+                caption.alignments = alignments
 
             # Step 5: Export alignments
             if output_caption_path:
@@ -295,13 +335,11 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
     ) -> Caption:
         try:
             # Step 1: Parse caption file (async)
-            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
             caption = await asyncio.to_thread(
                 self._read_caption,
                 input_caption,
                 input_caption_format,
             )
-            print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
 
             output_caption_path = output_caption_path or self.caption_config.output_path
 
@@ -314,19 +352,71 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
                     channel_selector="average",
                 )
 
-            # Step 2-4: Align using Lattice1Aligner (will be async in future)
-            # For now, we wrap the sync aligner in asyncio.to_thread
-            supervisions, alignments = await asyncio.to_thread(
-                self.aligner.alignment,
-                media_audio,
-                caption.supervisions,
-                split_sentence=split_sentence or self.caption_config.split_sentence,
-                return_details=self.caption_config.word_level
-                or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
-            )
+            # Step 2: Check if segmented alignment is needed
+            segment_strategy = self.caption_config.segment_strategy
+            use_segmentation = segment_strategy != "none"
 
-            caption.supervisions = supervisions
-            caption.alignments = alignments
+            if use_segmentation:
+                if self.aligner.config.verbose:
+                    print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
+
+                # Create segmented aligner
+                segmenter = SegmentedAligner(self.caption_config)
+
+                # Create segments from caption (in thread to avoid blocking)
+                segments = await asyncio.to_thread(
+                    segmenter.create_segments,
+                    caption,
+                    media_audio,
+                )
+
+                if self.aligner.config.verbose:
+                    segmenter.print_segment_info(segments, media_audio.duration)
+
+                # Align each segment (async)
+                aligned_segments = []
+                for i, (start, end, segment_supervisions) in enumerate(segments, 1):
+                    if self.aligner.config.verbose:
+                        print(colorful.cyan(f"  ⏩ Aligning segment {i}/{len(segments)}: {start:.1f}s - {end:.1f}s"))
+
+                    # Extract audio segment
+                    segment_audio = await asyncio.to_thread(
+                        media_audio.cut,
+                        start=start,
+                        end=end,
+                    )
+
+                    # Align segment (in thread)
+                    aligned_supervisions, aligned_items = await asyncio.to_thread(
+                        self.aligner.alignment,
+                        segment_audio,
+                        segment_supervisions,
+                        split_sentence=split_sentence or self.caption_config.split_sentence,
+                        return_details=self.caption_config.word_level
+                        or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                    )
+
+                    aligned_segments.append((start, end, aligned_supervisions, aligned_items))
+
+                # Merge aligned segments (in thread)
+                caption.supervisions, caption.alignments = await asyncio.to_thread(
+                    segmenter.merge_aligned_segments,
+                    aligned_segments,
+                )
+
+            else:
+                # Step 2-4: Standard single-pass alignment (async)
+                supervisions, alignments = await asyncio.to_thread(
+                    self.aligner.alignment,
+                    media_audio,
+                    caption.supervisions,
+                    split_sentence=split_sentence or self.caption_config.split_sentence,
+                    return_details=self.caption_config.word_level
+                    or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                )
+
+                caption.supervisions = supervisions
+                caption.alignments = alignments
 
             # Step 5: Export alignments (async)
             if output_caption_path:

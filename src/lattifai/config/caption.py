@@ -74,6 +74,41 @@ class CaptionConfig:
     max_speakers: Optional[int] = None
     """Maximum number of speakers. Has no effect when `num_speakers` is provided."""
 
+    # Segmented Alignment for Long Audio
+    segment_strategy: Literal["time", "caption", "adaptive", "none"] = "none"
+    """Segmentation strategy for long audio alignment:
+    - 'none': Process entire audio as single alignment (default, suitable for <30 min)
+    - 'time': Split by fixed time intervals (segment_duration) with overlap
+    - 'caption': Split based on existing caption boundaries and gaps (segment_max_gap)
+    - 'adaptive': Hybrid - respect caption boundaries while limiting segment duration
+
+    Use segmentation for long audio (>30 min) to reduce memory usage and improve performance.
+    """
+
+    segment_duration: float = 300.0
+    """Target duration (in seconds) for each alignment segment when using 'time' or 'adaptive' strategy.
+    Default: 300.0 (5 minutes). Typical range: 30-600 seconds (30s-10min).
+    Shorter segments = lower memory, longer segments = better context for alignment.
+    """
+
+    segment_overlap: float = 2.0
+    """Overlap (in seconds) between consecutive segments to ensure smooth transitions at boundaries.
+    Default: 2.0 seconds. The overlap region is processed twice and merged intelligently.
+    Increase for better boundary alignment, decrease to speed up processing.
+    """
+
+    segment_max_gap: float = 5.0
+    """Maximum gap (in seconds) between captions to consider them part of the same segment.
+    Used by 'caption' and 'adaptive' strategies. Gaps larger than this trigger segment splitting.
+    Default: 5.0 seconds. Useful for detecting scene changes or natural breaks in content.
+    """
+
+    preserve_original_timestamps: bool = True
+    """When True, use original caption timestamps as hints for alignment.
+    Useful when input captions have approximate timing that should guide the alignment process.
+    When False, alignment relies purely on acoustic-text matching.
+    """
+
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._normalize_paths()
