@@ -1,7 +1,7 @@
 """LattifAI client implementation with config-driven architecture."""
 
 import asyncio
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import colorful
 from lhotse.utils import Pathlike
@@ -103,7 +103,6 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             # Step 5: Export alignments
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
-                print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
 
             return caption
 
@@ -118,6 +117,50 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
+
+    def diarization(
+        self,
+        input_media: AudioData,
+        caption: Caption,
+        output_caption_path: Optional[Pathlike] = None,
+    ) -> Caption:
+        """
+        Perform speaker diarization on aligned caption.
+
+        Args:
+            input_media: AudioData object
+            caption: Caption object with aligned segments
+            output_caption_path: Optional path to write diarized caption
+
+        Returns:
+            Caption object with speaker labels assigned
+
+        Raises:
+            ImportError: If lattifai_core diarization module is not available
+            RuntimeError: If diarization fails
+        """
+        try:
+            from lattifai_core.diarization import perform_diarization
+        except ImportError:
+            raise ImportError(
+                "lattifai_core.diarization module not found. " "Please install lattifai-core with diarization support."
+            )
+
+        # Load audio if needed
+        if isinstance(input_media, AudioData):
+            media_audio = input_media
+        else:
+            media_audio = self.audio_loader(input_media, channel_selector="average")
+
+        # Perform diarization
+        diarized_supervisions = perform_diarization(media_audio, caption.supervisions)
+        caption.supervisions = diarized_supervisions
+
+        # Write output if requested
+        if output_caption_path:
+            self._write_caption(caption, output_caption_path)
+
+        return caption
 
     def youtube(
         self,
@@ -141,7 +184,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         media_audio = self.audio_loader(media_file, channel_selector="average")
 
         # Step 2: Get or create captions (download or transcribe)
-        input_caption = self._download_or_transcribe_caption(
+        caption = self._download_or_transcribe_caption(
             url, output_dir, media_audio, force_overwrite, caption_lang, is_async=False
         )
 
@@ -150,12 +193,23 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Step 4: Perform alignment
         print(colorful.cyan("🔗 Performing forced alignment..."))
-        return self.alignment(
+
+        caption: Caption = self.alignment(
             input_media=media_audio,
-            input_caption=input_caption,
-            output_caption_path=output_caption_path,
+            input_caption=caption,
+            output_caption_path=output_caption_path if not self.caption_config.speaker_diarization else None,
             split_sentence=split_sentence,
         )
+
+        if self.caption_config.speaker_diarization:
+            print(colorful.cyan("🗣️  Performing speaker diarization..."))
+            caption = self.diarization(
+                input_media=media_audio,
+                caption=caption,
+                output_caption_path=output_caption_path,
+            )
+
+        return caption
 
 
 # Set docstrings for LattifAI methods
@@ -238,7 +292,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         output_caption_path: Optional[Pathlike] = None,
         input_caption_format: Optional[InputCaptionFormat] = None,
         split_sentence: Optional[bool] = None,
-    ) -> Tuple[Caption, Optional[Pathlike]]:
+    ) -> Caption:
         try:
             # Step 1: Parse caption file (async)
             print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
@@ -281,7 +335,6 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
                     caption,
                     output_caption_path,
                 )
-                print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
 
             return caption
 
@@ -296,6 +349,62 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
                 caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
+
+    async def diarization(
+        self,
+        input_media: AudioData,
+        caption: Caption,
+        output_caption_path: Optional[Pathlike] = None,
+    ) -> Caption:
+        """
+        Perform speaker diarization on aligned caption (async).
+
+        Args:
+            input_media: AudioData object
+            caption: Caption object with aligned segments
+            output_caption_path: Optional path to write diarized caption
+
+        Returns:
+            Caption object with speaker labels assigned
+
+        Raises:
+            ImportError: If lattifai_core diarization module is not available
+            RuntimeError: If diarization fails
+        """
+        try:
+            from lattifai_core.diarization import perform_diarization
+        except ImportError:
+            raise ImportError(
+                "lattifai_core.diarization module not found. " "Please install lattifai-core with diarization support."
+            )
+
+        # Load audio if needed
+        if isinstance(input_media, AudioData):
+            media_audio = input_media
+        else:
+            media_audio = await asyncio.to_thread(
+                self.audio_loader,
+                input_media,
+                channel_selector="average",
+            )
+
+        # Perform diarization in thread pool
+        diarized_supervisions = await asyncio.to_thread(
+            perform_diarization,
+            media_audio,
+            caption.supervisions,
+        )
+        caption.supervisions = diarized_supervisions
+
+        # Write output if requested
+        if output_caption_path:
+            await asyncio.to_thread(
+                self._write_caption,
+                caption,
+                output_caption_path,
+            )
+
+        return caption
 
     async def youtube(
         self,
@@ -323,7 +432,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
         )
 
         # Step 2: Get or create captions (download or transcribe)
-        input_caption = await self._download_or_transcribe_caption(
+        caption = await self._download_or_transcribe_caption(
             url, output_dir, media_audio, force_overwrite, caption_lang, is_async=True
         )
 
@@ -332,12 +441,20 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
 
         # Step 4: Perform alignment
         print(colorful.cyan("🔗 Performing forced alignment..."))
-        return await self.alignment(
+        caption: Caption = await self.alignment(
             input_media=media_audio,
-            input_caption=input_caption,
-            output_caption_path=output_caption_path,
+            input_caption=caption,
+            output_caption_path=output_caption_path if not self.caption_config.speaker_diarization else None,
             split_sentence=split_sentence,
         )
+        if self.caption_config.speaker_diarization:
+            print(colorful.cyan("🗣️  Performing speaker diarization..."))
+            caption = await self.diarization(
+                input_media=media_audio,
+                caption=caption,
+                output_caption_path=output_caption_path,
+            )
+        return caption
 
 
 # Set docstrings for AsyncLattifAI methods

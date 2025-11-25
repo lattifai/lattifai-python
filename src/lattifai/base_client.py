@@ -302,10 +302,13 @@ class LattifAIClientMixin:
             CaptionProcessingError: If caption cannot be written
         """
         try:
+            import colorful
+
             return caption.write(
                 output_caption_path,
                 include_speaker_in_text=self.caption_config.include_speaker_in_text,
             )
+            print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
         except Exception as e:
             raise CaptionProcessingError(
                 f"Failed to write output file: {output_caption_path}",
