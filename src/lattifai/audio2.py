@@ -21,6 +21,11 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "
     def __str__(self) -> str:
         return self.path
 
+    @property
+    def duration(self) -> float:
+        """Duration of the audio in seconds."""
+        return self.ndarray.shape[-1] / self.sampling_rate
+
 
 class AudioLoader:
     """Load and preprocess audio files into AudioData format."""

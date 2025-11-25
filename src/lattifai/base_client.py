@@ -56,7 +56,7 @@ class LattifAIClientMixin:
         >>> # Perform alignment
         >>> {await_keyword}alignments, output_path = {await_keyword}client.alignment(
         ...     input_media="audio.wav",
-        ...     input_caption_path="caption.srt",
+        ...     input_caption="caption.srt",
         ...     output_caption_path="aligned.srt"
         ... )
 
@@ -97,7 +97,7 @@ class LattifAIClientMixin:
 
         Args:
             input_media: Path to audio/video file (WAV, MP3, FLAC, MP4, etc.). Must be readable by ffmpeg.
-            input_caption_path: Path to caption or plain text file to align with audio.
+            input_caption: Path to caption or plain text file to align with audio.
             input_caption_format: Input caption format ('srt', 'vtt', 'ass', 'txt'). If None, {format_default}
                    from file extension or uses config default.
             split_sentence: Enable automatic sentence re-splitting for better alignment accuracy.

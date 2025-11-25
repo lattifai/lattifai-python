@@ -75,10 +75,17 @@ class CaptionConfig:
     """Maximum number of speakers. Has no effect when `num_speakers` is provided."""
 
     # Segmented Alignment for Long Audio
-    segment_strategy: Literal["time", "caption", "adaptive", "none"] = "none"
+    trust_input_timestamps: bool = False
+    """When True, use original caption timestamps as strong reference constraints during alignment.
+    The alignment process will still adjust timestamps but stay close to the input timing.
+    Use this when you want to re-segment caption sentence boundaries (split_sentence=True)
+    while preserving the approximate timing from the original captions.
+    When False (default), performs unconstrained forced alignment based purely on media-caption matching.
+    """
+
+    segment_strategy: Literal["caption", "adaptive", "none"] = "none"
     """Segmentation strategy for long audio alignment:
     - 'none': Process entire audio as single alignment (default, suitable for <30 min)
-    - 'time': Split by fixed time intervals (segment_duration) with overlap
     - 'caption': Split based on existing caption boundaries and gaps (segment_max_gap)
     - 'adaptive': Hybrid - respect caption boundaries while limiting segment duration
 
@@ -91,28 +98,33 @@ class CaptionConfig:
     Shorter segments = lower memory, longer segments = better context for alignment.
     """
 
-    segment_overlap: float = 2.0
-    """Overlap (in seconds) between consecutive segments to ensure smooth transitions at boundaries.
-    Default: 2.0 seconds. The overlap region is processed twice and merged intelligently.
-    Increase for better boundary alignment, decrease to speed up processing.
-    """
-
-    segment_max_gap: float = 5.0
+    segment_max_gap: float = 4.0
     """Maximum gap (in seconds) between captions to consider them part of the same segment.
     Used by 'caption' and 'adaptive' strategies. Gaps larger than this trigger segment splitting.
-    Default: 5.0 seconds. Useful for detecting scene changes or natural breaks in content.
-    """
-
-    preserve_original_timestamps: bool = True
-    """When True, use original caption timestamps as hints for alignment.
-    Useful when input captions have approximate timing that should guide the alignment process.
-    When False, alignment relies purely on acoustic-text matching.
+    Default: 4.0 seconds. Useful for detecting scene changes or natural breaks in content.
     """
 
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._normalize_paths()
         self._validate_formats()
+
+    @property
+    def need_alignment(self) -> bool:
+        """Determine if alignment is needed based on configuration."""
+        if self.trust_input_timestamps and not self.split_sentence:
+            if not self.word_level:
+                return False
+            if self.normalize_text:
+                print(
+                    "⚠️ Warning: Text normalization with 'trust_input_timestamps=True' and 'split_sentence=False'"
+                    "💡 Recommended command:\n"
+                    "   lai caption normalize input.srt normalized.srt\n"
+                )
+
+            return False
+
+        return True
 
     def _normalize_paths(self) -> None:
         """Normalize and expand input/output paths."""

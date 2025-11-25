@@ -6,8 +6,7 @@ from typing import Optional, Union
 import colorful
 from lhotse.utils import Pathlike
 
-from lattifai.alignment import Lattice1Aligner
-from lattifai.alignment.segmented_aligner import SegmentedAligner
+from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.base_client import AsyncAPIClient, LattifAIClientMixin, SyncAPIClient
 from lattifai.caption import Caption, InputCaptionFormat
@@ -92,41 +91,38 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             use_segmentation = segment_strategy != "none"
 
             if use_segmentation:
-                if self.alignment_config.verbose:
-                    print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
+                print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
 
-                # Create segmented aligner
-                segmenter = SegmentedAligner(self.caption_config)
+                # Create segmenter
+                segmenter = Segmenter(self.caption_config)
 
                 # Create segments from caption
-                segments = segmenter.create_segments(caption, media_audio)
+                segments = segmenter(caption)
 
-                if self.alignment_config.verbose:
-                    segmenter.print_segment_info(segments, media_audio.duration)
+                segmenter.print_segment_info(segments, media_audio.duration)
+
+                # First pass
+                for i, (start, end, _supervisions) in enumerate(segments, 1):
+                    if not isinstance(_supervisions, list):
+                        print(colorful.yellow(f"Segment {i} contains a single supervision: {_supervisions}."))
+                        pass
 
                 # Align each segment
-                aligned_segments = []
-                for i, (start, end, segment_supervisions) in enumerate(segments, 1):
-                    if self.alignment_config.verbose:
-                        print(colorful.cyan(f"  ⏩ Aligning segment {i}/{len(segments)}: {start:.1f}s - {end:.1f}s"))
-
-                    # Extract audio segment
-                    segment_audio = media_audio.cut(start=start, end=end)
+                supervisions, alignments = [], []
+                for i, (start, end, _supervisions) in enumerate(segments, 1):
+                    print(colorful.cyan(f"  ⏩ Aligning segment {i}/{len(segments)}: {start:.1f}s - {end:.1f}s"))
 
                     # Align segment
-                    aligned_supervisions, aligned_items = self.aligner.alignment(
-                        segment_audio,
-                        segment_supervisions,
+                    _supervisions, _alignments = self.aligner.alignment(
+                        media_audio,
+                        _supervisions,
                         split_sentence=split_sentence or self.caption_config.split_sentence,
                         return_details=self.caption_config.word_level
                         or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
                     )
 
-                    aligned_segments.append((start, end, aligned_supervisions, aligned_items))
-
-                # Merge aligned segments
-                caption.supervisions, caption.alignments = segmenter.merge_aligned_segments(aligned_segments)
-
+                    supervisions.extend(_supervisions)
+                    alignments.extend(_alignments)
             else:
                 # Step 2-4: Standard single-pass alignment
                 supervisions, alignments = self.aligner.alignment(
@@ -137,8 +133,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
                 )
 
-                caption.supervisions = supervisions
-                caption.alignments = alignments
+            # Update caption with aligned results
+            caption.supervisions = supervisions
+            caption.alignments = alignments
 
             # Step 5: Export alignments
             if output_caption_path:
@@ -361,7 +358,7 @@ class AsyncLattifAI(LattifAIClientMixin, AsyncAPIClient):
                     print(colorful.cyan(f"🔄 Using segmented alignment strategy: {segment_strategy}"))
 
                 # Create segmented aligner
-                segmenter = SegmentedAligner(self.caption_config)
+                segmenter = Segmenter(self.caption_config)
 
                 # Create segments from caption (in thread to avoid blocking)
                 segments = await asyncio.to_thread(

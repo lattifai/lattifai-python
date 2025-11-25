@@ -22,7 +22,6 @@ class BaseTranscriber(ABC):
     supports_url: bool = True
     """Whether this transcriber supports direct URL transcription."""
 
-    @abstractmethod
     @property
     def name(self) -> str:
         """Human-readable name of the transcriber."""

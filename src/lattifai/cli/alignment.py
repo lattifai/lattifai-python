@@ -114,7 +114,7 @@ def align(
 
     return client.alignment(
         input_media=media_config.input_path,
-        input_caption_path=caption_config.input_path,
+        input_caption=caption_config.input_path,
         output_caption_path=caption_config.output_path,
     )
 
