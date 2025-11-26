@@ -96,22 +96,101 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
             # Step 2: Check if segmented alignment is needed
             alignment_strategy = self.aligner.config.strategy
-            use_segmentation = alignment_strategy != "none"
 
-            if use_segmentation or caption.transcription:
+            if alignment_strategy != "entire" or caption.transcription:
                 print(colorful.cyan(f"🔄 Using segmented alignment strategy: {alignment_strategy}"))
 
-                if caption.transcription:
-                    segments = [(sup.start, sup.end, [sup], False) for sup in caption.transcription]
-                elif self.aligner.config.trust_caption_timestamps:
-                    # Create segmenter
-                    segmenter = Segmenter(self.aligner.config)
-                    # Create segments from caption
-                    segments = segmenter(caption)
-                else:
-                    raise NotImplementedError(
-                        "Segmented alignment without trusting input timestamps is not yet implemented."
+                if alignment_strategy == "transcription":
+                    # raise NotImplementedError("Transcription-based alignment is not yet implemented.")
+                    assert (
+                        "gemini" not in self.transcriber.name.lower()
+                    ), "Transcription-based alignment is not supported with Gemini transcriber."
+                    assert (
+                        caption.supervisions
+                    ), "Input caption should contain supervisions when using transcription-based alignment."
+                    if not caption.transcription:
+                        import asyncio
+
+                        print(colorful.cyan("📝 Transcribing media for alignment..."))
+                        if output_caption_path:
+                            transcript_file = (
+                                Path(str(output_caption_path)).parent
+                                / f"{Path(str(media_audio)).stem}_{self.transcriber.name}{self.transcriber.file_suffix}"
+                            )
+                            if transcript_file.exists():
+                                # print(colorful.cyan(f"Reading existing transcription from {transcript_file}"))
+                                transcript = self._read_caption(transcript_file, verbose=False)
+                                caption.transcription = transcript.supervisions
+                                caption.audio_events = transcript.audio_events
+
+                        if not caption.transcription:
+                            transcript = asyncio.run(self.transcriber(media_audio))
+                            caption.transcription = transcript.transcription
+                            caption.audio_events = transcript.audio_events
+
+                    # Align caption.supervisions with transcription to get segments
+                    import regex
+                    from error_align import ErrorAlign, error_align  # noqa: F401
+                    from error_align.utils import DELIMITERS, NUMERIC_TOKEN, STANDARD_TOKEN, OpType
+
+                    JOIN_TOKEN = "❄"
+                    if JOIN_TOKEN not in DELIMITERS:
+                        DELIMITERS.add(JOIN_TOKEN)
+
+                    def custom_tokenizer(text: str) -> list:
+                        """Default tokenizer that splits text into words based on whitespace.
+
+                        Args:
+                            text (str): The input text to tokenize.
+
+                        Returns:
+                            list: A list of tokens (words).
+
+                        """
+                        # Escape JOIN_TOKEN for use in regex pattern
+                        escaped_join_token = regex.escape(JOIN_TOKEN)
+                        return list(
+                            regex.finditer(
+                                rf"({NUMERIC_TOKEN})|({STANDARD_TOKEN}|{escaped_join_token})",
+                                text,
+                                regex.UNICODE | regex.VERBOSE,
+                            )
+                        )
+
+                    alignments = error_align(
+                        f"{JOIN_TOKEN}".join(sup.text for sup in caption.supervisions),
+                        f"{JOIN_TOKEN}".join(sup.text for sup in caption.transcription),
+                        tokenizer=custom_tokenizer,
                     )
+
+                    for align in alignments:
+                        if align.hyp == JOIN_TOKEN and align.op_type == OpType.MATCH:
+                            pass
+
+                        # if align.op_type == OpType.MATCH:
+                        #     continue
+                        # elif align.op_type in (OpType.INSERT, OpType.DELETE, OpType.SUBSTITUTE):
+                        #     # print(colorful.yellow(f"⚠️ Alignment warning: {op}"))
+                        #     pass
+
+                    raise NotImplementedError("Transcription-based segmentation is not yet implemented.")
+                else:
+                    if caption.transcription:
+                        if not caption.supervisions:  # youtube + transcription case
+                            segments = [(sup.start, sup.end, [sup], False) for sup in caption.transcription]
+                        else:
+                            raise NotImplementedError(
+                                f"Input caption with both supervisions and transcription(strategy={alignment_strategy}) is not supported."
+                            )
+                    elif self.aligner.config.trust_caption_timestamps:
+                        # Create segmenter
+                        segmenter = Segmenter(self.aligner.config)
+                        # Create segments from caption
+                        segments = segmenter(caption)
+                    else:
+                        raise NotImplementedError(
+                            "Segmented alignment without trusting input timestamps is not yet implemented."
+                        )
 
                 # align each segment
                 supervisions, alignments = [], []
@@ -173,7 +252,6 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 self._write_caption(caption, output_caption_path)
 
             return caption
-
         except (CaptionProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
             # Re-raise our specific errors as-is
             raise

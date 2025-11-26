@@ -255,6 +255,7 @@ class LattifAIClientMixin:
         input_caption: Union[Pathlike, Caption],
         input_caption_format: Optional[str] = None,
         normalize_text: Optional[bool] = None,
+        verbose: bool = True,
     ) -> Caption:
         """
         Read caption file or return Caption object directly.
@@ -273,7 +274,8 @@ class LattifAIClientMixin:
             return input_caption
 
         try:
-            print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
+            if verbose:
+                print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
             caption = Caption.read(
                 input_caption,
                 format=input_caption_format,
@@ -281,16 +283,19 @@ class LattifAIClientMixin:
             )
             diarization_file = Path(str(input_caption)).with_suffix(".SpkDiar")
             if diarization_file.exists():
-                print(colorful.cyan(f"📖 Step 1b: Reading speaker diarization from {diarization_file}"))
+                if verbose:
+                    print(colorful.cyan(f"📖 Step 1b: Reading speaker diarization from {diarization_file}"))
                 caption.read_speaker_diarization(diarization_file)
             events_file = Path(str(input_caption)).with_suffix(".AED")
             if events_file.exists():
-                print(colorful.cyan(f"📖 Step 1c: Reading audio events from {events_file}"))
+                if verbose:
+                    print(colorful.cyan(f"📖 Step 1c: Reading audio events from {events_file}"))
                 from tgt import read_textgrid
 
                 caption.audio_events = read_textgrid(events_file)
 
-            print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
+            if verbose:
+                print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
             return caption
         except Exception as e:
             raise CaptionProcessingError(
