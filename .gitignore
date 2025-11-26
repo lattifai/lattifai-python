@@ -82,3 +82,4 @@ tests/data/SA1_*.*
 tests/data/SA1.TextGrid
 benchmark/data/*.TextGrid
 benchmark/data/*.txt
+checkpoints/

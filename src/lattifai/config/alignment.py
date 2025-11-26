@@ -33,7 +33,7 @@ class AlignmentConfig:
     When False (default), performs unconstrained forced alignment based purely on media-caption matching.
     """
 
-    strategy: Literal["caption", "transcription", "diarization", "none"] = "none"
+    strategy: Literal["caption", "transcription", "diarization", "none", "enhance"] = "none"
     """Alignment strategy for long audio alignment:
     - 'none': Process entire audio as single alignment (default, suitable for <30 min)
     - 'caption': Split based on existing caption boundaries and gaps (segment_max_gap)

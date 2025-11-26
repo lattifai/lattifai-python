@@ -79,6 +79,13 @@ class LattifAITranscriber(BaseTranscriber):
             output_file,
             include_speaker_in_text=False,
         )
+        if transcript.audio_events:
+            from tgt import write_to_file
+
+            events_file = output_file.with_suffix(".AED")
+            write_to_file(transcript.audio_events, events_file, format="long")
+
+        return output_file
 
     def _get_transcription_prompt(self) -> str:
         """Get (and cache) transcription system prompt from prompts module."""

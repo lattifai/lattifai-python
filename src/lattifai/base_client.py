@@ -283,6 +283,12 @@ class LattifAIClientMixin:
             if diarization_file.exists():
                 print(colorful.cyan(f"📖 Step 1b: Reading speaker diarization from {diarization_file}"))
                 caption.read_speaker_diarization(diarization_file)
+            events_file = Path(str(input_caption)).with_suffix(".AED")
+            if events_file.exists():
+                print(colorful.cyan(f"📖 Step 1c: Reading audio events from {events_file}"))
+                from tgt import read_textgrid
+
+                caption.audio_events = read_textgrid(events_file)
 
             print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
             return caption

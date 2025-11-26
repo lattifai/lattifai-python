@@ -168,7 +168,7 @@ class AudioLoader:
                     raise ValueError(f"No audio data found in file: {audio}")
 
                 # Concatenate all frames
-                waveform = np.concatenate(frames, axis=1)
+                waveform = np.concatenate(frames, axis=1).astype(np.float32)  # (channels, samples)
                 sample_rate = audio_stream.codec_context.sample_rate
             except Exception as e:
                 raise RuntimeError(f"Failed to load audio file {audio}: {e}")

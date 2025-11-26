@@ -270,6 +270,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     tier.name = f"Diarization-{tier.name}"
                     debug_tg.add_tier(tier)
 
+                if caption.audio_events:
+                    for tier in caption.audio_events.tiers:
+                        # tier.name = f"{tier.name}"
+                        debug_tg.add_tier(tier)
+
                 debug_tgt_file = Path(str(output_caption_path)).with_suffix(".DiarizationDebug.TextGrid")
                 write_to_file(debug_tg, debug_tgt_file, format="long")
 

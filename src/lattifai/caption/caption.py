@@ -52,7 +52,7 @@ class Caption:
 
     def __len__(self) -> int:
         """Return the number of supervision segments."""
-        return len(self.supervisions or self.transcripts)
+        return len(self.supervisions or self.transcription)
 
     def __iter__(self):
         """Iterate over supervision segments."""
@@ -655,7 +655,7 @@ class Caption:
         """String representation of Caption."""
         lang = f"lang={self.language}" if self.language else "lang=unknown"
         kind_str = f"kind={self.kind}" if self.kind else ""
-        parts = [f"Caption({len(self.supervisions)} segments", lang]
+        parts = [f"Caption({len(self.supervisions or self.transcription)} segments", lang]
         if kind_str:
             parts.append(kind_str)
         if self.duration:
