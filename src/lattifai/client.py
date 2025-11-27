@@ -100,7 +100,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             if alignment_strategy != "entire" or caption.transcription:
                 print(colorful.cyan(f"🔄 Using segmented alignment strategy: {alignment_strategy}"))
 
-                if alignment_strategy == "transcription":
+                if caption.supervisions and alignment_strategy == "transcription":
                     # raise NotImplementedError("Transcription-based alignment is not yet implemented.")
                     assert (
                         "gemini" not in self.transcriber.name.lower()
@@ -329,16 +329,51 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
                 spk2intervals = defaultdict(lambda: [])
                 num_multispk = 0
-                for supervision in caption.alignments:
+
+                segments, skipks = [], []
+                for k, supervision in enumerate(caption.alignments):  # TODO: alignments 本身存在 overlap, eg: [event]
+                    # supervision = caption.alignments[k]
                     if supervision.custom.get("speaker", []):
                         num_multispk += 1
+                    else:
+                        continue
+
+                    if k in skipks:
+                        continue
 
                     for speaker in supervision.custom.get("speaker", []):
                         for name, start_time, end_time in speaker:
                             spk2intervals[name].append(Interval(start_time, end_time, name))
-                print(f"Number of multi-speaker segments: {num_multispk}/{len(caption.alignments)}")
 
-                for speaker, intervals in spk2intervals.items():
+                    _segments = []
+                    if k > 0:
+                        _segments.append(caption.alignments[k - 1])
+                    _segments.append(supervision)
+                    while k + 1 < len(caption.alignments):
+                        skipks.append(k + 1)
+                        next_sup = caption.alignments[k + 1]
+                        if not next_sup.custom.get("speaker", []):
+                            k += 1
+                            break
+                        _segments.append(next_sup)
+                        k += 1
+
+                    if segments:
+                        if _segments[0].start >= segments[-1][-1].end:
+                            segments.append(_segments)
+                        else:
+                            if _segments[1:]:
+                                segments.append(_segments[1:])
+                            else:
+                                pass
+                    else:
+                        segments.append(_segments)
+
+                print(
+                    f"Number of multi-speaker segments: {num_multispk}/{len(caption.alignments)} segments: {len(segments)}"
+                )
+
+                for speaker, intervals in sorted(spk2intervals.items(), key=lambda x: x[0]):
                     speaker_tier = IntervalTier(
                         start_time=0, end_time=input_media.duration, name=speaker, objects=intervals
                     )
@@ -348,10 +383,22 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     tier.name = f"Diarization-{tier.name}"
                     debug_tg.add_tier(tier)
 
-                if caption.audio_events:
-                    for tier in caption.audio_events.tiers:
-                        # tier.name = f"{tier.name}"
-                        debug_tg.add_tier(tier)
+                tier = IntervalTier(
+                    start_time=0,
+                    end_time=input_media.duration,
+                    name="resegment",
+                    objects=[
+                        Interval(round(sup.start, 2), round(sup.end, 2), sup.text)
+                        for _segments in segments
+                        for sup in _segments
+                    ],
+                )
+                debug_tg.add_tier(tier)
+
+                # if caption.audio_events:
+                #     for tier in caption.audio_events.tiers:
+                #         # tier.name = f"{tier.name}"
+                #         debug_tg.add_tier(tier)
 
                 debug_tgt_file = Path(str(output_caption_path)).with_suffix(".DiarizationDebug.TextGrid")
                 write_to_file(debug_tg, debug_tgt_file, format="long")
