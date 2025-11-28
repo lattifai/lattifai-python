@@ -544,6 +544,204 @@ class Caption:
         return metadata
 
     @classmethod
+    def _parse_youtube_vtt_with_word_timestamps(
+        cls, content: str, normalize_text: Optional[bool] = False
+    ) -> List[Supervision]:
+        """
+        Parse YouTube VTT format with word-level timestamps.
+
+        YouTube auto-generated captions use this format:
+        Word1<00:00:10.559><c> Word2</c><00:00:11.120><c> Word3</c>...
+
+        Args:
+            content: VTT file content
+            normalize_text: Whether to normalize text
+
+        Returns:
+            List of Supervision objects with word-level alignments
+        """
+        from lhotse.supervision import AlignmentItem
+
+        supervisions = []
+
+        # Pattern to match timestamp lines: 00:00:14.280 --> 00:00:17.269 align:start position:0%
+        timestamp_pattern = re.compile(r"(\d{2}:\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[.,]\d{3})")
+
+        # Pattern to match word-level timestamps: <00:00:10.559><c> word</c>
+        word_timestamp_pattern = re.compile(r"<(\d{2}:\d{2}:\d{2}[.,]\d{3})><c>\s*([^<]+)</c>")
+
+        # Pattern to match the first word (before first timestamp)
+        first_word_pattern = re.compile(r"^([^<\n]+?)<(\d{2}:\d{2}:\d{2}[.,]\d{3})>")
+
+        def parse_timestamp(ts: str) -> float:
+            """Convert timestamp string to seconds."""
+            ts = ts.replace(",", ".")
+            parts = ts.split(":")
+            hours = int(parts[0])
+            minutes = int(parts[1])
+            seconds = float(parts[2])
+            return hours * 3600 + minutes * 60 + seconds
+
+        lines = content.split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+
+            # Look for timestamp line
+            ts_match = timestamp_pattern.search(line)
+            if ts_match:
+                cue_start = parse_timestamp(ts_match.group(1))
+                cue_end = parse_timestamp(ts_match.group(2))
+
+                # Read the next non-empty lines for cue content
+                cue_lines = []
+                i += 1
+                while i < len(lines) and lines[i].strip() and not timestamp_pattern.search(lines[i]):
+                    cue_lines.append(lines[i])
+                    i += 1
+
+                # Process cue content
+                for cue_line in cue_lines:
+                    cue_line = cue_line.strip()
+                    if not cue_line:
+                        continue
+
+                    # Check if this line has word-level timestamps
+                    word_matches = word_timestamp_pattern.findall(cue_line)
+                    if word_matches:
+                        # This line has word-level timing
+                        word_alignments = []
+
+                        # Get the first word (before the first timestamp)
+                        first_match = first_word_pattern.match(cue_line)
+                        if first_match:
+                            first_word = first_match.group(1).strip()
+                            first_word_next_ts = parse_timestamp(first_match.group(2))
+                            if first_word:
+                                # First word starts at cue_start
+                                word_alignments.append(
+                                    AlignmentItem(
+                                        symbol=first_word,
+                                        start=cue_start,
+                                        duration=first_word_next_ts - cue_start,
+                                    )
+                                )
+
+                        # Process remaining words with timestamps
+                        for idx, (ts, word) in enumerate(word_matches):
+                            word_start = parse_timestamp(ts)
+                            word = word.strip()
+                            if not word:
+                                continue
+
+                            # Calculate duration based on next word's timestamp or cue end
+                            if idx + 1 < len(word_matches):
+                                next_ts = parse_timestamp(word_matches[idx + 1][0])
+                                duration = next_ts - word_start
+                            else:
+                                duration = cue_end - word_start
+
+                            word_alignments.append(
+                                AlignmentItem(
+                                    symbol=word,
+                                    start=word_start,
+                                    duration=max(0.01, duration),  # Ensure positive duration
+                                )
+                            )
+
+                        if word_alignments:
+                            # Create supervision with word-level alignment
+                            full_text = " ".join(item.symbol for item in word_alignments)
+                            if normalize_text:
+                                full_text = normalize_text_fn(full_text)
+
+                            sup_start = word_alignments[0].start
+                            sup_end = word_alignments[-1].start + word_alignments[-1].duration
+
+                            supervisions.append(
+                                Supervision(
+                                    text=full_text,
+                                    start=sup_start,
+                                    duration=sup_end - sup_start,
+                                    alignment={"word": word_alignments},
+                                )
+                            )
+                    else:
+                        # Plain text line without word-level timing - skip duplicate lines
+                        # (YouTube VTT often repeats the previous line without timestamps)
+                        pass
+
+                continue
+            i += 1
+
+        # Merge consecutive supervisions to form complete utterances
+        if supervisions:
+            supervisions = cls._merge_youtube_vtt_supervisions(supervisions)
+
+        return supervisions
+
+    @classmethod
+    def _merge_youtube_vtt_supervisions(cls, supervisions: List[Supervision]) -> List[Supervision]:
+        """
+        Merge consecutive YouTube VTT supervisions into complete utterances.
+
+        YouTube VTT splits utterances across multiple cues. This method merges
+        cues that are close together in time.
+
+        Args:
+            supervisions: List of supervisions to merge
+
+        Returns:
+            List of merged supervisions
+        """
+        if not supervisions:
+            return supervisions
+
+        merged = []
+        current = supervisions[0]
+
+        for next_sup in supervisions[1:]:
+            # Check if next supervision is close enough to merge (within 0.5 seconds)
+            gap = next_sup.start - (current.start + current.duration)
+
+            if gap < 0.5 and current.alignment and next_sup.alignment:
+                # Merge alignments
+                current_words = current.alignment.get("word", [])
+                next_words = next_sup.alignment.get("word", [])
+                merged_words = list(current_words) + list(next_words)
+
+                # Create merged supervision
+                merged_text = current.text + " " + next_sup.text
+                merged_end = next_sup.start + next_sup.duration
+
+                current = Supervision(
+                    text=merged_text,
+                    start=current.start,
+                    duration=merged_end - current.start,
+                    alignment={"word": merged_words},
+                )
+            else:
+                merged.append(current)
+                current = next_sup
+
+        merged.append(current)
+        return merged
+
+    @classmethod
+    def _is_youtube_vtt_with_word_timestamps(cls, content: str) -> bool:
+        """
+        Check if content is YouTube VTT format with word-level timestamps.
+
+        Args:
+            content: File content to check
+
+        Returns:
+            True if content contains YouTube-style word timestamps
+        """
+        # Look for pattern like <00:00:10.559><c> word</c>
+        return bool(re.search(r"<\d{2}:\d{2}:\d{2}[.,]\d{3}><c>", content))
+
+    @classmethod
     def _parse_supervisions(
         cls, caption: Pathlike, format: Optional[str], normalize_text: Optional[bool] = False
     ) -> List[Supervision]:
@@ -560,6 +758,14 @@ class Caption:
         """
         if format:
             format = format.lower()
+
+        # Check for YouTube VTT with word-level timestamps first
+        caption_path = Path(str(caption))
+        if caption_path.exists():
+            with open(caption_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            if cls._is_youtube_vtt_with_word_timestamps(content):
+                return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
 
         if format == "gemini" or str(caption).endswith("Gemini.md"):
             from .gemini_reader import GeminiReader
