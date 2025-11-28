@@ -25,6 +25,54 @@ MAXIMUM_WORD_LENGTH = 40
 TokenizerT = TypeVar("TokenizerT", bound="LatticeTokenizer")
 
 
+def tokenize_multilingual_text(text: str, keep_spaces: bool = True) -> list[str]:
+    """
+    Tokenize a mixed Chinese-English string into individual units.
+
+    Tokenization rules:
+    - Chinese characters (CJK) are split individually
+    - Consecutive Latin letters (including accented characters) and digits are grouped as one unit
+    - English contractions ('s, 't, 'm, 'll, 're, 've) are kept with the preceding word
+    - Other characters (punctuation, spaces) are split individually
+
+    Args:
+        text: Input string containing mixed Chinese and English text
+        keep_spaces: If True, spaces are included in the output as separate tokens.
+                     If False, spaces are excluded from the output. Default is True.
+
+    Returns:
+        List of tokenized units
+
+    Examples:
+        >>> tokenize_multilingual_text("Hello世界")
+        ['Hello', '世', '界']
+        >>> tokenize_multilingual_text("I'm fine")
+        ["I'm", ' ', 'fine']
+        >>> tokenize_multilingual_text("I'm fine", keep_spaces=False)
+        ["I'm", 'fine']
+        >>> tokenize_multilingual_text("Kühlschrank")
+        ['Kühlschrank']
+    """
+    # Regex pattern:
+    # - [a-zA-Z0-9\u00C0-\u024F]+ matches Latin letters (including accented chars like ü, ö, ä, ß, é, etc.)
+    # - (?:'[a-zA-Z]{1,2})? optionally matches contractions like 's, 't, 'm, 'll, 're, 've
+    # - [\u4e00-\u9fff] matches CJK characters
+    # - . matches any other single character
+    # Unicode ranges:
+    # - \u00C0-\u00FF: Latin-1 Supplement (À-ÿ)
+    # - \u0100-\u017F: Latin Extended-A
+    # - \u0180-\u024F: Latin Extended-B
+    pattern = re.compile(r"([a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
+
+    # filter(None, ...) removes any empty strings from re.findall results
+    tokens = list(filter(None, pattern.findall(text)))
+
+    if not keep_spaces:
+        tokens = [t for t in tokens if not t.isspace()]
+
+    return tokens
+
+
 class LatticeTokenizer:
     """Tokenizer for converting Lhotse Cut to LatticeGraph."""
 
@@ -149,7 +197,10 @@ class LatticeTokenizer:
         oov_words = []
         for text in texts:
             text = normalize_html_text(text)
-            words = text.lower().replace("-", " ").replace("—", " ").replace("–", " ").split()
+            # support english, chinese and german tokenization
+            words = tokenize_multilingual_text(
+                text.lower().replace("-", " ").replace("—", " ").replace("–", " "), keep_spaces=False
+            )
             oovs = [w.strip(PUNCTUATION) for w in words if w not in self.words]
             if oovs:
                 oov_words.extend([w for w in oovs if (w not in self.words and len(w) <= MAXIMUM_WORD_LENGTH)])
@@ -189,28 +240,39 @@ class LatticeTokenizer:
 
         Carefull about speaker changes.
         """
-        texts, text_len, sidx = [], 0, 0
-        speakers = []
+        texts, speakers = [], []
+        text_len, sidx = 0, 0
+
+        def flush_segment(end_idx: int, speaker: Optional[str] = None):
+            """Flush accumulated text from sidx to end_idx with given speaker."""
+            nonlocal text_len, sidx
+            if sidx <= end_idx:
+                if len(speakers) < len(texts) + 1:
+                    speakers.append(speaker)
+                text = " ".join(sup.text for sup in supervisions[sidx : end_idx + 1])
+                texts.append(text)
+                sidx = end_idx + 1
+                text_len = 0
+
         for s, supervision in enumerate(supervisions):
             text_len += len(supervision.text)
-            if supervision.speaker:
-                if sidx < s:
-                    if len(speakers) < len(texts) + 1:
-                        speakers.append(None)
-                    text = " ".join([sup.text for sup in supervisions[sidx:s]])
-                    texts.append(text)
-                    sidx = s
-                    text_len = len(supervision.text)
-                speakers.append(supervision.speaker)
+            is_last = s == len(supervisions) - 1
 
-            else:
-                if text_len >= 2000 or s == len(supervisions) - 1:
-                    if len(speakers) < len(texts) + 1:
-                        speakers.append(None)
-                    text = " ".join([sup.text for sup in supervisions[sidx : s + 1]])
-                    texts.append(text)
-                    sidx = s + 1
-                    text_len = 0
+            if supervision.speaker:
+                # Flush previous segment without speaker (if any)
+                if sidx < s:
+                    flush_segment(s - 1, None)
+                    text_len = len(supervision.text)
+
+                # Check if we should flush this speaker's segment now
+                next_has_speaker = not is_last and supervisions[s + 1].speaker
+                if is_last or next_has_speaker:
+                    flush_segment(s, supervision.speaker)
+                else:
+                    speakers.append(supervision.speaker)
+
+            elif text_len >= 2000 or is_last:
+                flush_segment(s, None)
 
         assert len(speakers) == len(texts), f"len(speakers)={len(speakers)} != len(texts)={len(texts)}"
         sentences = self.sentence_splitter.split(texts, threshold=0.15, strip_whitespace=strip_whitespace)
