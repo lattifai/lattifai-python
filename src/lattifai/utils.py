@@ -53,8 +53,8 @@ def _create_cache_marker(cache_dir: Path) -> None:
 
 def _resolve_model_path(model_name_or_path: str) -> str:
     """Resolve model path, downloading from Hugging Face when necessary."""
-    if Path(model_name_or_path).exists():
-        return model_name_or_path
+    if Path(model_name_or_path).expanduser().exists():
+        return str(Path(model_name_or_path).expanduser())
 
     from huggingface_hub import snapshot_download
     from huggingface_hub.constants import HF_HUB_CACHE
