@@ -235,6 +235,13 @@ class ConfigurationError(LattifAIError):
         super().__init__(message, **kwargs)
 
 
+class QuotaExceededError(APIError):
+    """Error when user quota or API key limit is exceeded."""
+
+    def __init__(self, message: str, **kwargs):
+        super().__init__(message, status_code=402, **kwargs)
+
+
 def handle_exception(func):
     """Decorator to handle exceptions and convert them to LattifAI errors."""
 
