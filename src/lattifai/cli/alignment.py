@@ -49,7 +49,7 @@ def align(
         client: API client configuration.
             Fields: api_key, base_url, timeout, max_retries, default_headers
         alignment: Alignment configuration (model selection and inference settings).
-            Fields: model_name_or_path, device, batch_size
+            Fields: model_name, device, batch_size
         caption: Caption I/O configuration (file reading/writing and formatting).
             Fields: input_format, input_path, output_format, output_path,
                     normalize_text, split_sentence, word_level,
@@ -81,7 +81,7 @@ def align(
             caption.word_level=true \\
             caption.normalize_text=true \\
             alignment.device=mps \\
-            alignment.model_name_or_path=Lattifai/Lattice-1-Alpha
+            alignment.model_name=Lattifai/Lattice-1-Alpha
     """
     media_config = media or MediaConfig()
 

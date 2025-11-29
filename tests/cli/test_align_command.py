@@ -101,7 +101,7 @@ class TestAlignCommand:
             f"media.input_path={sample_audio_file}",
             f"caption.input_path={sample_caption_file}",
             f"caption.output_path={output_file}",
-            "alignment.model_name_or_path=Lattifai/Lattice-1-Alpha",
+            "alignment.model_name=Lattifai/Lattice-1-Alpha",
             "alignment.device=cpu",
         ]
 

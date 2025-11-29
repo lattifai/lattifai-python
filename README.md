@@ -181,7 +181,7 @@ lai alignment align audio.wav subtitle.srt output.vtt \
 - Third argument: Output path for aligned subtitle (or use `output_subtitle_path=`)
 - `subtitle.split_sentence=true`: Enable intelligent sentence splitting
 - `alignment.device=cuda`: Device to use (`cpu`, `cuda`, or `mps`)
-- `alignment.model_name_or_path=MODEL`: Model to use for alignment
+- `alignment.model_name=MODEL`: Model to use for alignment
 
 #### lai alignment youtube
 
@@ -567,7 +567,7 @@ word_level: true
 normalize_text: true
 
 # config/alignment.yaml
-model_name_or_path: "Lattifai/Lattice-1-Alpha"
+model_name: "Lattifai/Lattice-1-Alpha"
 device: "mps"
 batch_size: 1
 ```
@@ -660,7 +660,7 @@ client = LattifAI(client_config=config)
 from lattifai import AlignmentConfig
 
 config = AlignmentConfig(
-    model_name_or_path="Lattifai/Lattice-1-Alpha",  # Model identifier or local path
+    model_name="Lattifai/Lattice-1-Alpha",  # Model identifier or local path
     device="cpu",                   # Device: "cpu", "cuda", "cuda:0", "mps"
     batch_size=1,                   # Batch size for processing
 )
@@ -698,7 +698,7 @@ client = LattifAI(
         timeout=60.0,
     ),
     alignment_config=AlignmentConfig(
-        model_name_or_path="Lattifai/Lattice-1-Alpha",
+        model_name="Lattifai/Lattice-1-Alpha",
         device="cuda",
     ),
     subtitle_config=SubtitleConfig(

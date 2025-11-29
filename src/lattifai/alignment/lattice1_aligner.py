@@ -34,9 +34,9 @@ class Lattice1Aligner(object):
             config = AlignmentConfig()
 
         self.config = config
-        model_path = _resolve_model_path(config.model_name_or_path)
+        model_path = _resolve_model_path(config.model_name)
 
-        self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.device)
+        self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.model_name, config.device)
         self.worker = _load_worker(model_path, config.device)
 
         self.frame_shift = self.worker.frame_shift

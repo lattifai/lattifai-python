@@ -83,6 +83,7 @@ class LatticeTokenizer:
 
     def __init__(self, client_wrapper: Any):
         self.client_wrapper = client_wrapper
+        self.model_name = ""
         self.words: List[str] = []
         self.g2p_model: Any = None  # Placeholder for G2P model
         self.dictionaries = defaultdict(lambda: [])
@@ -161,6 +162,7 @@ class LatticeTokenizer:
         cls: Type[TokenizerT],
         client_wrapper: Any,
         model_path: str,
+        model_name: str,
         device: str = "cpu",
         compressed: bool = True,
     ) -> TokenizerT:
@@ -176,6 +178,7 @@ class LatticeTokenizer:
                 data = pickle.load(f)
 
         tokenizer = cls(client_wrapper=client_wrapper)
+        tokenizer.model_name = model_name
         tokenizer.words = data["words"]
         tokenizer.dictionaries = defaultdict(list, data["dictionaries"])
         tokenizer.oov_word = data["oov_word"]
@@ -356,6 +359,7 @@ class LatticeTokenizer:
         response = self.client_wrapper.post(
             "tokenize",
             json={
+                "model_name": self.model_name,
                 "supervisions": [s.to_dict() for s in supervisions],
                 "pronunciation_dictionaries": pronunciation_dictionaries,
             },
@@ -406,82 +410,6 @@ class LatticeTokenizer:
         result = response.json()
         if not result.get("success"):
             raise Exception("Failed to detokenize the alignment results.")
-
-        alignments = [Supervision.from_dict(s) for s in result["supervisions"]]
-
-        if return_details:
-            # Add emission confidence scores for segments and word-level alignments
-            _add_confidence_scores(alignments, emission, labels[0], frame_shift, offset)
-
-        alignments = _update_alignments_speaker(supervisions, alignments)
-
-        return alignments
-
-
-class AsyncLatticeTokenizer(LatticeTokenizer):
-    async def _post_async(self, endpoint: str, **kwargs):
-        response = self.client_wrapper.post(endpoint, **kwargs)
-        if inspect.isawaitable(response):
-            return await response
-        return response
-
-    async def tokenize(
-        self, supervisions: List[Supervision], split_sentence: bool = False
-    ) -> Tuple[str, Dict[str, Any]]:
-        if split_sentence:
-            self.init_sentence_splitter()
-            supervisions = self.split_sentences(supervisions)
-
-        pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
-        response = await self._post_async(
-            "tokenize",
-            json={
-                "supervisions": [s.to_dict() for s in supervisions],
-                "pronunciation_dictionaries": pronunciation_dictionaries,
-            },
-        )
-        if response.status_code != 200:
-            raise Exception(f"Failed to tokenize texts: {response.text}")
-        result = response.json()
-        lattice_id = result["id"]
-        return (
-            supervisions,
-            lattice_id,
-            (result["lattice_graph"], result["final_state"], result.get("acoustic_scale", 1.0)),
-        )
-
-    async def detokenize(
-        self,
-        lattice_id: str,
-        lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
-        supervisions: List[Supervision],
-        return_details: bool = False,
-    ) -> List[Supervision]:
-        emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
-        response = await self._post_async(
-            "detokenize",
-            json={
-                "lattice_id": lattice_id,
-                "frame_shift": frame_shift,
-                "results": [t.to_dict() for t in results[0]],
-                "labels": labels[0],
-                "offset": offset,
-                "channel": channel,
-                "return_details": return_details,
-                "destroy_lattice": True,
-            },
-        )
-        if response.status_code == 422:
-            raise LatticeDecodingError(
-                lattice_id,
-                original_error=Exception(LATTICE_DECODING_FAILURE_HELP),
-            )
-        if response.status_code != 200:
-            raise Exception(f"Failed to detokenize lattice: {response.text}")
-
-        result = response.json()
-        if not result.get("success"):
-            return Exception("Failed to detokenize the alignment results.")
 
         alignments = [Supervision.from_dict(s) for s in result["supervisions"]]
 

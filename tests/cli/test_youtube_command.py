@@ -95,7 +95,7 @@ class TestYoutubeCommand:
         args = [
             "yt_url=https://www.youtube.com/watch?v=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
-            "alignment.model_name_or_path=Lattifai/Lattice-1-Alpha",
+            "alignment.model_name=Lattifai/Lattice-1-Alpha",
             "alignment.device=cpu",
             "caption.input_path=dummy.srt",
         ]

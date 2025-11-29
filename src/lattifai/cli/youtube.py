@@ -49,7 +49,7 @@ def youtube(
         client: API client configuration.
             Fields: api_key, base_url, timeout, max_retries
         alignment: Alignment configuration (model selection and inference settings).
-            Fields: model_name_or_path, device, batch_size
+            Fields: model_name, device, batch_size
         caption: Caption configuration for reading/writing caption files.
             Fields: output_format, output_path, normalize_text,
                     split_sentence, word_level, encoding

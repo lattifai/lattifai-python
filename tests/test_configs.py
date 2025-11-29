@@ -46,7 +46,7 @@ class TestAlignmentConfig:
         config = AlignmentConfig()
         # Alignment defaults - device is auto-selected based on hardware
         assert config.device in ["cpu", "cuda", "mps"]
-        assert config.model_name_or_path == "Lattifai/Lattice-1-Alpha"
+        assert config.model_name == "Lattifai/Lattice-1-Alpha"
         assert config.batch_size == 1
 
     def test_api_key_from_env(self, monkeypatch):
@@ -81,11 +81,11 @@ class TestAlignmentConfig:
         """Test custom configuration values."""
         config = AlignmentConfig(
             device="cuda",
-            model_name_or_path="custom-model",
+            model_name="custom-model",
             batch_size=4,
         )
         assert config.device == "cuda"
-        assert config.model_name_or_path == "custom-model"
+        assert config.model_name == "custom-model"
         assert config.batch_size == 4
 
     def test_invalid_batch_size(self):
