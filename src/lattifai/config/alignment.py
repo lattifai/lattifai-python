@@ -15,8 +15,8 @@ class AlignmentConfig:
     """
 
     # Alignment configuration
-    model_name: str = "Lattifai/Lattice-1-Alpha"
-    """Model identifier or path to local model directory (e.g., 'Lattifai/Lattice-1-Alpha')."""
+    model_name: str = "Lattifai/Lattice-1"
+    """Model identifier or path to local model directory (e.g., 'Lattifai/Lattice-1')."""
 
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""

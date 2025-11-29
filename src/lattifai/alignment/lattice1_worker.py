@@ -14,7 +14,7 @@ from lattifai.audio2 import AudioData
 from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
 
 
-class Lattice1AlphaWorker:
+class Lattice1Worker:
     """Worker for processing audio with LatticeGraph."""
 
     def __init__(self, model_path: Pathlike, device: str = "cpu", num_threads: int = 8) -> None:
@@ -177,9 +177,9 @@ class Lattice1AlphaWorker:
         return emission, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
 
 
-def _load_worker(model_path: str, device: str) -> Lattice1AlphaWorker:
+def _load_worker(model_path: str, device: str) -> Lattice1Worker:
     """Instantiate lattice worker with consistent error handling."""
     try:
-        return Lattice1AlphaWorker(model_path, device=device, num_threads=8)
+        return Lattice1Worker(model_path, device=device, num_threads=8)
     except Exception as e:
         raise ModelLoadError(f"worker from {model_path}", original_error=e)

@@ -30,7 +30,24 @@ MAXIMUM_WORD_LENGTH = 40
 TokenizerT = TypeVar("TokenizerT", bound="LatticeTokenizer")
 
 
-def tokenize_multilingual_text(text: str, keep_spaces: bool = True) -> list[str]:
+def _is_punctuation(char: str) -> bool:
+    """Check if a character is punctuation (not space, not alphanumeric, not CJK)."""
+    if len(char) != 1:
+        return False
+    if char.isspace():
+        return False
+    if char.isalnum():
+        return False
+    # Check if it's a CJK character
+    if "\u4e00" <= char <= "\u9fff":
+        return False
+    # Check if it's an accented Latin character
+    if "\u00c0" <= char <= "\u024f":
+        return False
+    return True
+
+
+def tokenize_multilingual_text(text: str, keep_spaces: bool = True, attach_punctuation: bool = False) -> list[str]:
     """
     Tokenize a mixed Chinese-English string into individual units.
 
@@ -38,12 +55,16 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True) -> list[str]
     - Chinese characters (CJK) are split individually
     - Consecutive Latin letters (including accented characters) and digits are grouped as one unit
     - English contractions ('s, 't, 'm, 'll, 're, 've) are kept with the preceding word
-    - Other characters (punctuation, spaces) are split individually
+    - Other characters (punctuation, spaces) are split individually by default
+    - If attach_punctuation=True, punctuation marks are attached to the preceding token
 
     Args:
         text: Input string containing mixed Chinese and English text
         keep_spaces: If True, spaces are included in the output as separate tokens.
                      If False, spaces are excluded from the output. Default is True.
+        attach_punctuation: If True, punctuation marks are attached to the preceding token.
+                            For example, "Hello, World!" becomes ["Hello,", " ", "World!"].
+                            Default is False.
 
     Returns:
         List of tokenized units
@@ -57,6 +78,8 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True) -> list[str]
         ["I'm", 'fine']
         >>> tokenize_multilingual_text("Kühlschrank")
         ['Kühlschrank']
+        >>> tokenize_multilingual_text("Hello, World!", attach_punctuation=True)
+        ['Hello,', ' ', 'World!']
     """
     # Regex pattern:
     # - [a-zA-Z0-9\u00C0-\u024F]+ matches Latin letters (including accented chars like ü, ö, ä, ß, é, etc.)
@@ -71,6 +94,21 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True) -> list[str]
 
     # filter(None, ...) removes any empty strings from re.findall results
     tokens = list(filter(None, pattern.findall(text)))
+
+    if attach_punctuation and len(tokens) > 1:
+        # Attach punctuation to the preceding token
+        # Punctuation characters (excluding spaces) are merged with the previous token
+        merged_tokens = []
+        i = 0
+        while i < len(tokens):
+            token = tokens[i]
+            # Look ahead to collect consecutive punctuation (non-space, non-alphanumeric, non-CJK)
+            if merged_tokens and _is_punctuation(token):
+                merged_tokens[-1] = merged_tokens[-1] + token
+            else:
+                merged_tokens.append(token)
+            i += 1
+        tokens = merged_tokens
 
     if not keep_spaces:
         tokens = [t for t in tokens if not t.isspace()]
@@ -387,6 +425,7 @@ class LatticeTokenizer:
         response = self.client_wrapper.post(
             "detokenize",
             json={
+                "model_name": self.model_name,
                 "lattice_id": lattice_id,
                 "frame_shift": frame_shift,
                 "results": [t.to_dict() for t in results[0]],
@@ -479,6 +518,7 @@ def _update_alignments_speaker(supervisions: List[Supervision], alignments: List
 def _load_tokenizer(
     client_wrapper: Any,
     model_path: str,
+    model_name: str,
     device: str,
     *,
     tokenizer_cls: Type[LatticeTokenizer] = LatticeTokenizer,
@@ -488,6 +528,7 @@ def _load_tokenizer(
         return tokenizer_cls.from_pretrained(
             client_wrapper=client_wrapper,
             model_path=model_path,
+            model_name=model_name,
             device=device,
         )
     except Exception as e:

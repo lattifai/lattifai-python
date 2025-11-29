@@ -15,7 +15,7 @@ from lattifai.errors import (
 )
 from lattifai.utils import _resolve_model_path
 
-from .lattice1_alpha import _load_worker
+from .lattice1_worker import _load_worker
 from .tokenizer import _load_tokenizer
 
 ClientType = Any
