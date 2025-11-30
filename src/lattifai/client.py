@@ -1,7 +1,7 @@
 """LattifAI client implementation with config-driven architecture."""
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import colorful
 from lhotse.utils import Pathlike
@@ -11,13 +11,15 @@ from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.base_client import LattifAIClientMixin, SyncAPIClient
 from lattifai.caption import Caption, InputCaptionFormat
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
-from lattifai.diarization import LattifAIDiarizer
 from lattifai.errors import (
     AlignmentError,
     CaptionProcessingError,
     LatticeDecodingError,
     LatticeEncodingError,
 )
+
+if TYPE_CHECKING:
+    from lattifai.diarization import LattifAIDiarizer  # noqa: F401
 
 
 class LattifAI(LattifAIClientMixin, SyncAPIClient):
@@ -66,8 +68,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         self.aligner = Lattice1Aligner(self, config=alignment_config)
 
         # Initialize diarizer if enabled
-        self.diarizer = None
+        self.diarizer: Optional["LattifAIDiarizer"] = None
         if self.diarization_config.enabled:
+            from lattifai.diarization import LattifAIDiarizer  # noqa: F811
+
             self.diarizer = LattifAIDiarizer(config=self.diarization_config)
 
         # Initialize shared components (transcriber, downloader)
