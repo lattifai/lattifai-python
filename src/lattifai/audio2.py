@@ -124,7 +124,7 @@ class AudioLoader:
             RuntimeError: If audio loading fails.
         """
         if isinstance(audio, Pathlike):
-            audio = str(Path(audio).expanduser())
+            audio = str(Path(str(audio)).expanduser())
 
         # load audio
         try:
