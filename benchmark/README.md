@@ -42,20 +42,19 @@ python eval.py -r data/Introducing_GPT-4o_GroundTruth.ass -hyp data/Introducing_
   --metrics der jer wer sca scer --collar 0.0 --model-name "Ground Truth"
 
 # Gemini 2.5 Pro + LattifAI alignment
-# Note: subtitle.split_sentence=true may cause slight WER increase due to text normalization
+# Note: caption.split_sentence=true may cause slight WER increase due to text normalization
 # (e.g., "ChatGPT" may be split into "Chat GPT")
 lai alignment youtube \
     https://www.youtube.com/watch\?v\=DQacCB9tDaw \
     media.output_dir=~/Downloads/lattifai_youtube \
-    subtitle.include_speaker_in_text=false subtitle.split_sentence=true \
-    subtitle.input_path=./data/Introducing_GPT-4o_Gemini.md \
-    subtitle.output_path=./data/Introducing_GPT-4o_Gemini_LattifAI.ass \
-    subtitle.use_transcription=true \
+    caption.include_speaker_in_text=false caption.split_sentence=true \
+    caption.input_path=./data/Introducing_GPT-4o_Gemini.md \
+    caption.output_path=./data/Introducing_GPT-4o_Gemini_LattifAI.ass \
     transcription.model_name=gemini-2.5-pro \
     transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
 
 # Gemini 2.5 Pro
-lai subtitle convert ./data/Introducing_GPT-4o_Gemini.md ./data/Introducing_GPT-4o_Gemini.ass include_speaker_in_text=false
+lai caption convert ./data/Introducing_GPT-4o_Gemini.md ./data/Introducing_GPT-4o_Gemini.ass include_speaker_in_text=false
 
 python eval.py -r data/Introducing_GPT-4o_GroundTruth.ass -hyp data/Introducing_GPT-4o_Gemini.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 Pro"
@@ -66,14 +65,13 @@ python eval.py -r data/Introducing_GPT-4o_GroundTruth.ass -hyp data/Introducing_
 lai alignment youtube \
     https://www.youtube.com/watch\?v\=DQacCB9tDaw \
     media.output_dir=~/Downloads/lattifai_youtube_Gemini3 \
-    subtitle.include_speaker_in_text=false subtitle.split_sentence=true \
-    subtitle.input_path=./data/Introducing_GPT-4o_Gemini3.md \
-    subtitle.output_path=./data/Introducing_GPT-4o_Gemini3_LattifAI.ass \
-    subtitle.use_transcription=true \
+    caption.include_speaker_in_text=false caption.split_sentence=true \
+    caption.input_path=./data/Introducing_GPT-4o_Gemini3.md \
+    caption.output_path=./data/Introducing_GPT-4o_Gemini3_LattifAI.ass \
     transcription.model_name=gemini-3-pro-preview \
     transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
 
-lai subtitle convert ./data/Introducing_GPT-4o_Gemini3.md ./data/Introducing_GPT-4o_Gemini3.ass include_speaker_in_text=false
+lai caption convert ./data/Introducing_GPT-4o_Gemini3.md ./data/Introducing_GPT-4o_Gemini3.ass include_speaker_in_text=false
 
 python eval.py -r data/Introducing_GPT-4o_GroundTruth.ass -hyp data/Introducing_GPT-4o_Gemini3.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 3 Pro Preview"

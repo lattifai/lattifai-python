@@ -1,5 +1,68 @@
 # CHANGELOG
 
+## [1.0.0rc2] - 2025-11-30
+
+### Major Changes
+
+#### Caption System Refactor
+- **New Caption Class**: Introduced unified `Caption` class to replace `CaptionIO` for streamlined subtitle/caption handling
+  - Comprehensive data structure with supervisions, transcription, audio events, and speaker diarization support
+  - Rich metadata support including language, kind, source format, and custom fields
+  - Built-in methods for reading/writing various caption formats
+- **YouTube VTT Word-Level Timestamps**: Added parsing support for YouTube auto-generated captions with word-level timing
+  - Extracts and merges word-level alignments from YouTube VTT format
+  - Preserves precise timing information for each word
+
+#### Alignment Engine Updates
+- **Segmenter Class**: New `Segmenter` class for segmented alignment strategy
+  - Supports audio event-aware segmentation (e.g., [APPLAUSE], [MUSIC])
+  - Improved handling of multi-speaker segments with resegmentation tiers
+- **Model Path Resolution**: Fixed user directory expansion for accurate path checking
+- **Emission and Offset Parameters**: Enhanced alignment accuracy with new emission and offset parameters
+- **Renamed `Lattice1AlphaWorker` to `Lattice1Worker`**: Simplified naming for consistency
+
+#### Audio Processing Improvements
+- **AudioLoader and AudioData Classes**: New abstractions for improved audio loading and processing
+  - `AudioData` class with `duration` property and tensor handling
+  - Cleaner separation of audio loading and alignment logic
+
+#### Transcription Enhancements
+- **Speaker Diarization API**: Introduced speaker diarization configuration in `TranscriptionConfig`
+  - Renamed diarization method to `speaker_diarization` for clarity
+- **Audio Event Detection**: Added support for reading and writing audio events in transcription workflows
+- **Transcriber Identification**: Implemented abstract `name` property in `BaseTranscriber` for improved transcriber identification
+
+#### Configuration System
+- **Device Auto-Detection**: Added 'auto' option for device configuration in alignment and transcription
+- **Enhanced Validation**: Improved path handling with `Pathlike` and better input validation across configurations
+- **Logging Configuration**: New logging setup for better debugging and monitoring
+
+#### CLI Improvements
+- **Renamed CLI Commands**: Updated subtitle CLI command shortcuts (e.g., `laicap-shift` for time shifting)
+- **Verbose Option**: Added verbose output option for caption reading and alignment debugging
+- **Alignment Strategy**: New alignment strategy option with 'entire' mode support
+
+#### Tokenizer Updates
+- **Multilingual Tokenization**: Added text tokenization function supporting Chinese, English, and German
+- **Error Handling**: Enhanced quota exceeds error handling with 402 status code capture
+- **Removed `AsyncLatticeTokenizer`**: Simplified tokenizer architecture
+- **Renamed `model_name_or_path` to `model_name`**: Consistent parameter naming
+
+#### Benchmark and Evaluation
+- **Evaluation Metrics**: Added comprehensive metrics for subtitle alignment quality (DER, JER, WER, SCA, SCER)
+- **Verbose Alignment Debugging**: Enhanced detailed DER output formatting
+- **Text Normalization**: Improved WER calculation with better text normalization
+
+### Bug Fixes
+- Fixed model path resolution to properly expand user directory (`~`)
+- Fixed speaker name handling in subtitle to annotation conversion
+- Removed `AsyncLattifAI` class (use synchronous `LattifAI` client)
+
+### Technical Changes
+- Updated dependency: `lattifai-run>=1.0.1` for enhanced CLI framework
+- Refactored parameter naming: `input_media_path` → `input_media` for consistency
+- Enhanced speaker handling in SubtitleReader to default to event name if not provided
+
 ## [1.0.0rc1] - 2025-11-17
 
 ### Major Refactor

@@ -1,10 +1,10 @@
 [build-system]
-requires = ['setuptools>=60', 'wheel']
+requires = ['setuptools>=60,<80', 'wheel']
 build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.0.0rc1'
+version = '1.0.0rc2'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -18,7 +18,8 @@ maintainers = [
 requires-python = '>=3.10,<3.15'
 
 dependencies = [
-    "lattifai-core>=0.4.0",
+    "lattifai-core>=0.4.1",
+    "lattifai-run>=1.0.1",
     "httpx",
     "python-dotenv",
     "lhotse>=1.26.0",
@@ -26,17 +27,20 @@ dependencies = [
     "pysubs2",
     "praatio",
     "tgt",
+    "onnx>=1.16.0",
     "onnxruntime",
     "g2p-phonemizer==0.1.1",
-    "wtpsplit>=2.1.6",
     "av",
+    "wtpsplit>=2.1.6",
+    "OmniSenseVoice>=0.2.2",
+    ## Need to fix deps conflict
+    # "nemo_toolkit[asr]==2.5.3",
+    # "pyannote.audio>=4.0.2",
     # agentic workflow dependencies
     "questionary>=2.0",
     "yt-dlp",
     "pycryptodome",
     "google-genai>=1.22.0",
-    # config
-    "lattifai-run>=1.0.0rc3",
 ]
 
 classifiers = [
@@ -67,6 +71,8 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 [project.scripts]
 "lai-align" = "lattifai.cli.alignment:main"
 "lai-youtube" = "lattifai.cli.youtube:main"
+"lai-transcribe-file" = "lattifai.cli.transcribe:main_file"
+"lai-transcribe-youtube" = "lattifai.cli.transcribe:main_youtube"
 "laicap-convert" = "lattifai.cli.caption:main_convert"
 "laicap-normalize" = "lattifai.cli.caption:main_normalize"
 "laicap-shift" = "lattifai.cli.caption:main_shift"
@@ -76,6 +82,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 alignment = "lattifai.cli"
 caption = "lattifai.cli"
 agent = "lattifai.cli"
+transcribe = "lattifai.cli"
 
 [tool.setuptools]
 packages = [
@@ -113,8 +120,8 @@ testpaths = ["tests"]
 omit = [
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.23.0",

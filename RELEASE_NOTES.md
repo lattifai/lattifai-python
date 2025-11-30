@@ -1,4 +1,252 @@
 ````markdown
+# Release Notes - LattifAI Python v1.0.0rc2
+
+**Release Date:** November 30, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.0.0rc2 is a significant update that introduces a refactored caption system, enhanced alignment engine, and improved audio processing capabilities. This release focuses on better handling of complex caption formats, multi-speaker scenarios, and benchmark evaluation metrics.
+
+---
+
+## ✨ Major Changes
+
+### 📝 Caption System Refactor
+
+**New Unified Caption Class**
+
+Introduced a comprehensive `Caption` class that replaces the previous `CaptionIO` for streamlined subtitle/caption handling:
+
+```python
+from lattifai.caption import Caption
+
+# Read captions with metadata preservation
+caption = Caption.read("subtitles.srt")
+print(f"Loaded {len(caption)} segments")
+print(f"Language: {caption.language}")
+print(f"Duration: {caption.duration:.2f}s")
+
+# Write to different formats
+caption.write("output.vtt")
+caption.write("output.TextGrid")
+```
+
+**Key Features:**
+- ✅ **Rich Metadata**: Language, kind, source format, and custom fields
+- ✅ **Multi-format Support**: SRT, VTT, ASS, TextGrid, JSON, TXT
+- ✅ **Transcription Integration**: Built-in support for transcription results, audio events, and speaker diarization
+
+**YouTube VTT Word-Level Timestamps**
+
+Added support for parsing YouTube auto-generated captions with word-level timing:
+
+```python
+# YouTube VTT format with word timestamps is auto-detected
+caption = Caption.read("youtube_captions.vtt")
+
+# Word-level alignments are preserved
+for supervision in caption.supervisions:
+    if supervision.alignment:
+        for word in supervision.alignment["word"]:
+            print(f"[{word.start:.2f}-{word.end:.2f}] {word.symbol}")
+```
+
+### 🔧 Alignment Engine Updates(WIP)
+
+**New Segmenter Class**
+
+Introduced `Segmenter` class for advanced segmented alignment:
+
+```python
+from lattifai.alignment import Segmenter
+
+# Segmented alignment with audio event awareness
+segmenter = Segmenter(...)
+# Handles [APPLAUSE], [MUSIC], and other audio events
+# Improved multi-speaker segment handling
+```
+
+**Improvements:**
+- ✅ **Audio Event-Aware Segmentation**: Properly handles non-speech events
+- ✅ **Multi-Speaker Resegmentation**: Better alignment for overlapping speakers
+- ✅ **Emission and Offset Parameters**: Enhanced alignment accuracy
+
+### 🎙️ Transcription Enhancements
+
+**Speaker Diarization API**
+
+```python
+from lattifai import LattifAI
+
+client = LattifAI()
+
+# Speaker diarization is now configured in DiarizationConfig
+# Results stored in Caption.speaker_diarization as TextGrid
+```
+
+### 🌐 Multilingual Tokenization
+
+Added text tokenization function supporting multiple languages:
+
+```python
+# Supports Chinese, English, and German text processing
+# Improved handling of mixed-language content
+```
+
+### ⚙️ Configuration Improvements
+
+**Device Auto-Detection**
+
+```bash
+# New 'auto' option for device selection
+lai alignment align audio.wav sub.srt out.srt alignment.device=auto
+```
+
+**Enhanced Path Handling**
+
+- Fixed user directory expansion (`~`) in model paths
+- Improved validation across all configuration classes
+
+### 📊 Benchmark and Evaluation
+
+**New Evaluation Metrics**
+
+Added comprehensive alignment quality metrics:
+
+```bash
+# Available metrics: DER, JER, WER, SCA, SCER
+python eval.py -r reference.ass -hyp hypothesis.ass \
+  --metrics der jer wer sca scer --collar 0.0
+```
+
+**Verbose Output**
+
+```bash
+# Detailed alignment debugging
+lai alignment align audio.wav sub.srt out.srt -v
+```
+
+---
+
+## 🔄 Breaking Changes
+
+### Renamed Classes and Methods
+
+| Before | After |
+|--------|-------|
+| `Lattice1AlphaWorker` | `Lattice1Worker` |
+| `model_name_or_path` | `model_name` |
+| `input_media_path` | `input_media` |
+
+### Removed
+
+- `AsyncLattifAI` - Use synchronous `LattifAI` client
+- `AsyncLatticeTokenizer` - Simplified tokenizer architecture
+
+---
+
+## 📋 Command Reference
+
+### Alignment Commands
+
+**Basic Alignment:**
+```bash
+lai alignment align audio.wav subtitle.srt output.srt
+```
+
+**With Verbose Output:**
+```bash
+lai alignment align audio.wav subtitle.srt output.srt -v
+```
+
+**YouTube Alignment:**
+```bash
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
+```
+
+### Caption Commands
+
+**Convert Format:**
+```bash
+laicap-convert input.srt output.vtt
+```
+
+**Normalize Text:**
+```bash
+laicap-normalize input.srt output.srt
+```
+
+**Shift Timestamps:**
+```bash
+laicap-shift input.srt output.srt --seconds 2.5
+```
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+### Verify Installation:
+
+```bash
+lai --help
+# View new command structure
+```
+
+---
+
+## 🔗 Dependencies
+
+### Updated Dependencies
+
+- **lattifai-run>=1.0.1**: Enhanced CLI framework with improved argument handling
+- **lattifai-core>=0.4.0**: Core alignment and tokenization updates
+
+### Python Support
+
+- Python 3.10 - 3.14 maintained
+
+---
+
+## 🧪 Testing
+
+This release includes:
+- ✅ Comprehensive Caption class tests
+- ✅ YouTube VTT parsing tests
+- ✅ Alignment segmentation tests
+- ✅ Evaluation metrics validation
+
+---
+
+## 📝 Version Info
+
+- **Version**: 1.0.0rc2
+- **Release Date**: November 30, 2025
+- **Python Support**: 3.10 - 3.14
+- **Model**: Lattice-1
+- **License**: Apache License 2.0
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
+
+---
+
+# Previous Release Notes
+
+## v1.0.0rc1 - CLI Architecture Refactor
+
 # Release Notes - LattifAI Python v1.0.0rc1
 
 **Release Date:** November 17, 2025
