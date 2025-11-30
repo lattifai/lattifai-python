@@ -187,6 +187,10 @@ class LattifAIClientMixin:
         if caption_config is None:
             caption_config = CaptionConfig()
 
+        from lattifai.utils import _resolve_model_path
+
+        transcription_config.lattice_model_path = _resolve_model_path(alignment_config.model_name)
+
         return client_config, alignment_config, caption_config, transcription_config
 
     def _init_shared_components(

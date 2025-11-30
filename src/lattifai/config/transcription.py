@@ -44,6 +44,9 @@ class TranscriptionConfig:
     language: Optional[str] = None
     """Target language code for transcription (e.g., 'en', 'zh', 'ja')."""
 
+    lattice_model_path: Optional[str] = None
+    """Path to local LattifAI model. Will be auto-set in LattifAI client."""
+
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
