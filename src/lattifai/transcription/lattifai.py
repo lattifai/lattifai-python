@@ -1,8 +1,7 @@
 """Transcription module with config-driven architecture."""
 
-import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from lattifai.audio2 import AudioData
 from lattifai.caption import Caption
@@ -71,7 +70,9 @@ class LattifAITranscriber(BaseTranscriber):
 
         return caption
 
-    def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8") -> Path:
+    def write(
+        self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_audio_events: bool = True
+    ) -> Path:
         """
         Persist transcript text to disk and return the file path.
         """
@@ -79,7 +80,7 @@ class LattifAITranscriber(BaseTranscriber):
             output_file,
             include_speaker_in_text=False,
         )
-        if transcript.audio_events:
+        if cache_audio_events and transcript.audio_events:
             from tgt import write_to_file
 
             events_file = output_file.with_suffix(".AED")

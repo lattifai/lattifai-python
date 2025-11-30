@@ -6,11 +6,14 @@ import nemo_run as run  # noqa: F401
 from lattifai.cli.agent import agent
 from lattifai.cli.alignment import align
 from lattifai.cli.caption import convert
+from lattifai.cli.transcribe import transcribe_file, transcribe_youtube
 from lattifai.cli.youtube import youtube
 
 __all__ = [
     "agent",
     "align",
     "convert",
+    "transcribe_file",
+    "transcribe_youtube",
     "youtube",
 ]

@@ -205,7 +205,9 @@ class GeminiTranscriber(BaseTranscriber):
 
         return transcript
 
-    def write(self, transcript: str, output_file: Path, encoding: str = "utf-8") -> Path:
+    def write(
+        self, transcript: str, output_file: Path, encoding: str = "utf-8", cache_audio_events: bool = True
+    ) -> Path:
         """
         Persist transcript text to disk and return the file path.
         """
