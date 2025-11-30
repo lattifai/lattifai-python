@@ -22,7 +22,7 @@ Visit our [LattifAI roadmap](https://lattifai.com/roadmap) for the latest update
 | Date | Release | Key Features |
 |------|---------|--------------|
 | **Oct 7, 2024** | **Lattice-1-Alpha** | ✅ English-only forced alignment<br>✅ Multiple media&subtitle format support<br>✅ CPU/GPU optimization |
-| **Nov 30, 2024** | **Lattice-1** | 🚀 English + Chinese + German support<br>🚀 Mixed language alignment<br>🚀 Integrate Speaker Diarization technology<br>🚀 Support up to 20 hours of continuous audio/video processing |
+| **Nov 30, 2024** | **Lattice-1** | 🚀 English + Chinese + German support<br>🚀 Mixed language alignment<br>🚀 WIP: Integrate Speaker Diarization technology<br>🚀 WIP: Support up to 20 hours of continuous audio/video processing |
 
 ## Installation
 
@@ -38,12 +38,15 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv init my-project
 cd my-project
 
-# Install LattifAI
-uv add lattifai
+uv init
+source .venv/bin/activate
 
 # Install k2 (required dependency)
 uv pip install install-k2
 uv run install-k2
+
+# Install LattifAI
+uv add lattifai
 ```
 
 ### Alternative: Using pip
