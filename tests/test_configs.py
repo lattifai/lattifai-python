@@ -6,6 +6,7 @@ from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
     ClientConfig,
+    DiarizationConfig,
     MediaConfig,
     TranscriptionConfig,
 )
@@ -46,7 +47,7 @@ class TestAlignmentConfig:
         config = AlignmentConfig()
         # Alignment defaults - device is auto-selected based on hardware
         assert config.device in ["cpu", "cuda", "mps"]
-        assert config.model_name == "Lattifai/Lattice-1-Alpha"
+        assert config.model_name == "Lattifai/Lattice-1"
         assert config.batch_size == 1
 
     def test_api_key_from_env(self, monkeypatch):
@@ -97,6 +98,30 @@ class TestAlignmentConfig:
         """Test validation of device parameter."""
         with pytest.raises(ValueError, match="device must be one of"):
             AlignmentConfig(device="invalid")
+
+    @pytest.mark.parametrize(
+        "device",
+        ["cpu", "cuda", "mps", "cuda:0", "cuda:1", "cuda:2", "cuda:7"],
+    )
+    def test_valid_device_values(self, device):
+        """Test all valid device values including cuda:N format."""
+        config = AlignmentConfig(device=device)
+        assert config.device == device
+
+    def test_auto_device_selection(self):
+        """Test that 'auto' device gets converted to actual device."""
+        config = AlignmentConfig(device="auto")
+        # auto should be converted to one of the actual devices
+        assert config.device in ["cpu", "cuda", "mps"]
+
+    @pytest.mark.parametrize(
+        "invalid_device",
+        ["gpu", "tpu", "CUDA", "Cuda:0", "GPU", "invalid"],
+    )
+    def test_invalid_device_values(self, invalid_device):
+        """Test various invalid device values."""
+        with pytest.raises(ValueError, match="device must be one of"):
+            AlignmentConfig(device=invalid_device)
 
 
 class TestCaptionConfig:
@@ -186,3 +211,119 @@ class TestTranscriptionConfig:
         """Test validation of device parameter."""
         with pytest.raises(ValueError, match="device must be one of"):
             TranscriptionConfig(device="invalid")
+
+    @pytest.mark.parametrize(
+        "device",
+        ["cpu", "cuda", "mps", "cuda:0", "cuda:1", "cuda:2", "cuda:7"],
+    )
+    def test_valid_device_values(self, device):
+        """Test all valid device values including cuda:N format."""
+        config = TranscriptionConfig(device=device)
+        assert config.device == device
+
+    def test_auto_device_selection(self):
+        """Test that 'auto' device gets converted to actual device."""
+        config = TranscriptionConfig(device="auto")
+        # auto should be converted to one of the actual devices
+        assert config.device in ["cpu", "cuda", "mps"]
+
+    @pytest.mark.parametrize(
+        "invalid_device",
+        ["gpu", "tpu", "CUDA", "Cuda:0", "GPU", "invalid"],
+    )
+    def test_invalid_device_values(self, invalid_device):
+        """Test various invalid device values."""
+        with pytest.raises(ValueError, match="device must be one of"):
+            TranscriptionConfig(device=invalid_device)
+
+
+class TestDiarizationConfig:
+    """Test DiarizationConfig class."""
+
+    def test_default_values(self):
+        """Test default configuration values."""
+        config = DiarizationConfig()
+        assert config.enabled is False
+        # Device is auto-selected based on hardware
+        assert config.device in ["cpu", "cuda", "mps"]
+        assert config.num_speakers is None
+        assert config.min_speakers is None
+        assert config.max_speakers is None
+        assert config.model_name == "pyannote/speaker-diarization-community-1"
+        assert config.verbose is False
+        assert config.debug is True
+
+    def test_custom_values(self):
+        """Test custom configuration values."""
+        config = DiarizationConfig(
+            enabled=True,
+            device="cuda",
+            num_speakers=2,
+            model_name="custom-diarization-model",
+            verbose=True,
+            debug=False,
+        )
+        assert config.enabled is True
+        assert config.device == "cuda"
+        assert config.num_speakers == 2
+        assert config.model_name == "custom-diarization-model"
+        assert config.verbose is True
+        assert config.debug is False
+
+    def test_speaker_range(self):
+        """Test min_speakers and max_speakers configuration."""
+        config = DiarizationConfig(
+            min_speakers=2,
+            max_speakers=5,
+        )
+        assert config.min_speakers == 2
+        assert config.max_speakers == 5
+
+    def test_invalid_num_speakers(self):
+        """Test validation of num_speakers parameter."""
+        with pytest.raises(ValueError, match="num_speakers must be at least 1"):
+            DiarizationConfig(num_speakers=0)
+
+    def test_invalid_min_speakers(self):
+        """Test validation of min_speakers parameter."""
+        with pytest.raises(ValueError, match="min_speakers must be at least 1"):
+            DiarizationConfig(min_speakers=0)
+
+    def test_invalid_max_speakers(self):
+        """Test validation of max_speakers parameter."""
+        with pytest.raises(ValueError, match="max_speakers must be at least 1"):
+            DiarizationConfig(max_speakers=0)
+
+    def test_invalid_speaker_range(self):
+        """Test validation of speaker range."""
+        with pytest.raises(ValueError, match="min_speakers cannot be greater than max_speakers"):
+            DiarizationConfig(min_speakers=5, max_speakers=2)
+
+    def test_invalid_device(self):
+        """Test validation of device parameter."""
+        with pytest.raises(ValueError, match="device must be one of"):
+            DiarizationConfig(device="invalid")
+
+    @pytest.mark.parametrize(
+        "device",
+        ["cpu", "cuda", "mps", "cuda:0", "cuda:1", "cuda:2", "cuda:7"],
+    )
+    def test_valid_device_values(self, device):
+        """Test all valid device values including cuda:N format."""
+        config = DiarizationConfig(device=device)
+        assert config.device == device
+
+    def test_auto_device_selection(self):
+        """Test that 'auto' device gets converted to actual device."""
+        config = DiarizationConfig(device="auto")
+        # auto should be converted to one of the actual devices
+        assert config.device in ["cpu", "cuda", "mps"]
+
+    @pytest.mark.parametrize(
+        "invalid_device",
+        ["gpu", "tpu", "CUDA", "Cuda:0", "GPU", "invalid"],
+    )
+    def test_invalid_device_values(self, invalid_device):
+        """Test various invalid device values."""
+        with pytest.raises(ValueError, match="device must be one of"):
+            DiarizationConfig(device=invalid_device)

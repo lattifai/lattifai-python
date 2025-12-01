@@ -71,7 +71,7 @@ class TranscriptionConfig:
             raise ValueError("max_retries must be non-negative")
 
         # Validate device
-        if self.device not in ("cpu", "cuda", "mps", "auto"):
+        if self.device not in ("cpu", "cuda", "mps", "auto") and not self.device.startswith("cuda:"):
             raise ValueError(f"device must be one of ('cpu', 'cuda', 'mps', 'auto'), got '{self.device}'")
 
         if self.device == "auto":
