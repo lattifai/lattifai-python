@@ -499,8 +499,13 @@ LattifAI supports virtually all common media and subtitle formats:
 |------|---------|
 | **Audio** | WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF, and more |
 | **Video** | MP4, MKV, MOV, WEBM, AVI, and more |
-| **Subtitle Input** | SRT, VTT, ASS, SSA, SUB, SBV, TXT, Gemini, and more |
-| **Subtitle Output** | All input formats + TextGrid (Praat) |
+| **Caption/Subtitle Input** | SRT, VTT, ASS, SSA, SUB, SBV, TXT, Gemini, and more |
+| **Caption/Subtitle Output** | All input formats + TextGrid (Praat) |
+
+**Tabular Formats:**
+- **TSV**: Tab-separated values with optional speaker column
+- **CSV**: Comma-separated values with optional speaker column
+- **AUD**: Audacity labels format with `[[speaker]]` notation
 
 > **Note**: If a format is not listed above but commonly used, it's likely supported. Feel free to try it or reach out if you encounter any issues.
 

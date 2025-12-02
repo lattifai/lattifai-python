@@ -451,6 +451,12 @@ class Caption:
 
             write_to_file(tg, output_path, format="long")
 
+        elif str(output_path)[-4:].lower() == ".tsv":
+            cls._write_tsv(alignments, output_path, include_speaker_in_text)
+        elif str(output_path)[-4:].lower() == ".csv":
+            cls._write_csv(alignments, output_path, include_speaker_in_text)
+        elif str(output_path)[-4:].lower() == ".aud":
+            cls._write_aud(alignments, output_path, include_speaker_in_text)
         else:
             import pysubs2
 
@@ -790,6 +796,12 @@ class Caption:
                     ]
                 )
             supervisions = sorted(supervisions, key=lambda x: x.start)
+        elif format == "tsv" or str(caption)[-4:].lower() == ".tsv":
+            supervisions = cls._parse_tsv(caption, normalize_text)
+        elif format == "csv" or str(caption)[-4:].lower() == ".csv":
+            supervisions = cls._parse_csv(caption, normalize_text)
+        elif format == "aud" or str(caption)[-4:].lower() == ".aud":
+            supervisions = cls._parse_aud(caption, normalize_text)
         elif format == "txt" or (format == "auto" and str(caption)[-4:].lower() == ".txt"):
             if not Path(str(caption)).exists():  # str
                 lines = [line.strip() for line in str(caption).split("\n")]
@@ -810,6 +822,333 @@ class Caption:
                 supervisions = GeminiReader.extract_for_alignment(caption)
 
         return supervisions
+
+    @classmethod
+    def _parse_tsv(cls, caption: Pathlike, normalize_text: Optional[bool] = False) -> List[Supervision]:
+        """
+        Parse TSV (Tab-Separated Values) format caption file.
+
+        Format specifications:
+        - With speaker: speaker\tstart\tend\ttext
+        - Without speaker: start\tend\ttext
+        - Times are in milliseconds
+
+        Args:
+            caption: Caption file path
+            normalize_text: Whether to normalize text
+
+        Returns:
+            List of Supervision objects
+        """
+        caption_path = Path(str(caption))
+        if not caption_path.exists():
+            raise FileNotFoundError(f"Caption file not found: {caption}")
+
+        supervisions = []
+
+        with open(caption_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        # Check if first line is a header
+        first_line = lines[0].strip().lower()
+        has_header = "start" in first_line and "end" in first_line and "text" in first_line
+        has_speaker_column = "speaker" in first_line
+
+        start_idx = 1 if has_header else 0
+
+        for line in lines[start_idx:]:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+
+            try:
+                if has_speaker_column and len(parts) >= 4:
+                    # Format: speaker\tstart\tend\ttext
+                    speaker = parts[0].strip() if parts[0].strip() else None
+                    start = float(parts[1]) / 1000.0  # Convert milliseconds to seconds
+                    end = float(parts[2]) / 1000.0
+                    text = "\t".join(parts[3:]).strip()
+                else:
+                    # Format: start\tend\ttext
+                    start = float(parts[0]) / 1000.0  # Convert milliseconds to seconds
+                    end = float(parts[1]) / 1000.0
+                    text = "\t".join(parts[2:]).strip()
+                    speaker = None
+
+                if normalize_text:
+                    text = normalize_text_fn(text)
+
+                duration = end - start
+                if duration < 0:
+                    continue
+
+                supervisions.append(
+                    Supervision(
+                        text=text,
+                        start=start,
+                        duration=duration,
+                        speaker=speaker,
+                    )
+                )
+            except (ValueError, IndexError):
+                # Skip malformed lines
+                continue
+
+        return supervisions
+
+    @classmethod
+    def _parse_csv(cls, caption: Pathlike, normalize_text: Optional[bool] = False) -> List[Supervision]:
+        """
+        Parse CSV (Comma-Separated Values) format caption file.
+
+        Format specifications:
+        - With speaker: speaker,start,end,text
+        - Without speaker: start,end,text
+        - Times are in milliseconds
+
+        Args:
+            caption: Caption file path
+            normalize_text: Whether to normalize text
+
+        Returns:
+            List of Supervision objects
+        """
+        import csv
+
+        caption_path = Path(str(caption))
+        if not caption_path.exists():
+            raise FileNotFoundError(f"Caption file not found: {caption}")
+
+        supervisions = []
+
+        with open(caption_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv.reader(f)
+            lines = list(reader)
+
+        if not lines:
+            return supervisions
+
+        # Check if first line is a header
+        first_line = [col.strip().lower() for col in lines[0]]
+        has_header = "start" in first_line and "end" in first_line and "text" in first_line
+        has_speaker_column = "speaker" in first_line
+
+        start_idx = 1 if has_header else 0
+
+        for parts in lines[start_idx:]:
+            if len(parts) < 3:
+                continue
+
+            try:
+                if has_speaker_column and len(parts) >= 4:
+                    # Format: speaker,start,end,text
+                    speaker = parts[0].strip() if parts[0].strip() else None
+                    start = float(parts[1]) / 1000.0  # Convert milliseconds to seconds
+                    end = float(parts[2]) / 1000.0
+                    text = ",".join(parts[3:]).strip()
+                else:
+                    # Format: start,end,text
+                    start = float(parts[0]) / 1000.0  # Convert milliseconds to seconds
+                    end = float(parts[1]) / 1000.0
+                    text = ",".join(parts[2:]).strip()
+                    speaker = None
+
+                if normalize_text:
+                    text = normalize_text_fn(text)
+
+                duration = end - start
+                if duration < 0:
+                    continue
+
+                supervisions.append(
+                    Supervision(
+                        text=text,
+                        start=start,
+                        duration=duration,
+                        speaker=speaker,
+                    )
+                )
+            except (ValueError, IndexError):
+                # Skip malformed lines
+                continue
+
+        return supervisions
+
+    @classmethod
+    def _parse_aud(cls, caption: Pathlike, normalize_text: Optional[bool] = False) -> List[Supervision]:
+        """
+        Parse AUD (Audacity Labels) format caption file.
+
+        Format: start\tend\t[[speaker]]text
+        - Times are in seconds (float)
+        - Speaker is optional and enclosed in [[brackets]]
+
+        Args:
+            caption: Caption file path
+            normalize_text: Whether to normalize text
+
+        Returns:
+            List of Supervision objects
+        """
+        caption_path = Path(str(caption))
+        if not caption_path.exists():
+            raise FileNotFoundError(f"Caption file not found: {caption}")
+
+        supervisions = []
+
+        with open(caption_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+
+            try:
+                # AUD format: start\tend\ttext (speaker in [[brackets]])
+                start = float(parts[0])
+                end = float(parts[1])
+                text = "\t".join(parts[2:]).strip()
+
+                # Extract speaker from [[speaker]] prefix
+                speaker = None
+                speaker_match = re.match(r"^\[\[([^\]]+)\]\]\s*(.*)$", text)
+                if speaker_match:
+                    speaker = speaker_match.group(1)
+                    text = speaker_match.group(2)
+
+                if normalize_text:
+                    text = normalize_text_fn(text)
+
+                duration = end - start
+                if duration < 0:
+                    continue
+
+                supervisions.append(
+                    Supervision(
+                        text=text,
+                        start=start,
+                        duration=duration,
+                        speaker=speaker,
+                    )
+                )
+            except (ValueError, IndexError):
+                # Skip malformed lines
+                continue
+
+        return supervisions
+
+    @classmethod
+    def _write_tsv(
+        cls,
+        alignments: List[Supervision],
+        output_path: Pathlike,
+        include_speaker_in_text: bool = True,
+    ) -> None:
+        """
+        Write caption to TSV format.
+
+        Format: speaker\tstart\tend\ttext (with speaker)
+        or: start\tend\ttext (without speaker)
+
+        Args:
+            alignments: List of supervision segments to write
+            output_path: Path to output TSV file
+            include_speaker_in_text: Whether to include speaker column
+        """
+        with open(output_path, "w", encoding="utf-8") as file:
+            # Write header
+            if include_speaker_in_text:
+                file.write("speaker\tstart\tend\ttext\n")
+                for supervision in alignments:
+                    speaker = supervision.speaker or ""
+                    start_ms = round(1000 * supervision.start)
+                    end_ms = round(1000 * supervision.end)
+                    text = supervision.text.strip().replace("\t", " ")
+                    file.write(f"{speaker}\t{start_ms}\t{end_ms}\t{text}\n")
+            else:
+                file.write("start\tend\ttext\n")
+                for supervision in alignments:
+                    start_ms = round(1000 * supervision.start)
+                    end_ms = round(1000 * supervision.end)
+                    text = supervision.text.strip().replace("\t", " ")
+                    file.write(f"{start_ms}\t{end_ms}\t{text}\n")
+
+    @classmethod
+    def _write_csv(
+        cls,
+        alignments: List[Supervision],
+        output_path: Pathlike,
+        include_speaker_in_text: bool = True,
+    ) -> None:
+        """
+        Write caption to CSV format.
+
+        Format: speaker,start,end,text (with speaker)
+        or: start,end,text (without speaker)
+
+        Args:
+            alignments: List of supervision segments to write
+            output_path: Path to output CSV file
+            include_speaker_in_text: Whether to include speaker column
+        """
+        import csv
+
+        with open(output_path, "w", encoding="utf-8", newline="") as file:
+            if include_speaker_in_text:
+                writer = csv.writer(file)
+                writer.writerow(["speaker", "start", "end", "text"])
+                for supervision in alignments:
+                    speaker = supervision.speaker or ""
+                    start_ms = round(1000 * supervision.start)
+                    end_ms = round(1000 * supervision.end)
+                    text = supervision.text.strip()
+                    writer.writerow([speaker, start_ms, end_ms, text])
+            else:
+                writer = csv.writer(file)
+                writer.writerow(["start", "end", "text"])
+                for supervision in alignments:
+                    start_ms = round(1000 * supervision.start)
+                    end_ms = round(1000 * supervision.end)
+                    text = supervision.text.strip()
+                    writer.writerow([start_ms, end_ms, text])
+
+    @classmethod
+    def _write_aud(
+        cls,
+        alignments: List[Supervision],
+        output_path: Pathlike,
+        include_speaker_in_text: bool = True,
+    ) -> None:
+        """
+        Write caption to AUD format.
+
+        Format: start\tend\t[[speaker]]text
+        or: start\tend\ttext (without speaker)
+
+        Args:
+            alignments: List of supervision segments to write
+            output_path: Path to output AUD file
+            include_speaker_in_text: Whether to include speaker in [[brackets]]
+        """
+        with open(output_path, "w", encoding="utf-8") as file:
+            for supervision in alignments:
+                start = supervision.start
+                end = supervision.end
+                text = supervision.text.strip().replace("\t", " ")
+
+                if include_speaker_in_text and supervision.speaker:
+                    text = f"[[{supervision.speaker}]]{text}"
+
+                file.write(f"{start}\t{end}\t{text}\n")
 
     @classmethod
     def _parse_caption(
