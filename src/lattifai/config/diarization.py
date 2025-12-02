@@ -35,7 +35,7 @@ class DiarizationConfig:
     verbose: bool = False
     """Enable debug logging for diarization operations."""
 
-    debug: bool = True
+    debug: bool = False
     """Enable debug mode for diarization operations."""
 
     def __post_init__(self):

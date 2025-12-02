@@ -457,8 +457,20 @@ caption = client.alignment(
 )
 ```
 
-### WIP: Speaker Diarization
+### Speaker Diarization (WIP)
 
+**Note:** This feature is currently under development and not yet fully available.
+
+Speaker diarization automatically identifies and labels different speakers in audio. When enabled, the system will:
+- Detect speaker changes in the audio
+- Assign speaker labels (e.g., SPEAKER_00, SPEAKER_01) to each segment
+- Update subtitle segments with speaker information
+
+**Speaker Name Handling:**
+- **Existing speaker labels in subtitles**: If your input captions already contain speaker names (e.g., `[Alice]`, `>> Bob:`, or `SPEAKER_01:`), the system will preserve them as much as possible during alignment
+- **Gemini Transcriber**: When using Gemini models for transcription (e.g., `gemini-2.5-pro`), the model can intelligently identify and extract speaker names from dialogue context, making it easier to generate speaker-aware transcripts
+
+**Python SDK:**
 ```python
 from lattifai import LattifAI, DiarizationConfig
 
@@ -471,6 +483,10 @@ caption = client.alignment(
     input_caption="subtitle.srt",
     output_caption_path="output.srt",
 )
+
+# Access speaker information
+for segment in caption.supervisions:
+    print(f"[{segment.speaker}] {segment.text}")
 ```
 
 ### YAML Configuration Files

@@ -251,7 +251,7 @@ class TestDiarizationConfig:
         assert config.max_speakers is None
         assert config.model_name == "pyannote/speaker-diarization-community-1"
         assert config.verbose is False
-        assert config.debug is True
+        assert config.debug is False
 
     def test_custom_values(self):
         """Test custom configuration values."""

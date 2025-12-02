@@ -2,6 +2,10 @@ import logging
 import re
 from typing import Optional, Tuple
 
+# Timestamp pattern: [start-end] text
+# Example: [1.23-4.56] Hello world
+TIMESTAMP_PATTERN = re.compile(r"^\[([\d.]+)-([\d.]+)\]\s*(.*)$")
+
 # 来自于字幕中常见的说话人标记格式
 SPEAKER_PATTERN = re.compile(r"((?:>>|&gt;&gt;|>|&gt;).*?[:：])\s*(.*)")
 
@@ -79,6 +83,36 @@ def parse_speaker_text(line) -> Tuple[Optional[str], str]:
     return None, line
 
 
+def parse_timestamp_text(line: str) -> Tuple[Optional[float], Optional[float], str]:
+    """
+    Parse a line of text to extract timestamp and content.
+
+    Format: [start-end] text
+    Example: [1.23-4.56] Hello world
+
+    Args:
+        line: Input line to parse
+
+    Returns:
+        Tuple of (start_time, end_time, text)
+        - start_time: Start timestamp in seconds, or None if not found
+        - end_time: End timestamp in seconds, or None if not found
+        - text: The text content after the timestamp
+    """
+    match = TIMESTAMP_PATTERN.match(line)
+    if match:
+        try:
+            start = float(match.group(1))
+            end = float(match.group(2))
+            text = match.group(3).strip()
+            return start, end, text
+        except ValueError:
+            # If conversion fails, treat as plain text
+            return None, None, line
+
+    return None, None, line
+
+
 if __name__ == "__main__":
     pattern = re.compile(r">>\s*(.*?)\s*[:：]\s*(.*)")
     pattern = re.compile(r"(>>.*?[:：])\s*(.*)")
@@ -94,8 +128,8 @@ if __name__ == "__main__":
         match = pattern.match(text)
         if match:
             print(f"Input: '{text}'")
-            print(f"  Key:   '{match.group(1)}'")
-            print(f"  Value: '{match.group(2)}'")
+            print(f"Speaker:   '{match.group(1)}'")
+            print(f"Content: '{match.group(2)}'")
             print("-------------")
 
     # pattern2

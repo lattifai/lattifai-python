@@ -13,7 +13,7 @@ from tgt import TextGrid
 from ..config.caption import InputCaptionFormat, OutputCaptionFormat
 from .supervision import Supervision
 from .text_parser import normalize_text as normalize_text_fn
-from .text_parser import parse_speaker_text
+from .text_parser import parse_speaker_text, parse_timestamp_text
 
 
 @dataclass
@@ -403,7 +403,8 @@ class Caption:
                             f.write(f"[{item.start:.2f}-{item.end:.2f}] {item.symbol}\n")
                     else:
                         if include_speaker_in_text and sup.speaker is not None:
-                            text = f"{sup.speaker} {sup.text}"
+                            # Use [SPEAKER]: format for consistency with parsing
+                            text = f"[{sup.speaker}]: {sup.text}"
                         else:
                             text = sup.text
                         f.write(f"[{sup.start:.2f}-{sup.end:.2f}] {text}\n")
@@ -811,7 +812,26 @@ class Caption:
                     lines = [line.strip() for line in f.readlines()]
                     if normalize_text:
                         lines = [normalize_text_fn(line) for line in lines]
-            supervisions = [Supervision(text=line) for line in lines if line]
+            supervisions = []
+            for line in lines:
+                if line:
+                    # First try to parse timestamp format: [start-end] text
+                    start, end, remaining_text = parse_timestamp_text(line)
+                    if start is not None and end is not None:
+                        # Has timestamp, now check for speaker in the remaining text
+                        speaker, text = parse_speaker_text(remaining_text)
+                        supervisions.append(
+                            Supervision(
+                                text=text,
+                                start=start,
+                                duration=end - start,
+                                speaker=speaker,
+                            )
+                        )
+                    else:
+                        # No timestamp, just parse speaker and text
+                        speaker, text = parse_speaker_text(line)
+                        supervisions.append(Supervision(text=text, speaker=speaker))
         else:
             try:
                 supervisions = cls._parse_caption(caption, format=format, normalize_text=normalize_text)
