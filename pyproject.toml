@@ -32,10 +32,10 @@ dependencies = [
     "g2p-phonemizer==0.1.1",
     "av",
     "wtpsplit>=2.1.6",
-    "OmniSenseVoice>=0.2.2",
+    "OmniSenseVoice>=0.4.0",
     ## Need to fix deps conflict
-    # "nemo_toolkit[asr]==2.5.3",
-    # "pyannote.audio>=4.0.2",
+    "nemo_toolkit_asr[asr]>=2.7.0rc1",
+    "pyannote.audio>=4.0.2",
     # agentic workflow dependencies
     "questionary>=2.0",
     "yt-dlp",

@@ -7,7 +7,7 @@
 </div>
 
 <p align="center">
-   🌐 <a href="https://lattifai.com"><b>Official Website</b></a> &nbsp&nbsp | &nbsp&nbsp 🖥️ <a href="https://github.com/lattifai/lattifai-python">GitHub</a> &nbsp&nbsp | &nbsp&nbsp 🤗 <a href="https://huggingface.co/Lattifai/Lattice-1-Alpha">Model</a> &nbsp&nbsp | &nbsp&nbsp 📑 <a href="https://lattifai.com/blogs">Blog</a> &nbsp&nbsp | &nbsp&nbsp <a href="https://discord.gg/kvF4WsBRK8"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" style="vertical-align: middle;"></a>
+   🌐 <a href="https://lattifai.com"><b>Official Website</b></a> &nbsp&nbsp | &nbsp&nbsp 🖥️ <a href="https://github.com/lattifai/lattifai-python">GitHub</a> &nbsp&nbsp | &nbsp&nbsp 🤗 <a href="https://huggingface.co/Lattifai/Lattice-1">Model</a> &nbsp&nbsp | &nbsp&nbsp 📑 <a href="https://lattifai.com/blogs">Blog</a> &nbsp&nbsp | &nbsp&nbsp <a href="https://discord.gg/kvF4WsBRK8"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" style="vertical-align: middle;"></a>
 </p>
 
 
@@ -25,7 +25,6 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 - [Python SDK Reference](#python-sdk-reference)
   - [Basic Alignment](#basic-alignment)
   - [YouTube Processing](#youtube-processing)
-  - [Async Support](#async-support)
   - [Configuration Objects](#configuration-objects)
   - [Error Handling](#error-handling)
 - [Advanced Features](#advanced-features)
@@ -86,6 +85,8 @@ optional arguments:
 
 ### Step 2: Get Your API Key
 
+**LattifAI API Key (Required)**
+
 Get your **free API key** at [https://lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys)
 
 **Option A: Environment variable (recommended)**
@@ -98,6 +99,20 @@ export LATTIFAI_API_KEY="lf_your_api_key_here"
 # .env
 LATTIFAI_API_KEY=lf_your_api_key_here
 ```
+
+**Gemini API Key (Optional - for transcription)**
+
+If you want to use Gemini models for transcription (e.g., `gemini-2.5-pro`), get your **free Gemini API key** at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey)
+
+```bash
+# Add to environment variable
+export GEMINI_API_KEY="your_gemini_api_key_here"
+
+# Or add to .env file
+GEMINI_API_KEY=your_gemini_api_key_here  # AIzaSyxxxx
+```
+
+> **Note**: Gemini API key is only required if you use Gemini models for transcription. It's not needed for alignment or when using other transcription models.
 
 ---
 
@@ -138,9 +153,12 @@ That's it! Your aligned subtitles are saved to `aligned.srt`.
 |---------|-------------|
 | `lai alignment align` | Align local audio/video with caption |
 | `lai alignment youtube` | Download & align YouTube content |
+| `lai transcribe file` | Transcribe audio/video to caption |
+| `lai transcribe youtube` | Download & transcribe YouTube content |
 | `lai caption convert`   | Convert between caption formats |
 | `lai caption normalize` | Clean and normalize caption text |
 | `lai caption shift`     | Shift caption timestamps |
+
 
 ### lai alignment align
 
@@ -169,6 +187,77 @@ lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID" \
     caption.output_path=aligned.srt \
     caption.split_sentence=true
 ```
+
+### lai transcribe file
+
+Perform automatic speech recognition (ASR) on audio/video files to generate timestamped transcriptions.
+
+```bash
+# Basic usage
+lai transcribe file <audio> <output>
+
+# Examples
+lai transcribe file audio.wav output.srt
+
+# Use specific transcription model
+lai transcribe file audio.mp4 output.ass \
+    transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
+
+# Use Gemini API for transcription
+lai transcribe file audio.wav output.srt \
+    transcription.model_name=gemini-2.5-pro \
+    transcription.gemini_api_key=YOUR_GEMINI_API_KEY
+
+# Specify language for transcription
+lai transcribe file audio.wav output.srt \
+    transcription.language=zh
+
+# Full configuration with keyword arguments
+lai transcribe file \
+    input_media=audio.wav \
+    output_caption=output.srt \
+    transcription.device=cuda \
+    transcription.model_name=iic/SenseVoiceSmall
+```
+
+**Supported Transcription Models (More Coming Soon):**
+- `gemini-2.5-pro` - Google Gemini API (requires API key)
+- `gemini-3-pro-preview` - Google Gemini API (requires API key)
+- `nvidia/parakeet-tdt-0.6b-v3` - NVIDIA Parakeet model
+- `iic/SenseVoiceSmall` - Alibaba SenseVoice model
+- More models will be integrated in future releases
+
+
+### lai transcribe youtube
+
+Download YouTube video and perform automatic speech recognition without alignment.
+
+```bash
+# Basic usage
+lai transcribe youtube <url> <output_dir>
+
+# Examples
+lai transcribe youtube "https://youtube.com/watch?v=VIDEO_ID" ./output
+
+# Use Gemini API
+lai transcribe youtube "https://youtube.com/watch?v=VIDEO_ID" ./output \
+    transcription.model_name=gemini-2.5-pro \
+    transcription.gemini_api_key=YOUR_GEMINI_API_KEY
+
+# Use local model with specific device
+lai transcribe youtube "https://youtube.com/watch?v=VIDEO_ID" ./output \
+    transcription.model_name=nvidia/parakeet-tdt-0.6b-v3 \
+    transcription.device=cuda
+
+# Keyword argument syntax
+lai transcribe youtube \
+    url="https://youtube.com/watch?v=VIDEO_ID" \
+    output_dir=./output \
+    transcription.device=mps
+```
+
+**Note:** `lai transcribe youtube` performs transcription only. For transcription with alignment, use `lai alignment youtube` instead.
+
 
 ### lai caption convert
 
@@ -238,7 +327,6 @@ from lattifai import LattifAI, ClientConfig
 client = LattifAI(
     client_config=ClientConfig(
         api_key="lf_your_api_key",     # Or use LATTIFAI_API_KEY env var
-        base_url="https://api.lattifai.com",
         timeout=30.0,
         max_retries=3,
     )
@@ -254,7 +342,6 @@ client = LattifAI(
     alignment_config=AlignmentConfig(
         model_name="Lattifai/Lattice-1",
         device="cuda",      # "cpu", "cuda", "cuda:0", "mps"
-        batch_size=1,
     )
 )
 ```
@@ -290,7 +377,7 @@ client = LattifAI(
         timeout=60.0,
     ),
     alignment_config=AlignmentConfig(
-        model_name="Lattifai/Lattice-1-Alpha",
+        model_name="Lattifai/Lattice-1",
         device="cuda",
     ),
     caption_config=CaptionConfig(
@@ -305,34 +392,6 @@ caption = client.alignment(
     input_caption="subtitle.srt",
     output_caption_path="output.json",
 )
-```
-
-### Error Handling
-
-```python
-from lattifai import (
-    LattifAI,
-    LattifAIError,
-    AlignmentError,
-    AudioLoadError,
-    CaptionParseError,
-)
-
-client = LattifAI()
-
-try:
-    caption = client.alignment(
-        input_media="audio.wav",
-        input_caption="subtitle.srt",
-    )
-except AudioLoadError as e:
-    print(f"Failed to load audio: {e}")
-except CaptionParseError as e:
-    print(f"Failed to parse subtitle: {e}")
-except AlignmentError as e:
-    print(f"Alignment failed: {e}")
-except LattifAIError as e:
-    print(f"General error: {e}")
 ```
 
 ### Available Exports
@@ -352,25 +411,6 @@ from lattifai import (
 
     # I/O classes
     Caption,
-
-    # Error classes
-    LattifAIError,
-    AlignmentError,
-    AudioLoadError,
-    AudioFormatError,
-    CaptionParseError,
-    ModelLoadError,
-    APIError,
-
-    # Utilities
-    setup_logger,
-    get_logger,
-    set_log_level,
-
-    # Constants
-    AUDIO_FORMATS,
-    VIDEO_FORMATS,
-    MEDIA_FORMATS,
 )
 ```
 
@@ -439,7 +479,7 @@ Create reusable configuration files:
 
 ```yaml
 # config/alignment.yaml
-model_name: "Lattifai/Lattice-1-Alpha"
+model_name: "Lattifai/Lattice-1"
 device: "cuda"
 batch_size: 1
 ```
@@ -453,12 +493,16 @@ lai alignment align audio.wav subtitle.srt output.srt \
 
 ## Supported Formats
 
+LattifAI supports virtually all common media and subtitle formats:
+
 | Type | Formats |
 |------|---------|
-| **Audio** | WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF |
-| **Video** | MP4, MKV, MOV, WEBM, AVI |
-| **Subtitle Input** | SRT, VTT, ASS, SSA, SUB, SBV, TXT, Gemini |
+| **Audio** | WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF, and more |
+| **Video** | MP4, MKV, MOV, WEBM, AVI, and more |
+| **Subtitle Input** | SRT, VTT, ASS, SSA, SUB, SBV, TXT, Gemini, and more |
 | **Subtitle Output** | All input formats + TextGrid (Praat) |
+
+> **Note**: If a format is not listed above but commonly used, it's likely supported. Feel free to try it or reach out if you encounter any issues.
 
 ---
 
@@ -468,8 +512,8 @@ Visit our [LattifAI roadmap](https://lattifai.com/roadmap) for the latest update
 
 | Date | Release | Features |
 |------|---------|----------|
-| **Oct 2024** | **Lattice-1-Alpha** | ✅ English forced alignment<br>✅ Multi-format support<br>✅ CPU/GPU optimization |
-| **Nov 2024** | **Lattice-1** | 🚀 English + Chinese + German<br>🚀 Mixed language alignment<br>🚀 Speaker Diarization |
+| **Oct 2025** | **Lattice-1-Alpha** | ✅ English forced alignment<br>✅ Multi-format support<br>✅ CPU/GPU optimization |
+| **Nov 2025** | **Lattice-1** | ✅ English + Chinese + German<br>✅ Mixed languages alignment<br>🚀 Integrate Speaker Diarization |
 
 ---
 

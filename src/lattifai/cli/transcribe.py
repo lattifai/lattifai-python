@@ -103,7 +103,7 @@ def transcribe_file(
 
 @run.cli.entrypoint(name="youtube", namespace="transcribe")
 def transcribe_youtube(
-    yt_url: Optional[str] = None,
+    url: Optional[str] = None,
     output_caption: Optional[Pathlike] = None,
     output_dir: Optional[Pathlike] = None,
     media_format: str = "mp3",
@@ -118,7 +118,7 @@ def transcribe_youtube(
     Shortcut: invoking ``lai-transcribe-youtube`` is equivalent to running ``lai transcribe youtube``.
 
     Args:
-        yt_url: YouTube video URL (can be provided as positional argument)
+        url: YouTube video URL (can be provided as positional argument)
         output_dir: Directory for output files (can be provided as positional argument)
         transcription: Transcription service configuration.
             Fields: model_name, device, language, gemini_api_key
@@ -139,7 +139,7 @@ def transcribe_youtube(
 
         # Using keyword argument (traditional syntax)
         lai transcribe youtube \\
-            yt_url="https://www.youtube.com/watch?v=VIDEO_ID" \\
+            url="https://www.youtube.com/watch?v=VIDEO_ID" \\
             output_dir=./output \\
             transcription.device=mps
     """
@@ -158,10 +158,8 @@ def transcribe_youtube(
     transcription_config = transcription or TranscriptionConfig()
 
     # Validate URL input is required
-    if not yt_url:
-        raise ValueError("YouTube URL is required. Provide yt_url as positional argument.")
-
-    url = str(yt_url)
+    if not url:
+        raise ValueError("YouTube URL is required. Provide url as positional argument.")
 
     # Prepare output directory
     if output_dir:
