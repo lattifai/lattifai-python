@@ -35,6 +35,7 @@ dependencies = [
     "OmniSenseVoice>=0.4.0",
     ## Need to fix deps conflict
     "nemo_toolkit_asr[asr]>=2.7.0rc1",
+    "torch-audiomentations==0.12.0",  # not constraint to torchaudio>=0.9.0,<2.9
     "pyannote.audio>=4.0.2",
     # agentic workflow dependencies
     "questionary>=2.0",
