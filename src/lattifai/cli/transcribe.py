@@ -6,50 +6,62 @@ import nemo_run as run
 from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
+from lattifai.audio2 import AudioLoader, ChannelSelectorType
 from lattifai.config import TranscriptionConfig
 from lattifai.utils import _resolve_model_path
 
 
-@run.cli.entrypoint(name="file", namespace="transcribe")
-def transcribe_file(
-    input_media: Optional[Pathlike] = None,
+@run.cli.entrypoint(name="run", namespace="transcribe")
+def transcribe(
+    input: Optional[str] = None,
     output_caption: Optional[Pathlike] = None,
+    output_dir: Optional[Pathlike] = None,
+    media_format: str = "mp3",
+    channel_selector: Optional[ChannelSelectorType] = "average",
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
 ):
     """
-    Transcribe audio/video file to caption.
+    Transcribe audio/video file or YouTube URL to caption.
 
-    This command performs automatic speech recognition (ASR) on audio/video files,
-    generating timestamped transcriptions in various caption formats.
+    This command performs automatic speech recognition (ASR) on audio/video files
+    or YouTube videos, generating timestamped transcriptions in various caption formats.
 
-    Shortcut: invoking ``lai-transcribe-file`` is equivalent to running ``lai transcribe file``.
+    Shortcut: invoking ``lai-transcribe`` is equivalent to running ``lai transcribe run``.
 
     Args:
-        input_media: Path to input audio/video file (can be provided as positional argument)
+        input: Path to input audio/video file or YouTube URL (can be provided as positional argument)
         output_caption: Path for output caption file (can be provided as positional argument)
+        output_dir: Directory for output files when using YouTube URL
+        media_format: Media format for YouTube downloads (default: mp3)
+        channel_selector: Audio channel selection strategy (default: average)
+            Options: average, left, right, or an integer channel index.
+            Note: Ignored when input is a URL and Gemini transcriber is used.
         transcription: Transcription service configuration.
             Fields: model_name, device, language, gemini_api_key
 
     Examples:
-        # Basic usage with positional arguments
-        lai transcribe file audio.wav output.srt
+        # Transcribe local file with positional arguments
+        lai transcribe run audio.wav output.srt
+
+        # Transcribe YouTube video
+        lai transcribe run "https://www.youtube.com/watch?v=VIDEO_ID" ./output
 
         # Using specific transcription model
-        lai transcribe file audio.mp4 output.ass \\
+        lai transcribe run audio.mp4 output.ass \\
             transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
 
         # Using Gemini transcription (requires API key)
-        lai transcribe file audio.wav output.srt \\
+        lai transcribe run audio.wav output.srt \\
             transcription.model_name=gemini-2.5-pro \\
             transcription.gemini_api_key=YOUR_KEY
 
         # Specify language for transcription
-        lai transcribe file audio.wav output.srt \\
+        lai transcribe run audio.wav output.srt \\
             transcription.language=zh
 
         # Full configuration with keyword arguments
-        lai transcribe file \\
-            input_media=audio.wav \\
+        lai transcribe run \\
+            input=audio.wav \\
             output_caption=output.srt \\
             transcription.device=cuda \\
             transcription.model_name=iic/SenseVoiceSmall
@@ -64,17 +76,25 @@ def transcribe_file(
     # Initialize transcription config with defaults
     transcription_config = transcription or TranscriptionConfig()
 
-    # Validate input_media is required
-    if not input_media:
-        raise ValueError("Input media is required. Provide input_media as positional argument.")
+    # Validate input is required
+    if not input:
+        raise ValueError("Input is required. Provide input as positional argument (file path or URL).")
 
-    input_path = Path(str(input_media))
+    # Detect if input is a URL
+    is_url = input.startswith(("http://", "https://"))
 
-    # Generate default output path if not provided
-    if output_caption:
-        output_path = Path(str(output_caption))
+    # Prepare output paths
+    if is_url:
+        # For URLs, use output_dir
+        if output_dir:
+            output_path = Path(str(output_dir)).expanduser()
+            output_path.mkdir(parents=True, exist_ok=True)
+        else:
+            output_path = Path.cwd()
     else:
-        output_path = input_path.with_suffix("LattifAI.srt")
+        # For files, use input path directory
+        input_path = Path(str(input))
+        output_path = input_path.parent
 
     # Create transcriber
     if not transcription_config.lattice_model_path:
@@ -82,148 +102,65 @@ def transcribe_file(
     transcriber = create_transcriber(transcription_config=transcription_config)
 
     print(colorful.cyan(f"🎤 Starting transcription with {transcriber.name}..."))
-    print(colorful.cyan(f"    Input: {input_path}"))
-    print(colorful.cyan(f"   Output: {output_path}"))
-
-    from lattifai.audio2 import AudioLoader
-
-    audio_loader = AudioLoader(device=transcription_config.device)
-    media_audio = audio_loader(input_path, channel_selector="average")
+    print(colorful.cyan(f"    Input: {input}"))
 
     # Perform transcription
-    transcript = asyncio.run(transcriber.transcribe_file(media_audio))
+    if is_url and transcriber.supports_url:
+        # Check if transcriber supports URL directly
+        print(colorful.cyan("    Transcribing from URL directly..."))
+        transcript = asyncio.run(transcriber.transcribe(input))
+    else:
+        if is_url:
+            # Download media first, then transcribe
+            print(colorful.cyan("    Downloading media from URL..."))
+            from lattifai.workflow.youtube import YouTubeDownloader
+
+            downloader = YouTubeDownloader()
+            input_path = asyncio.run(
+                downloader.download_media(
+                    url=input,
+                    output_dir=str(output_path),
+                    media_format=media_format,
+                    force_overwrite=False,
+                )
+            )
+            print(colorful.cyan(f"    Media downloaded to: {input_path}"))
+        else:
+            input_path = Path(str(input))
+
+        print(colorful.cyan("    Loading audio..."))
+        # For files, load audio first
+        audio_loader = AudioLoader(device=transcription_config.device)
+        media_audio = audio_loader(input_path, channel_selector=channel_selector)
+        transcript = asyncio.run(transcriber.transcribe(media_audio))
+
+    # Determine output caption path
+    if output_caption:
+        final_output = Path(str(output_caption))
+        final_output.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        if is_url:
+            # For URLs, generate output filename based on transcriber
+            output_format = transcriber.file_suffix.lstrip(".")
+            final_output = output_path / f"youtube_LattifAI_{transcriber.name}.{output_format}"
+        else:
+            # For files, use input filename with suffix
+            final_output = Path(str(input)).with_suffix(".LattifAI.srt")
+
+    print(colorful.cyan(f"   Output: {final_output}"))
 
     # Write output
-    transcriber.write(transcript, output_path, encoding="utf-8", cache_audio_events=False)
+    transcriber.write(transcript, final_output, encoding="utf-8", cache_audio_events=False)
 
-    print(colorful.green(f"🎉 Transcription completed: {output_path}"))
-
-    return transcript
-
-
-@run.cli.entrypoint(name="youtube", namespace="transcribe")
-def transcribe_youtube(
-    url: Optional[str] = None,
-    output_caption: Optional[Pathlike] = None,
-    output_dir: Optional[Pathlike] = None,
-    media_format: str = "mp3",
-    transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
-):
-    """
-    Download YouTube video and transcribe to caption.
-
-    This command downloads media from YouTube and performs automatic speech recognition,
-    generating timestamped transcriptions without alignment.
-
-    Shortcut: invoking ``lai-transcribe-youtube`` is equivalent to running ``lai transcribe youtube``.
-
-    Args:
-        url: YouTube video URL (can be provided as positional argument)
-        output_dir: Directory for output files (can be provided as positional argument)
-        transcription: Transcription service configuration.
-            Fields: model_name, device, language, gemini_api_key
-
-    Examples:
-        # Basic usage with positional arguments
-        lai transcribe youtube "https://www.youtube.com/watch?v=VIDEO_ID" ./output
-
-        # Using Gemini transcription (requires API key)
-        lai transcribe youtube "https://www.youtube.com/watch?v=VIDEO_ID" ./output \\
-            transcription.model_name=gemini-2.5-pro \\
-            transcription.gemini_api_key=YOUR_KEY
-
-        # Using local model with specific device
-        lai transcribe youtube "https://www.youtube.com/watch?v=VIDEO_ID" ./output \\
-            transcription.model_name=nvidia/parakeet-tdt-0.6b-v3 \\
-            transcription.device=cuda
-
-        # Using keyword argument (traditional syntax)
-        lai transcribe youtube \\
-            url="https://www.youtube.com/watch?v=VIDEO_ID" \\
-            output_dir=./output \\
-            transcription.device=mps
-    """
-    import asyncio
-    import tempfile
-    from pathlib import Path
-
-    import colorful
-
-    from lattifai.audio2 import AudioLoader
-    from lattifai.transcription import create_transcriber
-    from lattifai.workflow import FileExistenceManager
-    from lattifai.workflow.youtube import YouTubeDownloader
-
-    # Initialize transcription config with defaults
-    transcription_config = transcription or TranscriptionConfig()
-
-    # Validate URL input is required
-    if not url:
-        raise ValueError("YouTube URL is required. Provide url as positional argument.")
-
-    # Prepare output directory
-    if output_dir:
-        output_path = Path(str(output_dir)).expanduser()
-    else:
-        output_path = Path(tempfile.gettempdir()) / "LattifAI_transcribe"
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    # Create transcriber
-    transcriber = create_transcriber(transcription_config=transcription_config)
-
-    # Create downloader
-    downloader = YouTubeDownloader()
-
-    print(colorful.cyan(f"🎬 Starting YouTube transcription workflow for: {url}"))
-
-    # Step 1: Download media
-    async def download_media():
-        print(colorful.cyan("📥 Downloading media from YouTube..."))
-        media_file = await downloader.download_media(
-            url=url,
-            output_dir=str(output_path),
-            media_format=media_format,
-            force_overwrite=False,
-        )
-        print(colorful.green(f"    ✓ Media downloaded: {media_file}"))
-        return media_file
-
-    media_file = asyncio.run(download_media())
-
-    # Step 2: Transcribe
-    print(colorful.cyan(f"🎤 Transcribing with {transcriber.name}..."))
-
-    if transcriber.supports_url:
-        # Use URL directly if supported
-        transcript = asyncio.run(transcriber.transcribe_url(url))
-    else:
-        # Load audio and transcribe file
-        if not transcriber.config.lattice_model_path:
-            transcriber.config.lattice_model_path = _resolve_model_path("Lattifai/Lattice-1")
-        audio_loader = AudioLoader(device=transcriber.config.device)
-        media_audio = audio_loader(media_file, channel_selector="average")
-        transcript = asyncio.run(transcriber.transcribe_file(media_audio))
-
-    # Step 3: Write output
-    if not output_caption:
-        output_format = transcriber.file_suffix.lstrip(".")
-        output_caption = output_path / f"{Path(media_file).stem}_LattifAI_{transcriber.name}.{output_format}"
-    transcriber.write(transcript, output_caption, encoding="utf-8", cache_audio_events=False)
-
-    print(colorful.green(f"🎉 Transcription completed: {output_caption}"))
+    print(colorful.green(f"🎉 Transcription completed: {final_output}"))
 
     return transcript
 
 
-def main_file():
-    """Entry point for lai-transcribe-file command."""
-    run.cli.main(transcribe_file)
-
-
-def main_youtube():
-    """Entry point for lai-transcribe-youtube command."""
-    run.cli.main(transcribe_youtube)
+def main():
+    """Entry point for lai-transcribe command."""
+    run.cli.main(transcribe)
 
 
 if __name__ == "__main__":
-    main_file()
+    main()

@@ -120,6 +120,7 @@ def youtube(
         force_overwrite=media_config.force_overwrite,
         split_sentence=caption_config.split_sentence,
         use_transcription=use_transcription,
+        channel_selector=media_config.channel_selector,
     )
 
 

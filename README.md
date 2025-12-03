@@ -22,12 +22,20 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
   - [Command Line Interface](#command-line-interface)
   - [Python SDK (5 Lines of Code)](#python-sdk-5-lines-of-code)
 - [CLI Reference](#cli-reference)
+  - [lai alignment align](#lai-alignment-align)
+  - [lai alignment youtube](#lai-alignment-youtube)
+  - [lai transcribe run](#lai-transcribe-run)
+  - [lai caption convert](#lai-caption-convert)
+  - [lai caption shift](#lai-caption-shift)
 - [Python SDK Reference](#python-sdk-reference)
   - [Basic Alignment](#basic-alignment)
   - [YouTube Processing](#youtube-processing)
   - [Configuration Objects](#configuration-objects)
-  - [Error Handling](#error-handling)
 - [Advanced Features](#advanced-features)
+  - [Word-Level Alignment](#word-level-alignment)
+  - [Smart Sentence Splitting](#smart-sentence-splitting)
+  - [Speaker Diarization](#speaker-diarization-wip)
+  - [YAML Configuration Files](#yaml-configuration-files)
 - [Supported Formats](#supported-formats)
 - [Roadmap](#roadmap)
 - [Development](#development)
@@ -153,8 +161,7 @@ That's it! Your aligned subtitles are saved to `aligned.srt`.
 |---------|-------------|
 | `lai alignment align` | Align local audio/video with caption |
 | `lai alignment youtube` | Download & align YouTube content |
-| `lai transcribe file` | Transcribe audio/video to caption |
-| `lai transcribe youtube` | Download & transcribe YouTube content |
+| `lai transcribe run` | Transcribe audio/video or YouTube URL to caption |
 | `lai caption convert`   | Convert between caption formats |
 | `lai caption normalize` | Clean and normalize caption text |
 | `lai caption shift`     | Shift caption timestamps |
@@ -188,37 +195,45 @@ lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID" \
     caption.split_sentence=true
 ```
 
-### lai transcribe file
+### lai transcribe run
 
-Perform automatic speech recognition (ASR) on audio/video files to generate timestamped transcriptions.
+Perform automatic speech recognition (ASR) on audio/video files or YouTube URLs to generate timestamped transcriptions.
 
 ```bash
-# Basic usage
-lai transcribe file <audio> <output>
+# Basic usage - local file
+lai transcribe run <input> <output>
 
-# Examples
-lai transcribe file audio.wav output.srt
+# Basic usage - YouTube URL
+lai transcribe run <url> <output_dir>
 
-# Use specific transcription model
-lai transcribe file audio.mp4 output.ass \
+# Examples - Local files
+lai transcribe run audio.wav output.srt
+lai transcribe run audio.mp4 output.ass \
     transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
 
-# Use Gemini API for transcription
-lai transcribe file audio.wav output.srt \
+# Examples - YouTube URLs
+lai transcribe run "https://youtube.com/watch?v=VIDEO_ID" output_dir=./output
+lai transcribe run "https://youtube.com/watch?v=VIDEO_ID" output.ass output_dir=./output \
     transcription.model_name=gemini-2.5-pro \
     transcription.gemini_api_key=YOUR_GEMINI_API_KEY
 
-# Specify language for transcription
-lai transcribe file audio.wav output.srt \
-    transcription.language=zh
-
 # Full configuration with keyword arguments
-lai transcribe file \
-    input_media=audio.wav \
+lai transcribe run \
+    input=audio.wav \
     output_caption=output.srt \
+    channel_selector=average \
     transcription.device=cuda \
     transcription.model_name=iic/SenseVoiceSmall
 ```
+
+**Parameters:**
+- `input`: Path to audio/video file or YouTube URL (required)
+- `output_caption`: Path for output caption file (for local files)
+- `output_dir`: Directory for output files (for YouTube URLs, defaults to current directory)
+- `media_format`: Media format for YouTube downloads (default: mp3)
+- `channel_selector`: Audio channel selection - "average", "left", "right", or channel index (default: "average")
+  - Note: Ignored when transcribing YouTube URLs with Gemini models
+- `transcription`: Transcription configuration (model_name, device, language, gemini_api_key)
 
 **Supported Transcription Models (More Coming Soon):**
 - `gemini-2.5-pro` - Google Gemini API (requires API key)
@@ -227,36 +242,7 @@ lai transcribe file \
 - `iic/SenseVoiceSmall` - Alibaba SenseVoice model
 - More models will be integrated in future releases
 
-
-### lai transcribe youtube
-
-Download YouTube video and perform automatic speech recognition without alignment.
-
-```bash
-# Basic usage
-lai transcribe youtube <url> <output_dir>
-
-# Examples
-lai transcribe youtube "https://youtube.com/watch?v=VIDEO_ID" ./output
-
-# Use Gemini API
-lai transcribe youtube "https://youtube.com/watch?v=VIDEO_ID" ./output \
-    transcription.model_name=gemini-2.5-pro \
-    transcription.gemini_api_key=YOUR_GEMINI_API_KEY
-
-# Use local model with specific device
-lai transcribe youtube "https://youtube.com/watch?v=VIDEO_ID" ./output \
-    transcription.model_name=nvidia/parakeet-tdt-0.6b-v3 \
-    transcription.device=cuda
-
-# Keyword argument syntax
-lai transcribe youtube \
-    url="https://youtube.com/watch?v=VIDEO_ID" \
-    output_dir=./output \
-    transcription.device=mps
-```
-
-**Note:** `lai transcribe youtube` performs transcription only. For transcription with alignment, use `lai alignment youtube` instead.
+**Note:** For transcription with alignment, use `lai alignment youtube` instead.
 
 
 ### lai caption convert

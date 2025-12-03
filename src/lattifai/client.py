@@ -80,23 +80,28 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
     def alignment(
         self,
         input_media: Union[Pathlike, AudioData],
-        input_caption: Union[Pathlike, Caption],
+        input_caption: Optional[Union[Pathlike, Caption]] = None,
         output_caption_path: Optional[Pathlike] = None,
         input_caption_format: Optional[InputCaptionFormat] = None,
         split_sentence: Optional[bool] = None,
+        channel_selector: Optional[str | int] = "average",
     ) -> Caption:
         try:
-            # Step 1: Parse caption file
-            caption = self._read_caption(input_caption, input_caption_format)
-
-            output_caption_path = output_caption_path or self.caption_config.output_path
+            # Step 1: Get caption
             if isinstance(input_media, AudioData):
                 media_audio = input_media
             else:
                 media_audio = self.audio_loader(
                     input_media,
-                    channel_selector="average",
+                    channel_selector=channel_selector,
                 )
+
+            if not input_caption:
+                caption = self._transcribe(media_audio, is_async=False)
+            else:
+                caption = self._read_caption(input_caption, input_caption_format)
+
+            output_caption_path = output_caption_path or self.caption_config.output_path
 
             # Step 2: Check if segmented alignment is needed
             alignment_strategy = self.aligner.config.strategy
@@ -419,6 +424,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_caption_path: Optional[Pathlike] = None,
         split_sentence: Optional[bool] = None,
         use_transcription: bool = False,
+        channel_selector: Optional[str | int] = "average",
     ) -> Caption:
         # Prepare output directory and media format
         output_dir = self._prepare_youtube_output_dir(output_dir)
@@ -429,7 +435,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Step 1: Download media
         media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite)
 
-        media_audio = self.audio_loader(media_file, channel_selector="average")
+        media_audio = self.audio_loader(media_file, channel_selector=channel_selector)
 
         # Step 2: Get or create captions (download or transcribe)
         caption = self._download_or_transcribe_caption(
@@ -453,6 +459,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             input_caption=caption,
             output_caption_path=output_caption_path,
             split_sentence=split_sentence,
+            channel_selector=channel_selector,
         )
 
         return caption

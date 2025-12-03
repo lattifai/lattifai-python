@@ -55,6 +55,9 @@ class MediaConfig:
     channels: Optional[int] = None
     """Number of audio channels (1=mono, 2=stereo)."""
 
+    channel_selector: Optional[str | int] = "average"
+    """Audio channel selection strategy: 'average', 'left', 'right', or channel index."""
+
     # Output / download configuration
     output_dir: Path = field(default_factory=lambda: Path.cwd())
     """Directory for output files (default: current working directory)."""

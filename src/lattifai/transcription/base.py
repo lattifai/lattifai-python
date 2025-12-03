@@ -47,15 +47,22 @@ class BaseTranscriber(ABC):
         return await self.transcribe(url_or_data)
 
     async def transcribe(self, url_or_data: Union[str, AudioData]) -> str:
+        """
+        Route transcription based on input type.
+
+        For URL inputs, only works if the transcriber supports direct URL transcription.
+        Otherwise, the caller should download the media first and pass AudioData.
+        """
         if isinstance(url_or_data, AudioData):
             return await self.transcribe_file(url_or_data)
         elif self._is_url(url_or_data):
-            if not self.supports_url:
-                raise NotImplementedError(
-                    f"{self.__class__.__name__} does not support URL transcription. "
-                    f"Please download the file first and use transcribe_file()."
+            if self.supports_url:
+                return await self.transcribe_url(url_or_data)
+            else:
+                raise ValueError(
+                    f"{self.__class__.__name__} does not support direct URL transcription. "
+                    f"Please download the media first and pass AudioData instead."
                 )
-            return await self.transcribe_url(url_or_data)  # URL
         return await self.transcribe_file(url_or_data)  # file path
 
     @abstractmethod

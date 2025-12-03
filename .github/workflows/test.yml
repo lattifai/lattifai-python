@@ -44,7 +44,7 @@ jobs:
           install-k2
           pip install -e ".[test]"  # Install with test dependencies including pytest-asyncio
           python tests/test_basic.py  # Run basic tests
-          pytest tests/io/test_text_parser.py -v
+          pytest tests/caption/test_text_parser.py -v
           bash tests/test_audio_formats.sh  # Run audio format tests
 
       - name: Run All Tests

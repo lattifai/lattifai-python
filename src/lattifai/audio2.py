@@ -12,7 +12,8 @@ from lhotse.utils import Pathlike
 
 from lattifai.errors import AudioLoadError
 
-ChannelSelectorType = Union[int, Iterable[int], str]
+# ChannelSelectorType = Union[int, Iterable[int], str]
+ChannelSelectorType = Union[int, str]
 
 
 class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "device", "path"])):
@@ -74,14 +75,15 @@ class AudioLoader:
             tensor = torch.mean(audio.to(device), dim=0, keepdim=True)
             del audio
         else:
-            assert isinstance(channel_selector, Iterable)
-            num_channels = audio.shape[0]
-            print(f"Selecting channels {channel_selector} from the signal with {num_channels} channels.")
-            if max(channel_selector) >= num_channels:
-                raise ValueError(
-                    f"Cannot select channel subset {channel_selector} from a signal with {num_channels} channels."
-                )
-            tensor = audio[channel_selector]
+            raise ValueError(f"Unsupported channel_selector: {channel_selector}")
+            # assert isinstance(channel_selector, Iterable)
+            # num_channels = audio.shape[0]
+            # print(f"Selecting channels {channel_selector} from the signal with {num_channels} channels.")
+            # if max(channel_selector) >= num_channels:
+            #     raise ValueError(
+            #         f"Cannot select channel subset {channel_selector} from a signal with {num_channels} channels."
+            #     )
+            # tensor = audio[channel_selector]
 
         tensor = tensor.to(device)
         if sr != sampling_rate:

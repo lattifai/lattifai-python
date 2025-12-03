@@ -98,13 +98,6 @@ def align(
 
     caption_config = caption or CaptionConfig()
 
-    # Validate that input_caption_path and caption_config.input_path are not both provided
-    if input_caption_path and caption_config.input_path:
-        raise ValueError(
-            "Cannot specify both positional input_caption_path and caption.input_path. "
-            "Use either positional argument or config, not both."
-        )
-
     # Validate that output_caption_path and caption_config.output_path are not both provided
     if output_caption_path and caption_config.output_path:
         raise ValueError(
@@ -130,6 +123,7 @@ def align(
         input_media=media_config.input_path,
         input_caption=caption_config.input_path,
         output_caption_path=caption_config.output_path,
+        channel_selector=media_config.channel_selector,
     )
 
 

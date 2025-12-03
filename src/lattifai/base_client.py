@@ -375,6 +375,57 @@ class LattifAIClientMixin:
 
         return asyncio.run(self._download_media(url, output_dir, media_format, force_overwrite))
 
+    def _transcribe(
+        self,
+        media_file: Union[str, Path, AudioData],
+        caption_lang: Optional[str],
+        is_async: bool = False,
+    ) -> Caption:
+        """
+        Get captions by downloading or transcribing.
+
+        Args:
+            url: YouTube video URL
+            output_dir: Output directory for caption file
+            media_file: Media file path (used to generate caption filename)
+            force_overwrite: Force overwrite existing files
+            caption_lang: Caption language to download
+            is_async: If True, returns coroutine; if False, runs synchronously
+
+        Returns:
+            Caption file path (str) or coroutine that returns str
+        """
+        import asyncio
+
+        async def _async_impl():
+            # Transcription mode: use Transcriber to transcribe
+            self._validate_transcription_setup()
+
+            print(colorful.cyan(f"🎤 Transcribing({self.transcriber.name}) media: {str(media_file)} ..."))
+            transcription = await self.transcriber.transcribe_file(media_file)
+            print(colorful.green("         ✓ Transcription completed."))
+
+            if "Gemini" in self.transcriber.name:
+                # write to temp file and use Caption read
+                with tempfile.NamedTemporaryFile(suffix=self.transcriber.file_suffix, delete=True) as tmp_file:
+                    tmp_path = Path(tmp_file.name)
+                    await asyncio.to_thread(
+                        self.transcriber.write,
+                        transcription,
+                        tmp_path,
+                        encoding="utf-8",
+                    )
+                    transcription = self._read_caption(
+                        tmp_path, input_caption_format="gemini", normalize_text=False, verbose=False
+                    )
+
+            return transcription
+
+        if is_async:
+            return _async_impl()
+        else:
+            return asyncio.run(_async_impl())
+
     def _download_or_transcribe_caption(
         self,
         url: str,

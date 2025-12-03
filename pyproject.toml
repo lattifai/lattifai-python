@@ -71,8 +71,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 [project.scripts]
 "lai-align" = "lattifai.cli.alignment:main"
 "lai-youtube" = "lattifai.cli.youtube:main"
-"lai-transcribe-file" = "lattifai.cli.transcribe:main_file"
-"lai-transcribe-youtube" = "lattifai.cli.transcribe:main_youtube"
+"lai-transcribe" = "lattifai.cli.transcribe:main"
 "laicap-convert" = "lattifai.cli.caption:main_convert"
 "laicap-normalize" = "lattifai.cli.caption:main_normalize"
 "laicap-shift" = "lattifai.cli.caption:main_shift"
