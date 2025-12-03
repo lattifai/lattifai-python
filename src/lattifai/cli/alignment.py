@@ -22,8 +22,8 @@ __all__ = ["align"]
 @run.cli.entrypoint(name="align", namespace="alignment")
 def align(
     input_media: Optional[Pathlike] = None,
-    input_caption_path: Optional[Pathlike] = None,
-    output_caption_path: Optional[Pathlike] = None,
+    input_caption: Optional[Pathlike] = None,
+    output_caption: Optional[Pathlike] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
@@ -71,8 +71,8 @@ def align(
         # Using keyword arguments (traditional syntax)
         lai alignment align \\
             input_media=audio.wav \\
-            input_caption_path=caption.srt \\
-            output_caption_path=output.srt
+            input_caption=caption.srt \\
+            output_caption=output.srt
 
         # Full configuration with nested config objects
         lai alignment align audio.wav caption.srt aligned.json \\
@@ -99,18 +99,18 @@ def align(
     caption_config = caption or CaptionConfig()
 
     # Validate that output_caption_path and caption_config.output_path are not both provided
-    if output_caption_path and caption_config.output_path:
+    if output_caption and caption_config.output_path:
         raise ValueError(
-            "Cannot specify both positional output_caption_path and caption.output_path. "
+            "Cannot specify both positional output_caption and caption.output_path. "
             "Use either positional argument or config, not both."
         )
 
     # Assign paths to caption_config if provided
-    if input_caption_path:
-        caption_config.set_input_path(input_caption_path)
+    if input_caption:
+        caption_config.set_input_path(input_caption)
 
-    if output_caption_path:
-        caption_config.set_output_path(output_caption_path)
+    if output_caption:
+        caption_config.set_output_path(output_caption)
 
     client = LattifAI(
         client_config=client,

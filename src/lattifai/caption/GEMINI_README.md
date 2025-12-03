@@ -55,40 +55,6 @@ supervisions = GeminiReader.extract_for_alignment(
 )
 ```
 
-### 3. Perform Forced Alignment
-
-```python
-from lattifai import LattifAI
-
-client = LattifAI()
-aligned, output_path = client.alignment(
-    audio='video.wav',
-    caption='videoid_Gemini.md',
-    format='gemini',
-    output_caption_path='aligned.srt'
-)
-```
-
-### 4. Update Original Transcript
-
-```python
-from lattifai.io import GeminiWriter
-GeminiWriter.update_timestamps(
-	original_transcript='videoid_Gemini.md',
-	aligned_supervisions=aligned,
-	output_path='videoid_aligned_Gemini.md'
-)
-```
-
-### 5. Write Simplified Aligned Transcript
-
-```python
-GeminiWriter.write_aligned_transcript(
-	aligned_supervisions=aligned,
-	output_path='transcript_simple.txt',
-	include_word_timestamps=True,
-)
-```
 
 ## API Reference
 
