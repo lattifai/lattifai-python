@@ -50,7 +50,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 ```bash
 
 pip install install-k2
-install-k2 # Auto-detect PyTorch version and install compatible k2
+install-k2 --torch-version 2.9.1  # if not set will auto-detect PyTorch version and install compatible k2
 
 pip install lattifai
 ```
@@ -70,7 +70,7 @@ source .venv/bin/activate
 # Install k2 (required dependency)
 uv pip install install-k2
 uv pip install pip
-uv run install-k2
+uv run install-k2 --torch-version 2.9.1
 
 # Install LattifAI
 uv pip install lattifai
