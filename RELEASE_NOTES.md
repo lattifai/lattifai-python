@@ -1,13 +1,13 @@
 ````markdown
-# Release Notes - LattifAI Python v1.0.0rc2
+# Release Notes - LattifAI Python v1.0.0rc3
 
-**Release Date:** November 30, 2025
+**Release Date:** December 03, 2025
 
 ---
 
 ## 🎉 Overview
 
-LattifAI Python v1.0.0rc2 is a significant update that introduces a refactored caption system, enhanced alignment engine, and improved audio processing capabilities. This release focuses on better handling of complex caption formats, multi-speaker scenarios, and benchmark evaluation metrics.
+LattifAI Python v1.0.0rc3 is a significant update that introduces a refactored caption system, enhanced alignment engine, and improved audio processing capabilities. This release focuses on better handling of complex caption formats, multi-speaker scenarios, and benchmark evaluation metrics.
 
 ---
 

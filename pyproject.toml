@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.0.0rc2'
+version = '1.0.0rc3'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -32,17 +32,18 @@ dependencies = [
     "g2p-phonemizer==0.1.1",
     "av",
     "wtpsplit>=2.1.6",
+    # transcription
     "OmniSenseVoice>=0.4.0",
-    ## Need to fix deps conflict
     "nemo_toolkit_asr[asr]>=2.7.0rc1",
-    "torch-audiomentations==0.12.0",  # not constraint to torchaudio>=0.9.0,<2.9
-    "pyannote.audio>=4.0.2",
-    # agentic workflow dependencies
+    # diarization
+    "pyannote-audio-notorchdeps>=4.0.2",  # not requires torch==2.8.0, torchaudio==2.8.0
+    # agentic workflow
     "questionary>=2.0",
     "yt-dlp",
     "pycryptodome",
     "google-genai>=1.22.0",
 ]
+
 
 classifiers = [
     'Development Status :: 5 - Production/Stable',
@@ -105,12 +106,21 @@ lattifai = "src/lattifai"
 
 [project.optional-dependencies]
 numpy = ['numpy']
+diarization = [
+    "torch-audiomentations==0.12.0",  # not constraint to torchaudio>=0.9.0,<2.9
+    "pyannote.audio>=4.0.2",  # Requires torch==2.8.0, torchaudio==2.8.0
+]
+transcription = [
+    "OmniSenseVoice>=0.4.0",
+    "nemo_toolkit_asr[asr]>=2.7.0rc1",
+]
 test = ['pytest', 'pytest-cov', 'pytest-asyncio', 'numpy']
 all = [
     "numpy",
     "pytest",
     "pytest-cov",
     "pytest-asyncio",
+    "pyannote.audio>=4.0.2",
 ]
 
 [tool.pytest.ini_options]
