@@ -42,6 +42,11 @@ class BaseTranscriber(ABC):
     def name(self) -> str:
         """Human-readable name of the transcriber."""
 
+    @property
+    def file_name(self) -> str:
+        """File name identifier for the transcriber."""
+        return f"{self.name.replace('/', '_')}{self.file_suffix}"
+
     async def __call__(self, url_or_data: Union[str, AudioData]) -> str:
         """Main entry point for transcription."""
         return await self.transcribe(url_or_data)

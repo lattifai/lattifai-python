@@ -51,7 +51,7 @@ class GeminiTranscriber(BaseTranscriber):
     @property
     def name(self) -> str:
         """Human-readable name of the transcriber."""
-        return f"Gemini_{self.config.model_name.replace('/', '_')}"
+        return f"{self.config.model_name}"
 
     async def transcribe_url(self, url: str) -> str:
         """

@@ -7,14 +7,22 @@ from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.audio2 import AudioLoader, ChannelSelectorType
-from lattifai.config import TranscriptionConfig
+from lattifai.cli.alignment import align as alignment_align
+from lattifai.config import (
+    AlignmentConfig,
+    CaptionConfig,
+    ClientConfig,
+    DiarizationConfig,
+    MediaConfig,
+    TranscriptionConfig,
+)
 from lattifai.utils import _resolve_model_path
 
 
 @run.cli.entrypoint(name="run", namespace="transcribe")
 def transcribe(
     input: Optional[str] = None,
-    output_caption: Optional[Pathlike] = None,
+    output_caption: Optional[str] = None,
     output_dir: Optional[Pathlike] = None,
     media_format: str = "mp3",
     channel_selector: Optional[ChannelSelectorType] = "average",
@@ -155,6 +163,29 @@ def transcribe(
     print(colorful.green(f"🎉 Transcription completed: {final_output}"))
 
     return transcript
+
+
+@run.cli.entrypoint(name="align", namespace="transcribe")
+def transcribe_align(
+    input_media: Optional[str] = None,
+    output_caption: Optional[str] = None,
+    media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
+    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
+    client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
+    alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
+    transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
+    diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
+):
+    return alignment_align(
+        input_media=input_media,
+        output_caption=output_caption,
+        media=media,
+        caption=caption,
+        client=client,
+        alignment=alignment,
+        transcription=transcription,
+        diarization=diarization,
+    )
 
 
 def main():

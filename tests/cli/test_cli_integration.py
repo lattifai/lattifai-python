@@ -38,7 +38,7 @@ class TestCLIIntegration:
 
     def test_all_commands_have_help(self):
         """Test that all commands have help"""
-        commands = ["alignment", "agent", "caption"]
+        commands = ["alignment", "caption"]
 
         for command in commands:
             result = run_cli_command(command, ["--help"])
@@ -55,12 +55,6 @@ class TestCLIIntegration:
             help_text = result.stdout + result.stderr
             assert "align" in help_text, help_text
             assert "youtube" in help_text
-
-        # Test agent command
-        result = run_cli_command("agent", ["--help"])
-        if result is not None and result.returncode == 0:
-            help_text = result.stdout + result.stderr
-            assert "agent" in help_text, help_text
 
         # Test caption command
         result = run_cli_command("caption", ["--help"])

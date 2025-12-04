@@ -166,8 +166,9 @@ class MediaConfig:
 
     def set_input_path(self, path: Pathlike) -> Path | str:
         """Update the input path (local path or URL) and infer format if possible."""
+        path = str(path)
         if self._is_url(path):
-            normalized_url = self._normalize_url(str(path))
+            normalized_url = self._normalize_url(path)
             self.input_path = normalized_url
             inferred_format = self._infer_format_from_source(normalized_url)
             if inferred_format:
@@ -293,18 +294,23 @@ class MediaConfig:
             )
         return normalized
 
+    def _clean_url_escapes(self, url: str) -> str:
+        """Remove shell escape backslashes from URL special characters."""
+        return url.strip().replace(r"\?", "?").replace(r"\=", "=").replace(r"\&", "&")
+
     def _is_url(self, value: Pathlike) -> bool:
         if not isinstance(value, str):
             return False
-        parsed = urlparse(value.strip())
+        cleaned = self._clean_url_escapes(value)
+        parsed = urlparse(cleaned)
         return bool(parsed.scheme and parsed.netloc)
 
     def _normalize_url(self, url: str) -> str:
-        stripped = url.strip()
-        parsed = urlparse(stripped)
+        cleaned = self._clean_url_escapes(url)
+        parsed = urlparse(cleaned)
         if not parsed.scheme or not parsed.netloc:
             raise ValueError("input_path must be an absolute URL when provided as a remote source.")
-        return stripped
+        return cleaned
 
     def _infer_format_from_source(self, source: str) -> Optional[str]:
         path_segment = Path(urlparse(source).path) if self._is_url(source) else Path(source)

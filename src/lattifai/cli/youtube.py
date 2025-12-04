@@ -19,7 +19,6 @@ from lattifai.config import (
 @run.cli.entrypoint(name="youtube", namespace="alignment")
 def youtube(
     yt_url: Optional[str] = None,
-    use_transcription: bool = False,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
@@ -43,7 +42,6 @@ def youtube(
 
     Args:
         yt_url: YouTube video URL (can be provided as positional argument)
-        use_transcription: Use transcription service instead of downloading YouTube captions
         media: Media configuration for controlling formats and output directories.
             Fields: input_path (YouTube URL), output_dir, output_format, force_overwrite
         client: API client configuration.
@@ -76,7 +74,6 @@ def youtube(
 
         # Use Gemini transcription (requires API key)
         lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            use_transcription=true \\
             transcription.gemini_api_key=YOUR_KEY \\
             transcription.model_name=gemini-2.0-flash
 
@@ -119,7 +116,6 @@ def youtube(
         media_format=media_config.normalize_format() if media_config.output_format else None,
         force_overwrite=media_config.force_overwrite,
         split_sentence=caption_config.split_sentence,
-        use_transcription=use_transcription,
         channel_selector=media_config.channel_selector,
     )
 

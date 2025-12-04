@@ -83,3 +83,4 @@ tests/data/SA1.TextGrid
 benchmark/data/*.TextGrid
 benchmark/data/*.txt
 checkpoints/
+tests/test_cli_commands.sh

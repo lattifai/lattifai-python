@@ -41,7 +41,7 @@ class LattifAITranscriber(BaseTranscriber):
 
     @property
     def name(self) -> str:
-        return f"LattifAI_{self.config.model_name.replace('/', '_')}"
+        return f"{self.config.model_name}"
 
     async def transcribe_url(self, url: str) -> str:
         """

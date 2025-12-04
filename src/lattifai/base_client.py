@@ -452,6 +452,8 @@ class LattifAIClientMixin:
         """
         import asyncio
 
+        from lattifai.workflow.youtube import TRANSCRIBE_CHOICE
+
         async def _async_impl():
             # First check if caption input_path is already provided
             if self.caption_config.input_path:
@@ -463,9 +465,7 @@ class LattifAIClientMixin:
                     raise FileNotFoundError(f"Provided caption path does not exist: {caption_path}")
 
             # Generate transcript file path
-            transcript_file = (
-                output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.name}{self.transcriber.file_suffix}"
-            )
+            transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
 
             if use_transcription:
                 # Transcription mode: use Transcriber to transcribe
@@ -480,7 +480,6 @@ class LattifAIClientMixin:
                         file_type=f"{self.transcriber.name} transcript",
                         files=[str(transcript_file)],
                         operation="transcribe",
-                        enable_gemini=False,
                     )
 
                     if choice == "cancel":
@@ -517,7 +516,7 @@ class LattifAIClientMixin:
                     output_dir=str(output_dir),
                     force_overwrite=force_overwrite,
                     caption_lang=caption_lang,
-                    enable_gemini_option=True,
+                    transcriber_name=self.transcriber.name if self.transcriber else None,
                 )
 
                 if str(caption_file) == str(transcript_file):
@@ -527,39 +526,18 @@ class LattifAIClientMixin:
                     caption.supervisions = None
                     return caption
 
-                if not caption_file:
-                    # No captions available, ask user if they want to transcribe
-                    print(colorful.yellow("\n⚠️  No captions available for this video."))
-
-                    if not self.transcriber:
-                        raise RuntimeError(
-                            "No captions found and transcription is not configured. "
-                            "Please provide TranscriptionConfig to enable transcription."
-                        )
-
-                    # Prompt user for transcription
-                    print(colorful.cyan(f"\n🎤 Transcriber available: {self.transcriber.name}"))
-                    print(colorful.white("   Would you like to transcribe the audio?"))
-                    print(colorful.white("   [y] Yes, transcribe now"))
-                    print(colorful.white("   [N] No, cancel operation"))
-
-                    choice = await asyncio.to_thread(input, colorful.cyan("   Your choice: "))
-                    choice = choice.strip().lower()
-
-                    if choice == "y" or choice == "yes":
-                        print(colorful.cyan(f"🎤 Starting transcription with {self.transcriber.name}..."))
-
-                        return await self._download_or_transcribe_caption(
-                            url=url,
-                            output_dir=output_dir,
-                            media_file=media_file,
-                            force_overwrite=force_overwrite,
-                            caption_lang=caption_lang,
-                            is_async=True,
-                            use_transcription=True,
-                        )
-                    else:
-                        raise RuntimeError("No caption file available and transcription was declined by user.")
+                if caption_file == TRANSCRIBE_CHOICE:
+                    return await self._download_or_transcribe_caption(
+                        url=url,
+                        output_dir=output_dir,
+                        media_file=media_file,
+                        force_overwrite=force_overwrite,
+                        caption_lang=caption_lang,
+                        is_async=True,
+                        use_transcription=True,
+                    )
+                elif not caption_file:
+                    raise RuntimeError("No caption file available and transcription was declined by user.")
 
             return caption_file
 

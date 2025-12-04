@@ -97,7 +97,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             if not input_caption:
-                caption = self._transcribe(media_audio, is_async=False)
+                caption = self._transcribe(media_audio, caption_lang=None, is_async=False)
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
 
@@ -124,7 +124,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         if output_caption_path:
                             transcript_file = (
                                 Path(str(output_caption_path)).parent
-                                / f"{Path(str(media_audio)).stem}_{self.transcriber.name}{self.transcriber.file_suffix}"
+                                / f"{Path(str(media_audio)).stem}_{self.transcriber.file_name}"
                             )
                             if transcript_file.exists():
                                 # print(colorful.cyan(f"Reading existing transcription from {transcript_file}"))
@@ -186,7 +186,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 else:
                     if caption.transcription:
                         if not caption.supervisions:  # youtube + transcription case
-                            segments = [(sup.start, sup.end, [sup], False) for sup in caption.transcription]
+                            segments = [(sup.start, sup.end, [sup], not sup.text) for sup in caption.transcription]
                         else:
                             raise NotImplementedError(
                                 f"Input caption with both supervisions and transcription(strategy={alignment_strategy}) is not supported."

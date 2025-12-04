@@ -10,12 +10,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ..caption import Caption, GeminiWriter
-from ..client import LattifAI
 from ..config.caption import CAPTION_FORMATS
-from ..transcription.base import BaseTranscriber
-from .base import WorkflowAgent, WorkflowStep, setup_workflow_logger
-from .file_manager import FileExistenceManager
+from .base import setup_workflow_logger
+from .file_manager import TRANSCRIBE_CHOICE, FileExistenceManager
 
 
 class YouTubeDownloader:
@@ -201,7 +198,7 @@ class YouTubeDownloader:
                     pass
                 elif user_choice in existing_files["media"]:
                     # User selected a specific file
-                    self.logger.info(f"✅ Using selected media file: {user_choice}")
+                    # self.logger.info(f"✅ Using selected media file: {user_choice}")
                     return user_choice
                 else:
                     # Fallback: use first file
@@ -340,7 +337,7 @@ class YouTubeDownloader:
         output_dir: str,
         force_overwrite: bool = False,
         caption_lang: Optional[str] = None,
-        enable_gemini_option: bool = False,
+        transcriber_name: Optional[str] = None,
     ) -> Optional[str]:
         """
         Download video captions using yt-dlp
@@ -351,8 +348,7 @@ class YouTubeDownloader:
             force_overwrite: Skip user confirmation and overwrite existing files
             caption_lang: Specific caption language/track to download (e.g., 'en')
                           If None, downloads all available captions
-            enable_gemini_option: Whether to show Gemini transcription as an option in interactive mode
-
+            transcriber_name: Name of the transcriber (for user prompts)
         Returns:
             Path to downloaded transcript file or None if not available
         """
@@ -372,7 +368,7 @@ class YouTubeDownloader:
             if existing_files["caption"] and not force_overwrite:
                 if FileExistenceManager.is_interactive_mode():
                     user_choice = FileExistenceManager.prompt_user_confirmation(
-                        {"caption": existing_files["caption"]}, "caption download"
+                        {"caption": existing_files["caption"]}, "caption download", transcriber_name=transcriber_name
                     )
 
                     if user_choice == "cancel":
@@ -380,6 +376,8 @@ class YouTubeDownloader:
                     elif user_choice == "overwrite":
                         # Continue with download
                         pass
+                    elif user_choice == TRANSCRIBE_CHOICE:
+                        return TRANSCRIBE_CHOICE
                     elif user_choice in existing_files["caption"]:
                         # User selected a specific file
                         caption_file = Path(user_choice)
@@ -458,20 +456,17 @@ class YouTubeDownloader:
             # Multiple caption files found, let user choose
             if FileExistenceManager.is_interactive_mode():
                 self.logger.info(f"📋 Found {len(caption_files)} caption files")
-                # Use the enable_gemini_option parameter passed by caller
                 caption_choice = FileExistenceManager.prompt_file_selection(
                     file_type="caption",
                     files=[str(f) for f in caption_files],
                     operation="use",
-                    enable_gemini=enable_gemini_option,
+                    transcriber_name=transcriber_name,
                 )
 
                 if caption_choice == "cancel":
                     raise RuntimeError("Caption selection cancelled by user")
-                elif caption_choice == "gemini":
-                    # User chose to transcribe with Gemini instead of using downloaded captions
-                    self.logger.info("✨ User selected Gemini transcription")
-                    return "gemini"  # Return special value to indicate Gemini transcription
+                elif caption_choice == TRANSCRIBE_CHOICE:
+                    return caption_choice
                 elif caption_choice:
                     self.logger.info(f"✅ Selected caption: {caption_choice}")
                     return caption_choice
@@ -567,373 +562,3 @@ class YouTubeDownloader:
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Failed to list captions: {e.stderr}")
             raise RuntimeError(f"Failed to list captions: {e.stderr}")
-
-
-class YouTubeCaptionAgent(WorkflowAgent):
-    """Agent for YouTube URL to aligned captions workflow
-
-    Configuration (in __init__):
-        - downloader, transcriber, aligner: Component instances (dependency injection)
-        - max_retries: Max retry attempts for workflow steps
-
-    Runtime parameters (in __call__ or process_youtube_url):
-        - url: YouTube URL to process
-        - output_dir: Where to save files
-        - media_format: Video/audio format (mp3, mp4, etc.)
-        - force_overwrite: Whether to overwrite existing files
-        - output_format: Caption output format (srt, vtt, etc.)
-        - split_sentence: Re-segment captions semantically
-        - word_level: Include word-level timestamps
-    """
-
-    def __init__(
-        self,
-        downloader: YouTubeDownloader,
-        transcriber: BaseTranscriber,
-        aligner: LattifAI,
-        max_retries: int = 0,
-    ):
-        super().__init__("YouTube Caption Agent", max_retries)
-
-        # Components (injected)
-        self.downloader = downloader
-        self.transcriber = transcriber
-        self.aligner = aligner
-
-    def define_steps(self) -> List[WorkflowStep]:
-        """Define the workflow steps"""
-        return [
-            WorkflowStep(
-                name="Process YouTube URL", description="Extract video info and download video/audio", required=True
-            ),
-            WorkflowStep(
-                name="Transcribe Media",
-                description="Download caption if available or transcribe the media file",
-                required=True,
-            ),
-            WorkflowStep(name="Align Caption", description="Align Caption with media using LattifAI", required=True),
-            WorkflowStep(
-                name="Export Results", description="Export aligned captions in specified formats", required=True
-            ),
-        ]
-
-    async def execute_step(self, step: WorkflowStep, context: Dict[str, Any]) -> Any:
-        """Execute a single workflow step"""
-
-        if step.name == "Process YouTube URL":
-            return await self._process_youtube_url(context)
-
-        elif step.name == "Transcribe Media":
-            return await self._transcribe_media(context)
-
-        elif step.name == "Align Caption":
-            return await self._align_caption(context)
-
-        elif step.name == "Export Results":
-            return await self._export_results(context)
-
-        else:
-            raise ValueError(f"Unknown step: {step.name}")
-
-    async def _process_youtube_url(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 1: Process YouTube URL and download video"""
-        url = context.get("url")
-        if not url:
-            raise ValueError("YouTube URL is required")
-
-        output_dir = context.get("output_dir") or tempfile.gettempdir()
-        output_dir = Path(output_dir).expanduser()
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        media_format = context.get("media_format", "mp4")
-        force_overwrite = context.get("force_overwrite", False)
-
-        self.logger.info(f"🎥 Processing YouTube URL: {url}")
-        self.logger.info(f"📦 Media format: {media_format}")
-
-        # Download media (audio or video) with runtime parameters
-        media_path = await self.downloader.download_media(
-            url=url,
-            output_dir=str(output_dir),
-            media_format=media_format,
-            force_overwrite=force_overwrite,
-        )
-
-        # Try to download captions if available
-        caption_path = None
-        try:
-            caption_path = await self.downloader.download_captions(
-                url=url,
-                output_dir=str(output_dir),
-                force_overwrite=force_overwrite,
-                enable_gemini_option=bool(self.transcriber.api_key),
-            )
-            if caption_path:
-                self.logger.info(f"✅ Caption downloaded: {caption_path}")
-            else:
-                self.logger.info("ℹ️  No captions available for this video")
-        except Exception as e:
-            self.logger.warning(f"⚠️  Failed to download captions: {e}")
-            # Continue without captions - will transcribe later if needed
-
-        # Get video metadata
-        metadata = await self.downloader.get_video_info(url)
-
-        result = {
-            "url": url,
-            "video_path": media_path,  # Keep 'video_path' key for backward compatibility
-            "audio_path": media_path,  # Also add 'audio_path' for clarity
-            "metadata": metadata,
-            "video_format": media_format,
-            "output_dir": output_dir,
-            "force_overwrite": force_overwrite,
-            "downloaded_caption_path": caption_path,  # Store downloaded caption path
-        }
-
-        self.logger.info(f"✅ Media downloaded: {media_path}")
-        return result
-
-    async def _transcribe_media(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 2: Transcribe video using Gemini 2.5 Pro or use downloaded caption"""
-        url = context.get("url")
-        result = context.get("process_youtube_url_result", {})
-        video_path = result.get("video_path")
-        output_dir = result.get("output_dir")
-        force_overwrite = result.get("force_overwrite", False)
-        downloaded_caption_path = result.get("downloaded_caption_path")
-
-        if not url or not video_path:
-            raise ValueError("URL and video path not found in context")
-
-        video_id = self.downloader.extract_video_id(url)
-
-        # If caption was already downloaded in step 1 and user selected it, use it directly
-        if downloaded_caption_path and downloaded_caption_path != "gemini":
-            self.logger.info(f"📥 Using caption: {downloaded_caption_path}")
-            return {"caption_path": downloaded_caption_path}
-
-        # Check for existing captions if caption was not downloaded yet
-        self.logger.info("📥 Checking for existing captions...")
-
-        # Check for existing caption files (all formats including Gemini transcripts)
-        existing_files = FileExistenceManager.check_existing_files(
-            video_id,
-            str(output_dir),
-            caption_formats=CAPTION_FORMATS,  # Check all caption formats including Markdown
-        )
-
-        # Prompt user if caption exists and force_overwrite is not set
-        if existing_files["caption"] and not force_overwrite:
-            # Let user choose which caption file to use
-            # Enable Gemini option if API key is available (check transcriber's api_key)
-            has_gemini_key = bool(self.transcriber.api_key)
-            caption_choice = FileExistenceManager.prompt_file_selection(
-                file_type="caption",
-                files=existing_files["caption"],
-                operation="transcribe",
-                enable_gemini=has_gemini_key,
-            )
-
-            if caption_choice == "cancel":
-                raise RuntimeError("Transcription cancelled by user")
-            elif caption_choice in ("overwrite", "gemini"):
-                # Continue to transcription below
-                # For 'gemini', user explicitly chose to transcribe with Gemini
-                pass
-            elif caption_choice == "use":
-                # User chose to use existing caption files (use first one)
-                caption_path = Path(existing_files["caption"][0])
-                self.logger.info(f"🔁 Using existing caption: {caption_path}")
-                return {"caption_path": str(caption_path)}
-            elif caption_choice:  # User selected a specific file path
-                # Use selected caption
-                caption_path = Path(caption_choice)
-                self.logger.info(f"🔁 Using existing caption: {caption_path}")
-                return {"caption_path": str(caption_path)}
-            # If user_choice == 'overwrite' or 'gemini', continue to transcription below
-
-        # TODO: support other Transcriber options
-        self.logger.info(f"✨ Transcribing URL with {self.transcriber.name}...")
-        transcript = await self.transcriber.transcribe_url(url)
-        caption_path = output_dir / f"{video_id}_{self.transcriber.name}{self.transcriber.file_suffix}"
-        with open(caption_path, "w", encoding="utf-8") as f:
-            f.write(transcript)
-        result = {"caption_path": str(caption_path)}
-        self.logger.info(f"✅   Transcript generated: {len(transcript)} characters")
-        return result
-
-    async def _align_caption(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 3: Align transcript with video using LattifAI"""
-        result = context["process_youtube_url_result"]
-        media_path = result.get("video_path", result.get("audio_path"))
-        caption_path = context.get("transcribe_media_result", {}).get("caption_path")
-
-        if not media_path or not caption_path:
-            raise ValueError("Video path and caption path are required")
-
-        self.logger.info("🎯 Aligning caption with video...")
-
-        # Check if caption is in markdown format (from transcriber)
-        if caption_path.endswith(self.transcriber.file_suffix):
-            is_transcriber_format = True
-        else:
-            is_transcriber_format = False
-        caption_path = Path(caption_path)
-
-        self.logger.info(
-            f'📄 Caption format: {self.transcriber.name if is_transcriber_format else f"{caption_path.suffix}"}'
-        )
-
-        original_caption_path = caption_path
-        output_dir = result.get("output_dir")
-        split_sentence = context.get("split_sentence", False)
-        word_level = context.get("word_level", False)
-        output_path = output_dir / f"{Path(media_path).stem}_aligned.ass"
-
-        # Perform alignment with LattifAI (split_sentence and word_level passed as function parameters)
-        aligned_result = await asyncio.to_thread(
-            self.aligner.alignment,
-            audio=media_path,
-            caption=str(caption_path),  # Use dialogue text for YouTube format, original for plain text
-            format="gemini" if is_transcriber_format else "auto",
-            split_sentence=split_sentence,
-            return_details=word_level,
-            output_caption_path=str(output_path),
-        )
-
-        result = {
-            "aligned_path": output_path,
-            "alignment_result": aligned_result,
-            "original_caption_path": original_caption_path,
-            "is_transcriber_format": is_transcriber_format,
-        }
-
-        self.logger.info("✅ Alignment completed")
-        return result
-
-    async def _export_results(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Step 4: Export results in specified format and update caption file"""
-        align_result = context.get("align_caption_result", {})
-        aligned_path = align_result.get("aligned_path")
-        original_caption_path = align_result.get("original_caption_path")
-        is_transcriber_format = align_result.get("is_transcriber_format", False)
-        metadata = context.get("process_youtube_url_result", {}).get("metadata", {})
-
-        if not aligned_path:
-            raise ValueError("Aligned caption path not found")
-
-        output_format = context.get("output_format", "srt")
-        include_speaker_in_text = context.get("include_speaker_in_text", True)
-        self.logger.info(f"📤 Exporting results in format: {output_format}")
-
-        caption = Caption.read(aligned_path, format="ass")
-        supervisions = caption.supervisions
-        exported_files = {}
-
-        # Update original transcript file with aligned timestamps if transcriber format
-        if is_transcriber_format:
-            assert Path(original_caption_path).exists(), "Original caption path not found"
-            self.logger.info("📝 Updating original transcript with aligned timestamps...")
-
-            try:
-                # Generate updated transcript file path
-                original_path = Path(original_caption_path)
-                updated_caption_path = original_path.parent / f"{original_path.stem}_LattifAI.md"
-
-                # Update timestamps in original transcript
-                GeminiWriter.update_timestamps(
-                    original_transcript=original_caption_path,
-                    aligned_supervisions=supervisions,
-                    output_path=str(updated_caption_path),
-                )
-
-                exported_files["updated_transcript"] = str(updated_caption_path)
-                self.logger.info(f"✅ Updated transcript: {updated_caption_path}")
-
-            except Exception as e:
-                self.logger.warning(f"⚠️  Failed to update transcript timestamps: {e}")
-
-        # Export to requested caption format
-        output_path = str(aligned_path).replace(
-            "_aligned.ass", f'{"_Gemini" if is_transcriber_format else ""}_LattifAI.{output_format}'
-        )
-        aligned_caption = Caption.from_supervisions(supervisions)
-        aligned_caption.write(output_path=output_path, include_speaker_in_text=include_speaker_in_text)
-        exported_files[output_format] = output_path
-        self.logger.info(f"✅ Exported {output_format.upper()}: {output_path}")
-
-        result = {
-            "exported_files": exported_files,
-            "metadata": metadata,
-            "caption_count": len(supervisions),
-            "is_transcriber_format": is_transcriber_format,
-            "original_caption_path": original_caption_path,
-        }
-
-        return result
-
-    async def __call__(
-        self,
-        url: str,
-        output_dir: Optional[str] = None,
-        media_format: str = "mp4",
-        force_overwrite: bool = False,
-        output_format: str = "srt",
-        split_sentence: bool = False,
-        word_level: bool = False,
-    ) -> Dict[str, Any]:
-        """Main entry point - callable interface"""
-        return await self.process_youtube_url(
-            url=url,
-            output_dir=output_dir,
-            media_format=media_format,
-            force_overwrite=force_overwrite,
-            output_format=output_format,
-            split_sentence=split_sentence,
-            word_level=word_level,
-        )
-
-    async def process_youtube_url(
-        self,
-        url: str,
-        output_dir: Optional[str] = None,
-        media_format: str = "mp4",
-        force_overwrite: bool = False,
-        output_format: str = "srt",
-        split_sentence: bool = False,
-        word_level: bool = False,
-    ) -> Dict[str, Any]:
-        """
-        Main entry point for processing a YouTube URL
-
-        Args:
-            url: YouTube URL to process
-            output_dir: Directory to save output files
-            media_format: Media format for download (mp3, mp4, etc.)
-            force_overwrite: Force overwrite existing files
-            output_format: Caption output format (srt, vtt, ass, etc.)
-            split_sentence: Re-segment captions by semantics
-            word_level: Include word-level alignment timestamps
-
-        Returns:
-            Dictionary containing results and exported file paths
-        """
-        # Execute the workflow with parameters
-        result = await self.execute(
-            url=url,
-            output_dir=output_dir,
-            media_format=media_format,
-            force_overwrite=force_overwrite,
-            output_format=output_format,
-            split_sentence=split_sentence,
-            word_level=word_level,
-        )
-
-        if result.is_success:
-            return result.data.get("export_results_result", {})
-        else:
-            # Re-raise the original exception if available to preserve error type and context
-            if result.exception:
-                raise result.exception
-            else:
-                raise Exception(f"Workflow failed: {result.error}")

@@ -21,9 +21,9 @@ __all__ = ["align"]
 
 @run.cli.entrypoint(name="align", namespace="alignment")
 def align(
-    input_media: Optional[Pathlike] = None,
-    input_caption: Optional[Pathlike] = None,
-    output_caption: Optional[Pathlike] = None,
+    input_media: Optional[str] = None,
+    input_caption: Optional[str] = None,
+    output_caption: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
@@ -119,10 +119,25 @@ def align(
         transcription_config=transcription,
         diarization_config=diarization,
     )
+
+    is_url = media_config.input_path.startswith(("http://", "https://"))
+    if is_url:
+        # Call the client's youtube method
+        return client.youtube(
+            url=media_config.input_path,
+            output_dir=media_config.output_dir,
+            output_caption_path=caption_config.output_path,
+            media_format=media_config.normalize_format() if media_config.output_format else None,
+            force_overwrite=media_config.force_overwrite,
+            split_sentence=caption_config.split_sentence,
+            channel_selector=media_config.channel_selector,
+        )
+
     return client.alignment(
         input_media=media_config.input_path,
         input_caption=caption_config.input_path,
         output_caption_path=caption_config.output_path,
+        split_sentence=caption_config.split_sentence,
         channel_selector=media_config.channel_selector,
     )
 
