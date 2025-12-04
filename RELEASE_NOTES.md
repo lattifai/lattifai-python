@@ -1,5 +1,5 @@
 ````markdown
-# Release Notes - LattifAI Python v1.0.0rc3
+# Release Notes - LattifAI Python v1.0.0rc3 & 1.0.0rc4
 
 **Release Date:** December 03, 2025
 
