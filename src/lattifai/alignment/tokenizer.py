@@ -1,5 +1,4 @@
 import gzip
-import inspect
 import pickle
 import re
 from collections import defaultdict
@@ -208,12 +207,23 @@ class LatticeTokenizer:
         from pathlib import Path
 
         words_model_path = f"{model_path}/words.bin"
-        if compressed:
-            with gzip.open(words_model_path, "rb") as f:
-                data = pickle.load(f)
-        else:
-            with open(words_model_path, "rb") as f:
-                data = pickle.load(f)
+        try:
+            if compressed:
+                with gzip.open(words_model_path, "rb") as f:
+                    data = pickle.load(f)
+            else:
+                with open(words_model_path, "rb") as f:
+                    data = pickle.load(f)
+        except pickle.UnpicklingError as e:
+            del e
+            import msgpack
+
+            if compressed:
+                with gzip.open(words_model_path, "rb") as f:
+                    data = msgpack.unpack(f, raw=False, strict_map_key=False)
+            else:
+                with open(words_model_path, "rb") as f:
+                    data = msgpack.unpack(f, raw=False, strict_map_key=False)
 
         tokenizer = cls(client_wrapper=client_wrapper)
         tokenizer.model_name = model_name
@@ -432,7 +442,7 @@ class LatticeTokenizer:
                 "labels": labels[0],
                 "offset": offset,
                 "channel": channel,
-                "return_details": return_details,
+                "return_details": False if return_details is None else return_details,
                 "destroy_lattice": True,
             },
         )
