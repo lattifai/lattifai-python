@@ -29,7 +29,7 @@ dependencies = [
     "tgt",
     "onnx>=1.16.0",
     "onnxruntime",
-    "g2p-phonemizer==0.1.1",
+    "g2p-phonemizer==0.1.4",
     "av",
     "wtpsplit>=2.1.6",
     # transcription
