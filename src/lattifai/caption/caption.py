@@ -168,6 +168,54 @@ class Caption:
             metadata=self.metadata.copy(),
         )
 
+    def to_string(self, format: str = "srt") -> str:
+        """
+        Return caption content in specified format.
+
+        Args:
+            format: Output format (e.g., 'srt', 'vtt', 'ass')
+
+        Returns:
+            String containing formatted captions
+        """
+        import pysubs2
+
+        subs = pysubs2.SSAFile()
+
+        if self.alignments:
+            alignments = self.alignments
+        else:
+            alignments = self.supervisions
+
+        if not alignments:
+            alignments = self.transcription
+
+        for sup in alignments:
+            # Add word-level timing as metadata in the caption text
+            word_items = self._parse_alignment_from_supervision(sup)
+            if word_items:
+                for word in word_items:
+                    subs.append(
+                        pysubs2.SSAEvent(
+                            start=int(word.start * 1000),
+                            end=int(word.end * 1000),
+                            text=word.symbol,
+                            name=sup.speaker or "",
+                        )
+                    )
+            else:
+                text = sup.text
+                subs.append(
+                    pysubs2.SSAEvent(
+                        start=int(sup.start * 1000),
+                        end=int(sup.end * 1000),
+                        text=text or "",
+                        name=sup.speaker or "",
+                    )
+                )
+
+        return subs.to_string(format_=format)
+
     def to_dict(self) -> Dict:
         """
         Convert Caption to dictionary representation.

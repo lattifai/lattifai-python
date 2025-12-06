@@ -43,6 +43,11 @@ dependencies = [
     "yt-dlp",
     "pycryptodome",
     "google-genai>=1.22.0",
+    # web
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1.4",
 ]
 
 
@@ -78,6 +83,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 "laicap-convert" = "lattifai.cli.caption:main_convert"
 "laicap-normalize" = "lattifai.cli.caption:main_normalize"
 "laicap-shift" = "lattifai.cli.caption:main_shift"
+"lai-web" = "lattifai.cli.web:main"
 
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"

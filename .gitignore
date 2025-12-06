@@ -5,7 +5,7 @@
 # Generated C code from Cython test
 tests/**/*.c
 # Cython HTML annotations
-*.html
+
 
 # C extensions
 *.so
