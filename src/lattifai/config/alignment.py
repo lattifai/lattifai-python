@@ -28,12 +28,12 @@ class AlignmentConfig:
     trust_caption_timestamps: bool = False
     """When True, use original caption timestamps as strong reference constraints during alignment.
     The alignment process will still adjust timestamps but stay close to the input timing.
-    Use this when you want to re-segment caption sentence boundaries (split_sentence=True)
+    Use this when you want to re-segment caption sentence boundaries (caption.split_sentence=True)
     while preserving the approximate timing from the original captions.
     When False (default), performs unconstrained forced alignment based purely on media-caption matching.
     """
 
-    strategy: Literal["caption", "transcription", "diarization", "entire", "enhance"] = "entire"
+    strategy: Literal["caption", "transcription", "entire"] = "entire"
     """Alignment strategy for long audio alignment:
     - 'entire': Process entire audio as single alignment (default, suitable for <30 min)
     - 'caption': Split based on existing caption boundaries and gaps (segment_max_gap)

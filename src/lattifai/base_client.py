@@ -439,7 +439,6 @@ class LattifAIClientMixin:
     ) -> Union[Union[str, Caption], Awaitable[Union[str, Caption]]]:
         """
         Get captions by downloading or transcribing.
-
         Args:
             url: YouTube video URL
             output_dir: Output directory for caption file
@@ -454,6 +453,8 @@ class LattifAIClientMixin:
         import asyncio
 
         from lattifai.workflow.youtube import TRANSCRIBE_CHOICE
+
+        transcriber_name = self.transcriber.name
 
         async def _async_impl():
             # First check if caption input_path is already provided
@@ -478,7 +479,7 @@ class LattifAIClientMixin:
 
                     choice = await asyncio.to_thread(
                         FileExistenceManager.prompt_file_selection,
-                        file_type=f"{self.transcriber.name} transcript",
+                        file_type=f"{transcriber_name} transcript",
                         files=[str(transcript_file)],
                         operation="transcribe",
                     )
@@ -487,7 +488,7 @@ class LattifAIClientMixin:
                         raise RuntimeError("Transcription cancelled by user")
                     elif choice == "use" or choice == str(transcript_file):
                         # User chose to use existing file (handles both "use" and file path)
-                        if "gemini" in self.transcriber.name.lower():
+                        if "gemini" in transcriber_name.lower():
                             return str(transcript_file)
 
                         caption = self._read_caption(transcript_file, normalize_text=False)
@@ -497,7 +498,7 @@ class LattifAIClientMixin:
 
                     # elif choice == "overwrite": continue to transcribe below
 
-                print(colorful.cyan(f"🎤 Transcribing media with {self.transcriber.name}..."))
+                print(colorful.cyan(f"🎤 Transcribing media with {transcriber_name}..."))
                 if self.transcriber.supports_url:
                     transcription = await self.transcriber.transcribe(url, language=source_lang)
                 else:
@@ -517,14 +518,19 @@ class LattifAIClientMixin:
                     output_dir=str(output_dir),
                     force_overwrite=force_overwrite,
                     source_lang=source_lang,
-                    transcriber_name=self.transcriber.name if self.transcriber else None,
+                    transcriber_name=transcriber_name,
                 )
 
                 if str(caption_file) == str(transcript_file):
                     # Transcription was used
                     caption = self._read_caption(transcript_file, normalize_text=False)
-                    caption.transcription = caption.supervisions
-                    caption.supervisions = None
+                    if transcriber_name and "gemini" not in transcriber_name.lower():
+                        caption.transcription = caption.supervisions  # alignment will trust transcription's timestamps
+                        caption.supervisions = None
+                    else:
+                        # Gemini transcription's timestamps are not accurate
+                        pass
+
                     return caption
 
                 if caption_file == TRANSCRIBE_CHOICE:

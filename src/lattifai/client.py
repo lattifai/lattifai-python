@@ -133,7 +133,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                                 caption.audio_events = transcript.audio_events
 
                         if not caption.transcription:
-                            transcript = asyncio.run(self.transcriber(media_audio))
+                            transcript = asyncio.run(
+                                self.transcriber.transcribe(media_audio, language=self.caption_config.source_lang)
+                            )
                             caption.transcription = transcript.transcription
                             caption.audio_events = transcript.audio_events
 

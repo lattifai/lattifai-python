@@ -47,9 +47,9 @@ class BaseTranscriber(ABC):
         """File name identifier for the transcriber."""
         return f"{self.name.replace('/', '_')}{self.file_suffix}"
 
-    async def __call__(self, url_or_data: Union[str, AudioData]) -> str:
+    async def __call__(self, url_or_data: Union[str, AudioData], language: Optional[str] = None) -> str:
         """Main entry point for transcription."""
-        return await self.transcribe(url_or_data)
+        return await self.transcribe(url_or_data, language=language)
 
     async def transcribe(self, url_or_data: Union[str, AudioData], language: Optional[str] = None) -> str:
         """
