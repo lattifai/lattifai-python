@@ -96,6 +96,9 @@ def align(
     if input_media:
         media_config.set_input_path(input_media)
 
+    if not media_config.input_path:
+        raise ValueError("Input media path must be specified via positional argument input_media= or media.input_path=")
+
     caption_config = caption or CaptionConfig()
 
     # Validate that output_caption_path and caption_config.output_path are not both provided
