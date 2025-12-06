@@ -12,3 +12,4 @@ per-file-ignores =
 exclude =
   .git,
   setup.py,
+  app/
