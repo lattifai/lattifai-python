@@ -63,8 +63,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Create a new project with uv
 uv init my-project
 cd my-project
-
-uv init
 source .venv/bin/activate
 
 # Install k2 (required dependency)
@@ -163,6 +161,7 @@ That's it! Your aligned subtitles are saved to `aligned.srt`.
 | `lai alignment align` | Align local audio/video with caption |
 | `lai alignment youtube` | Download & align YouTube content |
 | `lai transcribe run` | Transcribe audio/video or YouTube URL to caption |
+| `lai transcribe align` | Transcribe audio/video and align with generated transcript |
 | `lai caption convert`   | Convert between caption formats |
 | `lai caption normalize` | Clean and normalize caption text |
 | `lai caption shift`     | Shift caption timestamps |
@@ -238,12 +237,55 @@ lai transcribe run \
 
 **Supported Transcription Models (More Coming Soon):**
 - `gemini-2.5-pro` - Google Gemini API (requires API key)
+  - Languages: 100+ languages including English, Chinese, Spanish, French, German, Japanese, Korean, Arabic, and more
 - `gemini-3-pro-preview` - Google Gemini API (requires API key)
+  - Languages: 100+ languages (same as gemini-2.5-pro)
 - `nvidia/parakeet-tdt-0.6b-v3` - NVIDIA Parakeet model
+  - Languages: Bulgarian (bg), Croatian (hr), Czech (cs), Danish (da), Dutch (nl), English (en), Estonian (et), Finnish (fi), French (fr), German (de), Greek (el), Hungarian (hu), Italian (it), Latvian (lv), Lithuanian (lt), Maltese (mt), Polish (pl), Portuguese (pt), Romanian (ro), Slovak (sk), Slovenian (sl), Spanish (es), Swedish (sv), Russian (ru), Ukrainian (uk)
 - `iic/SenseVoiceSmall` - Alibaba SenseVoice model
+  - Languages: Chinese/Mandarin (zh), English (en), Japanese (ja), Korean (ko), Cantonese (yue)
 - More models will be integrated in future releases
 
-**Note:** For transcription with alignment, use `lai alignment youtube` instead.
+**Note:** For transcription with alignment on local files, use `lai transcribe align` instead.
+
+### lai transcribe align
+
+Transcribe audio/video file and automatically align the generated transcript with the audio.
+
+This command combines transcription and alignment in a single step, producing precisely aligned captions.
+
+```bash
+# Basic usage
+lai transcribe align <input_media> <output_caption>
+
+# Examples
+lai transcribe align audio.wav output.srt
+lai transcribe align audio.mp4 output.ass \
+    transcription.model_name=nvidia/parakeet-tdt-0.6b-v3 \
+    alignment.device=cuda
+
+# Using Gemini transcription with alignment
+lai transcribe align audio.wav output.srt \
+    transcription.model_name=gemini-2.5-pro \
+    transcription.gemini_api_key=YOUR_KEY \
+    caption.split_sentence=true
+
+# Full configuration
+lai transcribe align \
+    input_media=audio.wav \
+    output_caption=output.srt \
+    transcription.device=mps \
+    transcription.model_name=iic/SenseVoiceSmall \
+    alignment.device=cuda \
+    caption.word_level=true
+```
+
+**Parameters:**
+- `input_media`: Path to input audio/video file (required)
+- `output_caption`: Path for output aligned caption file (required)
+- `transcription`: Transcription configuration (model_name, device, language, gemini_api_key)
+- `alignment`: Alignment configuration (model_name, device)
+- `caption`: Caption formatting options (split_sentence, word_level, etc.)
 
 
 ### lai caption convert
@@ -425,8 +467,8 @@ caption = client.alignment(
 # Access word-level alignments
 for segment in caption.alignments:
     if segment.alignment and "word" in segment.alignment:
-        for word, start, duration, confidence in segment.alignment.word:
-            print(f"{start:.2f}s: {word} (confidence: {confidence:.2f})")
+        for word_item in segment.alignment["word"]:
+            print(f"{word_item.start:.2f}s: {word_item.symbol} (confidence: {word_item.score:.2f})")
 ```
 
 ### Smart Sentence Splitting
