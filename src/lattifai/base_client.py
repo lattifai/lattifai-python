@@ -189,7 +189,8 @@ class LattifAIClientMixin:
 
         from lattifai.utils import _resolve_model_path
 
-        transcription_config.lattice_model_path = _resolve_model_path(alignment_config.model_name)
+        if transcription_config is not None:
+            transcription_config.lattice_model_path = _resolve_model_path(alignment_config.model_name)
 
         return client_config, alignment_config, caption_config, transcription_config
 

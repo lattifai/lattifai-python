@@ -128,3 +128,40 @@ class TestYoutubeCommand:
                 assert "media" in help_text
                 assert "caption" in help_text
                 assert "alignment" in help_text
+
+    def test_youtube_source_lang_option(self, tmp_path):
+        """Test youtube command with source_lang option"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            "caption.source_lang=en",
+            "alignment.device=cpu",
+        ]
+
+        run_youtube_command(args)
+
+    @pytest.mark.parametrize(
+        "lang_code",
+        ["en", "zh", "es", "fr", "de", "ja", "ko"],
+    )
+    def test_youtube_various_source_languages(self, tmp_path, lang_code):
+        """Test youtube command with various source language codes"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            f"caption.source_lang={lang_code}",
+            "alignment.device=cpu",
+        ]
+
+        run_youtube_command(args)
+
+    def test_youtube_source_lang_with_region(self, tmp_path):
+        """Test youtube command with language code including region"""
+        args = [
+            "media.input_path=https://www.youtube.com/watch?v=kb9suz-kkoM",
+            f"media.output_dir={tmp_path}",
+            "caption.source_lang=en-US",
+            "alignment.device=cpu",
+        ]
+
+        run_youtube_command(args)

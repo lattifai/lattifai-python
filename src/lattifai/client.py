@@ -97,7 +97,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             if not input_caption:
-                caption = self._transcribe(media_audio, source_lang=None, is_async=False)
+                caption = self._transcribe(media_audio, source_lang=self.caption_config.source_lang, is_async=False)
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
 
@@ -443,7 +443,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             output_dir,
             media_audio,
             force_overwrite,
-            source_lang,
+            source_lang or self.caption_config.source_lang,
             is_async=False,
             use_transcription=use_transcription,
         )

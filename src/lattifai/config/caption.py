@@ -58,6 +58,9 @@ class CaptionConfig:
     encoding: str = "utf-8"
     """Character encoding for reading/writing caption files (default: utf-8)."""
 
+    source_lang: Optional[str] = None
+    """Source language code for the caption content (e.g., 'en', 'zh', 'de')."""
+
     def __post_init__(self):
         """Validate configuration after initialization."""
         self._normalize_paths()
