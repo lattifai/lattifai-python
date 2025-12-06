@@ -134,6 +134,12 @@ class FileExistenceManager:
         # Add overwrite and cancel options with aligned spacing
         overwrite_text, overwrite_op = "Overwrite existing files (re-generate or download)", "overwrite"
         if transcriber_name:
+            options.append(
+                (
+                    f'{colorful.green("•")} 🔄 {" " * shift_length} {overwrite_text}',
+                    overwrite_op,
+                )
+            )
             overwrite_text, overwrite_op = f"Transcribe with {transcriber_name}", TRANSCRIBE_CHOICE
 
         options.extend(
@@ -247,15 +253,10 @@ class FileExistenceManager:
             # Display full path for clarity
             options.append((f"{colorful.cyan(file_path)}", file_path))
 
-        # Add transcription option if transcriber_name is provided
+        # Add transcription or overwrite option
         if transcriber_name:
             transcribe_text = f"✨ Transcribe with {transcriber_name}"
             options.append((colorful.magenta(transcribe_text), TRANSCRIBE_CHOICE))
-
-        # Add overwrite and cancel options
-        if transcriber_name:
-            overwrite_text = f"Transcribe with {transcriber_name}"
-            options.append((colorful.yellow(overwrite_text), TRANSCRIBE_CHOICE))
         else:
             overwrite_text = f"Overwrite (re-{operation} or download)"
             options.append((colorful.yellow(overwrite_text), "overwrite"))
