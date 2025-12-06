@@ -43,26 +43,30 @@ class LattifAITranscriber(BaseTranscriber):
     def name(self) -> str:
         return f"{self.config.model_name}"
 
-    async def transcribe_url(self, url: str) -> str:
+    async def transcribe_url(self, url: str, language: Optional[str] = None) -> str:
         """
         URL transcription not supported for LattifAI local models.
 
         This method exists to satisfy the BaseTranscriber interface but
         will never be called because supports_url = False and the base
         class checks this flag before calling this method.
+
+        Args:
+            url: URL to transcribe (not supported)
+            language: Optional language code (not used)
         """
         raise NotImplementedError(
             f"{self.__class__.__name__} does not support URL transcription. "
             f"Please download the file first and use transcribe_file()."
         )
 
-    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Caption:
+    async def transcribe_file(self, media_file: Union[str, Path, AudioData], language: Optional[str] = None) -> Caption:
         if self._transcriber is None:
             from lattifai_core.transcription import LattifAITranscriber as CoreLattifAITranscriber
 
             self._transcriber = CoreLattifAITranscriber.from_pretrained(model_config=self.config)
 
-        transcription, audio_events = self._transcriber.transcribe(media_file, num_workers=2)
+        transcription, audio_events = self._transcriber.transcribe(media_file, language=language, num_workers=2)
         caption = Caption.from_transcription_results(
             transcription=transcription,
             audio_events=audio_events,

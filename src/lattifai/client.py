@@ -97,7 +97,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             if not input_caption:
-                caption = self._transcribe(media_audio, caption_lang=None, is_async=False)
+                caption = self._transcribe(media_audio, source_lang=None, is_async=False)
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
 
@@ -419,7 +419,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         url: str,
         output_dir: Optional[Pathlike] = None,
         media_format: Optional[str] = None,
-        caption_lang: Optional[str] = None,
+        source_lang: Optional[str] = None,
         force_overwrite: bool = False,
         output_caption_path: Optional[Pathlike] = None,
         split_sentence: Optional[bool] = None,
@@ -443,7 +443,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             output_dir,
             media_audio,
             force_overwrite,
-            caption_lang,
+            source_lang,
             is_async=False,
             use_transcription=use_transcription,
         )

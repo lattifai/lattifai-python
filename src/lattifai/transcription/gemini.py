@@ -53,12 +53,13 @@ class GeminiTranscriber(BaseTranscriber):
         """Human-readable name of the transcriber."""
         return f"{self.config.model_name}"
 
-    async def transcribe_url(self, url: str) -> str:
+    async def transcribe_url(self, url: str, language: Optional[str] = None) -> str:
         """
         Transcribe audio from URL using Gemini 2.5 Pro.
 
         Args:
             url: URL to transcribe (e.g., YouTube)
+            language: Optional language code for transcription (overrides config)
 
         Returns:
             Transcribed text
@@ -80,12 +81,13 @@ class GeminiTranscriber(BaseTranscriber):
             self.logger.error(f"Gemini transcription failed: {str(e)}")
             raise RuntimeError(f"Gemini transcription failed: {str(e)}")
 
-    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> str:
+    async def transcribe_file(self, media_file: Union[str, Path, AudioData], language: Optional[str] = None) -> str:
         """
         Transcribe audio/video from local file using Gemini 2.5 Pro.
 
         Args:
             media_file: Path to local audio/video file
+            language: Optional language code for transcription (overrides config)
 
         Returns:
             Transcribed text

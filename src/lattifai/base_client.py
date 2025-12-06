@@ -134,7 +134,7 @@ class LattifAIClientMixin:
             url: YouTube video URL (e.g., https://youtube.com/watch?v=VIDEO_ID)
             output_dir: Directory for downloaded files. If None, uses temporary directory.
             media_format: Media format to download (mp3, mp4, wav, etc.). If None, uses config default.
-            caption_lang: Specific caption language to download (e.g., 'en', 'zh'). If None, downloads all.
+            source_lang: Specific caption language to download (e.g., 'en', 'zh'). If None, downloads all.
             force_overwrite: Skip confirmation prompts and overwrite existing files.
             output_caption_path: Path for aligned caption output. If None, auto-generates.
             **alignment_kwargs: Additional arguments passed to alignment() method.
@@ -378,7 +378,7 @@ class LattifAIClientMixin:
     def _transcribe(
         self,
         media_file: Union[str, Path, AudioData],
-        caption_lang: Optional[str],
+        source_lang: Optional[str],
         is_async: bool = False,
     ) -> Caption:
         """
@@ -389,7 +389,7 @@ class LattifAIClientMixin:
             output_dir: Output directory for caption file
             media_file: Media file path (used to generate caption filename)
             force_overwrite: Force overwrite existing files
-            caption_lang: Caption language to download
+            source_lang: Caption language to download
             is_async: If True, returns coroutine; if False, runs synchronously
 
         Returns:
@@ -402,7 +402,7 @@ class LattifAIClientMixin:
             self._validate_transcription_setup()
 
             print(colorful.cyan(f"🎤 Transcribing({self.transcriber.name}) media: {str(media_file)} ..."))
-            transcription = await self.transcriber.transcribe_file(media_file)
+            transcription = await self.transcriber.transcribe_file(media_file, language=source_lang)
             print(colorful.green("         ✓ Transcription completed."))
 
             if "Gemini" in self.transcriber.name:
@@ -432,7 +432,7 @@ class LattifAIClientMixin:
         output_dir: Path,
         media_file: Union[str, Path, AudioData],
         force_overwrite: bool,
-        caption_lang: Optional[str],
+        source_lang: Optional[str],
         is_async: bool = False,
         use_transcription: bool = False,
     ) -> Union[Union[str, Caption], Awaitable[Union[str, Caption]]]:
@@ -444,7 +444,7 @@ class LattifAIClientMixin:
             output_dir: Output directory for caption file
             media_file: Media file path (used to generate caption filename)
             force_overwrite: Force overwrite existing files
-            caption_lang: Caption language to download
+            source_lang: Caption language to download
             is_async: If True, returns coroutine; if False, runs synchronously
 
         Returns:
@@ -498,9 +498,9 @@ class LattifAIClientMixin:
 
                 print(colorful.cyan(f"🎤 Transcribing media with {self.transcriber.name}..."))
                 if self.transcriber.supports_url:
-                    transcription = await self.transcriber.transcribe(url)
+                    transcription = await self.transcriber.transcribe(url, language=source_lang)
                 else:
-                    transcription = await self.transcriber.transcribe_file(media_file)
+                    transcription = await self.transcriber.transcribe_file(media_file, language=source_lang)
 
                 await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
 
@@ -515,7 +515,7 @@ class LattifAIClientMixin:
                     url=url,
                     output_dir=str(output_dir),
                     force_overwrite=force_overwrite,
-                    caption_lang=caption_lang,
+                    source_lang=source_lang,
                     transcriber_name=self.transcriber.name if self.transcriber else None,
                 )
 
@@ -532,7 +532,7 @@ class LattifAIClientMixin:
                         output_dir=output_dir,
                         media_file=media_file,
                         force_overwrite=force_overwrite,
-                        caption_lang=caption_lang,
+                        source_lang=source_lang,
                         is_async=True,
                         use_transcription=True,
                     )

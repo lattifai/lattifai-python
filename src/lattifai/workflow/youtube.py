@@ -336,7 +336,7 @@ class YouTubeDownloader:
         url: str,
         output_dir: str,
         force_overwrite: bool = False,
-        caption_lang: Optional[str] = None,
+        source_lang: Optional[str] = None,
         transcriber_name: Optional[str] = None,
     ) -> Optional[str]:
         """
@@ -346,7 +346,7 @@ class YouTubeDownloader:
             url: YouTube URL
             output_dir: Output directory
             force_overwrite: Skip user confirmation and overwrite existing files
-            caption_lang: Specific caption language/track to download (e.g., 'en')
+            source_lang: Specific caption language/track to download (e.g., 'en')
                           If None, downloads all available captions
             transcriber_name: Name of the transcriber (for user prompts)
         Returns:
@@ -394,8 +394,8 @@ class YouTubeDownloader:
                     return str(caption_file)
 
         self.logger.info(f"📥 Downloading caption for: {url}")
-        if caption_lang:
-            self.logger.info(f"🎯 Targeting specific caption track: {caption_lang}")
+        if source_lang:
+            self.logger.info(f"🎯 Targeting specific caption track: {source_lang}")
 
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
@@ -410,8 +410,8 @@ class YouTubeDownloader:
         ]
 
         # Add caption language selection if specified
-        if caption_lang:
-            ytdlp_options.extend(["--write-sub", "--write-auto-sub", "--sub-langs", f"{caption_lang}.*"])
+        if source_lang:
+            ytdlp_options.extend(["--write-sub", "--write-auto-sub", "--sub-langs", f"{source_lang}*"])
         else:
             # Download only manual captions (not auto-generated) in English to avoid rate limiting
             ytdlp_options.extend(["--write-sub", "--write-auto-sub"])

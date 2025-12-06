@@ -51,35 +51,49 @@ class BaseTranscriber(ABC):
         """Main entry point for transcription."""
         return await self.transcribe(url_or_data)
 
-    async def transcribe(self, url_or_data: Union[str, AudioData]) -> str:
+    async def transcribe(self, url_or_data: Union[str, AudioData], language: Optional[str] = None) -> str:
         """
         Route transcription based on input type.
 
         For URL inputs, only works if the transcriber supports direct URL transcription.
         Otherwise, the caller should download the media first and pass AudioData.
+
+        Args:
+            url_or_data: URL string or AudioData object to transcribe.
+            language: Optional language code for transcription (e.g., 'en', 'zh').
         """
         if isinstance(url_or_data, AudioData):
-            return await self.transcribe_file(url_or_data)
+            return await self.transcribe_file(url_or_data, language=language)
         elif self._is_url(url_or_data):
             if self.supports_url:
-                return await self.transcribe_url(url_or_data)
+                return await self.transcribe_url(url_or_data, language=language)
             else:
                 raise ValueError(
                     f"{self.__class__.__name__} does not support direct URL transcription. "
                     f"Please download the media first and pass AudioData instead."
                 )
-        return await self.transcribe_file(url_or_data)  # file path
+        return await self.transcribe_file(url_or_data, language=language)  # file path
 
     @abstractmethod
-    async def transcribe_url(self, url: str) -> str:
+    async def transcribe_url(self, url: str, language: Optional[str] = None) -> str:
         """
         Transcribe audio from a remote URL (e.g., YouTube).
+
+        Args:
+            url: URL of the audio/video to transcribe.
+            language: Optional language code for transcription.
         """
 
     @abstractmethod
-    async def transcribe_file(self, media_file: Union[str, Path, AudioData]) -> Union[str, Caption]:
+    async def transcribe_file(
+        self, media_file: Union[str, Path, AudioData], language: Optional[str] = None
+    ) -> Union[str, Caption]:
         """
         Transcribe audio from a local media file.
+
+        Args:
+            media_file: Path to media file or AudioData object.
+            language: Optional language code for transcription.
         """
 
     @abstractmethod
