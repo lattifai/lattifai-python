@@ -11,7 +11,8 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading }) =>
     const [captionFile, setCaptionFile] = useState<File | null>(null);
     const [youtubeUrl, setYoutubeUrl] = useState('');
     const [splitSentence, setSplitSentence] = useState(true);
-    const [isTranscription, setIsTranscription] = useState(false);
+    const [isTranscription, setIsTranscription] = useState(true);
+    const [normalizeText, setNormalizeText] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -26,6 +27,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading }) =>
         if (youtubeUrl) formData.append('youtube_url', youtubeUrl);
         formData.append('split_sentence', String(splitSentence));
         formData.append('is_transcription', String(isTranscription));
+        formData.append('normalize_text', String(normalizeText));
 
         try {
             const response = await axios.post('/align', formData, {
@@ -79,6 +81,10 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading }) =>
                 <label className="checkbox-label">
                     <input type="checkbox" checked={isTranscription} onChange={e => setIsTranscription(e.target.checked)} />
                     Use Transcription (if no caption)
+                </label>
+                <label className="checkbox-label">
+                    <input type="checkbox" checked={normalizeText} onChange={e => setNormalizeText(e.target.checked)} />
+                    Normalize Text
                 </label>
             </div>
 

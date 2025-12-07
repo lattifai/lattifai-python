@@ -178,7 +178,7 @@ class LattifAIClientMixin:
         transcription_config: Optional["TranscriptionConfig"],
     ) -> tuple:
         """Initialize all configs with defaults if not provided."""
-        from .config import AlignmentConfig, CaptionConfig, ClientConfig
+        from .config import AlignmentConfig, CaptionConfig, ClientConfig, TranscriptionConfig
 
         if client_config is None:
             client_config = ClientConfig()
@@ -186,6 +186,8 @@ class LattifAIClientMixin:
             alignment_config = AlignmentConfig()
         if caption_config is None:
             caption_config = CaptionConfig()
+        if transcription_config is None:
+            transcription_config = TranscriptionConfig()
 
         from lattifai.utils import _resolve_model_path
 

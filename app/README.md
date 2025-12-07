@@ -1,3 +1,27 @@
+# LattifAI Web Interface
+
+## Getting Started
+
+1. **Start the backend server:**
+   
+   Make sure to install the python package first (see root README).
+   ```bash
+   # In the root directory of the project
+   lai-server
+   ```
+
+2. **Start the frontend:**
+
+   ```bash
+   # In this directory
+   npm install
+   npm run dev
+   ```
+
+   Visit `http://localhost:5173` to open the web interface.
+
+---
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

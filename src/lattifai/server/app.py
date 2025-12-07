@@ -62,6 +62,7 @@ async def align_files(
     youtube_url: Optional[str] = Form(None),
     split_sentence: bool = Form(True),
     is_transcription: bool = Form(False),
+    normalize_text: bool = Form(False),
 ):
     if not media_file and not youtube_url:
         return JSONResponse(status_code=400, content={"error": "Either media file or YouTube URL must be provided."})
@@ -91,7 +92,14 @@ async def align_files(
             # Process in thread pool to not block event loop
             loop = asyncio.get_event_loop()
             result_caption = await loop.run_in_executor(
-                None, process_alignment, media_path, youtube_url, caption_path, split_sentence, is_transcription
+                None,
+                process_alignment,
+                media_path,
+                youtube_url,
+                caption_path,
+                split_sentence,
+                is_transcription,
+                normalize_text,
             )
 
             # Convert result to dict (SRT format text + list of segments)
@@ -116,10 +124,13 @@ async def align_files(
         return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
 
 
-def process_alignment(media_path, youtube_url, caption_path, split_sentence, is_transcription):
+def process_alignment(media_path, youtube_url, caption_path, split_sentence, is_transcription, normalize_text):
     """
     Wrapper to call LattifAI client.
     """
+    # Temporarily update config (assuming single user usage or accepting race condition for now)
+    client.caption_config.normalize_text = normalize_text
+
     if youtube_url:
         # If youtube, we use client.youtube
         # Note: client.youtube handles download + alignment

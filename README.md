@@ -21,6 +21,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 - [Quick Start](#quick-start)
   - [Command Line Interface](#command-line-interface)
   - [Python SDK (5 Lines of Code)](#python-sdk-5-lines-of-code)
+  - [Web Interface](#web-interface)
 - [CLI Reference](#cli-reference)
   - [lai alignment align](#lai-alignment-align)
   - [lai alignment youtube](#lai-alignment-youtube)
@@ -149,6 +150,22 @@ caption = client.alignment(
 ```
 
 That's it! Your aligned subtitles are saved to `aligned.srt`.
+
+### Web Interface
+
+1. **Start the backend server:**
+   ```bash
+   lai-server
+   ```
+
+2. **Start the frontend (in a new terminal):**
+   ```bash
+   cd app
+   npm install
+   npm run dev
+   ```
+
+   Visit `http://localhost:5173` to open the web interface.
 
 ---
 

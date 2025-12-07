@@ -97,6 +97,7 @@ packages = [
     "lattifai.config",
     "lattifai.caption",
     "lattifai.diarization",
+    "lattifai.server",
     "lattifai.transcription",
     "lattifai.transcription.prompts",
     "lattifai.workflow",
