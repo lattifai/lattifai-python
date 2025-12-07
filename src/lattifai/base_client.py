@@ -18,7 +18,7 @@ from .config import ClientConfig
 from .errors import APIError, CaptionProcessingError, ConfigurationError
 
 if TYPE_CHECKING:
-    from .config import AlignmentConfig, CaptionConfig, TranscriptionConfig
+    from .config import AlignmentConfig, CaptionConfig, DiarizationConfig, TranscriptionConfig
 
 
 class LattifAIClientMixin:
@@ -176,9 +176,10 @@ class LattifAIClientMixin:
         alignment_config: Optional["AlignmentConfig"],
         caption_config: Optional["CaptionConfig"],
         transcription_config: Optional["TranscriptionConfig"],
+        diarization_config: Optional["DiarizationConfig"] = None,
     ) -> tuple:
         """Initialize all configs with defaults if not provided."""
-        from .config import AlignmentConfig, CaptionConfig, ClientConfig, TranscriptionConfig
+        from .config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
 
         if client_config is None:
             client_config = ClientConfig()
@@ -188,13 +189,20 @@ class LattifAIClientMixin:
             caption_config = CaptionConfig()
         if transcription_config is None:
             transcription_config = TranscriptionConfig()
+        if diarization_config is None:
+            diarization_config = DiarizationConfig()
 
         from lattifai.utils import _resolve_model_path
 
         if transcription_config is not None:
             transcription_config.lattice_model_path = _resolve_model_path(alignment_config.model_name)
 
-        return client_config, alignment_config, caption_config, transcription_config
+        # Set client_wrapper for all configs
+        alignment_config.client_wrapper = self
+        transcription_config.client_wrapper = self
+        diarization_config.client_wrapper = self
+
+        return client_config, alignment_config, caption_config, transcription_config, diarization_config
 
     def _init_shared_components(
         self,

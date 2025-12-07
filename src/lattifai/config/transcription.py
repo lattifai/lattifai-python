@@ -1,10 +1,13 @@
 """Transcription service configuration for LattifAI."""
 
 import os
-from dataclasses import dataclass
-from typing import Literal, Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal, Optional
 
 from ..utils import _select_device
+
+if TYPE_CHECKING:
+    from ..base_client import SyncAPIClient
 
 SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",
@@ -46,6 +49,9 @@ class TranscriptionConfig:
 
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
+
+    client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
+    """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""

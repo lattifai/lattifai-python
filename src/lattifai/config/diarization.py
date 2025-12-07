@@ -1,9 +1,12 @@
 """Speaker diarization configuration for LattifAI."""
 
-from dataclasses import dataclass
-from typing import Literal, Optional
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal, Optional
 
 from ..utils import _select_device
+
+if TYPE_CHECKING:
+    from ..base_client import SyncAPIClient
 
 
 @dataclass
@@ -37,6 +40,9 @@ class DiarizationConfig:
 
     debug: bool = False
     """Enable debug mode for diarization operations."""
+
+    client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
+    """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""

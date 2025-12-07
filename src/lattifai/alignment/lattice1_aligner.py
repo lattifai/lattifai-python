@@ -26,14 +26,14 @@ class Lattice1Aligner(object):
 
     def __init__(
         self,
-        client_wrapper: ClientType,
-        *,
-        config: Optional[AlignmentConfig] = None,
+        config: AlignmentConfig,
     ) -> None:
-        if config is None:
-            config = AlignmentConfig()
-
         self.config = config
+
+        if config.client_wrapper is None:
+            raise ValueError("AlignmentConfig.client_wrapper is not set. It must be initialized by the client.")
+
+        client_wrapper = config.client_wrapper
         model_path = _resolve_model_path(config.model_name)
 
         self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.model_name, config.device)

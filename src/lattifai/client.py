@@ -49,23 +49,24 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             transcription_note=". If provided with valid API key, enables transcription capabilities (e.g., Gemini for YouTube videos)",
             api_key_source="and LATTIFAI_API_KEY env var is not set",
         )
-        # Initialize all configs with defaults
-        client_config, alignment_config, caption_config, transcription_config = self._init_configs(
-            client_config, alignment_config, caption_config, transcription_config
-        )
 
         # Initialize base API client
         super().__init__(config=client_config)
 
+        # Initialize all configs with defaults
+        client_config, alignment_config, caption_config, transcription_config, diarization_config = self._init_configs(
+            client_config, alignment_config, caption_config, transcription_config, diarization_config
+        )
+
         # Store configs
         self.caption_config = caption_config
-        self.diarization_config = diarization_config or DiarizationConfig()
+        self.diarization_config = diarization_config
 
         # audio loader
         self.audio_loader = AudioLoader(device=alignment_config.device)
 
         # aligner
-        self.aligner = Lattice1Aligner(self, config=alignment_config)
+        self.aligner = Lattice1Aligner(config=alignment_config)
 
         # Initialize diarizer if enabled
         self.diarizer: Optional["LattifAIDiarizer"] = None
