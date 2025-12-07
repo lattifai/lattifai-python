@@ -47,7 +47,7 @@ def align(
                     output_path, output_format, prefer_audio, default_audio_format,
                     default_video_format, force_overwrite
         client: API client configuration.
-            Fields: api_key, base_url, timeout, max_retries, default_headers
+            Fields: api_key, timeout, max_retries, default_headers
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name, device, batch_size
         caption: Caption I/O configuration (file reading/writing and formatting).

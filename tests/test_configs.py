@@ -56,12 +56,6 @@ class TestAlignmentConfig:
         config = ClientConfig()
         assert config.api_key == "env-key"
 
-    def test_base_url_from_env(self, monkeypatch):
-        """Test base URL loaded from environment."""
-        monkeypatch.setenv("LATTIFAI_BASE_URL", "https://custom.api.com")
-        config = ClientConfig(api_key="test-key")
-        assert config.base_url == "https://custom.api.com"
-
     def test_invalid_timeout(self):
         """Test validation of timeout parameter."""
         with pytest.raises(ValueError, match="timeout must be greater than 0"):

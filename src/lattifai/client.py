@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
 import colorful
+from lattifai_core.client import SyncAPIClient
 from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
-from lattifai.base_client import SyncAPIClient
 from lattifai.caption import Caption, InputCaptionFormat
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
 from lattifai.errors import (

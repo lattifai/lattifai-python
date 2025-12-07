@@ -45,7 +45,7 @@ def youtube(
         media: Media configuration for controlling formats and output directories.
             Fields: input_path (YouTube URL), output_dir, output_format, force_overwrite
         client: API client configuration.
-            Fields: api_key, base_url, timeout, max_retries
+            Fields: api_key, timeout, max_retries
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name, device, batch_size
         caption: Caption configuration for reading/writing caption files.

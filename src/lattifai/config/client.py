@@ -17,9 +17,6 @@ class ClientConfig:
     api_key: Optional[str] = field(default=None)
     """LattifAI API key. If None, reads from LATTIFAI_API_KEY environment variable."""
 
-    base_url: str = "https://api.lattifai.com/v1"
-    """API endpoint URL."""
-
     timeout: float = 120.0
     """Request timeout in seconds."""
 
@@ -41,12 +38,6 @@ class ClientConfig:
         # Auto-load API key from environment if not provided
         if self.api_key is None:
             object.__setattr__(self, "api_key", os.environ.get("LATTIFAI_API_KEY"))
-
-        # Auto-load base URL from environment if default
-        if self.base_url == "https://api.lattifai.com/v1":
-            env_base_url = os.environ.get("LATTIFAI_BASE_URL")
-            if env_base_url:
-                object.__setattr__(self, "base_url", env_base_url)
 
         # Validate API parameters
         if self.timeout <= 0:
