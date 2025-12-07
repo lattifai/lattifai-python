@@ -8,7 +8,7 @@ from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
-from lattifai.base_client import LattifAIClientMixin, SyncAPIClient
+from lattifai.base_client import SyncAPIClient
 from lattifai.caption import Caption, InputCaptionFormat
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
 from lattifai.errors import (
@@ -17,6 +17,7 @@ from lattifai.errors import (
     LatticeDecodingError,
     LatticeEncodingError,
 )
+from lattifai.mixin import LattifAIClientMixin
 
 if TYPE_CHECKING:
     from lattifai.diarization import LattifAIDiarizer  # noqa: F401
@@ -49,18 +50,21 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             transcription_note=". If provided with valid API key, enables transcription capabilities (e.g., Gemini for YouTube videos)",
             api_key_source="and LATTIFAI_API_KEY env var is not set",
         )
+        if client_config is None:
+            client_config = ClientConfig()
 
         # Initialize base API client
         super().__init__(config=client_config)
 
         # Initialize all configs with defaults
-        client_config, alignment_config, caption_config, transcription_config, diarization_config = self._init_configs(
-            client_config, alignment_config, caption_config, transcription_config, diarization_config
+        alignment_config, transcription_config, diarization_config = self._init_configs(
+            alignment_config, transcription_config, diarization_config
         )
 
         # Store configs
+        if caption_config is None:
+            caption_config = CaptionConfig()
         self.caption_config = caption_config
-        self.diarization_config = diarization_config
 
         # audio loader
         self.audio_loader = AudioLoader(device=alignment_config.device)
@@ -69,6 +73,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         self.aligner = Lattice1Aligner(config=alignment_config)
 
         # Initialize diarizer if enabled
+        self.diarization_config = diarization_config
         self.diarizer: Optional["LattifAIDiarizer"] = None
         if self.diarization_config.enabled:
             from lattifai.diarization import LattifAIDiarizer  # noqa: F811
