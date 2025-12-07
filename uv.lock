@@ -2793,7 +2793,7 @@ wheels = [
 
 [[package]]
 name = "lattifai"
-version = "1.0.0rc5"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "av" },
@@ -2801,7 +2801,6 @@ dependencies = [
     { name = "fastapi" },
     { name = "g2p-phonemizer" },
     { name = "google-genai" },
-    { name = "httpx" },
     { name = "jinja2" },
     { name = "lattifai-core" },
     { name = "lattifai-run" },
@@ -2867,9 +2866,8 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.111.0" },
     { name = "g2p-phonemizer", specifier = ">=0.4.0" },
     { name = "google-genai", specifier = ">=1.22.0" },
-    { name = "httpx" },
     { name = "jinja2", specifier = ">=3.1.4" },
-    { name = "lattifai-core", specifier = ">=0.4.2" },
+    { name = "lattifai-core", specifier = ">=0.4.5" },
     { name = "lattifai-run", specifier = ">=1.0.1" },
     { name = "lhotse", specifier = ">=1.26.0" },
     { name = "msgpack" },
@@ -2914,28 +2912,30 @@ dev = [
 
 [[package]]
 name = "lattifai-core"
-version = "0.4.2"
+version = "0.4.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "cryptography" },
+    { name = "httpx" },
     { name = "numba" },
     { name = "sebbs" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/2b/43343fe2aedda787595617bc8670c156ee718604b16de973cece60898ce4/lattifai_core-0.4.2-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:413360e125e010342bbda0fd07c9529905a69408c76e418865925d92b45404db", size = 1057019, upload-time = "2025-12-04T17:27:39.324Z" },
-    { url = "https://files.pythonhosted.org/packages/17/61/d9e736ff0fc5dfc7469698478c0be66e01f1e5bb8e00e64a980104bfd7cf/lattifai_core-0.4.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:1592e083db801c4065f17ca2250802c732b7ee5ea4f39d2a3a07acbaad94c434", size = 1205545, upload-time = "2025-12-04T17:27:40.972Z" },
-    { url = "https://files.pythonhosted.org/packages/85/e4/13e1d228fefc4d4fb523a6000ac8cbbd153f75c109ec691f7b3da3207b7d/lattifai_core-0.4.2-cp310-cp310-win_amd64.whl", hash = "sha256:073b786e1c72170b3514298dcbd2cbc02f5194a06d25b177b63414ec9cc8d3b5", size = 1095801, upload-time = "2025-12-04T17:27:42.699Z" },
-    { url = "https://files.pythonhosted.org/packages/85/1d/9a20a1b4d09084b9c233464f0b565a6b19da059856a1ff97cdea7cde8d49/lattifai_core-0.4.2-cp311-cp311-macosx_11_0_universal2.whl", hash = "sha256:8d8162102b87ce0b1c79567b345fd6841e7abe7d1645bf76cce170bc4c55d58f", size = 1181206, upload-time = "2025-12-04T17:27:44.249Z" },
-    { url = "https://files.pythonhosted.org/packages/a3/59/df3f3b61d7099d754e171691736e46835aa6d5f5337182fba1b6b8dd9f4b/lattifai_core-0.4.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:58a001889dbc717041f15073cf843cf76a68fa7ba96aad8288220d10782a1e89", size = 1325683, upload-time = "2025-12-04T17:27:45.528Z" },
-    { url = "https://files.pythonhosted.org/packages/19/0b/f5452f9ef14f9b1e2fbab0cd0bda635d18052dffa1353265ad5cdbe3f17a/lattifai_core-0.4.2-cp311-cp311-win_amd64.whl", hash = "sha256:e3abab2e59d78f0def29384faef92d2c33e3be5c818a2190bd58831bc293c22d", size = 1218589, upload-time = "2025-12-04T17:27:46.952Z" },
-    { url = "https://files.pythonhosted.org/packages/60/43/42cf56b75b30f4e6ea9bffa48a172314b712bc8a139d0b8ac426cba4799f/lattifai_core-0.4.2-cp312-cp312-macosx_11_0_universal2.whl", hash = "sha256:80fb4f988363ce251042a37e1da54135953dcb70c8a216d61c4f9a49dcbb81ed", size = 1149889, upload-time = "2025-12-04T17:27:48.26Z" },
-    { url = "https://files.pythonhosted.org/packages/6d/cf/c7f3feb3323c0e3d4ac23ebd902319c0db343584fcebbf83acf6e20b9c0d/lattifai_core-0.4.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:22d02793c455bfa7c5ad84f6f976ecf3778929d629bc963fcf45ada2d0cfdefb", size = 1299241, upload-time = "2025-12-04T17:27:49.888Z" },
-    { url = "https://files.pythonhosted.org/packages/bf/7f/85bc663e6a81bd2df7a1e124d13626bb8b1e4bfda07a3bdde3a369dabad4/lattifai_core-0.4.2-cp312-cp312-win_amd64.whl", hash = "sha256:393ec48a4837305731344623dd3b5e475d5ecc0c0062198f7ffff1cd86044cc5", size = 1190864, upload-time = "2025-12-04T17:27:51.233Z" },
-    { url = "https://files.pythonhosted.org/packages/5e/a9/98d7724a0d4128e9613742e557fef8cf30762397dcd5e3d3a804baf329d7/lattifai_core-0.4.2-cp313-cp313-macosx_11_0_universal2.whl", hash = "sha256:cbb7b346ccebfe1745d17c620e0da3e5a198a97832a7dc7b13423c5a2a94a460", size = 1154881, upload-time = "2025-12-04T17:27:52.607Z" },
-    { url = "https://files.pythonhosted.org/packages/2b/42/3952c8a0f9b1273d56ad49a60516bab02d2b56cbe30719b76ce9c61d6b66/lattifai_core-0.4.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:bc9bbba0f3f49de70d28abe50e1cc3a242677c1a56c360c4e4228a6bfe9f2580", size = 1300854, upload-time = "2025-12-04T17:27:54.218Z" },
-    { url = "https://files.pythonhosted.org/packages/4d/28/5abd47219fb660adcd2fc204886b6964cca3db0229388c6d5b2fbf49d589/lattifai_core-0.4.2-cp313-cp313-win_amd64.whl", hash = "sha256:148bbe78de6716af16e5ad8fb5ef3027872738cd930a1b8afb475210970f0863", size = 1193190, upload-time = "2025-12-04T17:27:55.626Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/5c/e208c4089775ac7a4e6c412dc22e9c731a28875e6d2978f1b4496d05d258/lattifai_core-0.4.2-cp314-cp314-macosx_11_0_universal2.whl", hash = "sha256:571401fa7a67e9c3fdc3a3eae565691941358bcd24072aa07221a5709a0a8652", size = 1197505, upload-time = "2025-12-04T17:27:57.06Z" },
-    { url = "https://files.pythonhosted.org/packages/97/b3/8c2560c7af07105eaa0f0c562b579a868701776b33019c4c41f2ffbf43e5/lattifai_core-0.4.2-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2dedab5ea1362ef2c4a65d7e6c2c779cac6da0cbaf29435903beea70cc175057", size = 1341947, upload-time = "2025-12-04T17:27:58.495Z" },
-    { url = "https://files.pythonhosted.org/packages/03/54/1ccca5364df6981e7466365c7414267a34a657c80da8fe00bac6e8e4a60d/lattifai_core-0.4.2-cp314-cp314-win_amd64.whl", hash = "sha256:da949c1ee66c2bd37b5d7f7ed67c96bd681e7ff0333eeb7ccc57344d410b0c16", size = 1272081, upload-time = "2025-12-04T17:27:59.868Z" },
+    { url = "https://files.pythonhosted.org/packages/16/13/dc77f98213fa5d56b53ded9091f36fe782a1755b0fd3f68401d2e1d379f8/lattifai_core-0.4.5-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:cb94c7850f3708587b3c35626631dc446d4832129da72bf5e1148cc42c49f1e0", size = 1298677, upload-time = "2025-12-07T15:45:42.083Z" },
+    { url = "https://files.pythonhosted.org/packages/17/86/591e002061bb3fa106d49b9490082228a095692d2d323835aa0fae167ce0/lattifai_core-0.4.5-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:bad0facce22f8973cb9aa7a7b20bfea41680b3baedc633ca0fc819564c4def51", size = 1484025, upload-time = "2025-12-07T15:45:43.541Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/df/5027b4b242d1a616459733f73069527f36b7d80dde1d35b0dc501d12d89e/lattifai_core-0.4.5-cp310-cp310-win_amd64.whl", hash = "sha256:0dd2db6a47014983692440e5d22cd11bb9315bf5c2230120dd29b27966435bc9", size = 1347799, upload-time = "2025-12-07T15:45:45.1Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/36/314c47cdfb2eea93f5ba00482d795c514888f53601964312284990f53cf6/lattifai_core-0.4.5-cp311-cp311-macosx_11_0_universal2.whl", hash = "sha256:576244395a86314d403b27ca6c9f2da1440ef90e47e4bb28daab526f7d13588c", size = 1434992, upload-time = "2025-12-07T15:45:47.023Z" },
+    { url = "https://files.pythonhosted.org/packages/a3/78/0d2d588fb221ca37d2dc65dedbb90a700d6e1d772f4d410bd29186281f63/lattifai_core-0.4.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ea94dd830db346a0dbc9bec8815b93fa73070ddb31a2ecb3b2a10e86c41f4e58", size = 1615323, upload-time = "2025-12-07T15:45:48.46Z" },
+    { url = "https://files.pythonhosted.org/packages/97/eb/4ddd9e4e1e649c4c51a9def23c1a52efedd6ba82c03a586754f15967095e/lattifai_core-0.4.5-cp311-cp311-win_amd64.whl", hash = "sha256:b69b91c56612897b8a968cb1be7590c2b20f30322e0a57e620b03bb583adf7e7", size = 1481621, upload-time = "2025-12-07T15:45:50.303Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/f9/289cce33796b96e377f1c3cec77fbe83ca4830a4bd441996e9f792275eac/lattifai_core-0.4.5-cp312-cp312-macosx_11_0_universal2.whl", hash = "sha256:17f6af5158e3547008d0e0e939cf3c77902e773a14bdf9b60e75e4a735ac5b8d", size = 1402128, upload-time = "2025-12-07T15:45:51.802Z" },
+    { url = "https://files.pythonhosted.org/packages/2c/86/04df86a79e38b081ae6673054dd3fad7588b6698a07b4270ba9a3ef983be/lattifai_core-0.4.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:aab285ddf4353e9251aa71950bdfd583615742933410d8ea71bb36cc106ce650", size = 1588750, upload-time = "2025-12-07T15:45:53.094Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/0f/c2c12f4b46dbcee4272ec9a904d6b504a7a251c319d4867ab251a847f657/lattifai_core-0.4.5-cp312-cp312-win_amd64.whl", hash = "sha256:74383c63fec1653e99a076ed9101a07dbc2e98e23e2b580963b00a3e4faac1c1", size = 1453409, upload-time = "2025-12-07T15:45:55.216Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/2d/9b9e1dd46d099c31dca60183b76969e90fcf9006e0f82ca0dabf48a6ea95/lattifai_core-0.4.5-cp313-cp313-macosx_11_0_universal2.whl", hash = "sha256:c1abfac07f0a7f1ed138aff3472f7a0214d9049d0ef91fcaf6e71f102e03406a", size = 1408620, upload-time = "2025-12-07T15:45:57.055Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/43/79a56346f6eead884608b6215564d64c1cac4ff5be08b7164cdd7586727b/lattifai_core-0.4.5-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:aeb61c3832684e97101822939cbbac8ba1c3771617adf45106716fad22322e36", size = 1591234, upload-time = "2025-12-07T15:45:58.652Z" },
+    { url = "https://files.pythonhosted.org/packages/e7/75/466309fa02b74ef2ca40437de1f41f88032b3f5e6bb67bc09d483e03ac03/lattifai_core-0.4.5-cp313-cp313-win_amd64.whl", hash = "sha256:a937c4b3f955fbcddcfb7dc6be0921dab6fdbcc6ec895f4ac2b92b1d6506f1eb", size = 1455987, upload-time = "2025-12-07T15:46:00.13Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/44/b3263eb6a9b3bcfd3b83fff3d2bbe88229fd4468a7afb82433f3008ef740/lattifai_core-0.4.5-cp314-cp314-macosx_11_0_universal2.whl", hash = "sha256:8eb354da93a1d4b2b8c65529ffa27a701760716f6d8525ba49e03c1c2f4eef21", size = 1456669, upload-time = "2025-12-07T15:46:01.761Z" },
+    { url = "https://files.pythonhosted.org/packages/72/26/8e4cc98fc1b8bc80255865b0d845df3fa2bb36b1b27fd56870dc15070113/lattifai_core-0.4.5-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:0d132843dfdd3f706f163b5027b16df98e43d61a2977385c646528de428a0aef", size = 1637147, upload-time = "2025-12-07T15:46:03.15Z" },
+    { url = "https://files.pythonhosted.org/packages/13/91/4feb1e9e7b0a8c8904277ebc30acf220723d03bcbb8b41ad68cf6efd79b3/lattifai_core-0.4.5-cp314-cp314-win_amd64.whl", hash = "sha256:77687fc0d4ae5b58389ab63e02cc72b721d555ab424db74285cf078a81a8d4a9", size = 1550077, upload-time = "2025-12-07T15:46:04.472Z" },
 ]
 
 [[package]]

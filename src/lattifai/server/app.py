@@ -1,5 +1,7 @@
 import asyncio
 import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -164,6 +166,52 @@ async def save_api_keys(request: Request):
         return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
 
 
+@app.post("/api/utils/select-directory")
+async def select_directory():
+    """
+    Open a native directory selection dialog on the server (local machine).
+    Returns the selected path.
+    """
+    try:
+        path = ""
+        if sys.platform == "darwin":
+            # Use AppleScript for macOS - it's cleaner than Tkinter on Mac
+            script = """
+            try
+                set theFolder to choose folder with prompt "Select Output Directory"
+                POSIX path of theFolder
+            on error
+                return ""
+            end try
+            """
+            result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
+            if result.returncode == 0:
+                path = result.stdout.strip()
+
+        # Fallback to Tkinter if path is still empty (e.g. not mac or mac script failed)
+        # Note: Tkinter might not be installed or might fail in some environments
+        if not path and sys.platform != "darwin":
+            try:
+                import tkinter
+                from tkinter import filedialog
+
+                root = tkinter.Tk()
+                root.withdraw()  # Hide main window
+                root.wm_attributes("-topmost", 1)  # Bring to front
+                path = filedialog.askdirectory(title="Select Output Directory")
+                root.destroy()
+            except ImportError:
+                pass
+            except Exception as e:
+                print(f"Tkinter dialog failed: {e}")
+
+        return {"path": path}
+    except Exception as e:
+        # Don't fail the request, just return empty path or error logged
+        print(f"Directory selection failed: {e}")
+        return {"path": "", "error": str(e)}
+
+
 @app.post("/align")
 async def align_files(
     background_tasks: BackgroundTasks,
@@ -171,6 +219,7 @@ async def align_files(
     caption_file: Optional[UploadFile] = File(None),
     local_media_path: Optional[str] = Form(None),
     local_caption_path: Optional[str] = Form(None),
+    local_output_dir: Optional[str] = Form(None),
     youtube_url: Optional[str] = Form(None),
     youtube_output_dir: Optional[str] = Form(None),
     split_sentence: bool = Form(True),
@@ -228,8 +277,6 @@ async def align_files(
                     caption_path = tmp_caption.name
                     temp_files_to_delete.append(caption_path)
 
-            print(f"DEBUG 1111 {media_file=}")
-
         elif local_media_path:
             media_path = local_media_path
             if not Path(media_path).exists():
@@ -251,10 +298,12 @@ async def align_files(
             youtube_url,
             youtube_output_dir,
             caption_path,
+            local_output_dir,
             split_sentence,
             normalize_text,
             transcription_model,
             alignment_model,
+            output_format,
         )
 
         # Convert result to dict with specified output format
@@ -287,10 +336,12 @@ def process_alignment(
     youtube_url,
     youtube_output_dir,
     caption_path,
+    local_output_dir,
     split_sentence,
     normalize_text,
     transcription_model,
     alignment_model,
+    output_format,
 ):
     """
     Wrapper to call LattifAI client.
@@ -311,8 +362,8 @@ def process_alignment(
         )  # noqa: E501
         from lattifai.alignment import Lattice1Aligner
 
-        client.aligner_config.model_name = alignment_model
-        client.aligner = Lattice1Aligner(client, config=client.aligner.config)
+        client.aligner.config.model_name = alignment_model
+        client.aligner = Lattice1Aligner(config=client.aligner.config)
 
     # Check if transcription model changed - if so, reinitialize transcriber
     if transcription_model != client.transcription_config.model_name:
@@ -350,9 +401,20 @@ def process_alignment(
         return result
     else:
         # Local file alignment
+        output_caption_path = None
+        if local_output_dir:
+            output_dir = Path(local_output_dir).expanduser()
+            output_dir.mkdir(parents=True, exist_ok=True)
+            stem = Path(media_path).stem
+            # Prevent overwriting input if names clash, use _LattifAI suffix
+            output_filename = f"{stem}_LattifAI.{output_format}"
+            output_caption_path = output_dir / output_filename
+            print(f"Saving alignment result to: {output_caption_path}")
+
         # If no caption_path provided, client.alignment will automatically call _transcribe
         return client.alignment(
             input_media=str(media_path),
             input_caption=str(caption_path) if caption_path else None,
+            output_caption_path=str(output_caption_path) if output_caption_path else None,
             split_sentence=split_sentence,
         )

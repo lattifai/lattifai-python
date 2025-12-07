@@ -24,6 +24,7 @@ function App() {
   const [lattifaiKeyInput, setLattifaiKeyInput] = useState('')
   const [savingKeys, setSavingKeys] = useState(false)
   const [saveToFile, setSaveToFile] = useState(true) // Default to save to file
+  const [serverUrl, setServerUrl] = useState('')
 
   // Fetch API key status on mount
   useEffect(() => {
@@ -301,6 +302,41 @@ function App() {
               </div>
             )}
           </div>
+
+          {/* Custom Backend Server URL */}
+          <div style={{
+            marginTop: '1.5rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <label style={{
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              color: 'rgba(255, 255, 255, 0.9)',
+              display: 'block',
+              marginBottom: '0.5rem'
+            }}>
+              ⚙️ Custom Backend Server URL (Optional)
+            </label>
+            <input
+              type="text"
+              value={serverUrl}
+              onChange={e => setServerUrl(e.target.value)}
+              placeholder="Leave empty to use default (proxied to localhost:8001)"
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                fontSize: '0.9rem',
+                outline: 'none',
+                backdropFilter: 'blur(5px)',
+                boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.05)'
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -310,6 +346,7 @@ function App() {
           onLoading={setLoading}
           alignmentModel={alignmentModel}
           geminiApiKey={apiKeys?.gemini ?? null}
+          serverUrl={serverUrl}
         />
 
         {loading && <div className="loading-spinner">Processing alignment... Please wait.</div>}

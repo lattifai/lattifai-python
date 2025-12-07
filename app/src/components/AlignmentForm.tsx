@@ -13,22 +13,25 @@ interface AlignmentFormProps {
     onLoading: (isLoading: boolean) => void;
     alignmentModel: string;
     geminiApiKey: ApiKeyStatus | null;
+    serverUrl: string;
 }
 
 type InputMode = 'upload' | 'local' | 'youtube';
 
-const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alignmentModel, geminiApiKey }) => {
+const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alignmentModel, geminiApiKey, serverUrl }) => {
     const [mode, setMode] = useState<InputMode>('upload');
 
     // File Upload State
     const [mediaFile, setMediaFile] = useState<File | null>(null);
     const [captionText, setCaptionText] = useState('');
     const [captionExpanded, setCaptionExpanded] = useState(false);
+    const [captionFilename, setCaptionFilename] = useState('');
     const [dragActive, setDragActive] = useState(false);
 
     // Local Path State
     const [localMediaPath, setLocalMediaPath] = useState('');
     const [localCaptionPath, setLocalCaptionPath] = useState('');
+    const [localOutputDir, setLocalOutputDir] = useState('');
 
     // YouTube State
     const [youtubeUrl, setYoutubeUrl] = useState('https://www.youtube.com/watch?v=DQacCB9tDaw');
@@ -47,12 +50,34 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
     const [geminiKeyInput, setGeminiKeyInput] = useState('');
     const [savingGeminiKey, setSavingGeminiKey] = useState(false);
     const [saveGeminiToFile, setSaveGeminiToFile] = useState(true);
-    const [serverUrl, setServerUrl] = useState('');
+
     const [loading, setLoading] = useState(false);
+    const [selectingDir, setSelectingDir] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // Browse Directory on Server
+    const handleBrowsing = async () => {
+        setSelectingDir(true);
+        try {
+            const baseUrl = serverUrl || '';
+            const response = await fetch(`${baseUrl}/api/utils/select-directory`, {
+                method: 'POST'
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data.path) {
+                    setLocalOutputDir(data.path);
+                }
+            }
+        } catch (error) {
+            console.error("Failed to browse directory:", error);
+        } finally {
+            setSelectingDir(false);
+        }
+    };
 
     // Save Gemini API Key
     const saveGeminiApiKey = async () => {
@@ -143,6 +168,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                 reader.onload = (e) => {
                     const content = e.target?.result as string;
                     setCaptionText(content);
+                    setCaptionFilename(file.name);
                     setCaptionExpanded(true); // Expand to show the loaded content
                 };
                 reader.readAsText(file);
@@ -185,6 +211,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
         setLogs([]);
         setLoading(true);
         onLoading(true);
+        onResult(null);
 
         const formData = new FormData();
 
@@ -201,7 +228,12 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
             // Add caption text if provided
             if (captionText.trim()) {
                 const captionBlob = new Blob([captionText], { type: 'text/plain' });
-                formData.append('caption_file', captionBlob, 'pasted_caption.txt');
+                // Use original filename if available to preserve format extension
+                const filename = captionFilename || 'pasted_caption.txt';
+                formData.append('caption_file', captionBlob, filename);
+            }
+            if (localOutputDir) {
+                formData.append('local_output_dir', localOutputDir);
             }
         } else if (mode === 'local') {
             if (!localMediaPath) {
@@ -213,6 +245,9 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
             formData.append('local_media_path', localMediaPath);
             if (localCaptionPath) {
                 formData.append('local_caption_path', localCaptionPath);
+            }
+            if (localOutputDir) {
+                formData.append('local_output_dir', localOutputDir);
             }
         } else if (mode === 'youtube') {
             if (!youtubeUrl) {
@@ -231,6 +266,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
         formData.append('split_sentence', splitSentence.toString());
         formData.append('normalize_text', normalizeText.toString());
         formData.append('output_format', outputFormat);
+
         formData.append('transcription_model', transcriptionModel);
         formData.append('alignment_model', alignmentModel);
 
@@ -242,7 +278,30 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                 },
             });
 
-            onResult(response.data);
+            // Determine media stem for filename
+            let mediaStem = 'alignment_result';
+            if (mode === 'upload' && mediaFile) {
+                mediaStem = mediaFile.name.replace(/\.[^/.]+$/, "");
+            } else if (mode === 'local' && localMediaPath) {
+                // Get filename from path
+                const filename = localMediaPath.split(/[/\\]/).pop() || '';
+                mediaStem = filename.replace(/\.[^/.]+$/, "");
+            } else if (mode === 'youtube' && youtubeUrl) {
+                // Try to get video ID or use generic name
+                try {
+                    const urlObj = new URL(youtubeUrl);
+                    const v = urlObj.searchParams.get('v');
+                    if (v) mediaStem = `youtube_${v}`;
+                    else mediaStem = 'youtube_video';
+                } catch (e) {
+                    mediaStem = 'youtube_video';
+                }
+            }
+
+            onResult({
+                ...response.data,
+                media_stem: mediaStem
+            });
             addLog('✅ Alignment completed successfully!');
         } catch (err: any) {
             const errorMsg = err.response?.data?.error || err.message || 'Unknown error occurred';
@@ -289,18 +348,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                 </button>
             </div>
 
-            {/* Advanced Settings */}
-            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                <div className="path-input-group">
-                    <label style={{ fontWeight: 700, fontSize: '1rem' }}>Custom Backend Server URL (Optional)</label>
-                    <input
-                        type="text"
-                        value={serverUrl}
-                        onChange={e => setServerUrl(e.target.value)}
-                        placeholder="Leave empty to use default (proxied to localhost:8001)"
-                    />
-                </div>
-            </div>
+
 
             <form onSubmit={handleSubmit}>
                 {mode === 'upload' && (
@@ -353,8 +401,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
 
                         {/* Caption Input Section - Collapsible */}
                         <div style={{ marginTop: '1rem', marginBottom: '1rem', backgroundColor: 'var(--card-bg)', borderRadius: '8px', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                            <button
-                                type="button"
+                            <div
                                 onClick={() => setCaptionExpanded(!captionExpanded)}
                                 style={{
                                     width: '100%',
@@ -365,12 +412,42 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                                     backgroundColor: 'transparent',
                                     border: 'none',
                                     cursor: 'pointer',
-                                    color: 'var(--text-color)'
+                                    color: 'var(--text-color)',
+                                    userSelect: 'none'
                                 }}
                             >
-                                <span style={{ fontWeight: 700, fontSize: '1rem' }}>
+                                <span style={{ fontWeight: 700, fontSize: '1rem', display: 'flex', alignItems: 'center' }}>
                                     Caption (Paste Text)
-                                    {captionText.trim() && <span style={{ marginLeft: '0.5rem', color: 'var(--primary-color)', fontSize: '0.85rem' }}>✓ Has content</span>}
+                                    {captionFilename ? (
+                                        <span style={{ marginLeft: '0.5rem', color: 'var(--primary-color)', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <span>✓ File: {captionFilename}</span>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setCaptionText('');
+                                                    setCaptionFilename('');
+                                                }}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: 'var(--text-secondary)',
+                                                    cursor: 'pointer',
+                                                    padding: '4px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    borderRadius: '50%',
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.1)'}
+                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                                title="Remove caption file"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                            </button>
+                                        </span>
+                                    ) : (
+                                        captionText.trim() && <span style={{ marginLeft: '0.5rem', color: 'var(--primary-color)', fontSize: '0.85rem' }}>✓ Has content</span>
+                                    )}
                                 </span>
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"
@@ -389,30 +466,68 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                                 >
                                     <polyline points="6 9 12 15 18 9"></polyline>
                                 </svg>
-                            </button>
+                            </div>
                             {captionExpanded && (
                                 <div style={{ padding: '0 1rem 1rem 1rem' }}>
                                     <textarea
                                         value={captionText}
-                                        onChange={e => setCaptionText(e.target.value)}
-                                        placeholder="Paste your caption text here...&#10;&#10;Example:&#10;Hello, welcome to this video.&#10;Today we will learn about AI."
+                                        onChange={e => !captionFilename && setCaptionText(e.target.value)}
+                                        readOnly={!!captionFilename}
+                                        placeholder={captionFilename ? `Content from ${captionFilename}` : "Paste your caption text here...\n\nExample:\nHello, welcome to this video.\nToday we will learn about AI."}
                                         style={{
                                             width: '100%',
                                             minHeight: '120px',
                                             padding: '0.75rem',
                                             borderRadius: '8px',
                                             border: '1px solid var(--border-color)',
-                                            backgroundColor: 'var(--bg-color)',
-                                            color: 'var(--text-color)',
+                                            backgroundColor: captionFilename ? 'rgba(128, 128, 128, 0.05)' : 'var(--bg-color)',
+                                            color: captionFilename ? 'var(--text-secondary)' : 'var(--text-color)',
                                             fontSize: '0.95rem',
                                             lineHeight: '1.5',
                                             resize: 'vertical',
                                             fontFamily: 'inherit',
-                                            boxSizing: 'border-box'
+                                            boxSizing: 'border-box',
+                                            cursor: captionFilename ? 'not-allowed' : 'text',
+                                            opacity: captionFilename ? 0.9 : 1
                                         }}
                                     />
                                 </div>
                             )}
+                        </div>
+
+                        {/* Server Output Directory for Upload Mode */}
+                        <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'var(--card-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div className="path-input-group">
+                                <label>Server Output Directory (Optional)</label>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                                    If set, the aligned file will be saved to this folder on the server.
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <input
+                                        type="text"
+                                        value={localOutputDir}
+                                        onChange={e => setLocalOutputDir(e.target.value)}
+                                        placeholder="/home/user/output/"
+                                        style={{ flex: 1 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleBrowsing}
+                                        disabled={selectingDir}
+                                        style={{
+                                            padding: '0 1rem',
+                                            backgroundColor: 'var(--card-bg)',
+                                            border: '1px solid var(--border-color)',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            color: 'var(--text-color)',
+                                            whiteSpace: 'nowrap'
+                                        }}
+                                    >
+                                        {selectingDir ? '...' : '📁 Browse'}
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -436,6 +551,34 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                                 onChange={e => setLocalCaptionPath(e.target.value)}
                                 placeholder="/home/user/caption.srt"
                             />
+                        </div>
+                        <div className="path-input-group">
+                            <label>Output Directory (Optional)</label>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <input
+                                    type="text"
+                                    value={localOutputDir}
+                                    onChange={e => setLocalOutputDir(e.target.value)}
+                                    placeholder="/home/user/output/"
+                                    style={{ flex: 1 }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleBrowsing}
+                                    disabled={selectingDir}
+                                    style={{
+                                        padding: '0 1rem',
+                                        backgroundColor: 'var(--card-bg)',
+                                        border: '1px solid var(--border-color)',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        color: 'var(--text-color)',
+                                        whiteSpace: 'nowrap'
+                                    }}
+                                >
+                                    {selectingDir ? '...' : '📁 Browse'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -719,6 +862,8 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                         </select>
                     </div>
                 </div>
+
+
 
                 {error && (() => {
                     const formattedError = formatError(error);

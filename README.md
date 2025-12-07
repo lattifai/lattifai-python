@@ -15,6 +15,10 @@
 
 Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](https://huggingface.co/Lattifai/Lattice-1) model.
 
+> **⚠️ Note on Current Limitations**:
+> 1. **Memory Usage**: We are aware of high memory consumption and are actively working on further optimizations.
+> 2. **Long Audio**: Currently, long audio files might face issues. Support for **long-form audio (up to 20 hours)** will be available shortly.
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -127,6 +131,8 @@ GEMINI_API_KEY=your_gemini_api_key_here  # AIzaSyxxxx
 ## Quick Start
 
 ### Command Line Interface
+
+![CLI Demo](assets/cli.png)
 
 ```bash
 # Align local audio with subtitle
