@@ -12,7 +12,7 @@ def main():
     # Ensure the directory contains the app
     # We might need to adjust python path or just rely on installed package
 
-    uvicorn.run("lattifai.web.app:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
+    uvicorn.run("lattifai.server.app:app", host="0.0.0.0", port=8000, reload=True, log_level="info")
 
 
 if __name__ == "__main__":

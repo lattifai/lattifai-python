@@ -83,7 +83,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
 "laicap-convert" = "lattifai.cli.caption:main_convert"
 "laicap-normalize" = "lattifai.cli.caption:main_normalize"
 "laicap-shift" = "lattifai.cli.caption:main_shift"
-"lai-web" = "lattifai.cli.web:main"
+"lai-server" = "lattifai.cli.server:main"
 
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"
