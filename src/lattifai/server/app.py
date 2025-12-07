@@ -1,6 +1,5 @@
 import asyncio
 import os
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Optional
@@ -9,13 +8,7 @@ from typing import Optional
 from dotenv import find_dotenv, load_dotenv
 from fastapi import BackgroundTasks, FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-
-from lattifai.caption import Caption
-from lattifai.client import LattifAI
-from lattifai.config import AlignmentConfig, CaptionConfig
+from fastapi.responses import JSONResponse
 
 # Try to find and load .env file from current directory or parent directories
 load_dotenv(find_dotenv(usecwd=True))
@@ -24,6 +17,19 @@ load_dotenv(find_dotenv(usecwd=True))
 app = FastAPI(title="LattifAI Web Interface")
 
 print(f"LOADING APP FROM: {__file__}")
+
+# Lazy-initialized client - will be created on first use
+_client = None
+
+
+def get_client():
+    """Get or create the LattifAI client (lazy initialization)."""
+    global _client
+    if _client is None:
+        from lattifai.client import LattifAI
+
+        _client = LattifAI()
+    return _client
 
 
 @app.on_event("startup")
@@ -49,73 +55,107 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize LattifAI client (globally or per request?)
-# For now, global client is fine for local tool
-client = LattifAI()
+
+def mask_api_key(key: str) -> str:
+    """Mask API key for display, showing only first 6 and last 4 characters."""
+    if len(key) <= 10:
+        return "*" * len(key)
+    return key[:6] + "*" * (len(key) - 10) + key[-4:]
 
 
-@app.post("/align")
-async def align_files(
-    background_tasks: BackgroundTasks,
-    media_file: Optional[UploadFile] = File(None),
-    caption_file: Optional[UploadFile] = File(None),
-    youtube_url: Optional[str] = Form(None),
-    split_sentence: bool = Form(True),
-    is_transcription: bool = Form(False),
-    normalize_text: bool = Form(False),
-):
-    if not media_file and not youtube_url:
-        return JSONResponse(status_code=400, content={"error": "Either media file or YouTube URL must be provided."})
+@app.get("/api/keys")
+async def get_api_keys():
+    """Get status of API keys from environment variables."""
+    lattifai_key = os.environ.get("LATTIFAI_API_KEY", "")
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
+    return {
+        "lattifai": {
+            "exists": bool(lattifai_key),
+            "masked_value": mask_api_key(lattifai_key) if lattifai_key else None,
+            "create_url": "https://lattifai.com/dashboard/api-keys",
+        },
+        "gemini": {
+            "exists": bool(gemini_key),
+            "masked_value": mask_api_key(gemini_key) if gemini_key else None,
+            "create_url": "https://aistudio.google.com/apikey",
+        },
+    }
+
+
+@app.post("/api/keys")
+async def save_api_keys(request: Request):
+    """Save API keys to environment variables and optionally to .env file."""
     try:
-        # Create a unique task ID (simple timestamp based or uuid)
-        # For simplicity in this synchronous-ish wrapper, we'll just process immediately
-        # but in a real app better to offload to queue.
-        # Since this is a local tool, blocking for a bit is acceptable, but let's try to be async where possible.
+        data = await request.json()
+        lattifai_key = data.get("lattifai_key", "").strip()
+        gemini_key = data.get("gemini_key", "").strip()
+        save_to_file = data.get("save_to_file", False)  # Optional: save to .env file
 
-        # Use temporary directory for processing
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            media_path = None
-            caption_path = None
+        # Always update environment variables in current process
+        if lattifai_key:
+            os.environ["LATTIFAI_API_KEY"] = lattifai_key
+        if gemini_key:
+            os.environ["GEMINI_API_KEY"] = gemini_key
 
-            if media_file:
-                media_path = temp_path / media_file.filename
-                with open(media_path, "wb") as buffer:
-                    shutil.copyfileobj(media_file.file, buffer)
+        # Reset client to force re-initialization with new keys
+        global _client
+        _client = None
 
-            if caption_file:
-                caption_path = temp_path / caption_file.filename
-                with open(caption_path, "wb") as buffer:
-                    shutil.copyfileobj(caption_file.file, buffer)
+        result = {
+            "status": "success",
+            "message": "API keys updated in environment variables",
+        }
 
-            # Process in thread pool to not block event loop
-            loop = asyncio.get_event_loop()
-            result_caption = await loop.run_in_executor(
-                None,
-                process_alignment,
-                media_path,
-                youtube_url,
-                caption_path,
-                split_sentence,
-                is_transcription,
-                normalize_text,
-            )
+        # Optionally save to .env file for persistence
+        if save_to_file:
+            # Find the .env file path
+            env_path = find_dotenv(usecwd=True)
+            if not env_path:
+                # Create .env in current working directory
+                env_path = Path.cwd() / ".env"
 
-            # Convert result to dict (SRT format text + list of segments)
-            return {
-                "status": "success",
-                "segments": [
-                    {
-                        "start": seg.start,
-                        "end": seg.end,
-                        "text": seg.text,
-                        "speaker": seg.speaker if hasattr(seg, "speaker") else None,
-                    }
-                    for seg in result_caption.alignments
-                ],
-                "srt_content": result_caption.to_string(format="srt"),
-            }
+            # Read existing .env content
+            env_lines = []
+            if Path(env_path).exists():
+                with open(env_path, "r") as f:
+                    env_lines = f.readlines()
+
+            # Update or add API keys
+            updated_lines = []
+            lattifai_updated = False
+            gemini_updated = False
+
+            for line in env_lines:
+                if line.strip().startswith("LATTIFAI_API_KEY=") or line.strip().startswith("#LATTIFAI_API_KEY="):
+                    if lattifai_key:
+                        updated_lines.append(f"LATTIFAI_API_KEY={lattifai_key}\n")
+                        lattifai_updated = True
+                    else:
+                        updated_lines.append(line)  # Keep existing or commented out
+                elif line.strip().startswith("GEMINI_API_KEY=") or line.strip().startswith("#GEMINI_API_KEY="):
+                    if gemini_key:
+                        updated_lines.append(f"GEMINI_API_KEY={gemini_key}\n")
+                        gemini_updated = True
+                    else:
+                        updated_lines.append(line)  # Keep existing or commented out
+                else:
+                    updated_lines.append(line)
+
+            # Add new keys if they weren't in the file
+            if lattifai_key and not lattifai_updated:
+                updated_lines.append(f"LATTIFAI_API_KEY={lattifai_key}\n")
+            if gemini_key and not gemini_updated:
+                updated_lines.append(f"GEMINI_API_KEY={gemini_key}\n")
+
+            # Write back to .env file
+            with open(env_path, "w") as f:
+                f.writelines(updated_lines)
+
+            result["message"] = "API keys saved to environment variables and .env file"
+            result["env_path"] = str(env_path)
+
+        return result
 
     except Exception as e:
         import traceback
@@ -124,34 +164,193 @@ async def align_files(
         return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
 
 
-def process_alignment(media_path, youtube_url, caption_path, split_sentence, is_transcription, normalize_text):
+@app.post("/align")
+async def align_files(
+    background_tasks: BackgroundTasks,
+    media_file: Optional[UploadFile] = File(None),
+    caption_file: Optional[UploadFile] = File(None),
+    local_media_path: Optional[str] = Form(None),
+    local_caption_path: Optional[str] = Form(None),
+    youtube_url: Optional[str] = Form(None),
+    youtube_output_dir: Optional[str] = Form(None),
+    split_sentence: bool = Form(True),
+    normalize_text: bool = Form(False),
+    output_format: str = Form("srt"),
+    transcription_model: str = Form("nvidia/parakeet-tdt-0.6b-v3"),
+    alignment_model: str = Form("Lattifai/Lattice-1"),
+):
+    # Check if LATTIFAI_API_KEY is set
+    if not os.environ.get("LATTIFAI_API_KEY"):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "LATTIFAI_API_KEY is not set. Please set the environment variable or add it to your .env file.",
+                "help_url": "https://lattifai.com/dashboard/api-keys",
+            },
+        )
+
+    if not media_file and not youtube_url and not local_media_path:
+        return JSONResponse(
+            status_code=400, content={"error": "Either media file, local media path, or YouTube URL must be provided."}
+        )
+
+    # Get lazily initialized client
+    client = get_client()
+    if not client:
+        # This should rarely happen due to lazy init, but just in case
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "LattifAI client not initialized. Please check API key configuration.",
+            },
+        )
+
+    media_path = None
+    caption_path = None
+    temp_files_to_delete = []
+
+    try:
+        if media_file:
+            # Save uploaded media file to a temporary location
+            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(media_file.filename).suffix) as tmp_media:
+                content = await media_file.read()
+                tmp_media.write(content)
+                media_path = tmp_media.name
+                temp_files_to_delete.append(media_path)
+
+            if caption_file:
+                # Save uploaded caption file to a temporary location
+                with tempfile.NamedTemporaryFile(
+                    delete=False, suffix=Path(caption_file.filename).suffix
+                ) as tmp_caption:
+                    content = await caption_file.read()
+                    tmp_caption.write(content)
+                    caption_path = tmp_caption.name
+                    temp_files_to_delete.append(caption_path)
+
+            print(f"DEBUG 1111 {media_file=}")
+
+        elif local_media_path:
+            media_path = local_media_path
+            if not Path(media_path).exists():
+                return JSONResponse(status_code=400, content={"error": f"Local media file not found: {media_path}"})
+
+            if local_caption_path:
+                caption_path = local_caption_path
+                if not Path(caption_path).exists():
+                    return JSONResponse(
+                        status_code=400, content={"error": f"Local caption file not found: {caption_path}"}
+                    )
+
+        # Process in thread pool to not block event loop
+        loop = asyncio.get_event_loop()
+        result_caption = await loop.run_in_executor(
+            None,
+            process_alignment,
+            media_path,
+            youtube_url,
+            youtube_output_dir,
+            caption_path,
+            split_sentence,
+            normalize_text,
+            transcription_model,
+            alignment_model,
+        )
+
+        # Convert result to dict with specified output format
+        caption_content = result_caption.to_string(format=output_format)
+
+        return {
+            "status": "success",
+            "segments": [
+                {
+                    "start": seg.start,
+                    "end": seg.end,
+                    "text": seg.text,
+                    "speaker": seg.speaker if hasattr(seg, "speaker") else None,
+                }
+                for seg in result_caption.alignments
+            ],
+            "caption_content": caption_content,
+            "output_format": output_format,
+        }
+
+    except Exception as e:
+        import traceback
+
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"error": str(e), "traceback": traceback.format_exc()})
+
+
+def process_alignment(
+    media_path,
+    youtube_url,
+    youtube_output_dir,
+    caption_path,
+    split_sentence,
+    normalize_text,
+    transcription_model,
+    alignment_model,
+):
     """
     Wrapper to call LattifAI client.
+    Note: Transcription will be automatically triggered when no caption is provided.
     """
-    # Temporarily update config (assuming single user usage or accepting race condition for now)
+    # Get lazily initialized client
+    client = get_client()
+    if not client:
+        raise RuntimeError("LattifAI client not initialized")
+
+    # Update caption config
     client.caption_config.normalize_text = normalize_text
+
+    # Check if alignment model changed - if so, reinitialize aligner
+    if client.aligner.config.model_name != alignment_model:
+        print(
+            f"Alignment model changed from {client.aligner.config.model_name} to {alignment_model}, reinitializing aligner..."
+        )  # noqa: E501
+        from lattifai.alignment import Lattice1Aligner
+
+        client.aligner_config.model_name = alignment_model
+        client.aligner = Lattice1Aligner(client, config=client.aligner.config)
+
+    # Check if transcription model changed - if so, reinitialize transcriber
+    if transcription_model != client.transcription_config.model_name:
+        print(
+            f"Transcription model changed from {client.transcription_config.model_name} to {transcription_model}, reinitializing transcriber..."
+        )  # noqa: E501
+        from lattifai.config import TranscriptionConfig
+
+        client.transcription_config = TranscriptionConfig(model_name=transcription_model)
+        client._transcriber = None
 
     if youtube_url:
         # If youtube, we use client.youtube
         # Note: client.youtube handles download + alignment
-        # We need a temporary output dir
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            result = client.youtube(
-                url=youtube_url,
-                output_dir=temp_path,
-                use_transcription=is_transcription,
-                split_sentence=split_sentence,
-            )
-            return result
+        # Will try to download YT captions first, if not available, will transcribe
+
+        # Determine output directory
+        # Default: ~/Downloads/YYYY-MM-DD
+        if not youtube_output_dir or not youtube_output_dir.strip():
+            from datetime import datetime
+
+            today = datetime.now().strftime("%Y-%m-%d")
+            youtube_output_dir = f"~/Downloads/{today}"
+
+        temp_path = Path(youtube_output_dir).expanduser()
+        temp_path.mkdir(parents=True, exist_ok=True)
+
+        result = client.youtube(
+            url=youtube_url,
+            output_dir=temp_path,
+            use_transcription=False,  # Try to download captions first
+            force_overwrite=True,  # No user prompt in server mode
+            split_sentence=split_sentence,
+        )
+        return result
     else:
         # Local file alignment
-        # If no caption path and is_transcription is True, then we use ASR?
-        # The current client.alignment implementation calls _transcribe if input_caption is None.
-
-        # If user didn't provide caption_file, we pass None to input_caption
-        # client.alignment logic: if not input_caption -> _transcribe
-
+        # If no caption_path provided, client.alignment will automatically call _transcribe
         return client.alignment(
             input_media=str(media_path),
             input_caption=str(caption_path) if caption_path else None,

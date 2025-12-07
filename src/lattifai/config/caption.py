@@ -7,20 +7,22 @@ from typing import TYPE_CHECKING, Literal, Optional
 from lhotse.utils import Pathlike
 
 # Supported caption formats for reading/writing
-CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "md"]
+CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "md", "ttml", "sami", "smi"]
 
 # Input caption formats (includes special formats like 'auto' and 'gemini')
-INPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "auto", "gemini"]
+INPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "auto", "gemini"]
 
 # Output caption formats (includes special formats like 'TextGrid' and 'json')
-OUTPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
+OUTPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "TextGrid", "json"]
 
 # All caption formats combined (for file detection)
 ALL_CAPTION_FORMATS = list(set(CAPTION_FORMATS + ["TextGrid", "json", "gemini"]))
 
 # Type aliases for better type hints
-InputCaptionFormat = Literal["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "gemini"]
-OutputCaptionFormat = Literal["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
+InputCaptionFormat = Literal["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "gemini"]
+OutputCaptionFormat = Literal[
+    "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "TextGrid", "json"
+]
 
 
 @dataclass

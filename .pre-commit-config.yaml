@@ -28,6 +28,7 @@ repos:
         exclude: ^app/
       - id: end-of-file-fixer
         exclude: ^(tests/data/.*\.TextGrid|app/)$  # don't run on TextGrid files or app/
+        exclude: ^app/
       - id: mixed-line-ending
         exclude: ^app/
       - id: trailing-whitespace

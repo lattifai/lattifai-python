@@ -6,7 +6,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/align': 'http://localhost:8000',
+      '/align': 'http://localhost:8001',
+      '/api': 'http://localhost:8001',
     }
   }
 })

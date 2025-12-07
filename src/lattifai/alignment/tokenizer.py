@@ -231,9 +231,13 @@ class LatticeTokenizer:
         tokenizer.dictionaries = defaultdict(list, data["dictionaries"])
         tokenizer.oov_word = data["oov_word"]
 
-        g2p_model_path = f"{model_path}/g2p.bin" if Path(f"{model_path}/g2p.bin").exists() else None
-        if g2p_model_path:
-            tokenizer.g2p_model = G2Phonemizer(g2p_model_path, device=device)
+        g2pp_model_path = f"{model_path}/g2pp.bin" if Path(f"{model_path}/g2pp.bin").exists() else None
+        if g2pp_model_path:
+            tokenizer.g2p_model = G2Phonemizer(g2pp_model_path, device=device)
+        else:
+            g2p_model_path = f"{model_path}/g2p.bin" if Path(f"{model_path}/g2p.bin").exists() else None
+            if g2p_model_path:
+                tokenizer.g2p_model = G2Phonemizer(g2p_model_path, device=device)
 
         tokenizer.device = device
         tokenizer.add_special_tokens()

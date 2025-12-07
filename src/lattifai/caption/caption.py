@@ -204,12 +204,11 @@ class Caption:
                         )
                     )
             else:
-                text = sup.text
                 subs.append(
                     pysubs2.SSAEvent(
                         start=int(sup.start * 1000),
                         end=int(sup.end * 1000),
-                        text=text or "",
+                        text=sup.text or "",
                         name=sup.speaker or "",
                     )
                 )

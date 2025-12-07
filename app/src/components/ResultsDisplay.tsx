@@ -11,7 +11,8 @@ interface ResultsDisplayProps {
     data: {
         status: string;
         segments: Segment[];
-        srt_content: string;
+        caption_content: string;
+        output_format: string;
     } | null;
 }
 
@@ -24,11 +25,11 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data }) => {
 
             <div className="download-section">
                 <a
-                    href={`data:text/plain;charset=utf-8,${encodeURIComponent(data.srt_content)}`}
-                    download="alignment.srt"
+                    href={`data:text/plain;charset=utf-8,${encodeURIComponent(data.caption_content)}`}
+                    download={`alignment.${data.output_format}`}
                     className="download-btn"
                 >
-                    Download SRT
+                    Download {data.output_format.toUpperCase()}
                 </a>
             </div>
 
@@ -38,7 +39,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data }) => {
                     {data.segments.map((seg, idx) => (
                         <li key={idx} className="segment-item">
                             <span className="timestamp">[{formatTime(seg.start)} - {formatTime(seg.end)}]</span>
-                            {seg.speaker && <span className="speaker">{seg.speaker}: </span>}
+                            {seg.speaker && <span className="speaker">{seg.speaker} </span>}
                             <span className="text">{seg.text}</span>
                         </li>
                     ))}
@@ -46,8 +47,8 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data }) => {
             </div>
 
             <div className="raw-srt">
-                <h3>SRT Output</h3>
-                <pre>{data.srt_content}</pre>
+                <h3>{data.output_format.toUpperCase()} Output</h3>
+                <pre>{data.caption_content}</pre>
             </div>
         </div>
     );
