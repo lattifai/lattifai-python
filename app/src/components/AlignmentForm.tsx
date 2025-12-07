@@ -289,6 +289,19 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                 </button>
             </div>
 
+            {/* Advanced Settings */}
+            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                <div className="path-input-group">
+                    <label style={{ fontWeight: 700, fontSize: '1rem' }}>Custom Backend Server URL (Optional)</label>
+                    <input
+                        type="text"
+                        value={serverUrl}
+                        onChange={e => setServerUrl(e.target.value)}
+                        placeholder="Leave empty to use default (proxied to localhost:8001)"
+                    />
+                </div>
+            </div>
+
             <form onSubmit={handleSubmit}>
                 {mode === 'upload' && (
                     <div className="upload-section">
@@ -706,20 +719,6 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                         </select>
                     </div>
                 </div>
-
-                {/* Advanced Settings */}
-                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                    <div className="path-input-group">
-                        <label style={{ fontWeight: 700, fontSize: '1rem' }}>Custom Backend Server URL (Optional)</label>
-                        <input
-                            type="text"
-                            value={serverUrl}
-                            onChange={e => setServerUrl(e.target.value)}
-                            placeholder="Leave empty to use default (proxied to localhost:8001)"
-                        />
-                    </div>
-                </div>
-
 
                 {error && (() => {
                     const formattedError = formatError(error);

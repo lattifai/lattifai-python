@@ -1,108 +1,33 @@
 # CHANGELOG
 
-## [1.0.0rc2] - 2025-11-30
+
+## [1.0.0] - 2025-12-07
+
+> ⚠️ **BREAKING CHANGE**: This major release introduces a completely refactored CLI architecture and updated API. Previous commands and scripts will need to be updated.
 
 ### Major Changes
 
-#### Caption System Refactor
-- **New Caption Class**: Introduced unified `Caption` class to replace `CaptionIO` for streamlined subtitle/caption handling
-  - Comprehensive data structure with supervisions, transcription, audio events, and speaker diarization support
-  - Rich metadata support including language, kind, source format, and custom fields
-  - Built-in methods for reading/writing various caption formats
-- **YouTube VTT Word-Level Timestamps**: Added parsing support for YouTube auto-generated captions with word-level timing
-  - Extracts and merges word-level alignments from YouTube VTT format
-  - Preserves precise timing information for each word
+#### CLI & Configuration Refactor
+- **Unified Command Structure**: New subcommand-based CLI (e.g., `lai alignment align`, `lai caption convert`).
+- **Positional Arguments**: Support for clean, intuitive commands without excessive flags.
+- **Advanced Configuration**: Powered by `nemo_run`, enabling composable configs and type safety.
 
-#### Alignment Engine Updates
-- **Segmenter Class**: New `Segmenter` class for segmented alignment strategy
-  - Supports audio event-aware segmentation (e.g., [APPLAUSE], [MUSIC])
-  - Improved handling of multi-speaker segments with resegmentation tiers
-- **Model Path Resolution**: Fixed user directory expansion for accurate path checking
-- **Emission and Offset Parameters**: Enhanced alignment accuracy with new emission and offset parameters
-- **Renamed `Lattice1AlphaWorker` to `Lattice1Worker`**: Simplified naming for consistency
+#### Core System Updates
+- **New Caption Class**: A unified `Caption` class replaces `CaptionIO` for robust subtitle handling (SRT, VTT, ASS, TextGrid, JSON).
+- **YouTube Support**: Native parsing of YouTube auto-generated captions with word-level timestamps.
 
-#### Audio Processing Improvements
-- **AudioLoader and AudioData Classes**: New abstractions for improved audio loading and processing
-  - `AudioData` class with `duration` property and tensor handling
-  - Cleaner separation of audio loading and alignment logic
+#### Transcription & Diarization
+- **Enhanced Integration**: Seamless transcription toggle and model selection.
+- **Speaker Diarization**: Configurable diarization with results stored immediately in `Caption` objects.
 
-#### Transcription Enhancements
-- **Speaker Diarization API**: Introduced speaker diarization configuration in `TranscriptionConfig`
-  - Renamed diarization method to `speaker_diarization` for clarity
-- **Audio Event Detection**: Added support for reading and writing audio events in transcription workflows
-- **Transcriber Identification**: Implemented abstract `name` property in `BaseTranscriber` for improved transcriber identification
+#### Caption/Subtitle Tools
+- **Conversion & Normalization**: Dedicated commands to convert formats and normalize subtitle text.
+- **Multilingual Tokenization**: Improved text processing for Chinese, English, and German.
 
-#### Configuration System
-- **Device Auto-Detection**: Added 'auto' option for device configuration in alignment and transcription
-- **Enhanced Validation**: Improved path handling with `Pathlike` and better input validation across configurations
-- **Logging Configuration**: New logging setup for better debugging and monitoring
-
-#### CLI Improvements
-- **Renamed CLI Commands**: Updated subtitle CLI command shortcuts (e.g., `laicap-shift` for time shifting)
-- **Verbose Option**: Added verbose output option for caption reading and alignment debugging
-- **Alignment Strategy**: New alignment strategy option with 'entire' mode support
-
-#### Tokenizer Updates
-- **Multilingual Tokenization**: Added text tokenization function supporting Chinese, English, and German
-- **Error Handling**: Enhanced quota exceeds error handling with 402 status code capture
-- **Removed `AsyncLatticeTokenizer`**: Simplified tokenizer architecture
-- **Renamed `model_name_or_path` to `model_name`**: Consistent parameter naming
-
-#### Benchmark and Evaluation
-- **Evaluation Metrics**: Added comprehensive metrics for subtitle alignment quality (DER, JER, WER, SCA, SCER)
-- **Verbose Alignment Debugging**: Enhanced detailed DER output formatting
-- **Text Normalization**: Improved WER calculation with better text normalization
-
-### Bug Fixes
-- Fixed model path resolution to properly expand user directory (`~`)
-- Fixed speaker name handling in subtitle to annotation conversion
-- Removed `AsyncLattifAI` class (use synchronous `LattifAI` client)
-
-### Technical Changes
-- Updated dependency: `lattifai-run>=1.0.1` for enhanced CLI framework
-- Refactored parameter naming: `input_media_path` → `input_media` for consistency
-- Enhanced speaker handling in SubtitleReader to default to event name if not provided
-
-## [1.0.0rc1] - 2025-11-17
-
-### Major Refactor
-
-#### CLI Architecture Improvements
-- **New CLI Framework**: Migrated to `nemo_run` (lattifai-run) based configuration system
-  - Replaced individual command entry points with unified `lai` command structure
-  - Commands now use format: `lai alignment align`, `lai subtitle convert`, `lai agent youtube`
-- **Positional Argument Support**: Enhanced CLI to support intuitive positional arguments
-  - Enable concise commands: `lai subtitle convert input.srt output.vtt`
-  - Support mixed usage: `lai subtitle convert input_path=a.srt b.vtt normalize_text=true`
-
-#### Feature Enhancements
-- **Subtitle Commands**: Added dedicated `convert` and `normalize` subcommands
-  - `lai subtitle convert`: Convert between subtitle formats (SRT, VTT, JSON, TextGrid, etc.)
-  - `lai subtitle normalize`: Clean and format subtitle text with HTML normalization
-- **Transcription Integration**: Enhanced transcription capabilities
-  - Added `use_transcription` option in `SubtitleConfig` to toggle transcription service
-  - Introduced `model_name` in `TranscriptionConfig` for model specification
-  - Refactored `BaseTranscriber` to handle both audio and video inputs
-  - Implemented prompt management system for loading AI model prompts dynamically
-- **Configuration System**: New flexible configuration architecture
-  - Config classes now use `nemo_run` framework for better composability
-  - Support for runtime configuration overrides
-  - Enhanced media handling configuration
-
-#### Documentation Updates
-- Simplified command examples throughout README to use positional arguments
-- Enhanced command descriptions for alignment, subtitle, and youtube workflows
-- Updated all CLI usage examples to reflect new command structure
-
-#### Technical Changes
-- Updated dependency: `lattifai-run>=1.0.0rc2` for enhanced CLI support
-- Enhanced file management logic in `FileExistenceManager`
-- Refactored entry points and namespaces for better organization
-
-### Changed
-- Package version updated to 1.0.0rc1
-- CLI command structure migrated to subcommand-based architecture
-- Configuration system moved to nemo_run framework
+### Breaking Changes
+- **Renamed Classes**: `Lattice1AlphaWorker` -> `Lattice1Worker`.
+- **Removed**: `AsyncLattifAI` and `AsyncLatticeTokenizer` (use synchronous counterparts).
+- **CLI Structure**: Old command styles are replaced by the new `lai <subcommand> <action>` syntax.
 
 ## [0.4.6] - 2025-11-05
 

@@ -53,7 +53,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 pip install install-k2
 install-k2 --torch-version 2.9.1  # if not set will auto-detect PyTorch version and install compatible k2
 
-pip install lattifai==1.0.0rc5
+pip install lattifai==1.0.0
 ```
 
 **Using uv (Recommended - 10-100x faster):**
@@ -71,8 +71,8 @@ uv pip install install-k2
 uv pip install pip
 uv run install-k2 --torch-version 2.9.1
 
-# Install LattifAI
-uv pip install lattifai==1.0.0rc5
+# Install LattifAI (v1.0.0)
+uv pip install lattifai==1.0.0
 ```
 
 > **Note**: `install-k2` automatically detects your PyTorch version (up to 2.9) and installs the compatible k2 wheel.
