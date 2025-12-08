@@ -110,7 +110,7 @@ lattifai = "src/lattifai"
 
 [tool.setuptools.package-data]
 "lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]
-"" = ["app/**/*"]
+"lattifai" = ["app/**/*"]
 
 [project.optional-dependencies]
 numpy = ['numpy']
