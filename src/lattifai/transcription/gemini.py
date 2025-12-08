@@ -107,7 +107,7 @@ class GeminiTranscriber(BaseTranscriber):
             # Upload audio file
             if self.config.verbose:
                 self.logger.info("📤 Uploading audio file to Gemini...")
-            media_file = client.files.upload(path=media_file)
+            media_file = client.files.upload(file=media_file)
 
             contents = Part.from_uri(file_uri=media_file.uri, mime_type=media_file.mime_type)
             return await self._run_generation(contents, source=media_file, client=client)

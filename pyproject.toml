@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.0.0'
+version = '1.0.1'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -107,7 +107,7 @@ packages = [
 lattifai = "src/lattifai"
 
 [tool.setuptools.package-data]
-"lattifai.workflows.prompts" = ["**/*.txt", "**/*.md"]
+"lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]
 
 [project.optional-dependencies]
 numpy = ['numpy']
