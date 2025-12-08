@@ -44,6 +44,7 @@ jobs:
       - name: Build and Test
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           pip install install-k2>=0.1.0
           install_k2
