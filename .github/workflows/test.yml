@@ -46,6 +46,8 @@ jobs:
           python tests/test_basic.py  # Run basic tests
           pytest tests/caption/test_text_parser.py -v
           bash tests/test_audio_formats.sh  # Run audio format tests
+          # LattifAI transcription command
+          lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
 
       - name: Run All Tests
         if: startsWith(github.ref, 'refs/tags/v')  # Only run on release tags (vx.x.x)
@@ -55,3 +57,5 @@ jobs:
         run: |
           # Run comprehensive test suite on release tags
           pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+          # LattifAI transcription command
+          lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
