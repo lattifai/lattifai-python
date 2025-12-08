@@ -44,7 +44,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
     // Options
     const [splitSentence, setSplitSentence] = useState(true);
     const [normalizeText, setNormalizeText] = useState(true);
-    const [outputFormat, setOutputFormat] = useState('srt');
+    const outputFormat = 'srt'; // Fixed output format
     const [transcriptionModel, setTranscriptionModel] = useState('nvidia/parakeet-tdt-0.6b-v3');
     const [transcriptionExpanded, setTranscriptionExpanded] = useState(false);
     const [editingGeminiKey, setEditingGeminiKey] = useState(false);
