@@ -159,19 +159,69 @@ That's it! Your aligned subtitles are saved to `aligned.srt`.
 
 ### Web Interface
 
-1. **Start the backend server:**
+![web Demo](assets/web.png)
+
+1. **Install the web application (one-time setup):**
+   ```bash
+   lai-app-install
+   ```
+
+   This command will:
+   - Check if Node.js/npm is installed (and install if needed)
+   - Install frontend dependencies
+   - Build the application
+   - Setup the `lai-app` command globally
+
+2. **Start the backend server:**
    ```bash
    lai-server
+
+   # Custom port (default: 8001)
+   lai-server --port 9000
+
+   # Custom host
+   lai-server --host 127.0.0.1 --port 9000
+
+   # Production mode (disable auto-reload)
+   lai-server --no-reload
    ```
 
-2. **Start the frontend (in a new terminal):**
+   **Backend Server Options:**
+   - `-p, --port` - Server port (default: 8001)
+   - `--host` - Host address (default: 0.0.0.0)
+   - `--no-reload` - Disable auto-reload for production
+   - `-h, --help` - Show help message
+
+3. **Start the frontend application:**
    ```bash
-   cd app
-   npm install
-   npm run dev
+   lai-app
+
+   # Custom port (default: 5173)
+   lai-app --port 8080
+
+   # Custom backend URL
+   lai-app --backend http://localhost:9000
+
+   # Don't auto-open browser
+   lai-app --no-open
    ```
 
-   Visit `http://localhost:5173` to open the web interface.
+   **Frontend Application Options:**
+   - `-p, --port` - Frontend server port (default: 5173)
+   - `--backend` - Backend API URL (default: http://localhost:8001)
+   - `--no-open` - Don't automatically open browser
+   - `-h, --help` - Show help message
+
+   The web interface will automatically open in your browser at `http://localhost:5173`.
+
+**Features:**
+- ✅ Automatic backend server status detection
+- ✅ Visual file upload with drag-and-drop
+- ✅ Real-time alignment progress
+- ✅ Multiple subtitle format support
+- ✅ Built-in transcription with multiple models
+- ✅ API key management interface
+- ✅ Download aligned subtitles in various formats
 
 ---
 

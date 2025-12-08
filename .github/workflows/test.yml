@@ -36,6 +36,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Build and Test
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
@@ -48,6 +53,17 @@ jobs:
           bash tests/test_audio_formats.sh  # Run audio format tests
           # LattifAI transcription command
           lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
+
+      - name: Test Web App Installation
+        run: |
+          # Test lai-app-install command
+          lai-app-install --help
+          # Install the web app
+          lai-app-install
+          # Verify lai-app is installed
+          lai-app --help
+          # Test lai-server command
+          lai-server --help
 
       - name: Run All Tests
         if: startsWith(github.ref, 'refs/tags/v')  # Only run on release tags (vx.x.x)

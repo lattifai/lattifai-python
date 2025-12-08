@@ -1,18 +1,26 @@
 {
-  "name": "app",
-  "private": true,
-  "version": "0.0.0",
+  "name": "lai-app",
+  "private": false,
+  "version": "1.0.0",
   "type": "module",
+  "description": "LattifAI Alignment Web Application - Text-Speech Forced Alignment Tool",
+  "bin": {
+    "lai-app": "./bin/lai-app.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node bin/lai-app.js"
   },
   "dependencies": {
     "axios": "^1.13.2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "commander": "^12.1.0",
+    "express": "^4.21.2",
+    "open": "^10.1.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

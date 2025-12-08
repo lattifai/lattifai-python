@@ -46,6 +46,7 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
     const [normalizeText, setNormalizeText] = useState(true);
     const [outputFormat, setOutputFormat] = useState('srt');
     const [transcriptionModel, setTranscriptionModel] = useState('nvidia/parakeet-tdt-0.6b-v3');
+    const [transcriptionExpanded, setTranscriptionExpanded] = useState(false);
     const [editingGeminiKey, setEditingGeminiKey] = useState(false);
     const [geminiKeyInput, setGeminiKeyInput] = useState('');
     const [savingGeminiKey, setSavingGeminiKey] = useState(false);
@@ -494,41 +495,6 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                                 </div>
                             )}
                         </div>
-
-                        {/* Server Output Directory for Upload Mode */}
-                        <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: 'var(--card-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                            <div className="path-input-group">
-                                <label>Server Output Directory (Optional)</label>
-                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                                    If set, the aligned file will be saved to this folder on the server.
-                                </div>
-                                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <input
-                                        type="text"
-                                        value={localOutputDir}
-                                        onChange={e => setLocalOutputDir(e.target.value)}
-                                        placeholder="/home/user/output/"
-                                        style={{ flex: 1 }}
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleBrowsing}
-                                        disabled={selectingDir}
-                                        style={{
-                                            padding: '0 1rem',
-                                            backgroundColor: 'var(--card-bg)',
-                                            border: '1px solid var(--border-color)',
-                                            borderRadius: '4px',
-                                            cursor: 'pointer',
-                                            color: 'var(--text-color)',
-                                            whiteSpace: 'nowrap'
-                                        }}
-                                    >
-                                        {selectingDir ? '...' : '📁 Browse'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
 
@@ -636,19 +602,39 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                     </label>
                 </div>
 
-                {/* Transcription Model Selector - Updated with grid layout */}
+                {/* Transcription Model Selector - Collapsible */}
                 <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'var(--card-bg)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <div className="path-input-group">
-                        <label style={{ fontWeight: 700, fontSize: '1rem', display: 'block', marginBottom: '0.75rem' }}>Transcription Model</label>
-                        <div style={{
-                            fontSize: '0.9rem',
-                            color: '#d63384',
-                            marginBottom: '0.75rem',
-                            lineHeight: '1.4',
-                            fontWeight: 500
-                        }}>
-                            💡 Transcription will be automatically triggered when no caption file is provided
+                    <div
+                        onClick={() => setTranscriptionExpanded(!transcriptionExpanded)}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            cursor: 'pointer',
+                            marginBottom: transcriptionExpanded ? '0.75rem' : '0'
+                        }}
+                    >
+                        <div>
+                            <label style={{ fontWeight: 700, fontSize: '1rem', display: 'block', marginBottom: '0.25rem', cursor: 'pointer' }}>Transcription Model</label>
+                            <div style={{
+                                fontSize: '0.85rem',
+                                color: '#666',
+                                lineHeight: '1.4'
+                            }}>
+                                💡 Auto-triggered when no caption file provided
+                            </div>
                         </div>
+                        <div style={{
+                            fontSize: '1.5rem',
+                            transition: 'transform 0.3s ease',
+                            transform: transcriptionExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+                        }}>
+                            ▼
+                        </div>
+                    </div>
+
+                    {transcriptionExpanded && (
+                        <div className="path-input-group" style={{ marginTop: '1rem' }}>
 
                         {/* Grid layout: Model selector and Gemini API Key input side by side (when Gemini selected) */}
                         <div style={{ display: 'grid', gridTemplateColumns: transcriptionModel.includes('gemini') ? '3fr 2fr' : '1fr', gap: '1rem', alignItems: 'start' }}>
@@ -830,39 +816,9 @@ const AlignmentForm: React.FC<AlignmentFormProps> = ({ onResult, onLoading, alig
                                 </div>
                             )}
                         </div>
-                    </div>
+                        </div>
+                    )}
                 </div>
-
-                {/* Output Format Selector */}
-                <div style={{ marginTop: '1rem' }}>
-                    <div className="path-input-group">
-                        <label style={{ fontWeight: 700, fontSize: '1rem' }}>Output Format</label>
-                        <select
-                            value={outputFormat}
-                            onChange={e => setOutputFormat(e.target.value)}
-                            style={{
-                                padding: '0.5rem',
-                                borderRadius: '4px',
-                                border: '1px solid var(--border-color)',
-                                backgroundColor: 'var(--bg-color)',
-                                color: 'var(--text-color)',
-                                fontSize: '0.95rem'
-                            }}
-                        >
-                            <option value="srt">SRT - SubRip</option>
-                            <option value="vtt">VTT - WebVTT</option>
-                            <option value="ass">ASS - Advanced SubStation Alpha</option>
-                            <option value="ssa">SSA - SubStation Alpha</option>
-                            <option value="sub">SUB - MicroDVD</option>
-                            <option value="sbv">SBV - YouTube</option>
-                            <option value="ttml">TTML - Timed Text Markup Language</option>
-                            <option value="sami">SAMI - Microsoft SAMI</option>
-                            <option value="txt">TXT - Plain Text</option>
-                            <option value="json">JSON - JSON Format</option>
-                        </select>
-                    </div>
-                </div>
-
 
 
                 {error && (() => {
