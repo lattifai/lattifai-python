@@ -30,28 +30,42 @@ class Lattice1Worker:
         sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
         sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
 
+        acoustic_model_path = f"{model_path}/acoustic_opt.onnx"
+
         providers = []
-        if device.startswith("cuda") and ort.get_all_providers().count("CUDAExecutionProvider") > 0:
+        all_providers = ort.get_all_providers()
+        if device.startswith("cuda") and all_providers.count("CUDAExecutionProvider") > 0:
             providers.append("CUDAExecutionProvider")
-        elif device.startswith("mps") and ort.get_all_providers().count("MPSExecutionProvider") > 0:
+        if "MPSExecutionProvider" in all_providers:
             providers.append("MPSExecutionProvider")
+        if "CoreMLExecutionProvider" in all_providers:
+            if "quant" in acoustic_model_path:
+                # NOTE: CPUExecutionProvider is faster for quantized models
+                pass
+            else:
+                providers.append("CoreMLExecutionProvider")
 
         try:
             self.acoustic_ort = ort.InferenceSession(
-                f"{model_path}/acoustic_opt.onnx",
+                acoustic_model_path,
                 sess_options,
-                providers=providers + ["CPUExecutionProvider", "CoreMLExecutionProvider"],
+                providers=providers + ["CPUExecutionProvider"],
             )
         except Exception as e:
             raise ModelLoadError(f"acoustic model from {model_path}", original_error=e)
 
-        try:
-            config = FbankConfig(num_mel_bins=80, device=device, snip_edges=False)
-            config_dict = config.to_dict()
-            config_dict.pop("device")
-            self.extractor = Wav2LogFilterBank(**config_dict).to(device).eval()
-        except Exception as e:
-            raise ModelLoadError(f"feature extractor for device {device}", original_error=e)
+        # get input_names
+        input_names = [inp.name for inp in self.acoustic_ort.get_inputs()]
+        if "audios" not in input_names:
+            try:
+                config = FbankConfig(num_mel_bins=80, device=device, snip_edges=False)
+                config_dict = config.to_dict()
+                config_dict.pop("device")
+                self.extractor = Wav2LogFilterBank(**config_dict).to(device).eval()
+            except Exception as e:
+                raise ModelLoadError(f"feature extractor for device {device}", original_error=e)
+        else:
+            self.extractor = None  # ONNX model includes feature extractor
 
         self.device = torch.device(device)
         self.timings = defaultdict(lambda: 0.0)
@@ -63,28 +77,57 @@ class Lattice1Worker:
     @torch.inference_mode()
     def emission(self, audio: torch.Tensor) -> torch.Tensor:
         _start = time.time()
-        # audio -> features -> emission
-        features = self.extractor(audio)  # (1, T, D)
-        if features.shape[1] > 6000:
-            features_list = torch.split(features, 6000, dim=1)
-            emissions = []
-            for features in features_list:
+        if self.extractor is not None:
+            # audio -> features -> emission
+            features = self.extractor(audio)  # (1, T, D)
+            if features.shape[1] > 6000:
+                features_list = torch.split(features, 6000, dim=1)
+                emissions = []
+                for features in features_list:
+                    ort_inputs = {
+                        "features": features.cpu().numpy(),
+                        "feature_lengths": np.array([features.size(1)], dtype=np.int64),
+                    }
+                    emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
+                    emissions.append(emission)
+                emission = torch.cat(
+                    [torch.from_numpy(emission).to(self.device) for emission in emissions], dim=1
+                )  # (1, T, vocab_size)
+            else:
                 ort_inputs = {
                     "features": features.cpu().numpy(),
                     "feature_lengths": np.array([features.size(1)], dtype=np.int64),
                 }
                 emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
-                emissions.append(emission)
-            emission = torch.cat(
-                [torch.from_numpy(emission).to(self.device) for emission in emissions], dim=1
-            )  # (1, T, vocab_size)
+                emission = torch.from_numpy(emission).to(self.device)
         else:
-            ort_inputs = {
-                "features": features.cpu().numpy(),
-                "feature_lengths": np.array([features.size(1)], dtype=np.int64),
-            }
-            emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
-            emission = torch.from_numpy(emission).to(self.device)
+            CHUNK_SIZE = 60 * 16000  # 60 seconds
+            if audio.shape[1] > CHUNK_SIZE:
+                audio_list = torch.split(audio, CHUNK_SIZE, dim=1)
+                emissions = []
+                for audios in audio_list:
+                    emission = self.acoustic_ort.run(
+                        None,
+                        {
+                            "audios": audios.cpu().numpy(),
+                        },
+                    )[
+                        0
+                    ]  # (1, T, vocab_size) numpy
+                    emissions.append(emission)
+                emission = torch.cat(
+                    [torch.from_numpy(emission).to(self.device) for emission in emissions], dim=1
+                )  # (1, T, vocab_size)
+            else:
+                emission = self.acoustic_ort.run(
+                    None,
+                    {
+                        "audios": audio.cpu().numpy(),
+                    },
+                )[
+                    0
+                ]  # (1, T, vocab_size) numpy
+                emission = torch.from_numpy(emission).to(self.device)
 
         self.timings["emission"] += time.time() - _start
         return emission  # (1, T, vocab_size) torch
