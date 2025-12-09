@@ -41,6 +41,14 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install Chromium for yt-dlp cookies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+          # Create a minimal Chrome profile directory for yt-dlp
+          mkdir -p ~/.config/chromium/Default
+          echo '{}' > ~/.config/chromium/Default/Preferences
+
       - name: Build and Test
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
@@ -52,8 +60,26 @@ jobs:
           python tests/test_basic.py  # Run basic tests
           pytest tests/caption/test_text_parser.py -v
           bash tests/test_audio_formats.sh  # Run audio format tests
-          # LattifAI transcription command
+
+      - name: Test Cli Commands
+        env:
+          LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Test lai command
+          which lai
+          # Test alignment youtube (allow failure due to YouTube restrictions in CI)
+          lai alignment youtube -Y https://www.youtube.com/shorts/zTYymWpptyI caption.split_sentence=true media.output_dir=~/Downloads/lattifai_youtube media.force_overwrite=true || echo "⚠️ YouTube download failed (expected in CI environment)"
+          # Only test caption conversion if download succeeded
+          if [ -f ~/Downloads/lattifai_youtube/zTYymWpptyI_LattifAI.srt ]; then
+            laicap-convert -Y ~/Downloads/lattifai_youtube/zTYymWpptyI_LattifAI.srt ~/Downloads/lattifai_youtube/zTYymWpptyI_LattifAI.TextGrid
+          fi
+          # Test lai-transcribe command
+          # Gemini Model
           lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
+          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview
+          # iic/SenseVoiceSmall
+          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=iic/SenseVoiceSmall
 
       - name: Test Web App Installation
         run: |
@@ -76,3 +102,4 @@ jobs:
           pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
           # LattifAI transcription command
           lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
+          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/parakeet-tdt-0.6b-v3

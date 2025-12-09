@@ -404,7 +404,7 @@ class LattifAIClientMixin:
             transcription = await self.transcriber.transcribe_file(media_file, language=source_lang)
             print(colorful.green("         ✓ Transcription completed."))
 
-            if "Gemini" in self.transcriber.name:
+            if "gemini" in self.transcriber.name.lower():
                 # write to temp file and use Caption read
                 with tempfile.NamedTemporaryFile(suffix=self.transcriber.file_suffix, delete=True) as tmp_file:
                     tmp_path = Path(tmp_file.name)
