@@ -1,4 +1,58 @@
 ````markdown
+# Release Notes - LattifAI Python v1.0.4
+
+**Release Date:** December 09, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.0.4 is a patch release that fixes YouTube download issues in CI environments and improves test reliability.
+
+---
+
+## 🐛 Bug Fixes
+
+### CI/CD Improvements
+
+Fixed YouTube download issues in GitHub Actions CI:
+- **Chromium Installation**: Added Chromium browser installation to support yt-dlp cookie extraction
+- **Browser Environment**: Created minimal Chrome profile directory for yt-dlp compatibility
+- **yt-dlp Dependencies**: Upgraded to full yt-dlp installation with all optional dependencies
+- **Error Handling**: Improved error tolerance for YouTube downloads in CI environments
+
+**Impact:**
+- ✅ CI tests now handle YouTube download restrictions gracefully
+- ✅ JavaScript runtime requirements resolved with Node.js 20
+- ✅ Better error messages when YouTube downloads fail in automated environments
+- ✅ Conditional test execution based on download success
+
+### Test Reliability
+
+- **YouTube Test**: Made YouTube download tests non-blocking in CI to handle platform restrictions
+- **Caption Conversion**: Only tests caption conversion when download succeeds
+- **Error Messages**: Clear warnings when YouTube downloads fail in CI
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+lai --version
+# Expected: lattifai 1.0.4
+```
+
+---
+
+````markdown
 # Release Notes - LattifAI Python v1.0.2
 
 **Release Date:** December 09, 2025
