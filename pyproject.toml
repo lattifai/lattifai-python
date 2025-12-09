@@ -71,10 +71,10 @@ classifiers = [
 
 [project.urls]
 Homepage = 'https://github.com/lattifai/lattifai-python'
-Documentation = 'https://github.com/lattifai/lattifai-python/README.md'
+Documentation = 'https://github.com/lattifai/lattifai-python/blob/main/README.md'
 'Bug Tracker' = 'https://github.com/lattifai/lattifai-python/issues'
 Discussions = 'https://github.com/lattifai/lattifai-python/discussions'
-Changelog = 'https://github.com/lattifai/lattifai-python/CHANGELOG.md'
+Changelog = 'https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md'
 
 [project.scripts]
 "lai-align" = "lattifai.cli.alignment:main"
