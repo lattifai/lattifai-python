@@ -58,6 +58,12 @@ app.add_middleware(
 )
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for server status monitoring."""
+    return {"status": "ok", "message": "LattifAI backend server is running"}
+
+
 def mask_api_key(key: str) -> str:
     """Mask API key for display, showing only first 6 and last 4 characters."""
     if len(key) <= 10:

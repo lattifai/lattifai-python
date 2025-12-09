@@ -29,6 +29,42 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data }) => {
         }
     }, [data]);
 
+    const handleDownload = async () => {
+        if (!data) return;
+
+        const filename = data.media_stem ? `${data.media_stem}_LattifAI.${format}` : `alignment.${format}`;
+
+        // Try File System Access API for choosing save location (Chrome/Edge 86+)
+        if ('showSaveFilePicker' in window) {
+            try {
+                const handle = await (window as any).showSaveFilePicker({
+                    suggestedName: filename,
+                    types: [{
+                        description: 'Subtitle files',
+                        accept: { 'text/plain': [`.${format}`] }
+                    }]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(content);
+                await writable.close();
+                return;
+            } catch (err) {
+                // User cancelled or error occurred, fall back to traditional download
+                if ((err as Error).name !== 'AbortError') {
+                    console.error('Error saving file:', err);
+                }
+            }
+        }
+
+        // Fallback: traditional download (no path selection)
+        const link = document.createElement('a');
+        link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(content)}`;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     // Update content when format changes
     React.useEffect(() => {
         if (!data || !data.segments) return;
@@ -60,12 +96,12 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data }) => {
                 newContent = generateLRC(data.segments);
                 break;
             default:
-                // Fallback to original content if format matches what backend sent, 
+                // Fallback to original content if format matches what backend sent,
                 // otherwise show warning or try best effort json
                 if (format === data.output_format) {
                     newContent = data.caption_content;
                 } else {
-                    newContent = `Format conversion for ${format} is not supported in client-side mode yet.\n\nRaw Segments:\n` + JSON.stringify(data.segments, null, 2);
+                    newContent = `Format conversion for ${format} is not supported in client-side mode yet.\n\nRaw Caption:\n` + JSON.stringify(data.segments, null, 2);
                 }
         }
         setContent(newContent);
@@ -108,17 +144,24 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ data }) => {
             </div>
 
             <div className="download-section">
-                <a
-                    href={`data:text/plain;charset=utf-8,${encodeURIComponent(content)}`}
-                    download={data.media_stem ? `${data.media_stem}_LattifAI.${format}` : `alignment.${format}`}
+                <button
+                    onClick={handleDownload}
                     className="download-btn"
+                    style={{
+                        padding: '0.6rem 1.2rem',
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '1rem',
+                        fontWeight: 600
+                    }}
                 >
                     Download {format.toUpperCase()}
-                </a>
+                </button>
             </div>
 
             <div className="segments-list">
-                <h3>Segments</h3>
+                <h3>Caption</h3>
                 <ul>
                     {data.segments.map((seg, idx) => (
                         <li key={idx} className="segment-item">
