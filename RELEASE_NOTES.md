@@ -1,4 +1,88 @@
 ````markdown
+# Release Notes - LattifAI Python v1.0.2
+
+**Release Date:** December 09, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.0.2 is a patch release that fixes packaging issues and improves the web application component.
+
+---
+
+## 🐛 Bug Fixes
+
+### Package Configuration Fix
+
+Fixed critical packaging issue in `pyproject.toml`:
+- **Package Data Entry**: Corrected the package-data configuration for `lattifai` to properly include web application files
+- **App Files**: Ensures the `app/**/*` files are correctly bundled with the package distribution
+- **Installation**: Resolves issues where web application assets were missing after installation
+
+**Impact:**
+- ✅ `lai-app-install` command now works correctly with all required files
+- ✅ Web application assets are properly included in the package
+- ✅ Complete distribution with all necessary components
+
+### Web Application Updates
+
+- **Output Format**: Set fixed output format in AlignmentForm component for consistent behavior
+- **Documentation**: Updated installation instructions to reference v1.0.2
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+lai --version
+# Expected: lattifai 1.0.2
+```
+
+### Installing the Web Application:
+
+```bash
+lai-app-install
+```
+
+---
+
+## 🔄 Backward Compatibility
+
+✅ **100% backward compatible** - all existing code works without changes.
+
+---
+
+## 📝 Version Info
+
+- **Version**: 1.0.2
+- **Release Date**: December 09, 2025
+- **Python Support**: 3.10 - 3.14
+- **Model**: Lattice-1
+- **License**: Apache License 2.0
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/lattifai/lattifai-python/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/lattifai/lattifai-python/discussions)
+- **Discord**: [Join our community](https://discord.gg/kvF4WsBRK8)
+
+---
+
+# Previous Release Notes
+
+## v1.0.0 - Major Release
+
 # Release Notes - LattifAI Python v1.0.0
 
 **Release Date:** December 07, 2025

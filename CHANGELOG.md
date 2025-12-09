@@ -1,6 +1,16 @@
 # CHANGELOG
 
 
+## [1.0.2] - 2025-12-09
+
+### Fixed
+- Fixed package-data entry for lattifai in pyproject.toml to correctly include app files
+- Updated installation instructions to reference version 1.0.2
+- Set fixed output format for AlignmentForm component in web application
+
+### Changed
+- Package version incremented to 1.0.2
+
 ## [1.0.0] - 2025-12-07
 
 > ⚠️ **BREAKING CHANGE**: This major release introduces a completely refactored CLI architecture and updated API. Previous commands and scripts will need to be updated.
