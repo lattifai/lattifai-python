@@ -232,7 +232,7 @@ async def align_files(
     normalize_text: bool = Form(False),
     output_format: str = Form("srt"),
     transcription_model: str = Form("nvidia/parakeet-tdt-0.6b-v3"),
-    alignment_model: str = Form("Lattifai/Lattice-1"),
+    alignment_model: str = Form("LattifAI/Lattice-1"),
 ):
     # Check if LATTIFAI_API_KEY is set
     if not os.environ.get("LATTIFAI_API_KEY"):

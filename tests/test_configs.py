@@ -47,7 +47,7 @@ class TestAlignmentConfig:
         config = AlignmentConfig()
         # Alignment defaults - device is auto-selected based on hardware
         assert config.device in ["cpu", "cuda", "mps"]
-        assert config.model_name == "Lattifai/Lattice-1"
+        assert config.model_name == "LattifAI/Lattice-1"
         assert config.batch_size == 1
 
     def test_api_key_from_env(self, monkeypatch):

@@ -106,7 +106,7 @@ def transcribe(
 
     # Create transcriber
     if not transcription_config.lattice_model_path:
-        transcription_config.lattice_model_path = _resolve_model_path("Lattifai/Lattice-1")
+        transcription_config.lattice_model_path = _resolve_model_path("LattifAI/Lattice-1")
     transcriber = create_transcriber(transcription_config=transcription_config)
 
     print(colorful.cyan(f"🎤 Starting transcription with {transcriber.name}..."))

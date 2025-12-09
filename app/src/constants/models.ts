@@ -42,12 +42,12 @@ export interface AlignmentModel {
 
 export const ALIGNMENT_MODELS: AlignmentModel[] = [
     {
-        value: 'Lattifai/Lattice-1',
+        value: 'LattifAI/Lattice-1',
         label: 'Lattice-1 (Latest)',
         languages: 'Supports: English, Chinese, German, and mixed languages'
     },
     {
-        value: 'Lattifai/Lattice-1-Alpha',
+        value: 'LattifAI/Lattice-1-Alpha',
         label: 'Lattice-1-Alpha (Legacy)',
         languages: 'Supports: English only'
     }

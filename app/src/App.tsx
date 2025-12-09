@@ -19,10 +19,10 @@ interface ApiKeysResponse {
 function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [alignmentModel, setAlignmentModel] = useState('Lattifai/Lattice-1')
+  const [alignmentModel, setAlignmentModel] = useState('LattifAI/Lattice-1')
   const [apiKeys, setApiKeys] = useState<ApiKeysResponse | null>(null)
   const [editingKeys, setEditingKeys] = useState(false)
-  const [lattifaiKeyInput, setLattifaiKeyInput] = useState('')
+  const [lattifaiKeyInput, setLattifAIKeyInput] = useState('')
   const [savingKeys, setSavingKeys] = useState(false)
   const [saveToFile, setSaveToFile] = useState(true) // Default to save to file
   const [serverUrl, setServerUrl] = useState('')
@@ -60,7 +60,7 @@ function App() {
       if (response.ok) {
         await fetchApiKeys() // Refresh key status
         setEditingKeys(false)
-        setLattifaiKeyInput('')
+        setLattifAIKeyInput('')
         const result = await response.json()
         alert(result.message || 'API Key saved successfully!')
       } else {
@@ -183,7 +183,7 @@ function App() {
                     <button
                       onClick={() => {
                         setEditingKeys(true)
-                        setLattifaiKeyInput('')
+                        setLattifAIKeyInput('')
                       }}
                       style={{
                         padding: '0.35rem 0.75rem',
@@ -212,7 +212,7 @@ function App() {
                     <input
                       type="text"
                       value={lattifaiKeyInput}
-                      onChange={e => setLattifaiKeyInput(e.target.value)}
+                      onChange={e => setLattifAIKeyInput(e.target.value)}
                       placeholder="lf_..."
                       style={{
                         width: '100%',
@@ -285,7 +285,7 @@ function App() {
                         <button
                           onClick={() => {
                             setEditingKeys(false)
-                            setLattifaiKeyInput('')
+                            setLattifAIKeyInput('')
                           }}
                           style={{
                             padding: '0.5rem',
