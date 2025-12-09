@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.0.2'
+version = '1.0.4'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -18,7 +18,7 @@ maintainers = [
 requires-python = '>=3.10,<3.15'
 
 dependencies = [
-    "lattifai-core>=0.4.5",
+    "lattifai-core>=0.4.6",
     "lattifai-run>=1.0.1",
     "python-dotenv",
     "lhotse>=1.26.0",
@@ -33,6 +33,7 @@ dependencies = [
     "av",
     "wtpsplit>=2.1.6",
     # transcription
+    "kaldi-native-fbank",
     "OmniSenseVoice>=0.4.0",
     "nemo_toolkit_asr[asr]>=2.7.0rc1",
     # diarization

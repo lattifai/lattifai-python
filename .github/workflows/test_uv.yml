@@ -55,3 +55,14 @@ jobs:
           uv run python tests/test_basic.py  # Run basic tests
           uv run pytest tests/caption/test_text_parser.py -v
           uv run bash tests/test_audio_formats.sh  # Run audio format tests
+
+      - name: Test Cli Commands
+        env:
+          LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          # Test lai-transcribe command
+          uv run which lai
+          # Gemini Model
+          uv run lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
+          uv run lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview
