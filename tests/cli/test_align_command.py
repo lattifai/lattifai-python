@@ -11,7 +11,7 @@ load_dotenv(find_dotenv(usecwd=True))
 
 def run_align_command(args, env=None):
     """Helper function to run the align command and return result"""
-    cmd = ["lai", "alignment", "align"]
+    cmd = ["lai", "alignment", "align", "-Y"]
 
     if os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false").lower() == "true":
         cmd.append("--dryrun")

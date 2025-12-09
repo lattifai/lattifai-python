@@ -22,7 +22,7 @@ def run_caption_command(args, env=None, dryrun: bool = True):
         if args[0] in ["convert", "normalize", "shift"]:
             cmd.append(args[0])
             args = args[1:]
-        cmd.append("-Y")
+    cmd.append("-Y")
 
     cmd.extend(args)
     try:
