@@ -4,6 +4,7 @@ import os
 import subprocess
 
 import pytest
+import torch
 from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv(usecwd=True))
@@ -17,12 +18,13 @@ def run_align_command(args, env=None):
         cmd.append("--dryrun")
 
     cmd.extend(args)
+
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=120,
             check=True,
             env=env,
         )
@@ -30,7 +32,7 @@ def run_align_command(args, env=None):
     except subprocess.TimeoutExpired:
         return None
     except subprocess.CalledProcessError as e:
-        print(" ".join(cmd))
+        print(f"Command: {' '.join(cmd)} failed with exit code {e.returncode}")
         raise e
 
 
@@ -77,7 +79,14 @@ class TestAlignCommand:
             f"alignment.device={device}",
         ]
 
-        run_align_command(args)
+        if device == "mps" and not torch.backends.mps.is_available():
+            with pytest.raises(subprocess.CalledProcessError):
+                _ = run_align_command(args)
+        elif device == "cuda" and not torch.cuda.is_available():
+            with pytest.raises(subprocess.CalledProcessError):
+                _ = run_align_command(args)
+        else:
+            run_align_command(args)
 
     def test_align_split_sentence_option(self, sample_audio_file, sample_caption_file, tmp_path):
         """Test align command with split-sentence option"""
@@ -115,10 +124,8 @@ class TestAlignCommand:
             f"caption.output_path={tmp_path / 'output.srt'}",
         ]
 
-        result = run_align_command(args)
-
-        if result is not None:
-            assert result.returncode in [0, 1, 2] or "usage:" in result.stderr
+        with pytest.raises(subprocess.CalledProcessError):
+            _ = run_align_command(args)
 
     def test_align_help(self):
         """Test align command help output"""

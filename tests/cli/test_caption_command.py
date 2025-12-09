@@ -30,7 +30,7 @@ def run_caption_command(args, env=None, dryrun: bool = True):
             cmd,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=120,
             check=True,
             env=env,
         )

@@ -505,6 +505,8 @@ class Caption:
             cls._write_csv(alignments, output_path, include_speaker_in_text)
         elif str(output_path)[-4:].lower() == ".aud":
             cls._write_aud(alignments, output_path, include_speaker_in_text)
+        elif str(output_path)[-4:].lower() == ".sbv":
+            cls._write_sbv(alignments, output_path, include_speaker_in_text)
         else:
             import pysubs2
 
@@ -535,7 +537,14 @@ class Caption:
                             name=sup.speaker or "",
                         )
                     )
-            subs.save(output_path)
+
+            # MicroDVD format requires framerate to be specified
+            output_ext = str(output_path).lower().split(".")[-1]
+            if output_ext == "sub":
+                # Default to 25 fps for MicroDVD format if not specified
+                subs.save(output_path, fps=25.0)
+            else:
+                subs.save(output_path)
 
         return output_path
 
@@ -850,6 +859,8 @@ class Caption:
             supervisions = cls._parse_csv(caption, normalize_text)
         elif format == "aud" or str(caption)[-4:].lower() == ".aud":
             supervisions = cls._parse_aud(caption, normalize_text)
+        elif format == "sbv" or str(caption)[-4:].lower() == ".sbv":
+            supervisions = cls._parse_sbv(caption, normalize_text)
         elif format == "txt" or (format == "auto" and str(caption)[-4:].lower() == ".txt"):
             if not Path(str(caption)).exists():  # str
                 lines = [line.strip() for line in str(caption).split("\n")]
@@ -1114,6 +1125,101 @@ class Caption:
         return supervisions
 
     @classmethod
+    def _parse_sbv(cls, caption: Pathlike, normalize_text: Optional[bool] = False) -> List[Supervision]:
+        """
+        Parse SubViewer (SBV) format caption file.
+
+        Format:
+        0:00:00.000,0:00:02.000
+        Text line 1
+
+        0:00:02.000,0:00:04.000
+        Text line 2
+
+        Args:
+            caption: Caption file path
+            normalize_text: Whether to normalize text
+
+        Returns:
+            List of Supervision objects
+        """
+        caption_path = Path(str(caption))
+        if not caption_path.exists():
+            raise FileNotFoundError(f"Caption file not found: {caption}")
+
+        supervisions = []
+
+        with open(caption_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Split by double newlines to separate entries
+        entries = content.strip().split("\n\n")
+
+        for entry in entries:
+            lines = entry.strip().split("\n")
+            if len(lines) < 2:
+                continue
+
+            # First line: timestamp (H:MM:SS.mmm,H:MM:SS.mmm)
+            timestamp_line = lines[0].strip()
+            # Remaining lines: text
+            text_lines = lines[1:]
+
+            try:
+                # Parse timestamp: 0:00:00.000,0:00:02.000
+                if "," not in timestamp_line:
+                    continue
+
+                start_str, end_str = timestamp_line.split(",", 1)
+
+                # Parse start time
+                start_parts = start_str.strip().split(":")
+                if len(start_parts) == 3:
+                    h, m, s = start_parts
+                    s_parts = s.split(".")
+                    start = int(h) * 3600 + int(m) * 60 + int(s_parts[0])
+                    if len(s_parts) > 1:
+                        start += int(s_parts[1]) / 1000.0
+                else:
+                    continue
+
+                # Parse end time
+                end_parts = end_str.strip().split(":")
+                if len(end_parts) == 3:
+                    h, m, s = end_parts
+                    s_parts = s.split(".")
+                    end = int(h) * 3600 + int(m) * 60 + int(s_parts[0])
+                    if len(s_parts) > 1:
+                        end += int(s_parts[1]) / 1000.0
+                else:
+                    continue
+
+                # Parse text and speaker
+                text = " ".join(text_lines).strip()
+                speaker, text = parse_speaker_text(text)
+
+                if normalize_text:
+                    text = normalize_text_fn(text)
+
+                duration = end - start
+                if duration < 0:
+                    continue
+
+                supervisions.append(
+                    Supervision(
+                        text=text,
+                        start=start,
+                        duration=duration,
+                        speaker=speaker,
+                    )
+                )
+            except (ValueError, IndexError):
+                # Skip malformed entries
+                continue
+
+        return supervisions
+
+    @classmethod
     def _write_tsv(
         cls,
         alignments: List[Supervision],
@@ -1216,6 +1322,58 @@ class Caption:
                     text = f"[[{supervision.speaker}]]{text}"
 
                 file.write(f"{start}\t{end}\t{text}\n")
+
+    @classmethod
+    def _write_sbv(
+        cls,
+        alignments: List[Supervision],
+        output_path: Pathlike,
+        include_speaker_in_text: bool = True,
+    ) -> None:
+        """
+        Write caption to SubViewer (SBV) format.
+
+        Format:
+        0:00:00.000,0:00:02.000
+        Text line 1
+
+        0:00:02.000,0:00:04.000
+        Text line 2
+
+        Args:
+            alignments: List of supervision segments to write
+            output_path: Path to output SBV file
+            include_speaker_in_text: Whether to include speaker in text
+        """
+        with open(output_path, "w", encoding="utf-8") as file:
+            for i, supervision in enumerate(alignments):
+                # Format timestamps as H:MM:SS.mmm
+                start_h = int(supervision.start // 3600)
+                start_m = int((supervision.start % 3600) // 60)
+                start_s = int(supervision.start % 60)
+                start_ms = int((supervision.start % 1) * 1000)
+
+                end_h = int(supervision.end // 3600)
+                end_m = int((supervision.end % 3600) // 60)
+                end_s = int(supervision.end % 60)
+                end_ms = int((supervision.end % 1) * 1000)
+
+                start_time = f"{start_h}:{start_m:02d}:{start_s:02d}.{start_ms:03d}"
+                end_time = f"{end_h}:{end_m:02d}:{end_s:02d}.{end_ms:03d}"
+
+                # Write timestamp line
+                file.write(f"{start_time},{end_time}\n")
+
+                # Write text (with optional speaker)
+                text = supervision.text.strip()
+                if include_speaker_in_text and supervision.speaker:
+                    text = f"{supervision.speaker}: {text}"
+
+                file.write(f"{text}\n")
+
+                # Add blank line between entries (except after last one)
+                if i < len(alignments) - 1:
+                    file.write("\n")
 
     @classmethod
     def _parse_caption(

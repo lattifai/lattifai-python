@@ -97,6 +97,7 @@ jobs:
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LATTIFAI_TESTS_CLI_DRYRUN: ${{ secrets.LATTIFAI_TESTS_CLI_DRYRUN }}
         run: |
           # Run comprehensive test suite on release tags
           pytest tests/ -v --tb=short --cov=src --cov-report=term-missing

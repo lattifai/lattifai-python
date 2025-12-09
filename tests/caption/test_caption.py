@@ -89,6 +89,58 @@ Second caption
             assert isinstance(caption, Caption)
             print(f"✓ Auto-detected format for {filename}")
 
+    def test_sbv_read_write(self, tmp_path):
+        """Test SBV (SubViewer) format read and write."""
+        # Create SBV content
+        sbv_content = """0:00:01.000,0:00:03.500
+First subtitle line
+
+0:00:04.000,0:00:06.500
+Second subtitle line
+
+0:00:07.000,0:00:09.000
+SPEAKER: Third line with speaker
+"""
+        sbv_file = tmp_path / "test.sbv"
+        sbv_file.write_text(sbv_content)
+
+        # Test reading
+        caption = Caption.read(sbv_file)
+        assert isinstance(caption, Caption)
+        assert len(caption.supervisions) == 3
+        assert caption.supervisions[0].text == "First subtitle line"
+        assert caption.supervisions[0].start == 1.0
+        assert abs(caption.supervisions[0].duration - 2.5) < 0.01
+        assert caption.supervisions[2].speaker == "SPEAKER:"
+        print(f"✓ SBV read works correctly, parsed {len(caption.supervisions)} segments")
+
+        # Test writing
+        output_file = tmp_path / "output.sbv"
+        result_path = caption.write(output_file)
+        assert output_file.exists()
+        assert result_path == output_file
+
+        # Read back and verify
+        caption_readback = Caption.read(output_file)
+        assert len(caption_readback.supervisions) == 3
+        assert caption_readback.supervisions[0].text == "First subtitle line"
+        print(f"✓ SBV write works correctly, wrote to {output_file}")
+
+    def test_sub_microdvd_write(self, tmp_path):
+        """Test SUB (MicroDVD) format write with framerate."""
+        supervisions = [
+            Supervision(text="First line", start=1.0, duration=2.0),
+            Supervision(text="Second line", start=4.0, duration=2.0),
+        ]
+
+        output_file = tmp_path / "output.sub"
+        caption = Caption.from_supervisions(supervisions)
+        result_path = caption.write(output_file)
+
+        assert output_file.exists()
+        assert result_path == output_file
+        print(f"✓ MicroDVD (.sub) write works correctly with framerate")
+
 
 def run_tests():
     """Run all tests."""
@@ -104,11 +156,15 @@ def run_tests():
         test_io.test_caption_read(tmp_path)
         test_io.test_caption_write(tmp_path)
         test_io.test_caption_format_auto_detection(tmp_path)
+        test_io.test_sbv_read_write(tmp_path)
+        test_io.test_sub_microdvd_write(tmp_path)
 
     print("\n" + "=" * 60)
     print("✅ All API tests passed!")
     print("\n📝 API Summary:")
     print("   • Caption.read() and write() work correctly")
+    print("   • SBV format read/write works correctly")
+    print("   • MicroDVD (.sub) format write works correctly")
 
 
 if __name__ == "__main__":

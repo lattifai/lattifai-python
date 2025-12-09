@@ -407,6 +407,11 @@ class YouTubeDownloader:
             output_template,
             "--sub-format",
             "best",  # Prefer best available format
+            "--no-warnings",  # Suppress warnings for cleaner output
+            "--extractor-retries",
+            "3",  # Retry on errors
+            "--sleep-requests",
+            "1",  # Sleep between requests to avoid rate limiting
         ]
 
         # Add caption language selection if specified
@@ -425,7 +430,8 @@ class YouTubeDownloader:
                 None, lambda: subprocess.run(ytdlp_options, capture_output=True, text=True, check=True)
             )
 
-            self.logger.info(f"yt-dlp transcript output: {result.stdout.strip()}")
+            # Only log success message, not full yt-dlp output
+            self.logger.debug(f"yt-dlp output: {result.stdout.strip()}")
 
             # Find the downloaded transcript file
             caption_patterns = [
@@ -481,9 +487,18 @@ class YouTubeDownloader:
 
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.strip() if e.stderr else str(e)
+
+            # Check for specific error conditions
             if "No automatic or manual captions found" in error_msg:
                 self.logger.warning("No captions available for this video")
                 return None
+            elif "HTTP Error 429" in error_msg or "Too Many Requests" in error_msg:
+                self.logger.error("YouTube rate limit exceeded. Please try again later or use a different method.")
+                raise RuntimeError(
+                    "YouTube rate limit exceeded (HTTP 429). "
+                    "Try again later or use --cookies option with authenticated cookies. "
+                    "See: https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
+                )
             else:
                 self.logger.error(f"Failed to download transcript: {error_msg}")
                 raise RuntimeError(f"Failed to download transcript: {error_msg}")
