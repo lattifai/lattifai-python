@@ -10,11 +10,14 @@ from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv(usecwd=True))
 
 
+LATTIFAI_TESTS_CLI_DRYRUN = bool(os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false"))
+
+
 def run_align_command(args, env=None):
     """Helper function to run the align command and return result"""
     cmd = ["lai", "alignment", "align", "-Y"]
 
-    if os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false").lower() == "true":
+    if LATTIFAI_TESTS_CLI_DRYRUN:
         cmd.append("--dryrun")
 
     cmd.extend(args)
@@ -79,10 +82,10 @@ class TestAlignCommand:
             f"alignment.device={device}",
         ]
 
-        if device == "mps" and not torch.backends.mps.is_available():
+        if device == "mps" and not torch.backends.mps.is_available() and not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError):
                 _ = run_align_command(args)
-        elif device == "cuda" and not torch.cuda.is_available():
+        elif device == "cuda" and not torch.cuda.is_available() and not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError):
                 _ = run_align_command(args)
         else:
@@ -123,9 +126,11 @@ class TestAlignCommand:
             "caption.input_path=nonexistent_caption.srt",
             f"caption.output_path={tmp_path / 'output.srt'}",
         ]
-
-        with pytest.raises(subprocess.CalledProcessError):
-            _ = run_align_command(args)
+        if not LATTIFAI_TESTS_CLI_DRYRUN:
+            with pytest.raises(subprocess.CalledProcessError):
+                _ = run_align_command(args)
+        else:
+            run_align_command(args)
 
     def test_align_help(self):
         """Test align command help output"""

@@ -82,13 +82,13 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "
     def iter_chunks(
         self,
         chunk_duration: float = 30.0,
-        overlap_duration: float = 1.0,
+        overlap_duration: float = 0.0,
     ):
         """Iterate over audio chunks with configurable duration and overlap.
 
         Args:
             chunk_duration: Duration of each chunk in seconds (default: 30.0).
-            overlap_duration: Overlap between consecutive chunks in seconds (default: 1.0).
+            overlap_duration: Overlap between consecutive chunks in seconds (default: 0.0).
 
         Yields:
             AudioData: Chunks of audio data.

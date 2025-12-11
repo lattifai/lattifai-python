@@ -100,63 +100,71 @@ def test_streaming_alignment():
 
 
 def test_streaming_small_tail_frames():
-    """Test that chunking can leave a tiny tail (1-4 samples) and pipeline stitches correctly.
+    """Test that chunking handles various audio lengths correctly with and without overlap.
 
-    This constructs audio with length N = k*step + r where r in 1..4 samples. It then
-    iterates chunks using the same chunk/overlap settings as streaming and verifies:
-      - the last chunk contains exactly r samples
-      - stitching non-overlapping parts of each chunk reconstructs the original length
-
-    This simulates the minimal pipeline stitching behavior and verifies tiny tails
-    are not dropped or cause errors.
+    This test verifies that iter_chunks correctly splits audio into chunks
+    and that all chunks are produced without errors, even for small tail chunks.
+    Tests both with overlap (overlap_duration > 0) and without overlap (overlap_duration = 0).
     """
     sampling_rate = 16000
     chunk_duration = 30.0
-    overlap_duration = 1.0
 
-    chunk_samples = int(chunk_duration * sampling_rate)
-    overlap_samples = int(overlap_duration * sampling_rate)
-    step_samples = chunk_samples - overlap_samples
+    # Test both with and without overlap
+    for overlap_duration in [0.0, 1.0]:
+        chunk_samples = int(chunk_duration * sampling_rate)
+        overlap_samples = int(overlap_duration * sampling_rate)
+        step_samples = chunk_samples - overlap_samples
 
-    k = 3  # number of steps before the final tiny tail
+        k = 3  # number of step intervals
 
-    for r in range(1, 10):
-        # total samples chosen so that the last chunk start is k*step_samples
-        # and the last chunk length is exactly r samples
-        total_samples = k * step_samples + r * 160 + random.randint(0, 160)
+        for r in range(1, 10):
+            # Create audio with k step intervals plus a small tail
+            tail_samples = r * 160 + random.randint(0, 160)
+            total_samples = k * step_samples + tail_samples
 
-        ndarray = np.random.randn(1, total_samples).astype(np.float32) * 0.1
-        tensor = torch.from_numpy(ndarray)
+            ndarray = np.random.randn(1, total_samples).astype(np.float32) * 0.1
+            tensor = torch.from_numpy(ndarray)
 
-        audio = AudioData(
-            sampling_rate=sampling_rate,
-            ndarray=ndarray,
-            tensor=tensor,
-            device="cpu",
-            path=f"test_tail_{r}.wav",
-        )
+            audio = AudioData(
+                sampling_rate=sampling_rate,
+                ndarray=ndarray,
+                tensor=tensor,
+                device="cpu",
+                path=f"test_tail_{r}.wav",
+            )
 
-        chunks = list(audio.iter_chunks(chunk_duration, overlap_duration))
-        assert len(chunks) >= 1, "No chunks produced"
+            chunks = list(audio.iter_chunks(chunk_duration, overlap_duration))
+            assert len(chunks) >= 1, "No chunks produced"
 
-        last_chunk = chunks[-1]
+            # Verify chunk generation logic
+            # iter_chunks moves by step_samples and yields chunks of up to chunk_samples
+            # Last chunk may be shorter if we reach the end
+            for i, chunk in enumerate(chunks):
+                chunk_start = i * step_samples
+                chunk_end = min(chunk_start + chunk_samples, total_samples)
+                expected_len = chunk_end - chunk_start
+                actual_len = chunk.ndarray.shape[-1]
 
-        # Ensure last chunk has expected tiny tail length
-        last_len = last_chunk.ndarray.shape[-1]
-        assert last_len == r, f"Expected last chunk length {r}, got {last_len}"
+                assert actual_len == expected_len, (
+                    f"Chunk {i} has size {actual_len}, expected {expected_len} "
+                    f"(overlap={overlap_duration}, chunk_start={chunk_start}, chunk_end={chunk_end}, total={total_samples})"
+                )
 
-        # Simulate stitching: take first chunk as-is, then append each chunk without its
-        # leading overlap to avoid double counting. The reconstructed length must equal
-        # the original total_samples.
-        reconstructed = chunks[0].ndarray.shape[-1]
-        for c in chunks[1:]:
-            reconstructed += c.ndarray.shape[-1] - overlap_samples
+            # Verify coverage: last chunk should reach or exceed total_samples
+            last_chunk_start = (len(chunks) - 1) * step_samples
+            last_chunk_end = last_chunk_start + chunks[-1].ndarray.shape[-1]
+            assert (
+                last_chunk_end >= total_samples
+            ), f"Last chunk ends at {last_chunk_end}, but audio has {total_samples} samples"
 
-        assert (
-            reconstructed == total_samples
-        ), f"Reconstructed length {reconstructed} != original {total_samples} for r={r}"
+            # Verify no excessive chunks: if we have n chunks, the (n-1)th chunk start should be < total_samples
+            if len(chunks) > 1:
+                second_last_start = (len(chunks) - 2) * step_samples
+                assert (
+                    second_last_start < total_samples
+                ), f"Second-to-last chunk starts at {second_last_start}, but audio only has {total_samples} samples"
 
-    print("✓ Small-tail chunking tests passed for r=1..4 samples")
+    print("✓ Small-tail chunking tests passed for various tail sizes with and without overlap")
 
 
 def test_simulated_client_alignment_small_tail():

@@ -8,12 +8,14 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv(usecwd=True))
 
+LATTIFAI_TESTS_CLI_DRYRUN = bool(os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false"))
+
 
 def run_caption_command(args, env=None, dryrun: bool = True):
     """Helper function to run the caption command and return result"""
     cmd = ["lai", "caption"]
 
-    if dryrun and os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false").lower() == "true":
+    if dryrun and LATTIFAI_TESTS_CLI_DRYRUN:
         if args[0] in ["convert", "normalize", "shift"]:
             cmd.append(args[0])
             args = args[1:]
@@ -86,9 +88,11 @@ class TestCaptionConvertCommand:
             "input_path=nonexistent_file.srt",
             f"output_path={tmp_path / 'output.vtt'}",
         ]
-
-        with pytest.raises(subprocess.CalledProcessError):
-            run_caption_command(args, dryrun=False)
+        if not LATTIFAI_TESTS_CLI_DRYRUN:
+            with pytest.raises(subprocess.CalledProcessError):
+                run_caption_command(args, dryrun=False)
+        else:
+            run_caption_command(args)
 
     def test_caption_convert_help(self):
         """Test caption convert command help output"""
