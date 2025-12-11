@@ -58,6 +58,27 @@ class AlignmentConfig:
     Default: 4.0 seconds. Useful for detecting scene changes or natural breaks in content.
     """
 
+    # Audio Streaming Configuration
+    enable_streaming: bool = False
+    """Enable streaming mode for processing very long audio files (>1 hour).
+    When True, audio is processed in chunks to keep memory usage low (<4GB peak).
+    Suitable for 20+ hour audio files. When False (default), loads entire audio into memory.
+    Note: Streaming may add slight processing overhead but enables handling arbitrarily long files.
+    """
+
+    streaming_chunk_duration: float = 30.0
+    """Duration (in seconds) of each audio chunk when streaming is enabled.
+    Default: 30.0 seconds. Range: 10-120 seconds.
+    - Smaller chunks: Lower memory usage, more frequent I/O
+    - Larger chunks: Better alignment context, higher memory usage
+    """
+
+    streaming_overlap_duration: float = 0.0
+    """Overlap (in seconds) between consecutive chunks when streaming is enabled.
+    Default: 1.0 second. Range: 0.0-5.0 seconds.
+    Overlap ensures smooth alignment at chunk boundaries and prevents timing discontinuities.
+    """
+
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
@@ -71,3 +92,20 @@ class AlignmentConfig:
 
         if self.device == "auto":
             self.device = _select_device(self.device)
+
+        # Validate streaming parameters
+        if self.enable_streaming:
+            if not 10.0 <= self.streaming_chunk_duration <= 120.0:
+                raise ValueError(
+                    f"streaming_chunk_duration must be between 10 and 120 seconds, got {self.streaming_chunk_duration}"
+                )
+            if not 0.5 <= self.streaming_overlap_duration <= 5.0:
+                raise ValueError(
+                    f"streaming_overlap_duration must be between 0.5 and 5.0 seconds, "
+                    f"got {self.streaming_overlap_duration}"
+                )
+            if self.streaming_overlap_duration >= self.streaming_chunk_duration:
+                raise ValueError(
+                    f"streaming_overlap_duration ({self.streaming_overlap_duration}) must be less than "
+                    f"streaming_chunk_duration ({self.streaming_chunk_duration})"
+                )

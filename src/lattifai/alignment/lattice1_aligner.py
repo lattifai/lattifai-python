@@ -85,8 +85,21 @@ class Lattice1Aligner(object):
 
             if verbose:
                 print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
+                if self.config.enable_streaming:
+                    print(
+                        colorful.yellow(
+                            f"         ⚡ Using streaming mode with {self.config.streaming_chunk_duration}s chunks"
+                        )
+                    )
             try:
-                lattice_results = self.worker.alignment(audio, lattice_graph, emission=emission, offset=offset)
+                lattice_results = self.worker.alignment(
+                    audio,
+                    lattice_graph,
+                    emission=emission,
+                    offset=offset,
+                    streaming=self.config.enable_streaming,
+                    chunk_duration=self.config.streaming_chunk_duration,
+                )
                 if verbose:
                     print(colorful.green("         ✓ Lattice search completed"))
             except Exception as e:

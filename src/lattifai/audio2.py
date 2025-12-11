@@ -17,7 +17,10 @@ ChannelSelectorType = Union[int, str]
 
 
 class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "device", "path"])):
-    """Audio data container with sampling rate, numpy array, tensor, and device information."""
+    """Audio data container with sampling rate, numpy array, tensor, and device information.
+
+    Supports iteration to stream audio chunks for processing long audio files.
+    """
 
     def __str__(self) -> str:
         return self.path
@@ -26,6 +29,98 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "
     def duration(self) -> float:
         """Duration of the audio in seconds."""
         return self.ndarray.shape[-1] / self.sampling_rate
+
+    def __iter__(self):
+        """Initialize iterator for chunk-based audio streaming.
+
+        Returns an iterator that yields audio chunks as AudioData instances.
+        Default chunk size is 30 seconds with 1 second overlap for alignment accuracy.
+        """
+        self._chunk_duration = 30.0  # seconds
+        self._overlap_duration = 1.0  # seconds
+        self._current_offset = 0  # samples
+        self._chunk_size = int(self._chunk_duration * self.sampling_rate)
+        self._overlap_size = int(self._overlap_duration * self.sampling_rate)
+        self._step_size = self._chunk_size - self._overlap_size
+        self._total_samples = self.ndarray.shape[-1]
+        return self
+
+    def __next__(self):
+        """Get the next audio chunk.
+
+        Returns:
+            AudioData: Chunk of audio data with the same sampling rate.
+
+        Raises:
+            StopIteration: When all audio has been processed.
+        """
+        if self._current_offset >= self._total_samples:
+            raise StopIteration
+
+        # Calculate chunk boundaries
+        start = self._current_offset
+        end = min(start + self._chunk_size, self._total_samples)
+
+        # Extract chunk from ndarray and tensor
+        chunk_ndarray = self.ndarray[..., start:end]
+        chunk_tensor = self.tensor[..., start:end]
+
+        # Create new AudioData for this chunk
+        chunk = AudioData(
+            sampling_rate=self.sampling_rate,
+            ndarray=chunk_ndarray,
+            tensor=chunk_tensor,
+            device=self.device,
+            path=f"{self.path}[{start/self.sampling_rate:.2f}s-{end/self.sampling_rate:.2f}s]",
+        )
+
+        # Move to next chunk position (with overlap consideration)
+        self._current_offset += self._step_size
+
+        return chunk
+
+    def iter_chunks(
+        self,
+        chunk_duration: float = 30.0,
+        overlap_duration: float = 1.0,
+    ):
+        """Iterate over audio chunks with configurable duration and overlap.
+
+        Args:
+            chunk_duration: Duration of each chunk in seconds (default: 30.0).
+            overlap_duration: Overlap between consecutive chunks in seconds (default: 1.0).
+
+        Yields:
+            AudioData: Chunks of audio data.
+
+        Example:
+            >>> audio = loader("long_audio.wav")
+            >>> for chunk in audio.iter_chunks(chunk_duration=60.0, overlap_duration=2.0):
+            ...     process(chunk)
+        """
+        chunk_size = int(chunk_duration * self.sampling_rate)
+        overlap_size = int(overlap_duration * self.sampling_rate)
+        step_size = chunk_size - overlap_size
+        total_samples = self.ndarray.shape[-1]
+
+        current_offset = 0
+        while current_offset < total_samples:
+            start = current_offset
+            end = min(start + chunk_size, total_samples)
+
+            # Extract chunk
+            chunk_ndarray = self.ndarray[..., start:end]
+            chunk_tensor = self.tensor[..., start:end]
+
+            yield AudioData(
+                sampling_rate=self.sampling_rate,
+                ndarray=chunk_ndarray,
+                tensor=chunk_tensor,
+                device=self.device,
+                path=f"{self.path}[{start/self.sampling_rate:.2f}s-{end/self.sampling_rate:.2f}s]",
+            )
+
+            current_offset += step_size
 
 
 class AudioLoader:

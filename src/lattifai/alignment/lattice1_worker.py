@@ -138,12 +138,18 @@ class Lattice1Worker:
         lattice_graph: Tuple[str, int, float],
         emission: Optional[torch.Tensor] = None,
         offset: float = 0.0,
+        streaming: bool = False,
+        chunk_duration: float = 30.0,
     ) -> Dict[str, Any]:
         """Process audio with LatticeGraph.
 
         Args:
             audio: AudioData object
             lattice_graph: LatticeGraph data
+            emission: Pre-computed emission tensor (ignored if streaming=True)
+            offset: Time offset for the audio
+            streaming: If True, use streaming mode for memory-efficient processing
+            chunk_duration: Duration of each chunk in seconds (only for streaming)
 
         Returns:
             Processed LatticeGraph
@@ -153,16 +159,6 @@ class Lattice1Worker:
             DependencyError: If required dependencies are missing
             AlignmentError: If alignment process fails
         """
-        if emission is None:
-            try:
-                emission = self.emission(audio.tensor.to(self.device))  # (1, T, vocab_size)
-            except Exception as e:
-                raise AlignmentError(
-                    "Failed to compute acoustic features from audio",
-                    media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
-                    context={"original_error": str(e)},
-                )
-
         try:
             import k2
         except ImportError:
@@ -177,7 +173,7 @@ class Lattice1Worker:
 
         _start = time.time()
         try:
-            # graph
+            # Create decoding graph
             decoding_graph = k2.Fsa.from_str(lattice_graph_str, acceptor=False)
             decoding_graph.requires_grad_(False)
             decoding_graph = k2.arc_sort(decoding_graph)
@@ -190,17 +186,31 @@ class Lattice1Worker:
             )
         self.timings["decoding_graph"] += time.time() - _start
 
-        _start = time.time()
         if self.device.type == "mps":
             device = "cpu"  # k2 does not support mps yet
         else:
             device = self.device
 
-        try:
+        _start = time.time()
+
+        if emission is None and streaming:
+            # Streaming mode: pass emission iterator to align_segments
+            # The align_segments function will automatically detect the iterator
+            # and use k2.OnlineDenseIntersecter for memory-efficient processing
+
+            def emission_iterator():
+                """Generate emissions for each audio chunk."""
+                for chunk in audio.iter_chunks(chunk_duration, 0.0):
+                    chunk_emission = self.emission(chunk.tensor.to(self.device))
+                    yield (chunk_emission.to(device) * acoustic_scale)
+
+            # Calculate total frames for supervision_segments
+            total_frames = int(audio.duration / self.frame_shift)
+
             results, labels = align_segments(
-                emission.to(device) * acoustic_scale,
+                emission_iterator(),  # Pass iterator for streaming
                 decoding_graph.to(device),
-                torch.tensor([emission.shape[1]], dtype=torch.int32),
+                torch.tensor([total_frames], dtype=torch.int32),
                 search_beam=200,
                 output_beam=80,
                 min_active_states=400,
@@ -208,16 +218,46 @@ class Lattice1Worker:
                 subsampling_factor=1,
                 reject_low_confidence=False,
             )
-        except Exception as e:
-            raise AlignmentError(
-                "Failed to perform forced alignment",
-                media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
-                context={"original_error": str(e), "emission_shape": list(emission.shape), "device": str(device)},
-            )
+
+            # For streaming, don't return emission tensor to save memory
+            emission_result = None
+        else:
+            # Batch mode: compute full emission tensor and pass to align_segments
+            if emission is None:
+                try:
+                    emission = self.emission(audio.tensor.to(self.device))  # (1, T, vocab_size)
+                except Exception as e:
+                    raise AlignmentError(
+                        "Failed to compute acoustic features from audio",
+                        media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
+                        context={"original_error": str(e)},
+                    )
+
+            try:
+                results, labels = align_segments(
+                    emission.to(device) * acoustic_scale,
+                    decoding_graph.to(device),
+                    torch.tensor([emission.shape[1]], dtype=torch.int32),
+                    search_beam=200,
+                    output_beam=80,
+                    min_active_states=400,
+                    max_active_states=10000,
+                    subsampling_factor=1,
+                    reject_low_confidence=False,
+                )
+            except Exception as e:
+                raise AlignmentError(
+                    "Failed to perform forced alignment",
+                    media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
+                    context={"original_error": str(e), "emission_shape": list(emission.shape), "device": str(device)},
+                )
+
+            emission_result = emission
+
         self.timings["align_segments"] += time.time() - _start
 
         channel = 0
-        return emission, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
+        return emission_result, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
 
 
 def _load_worker(model_path: str, device: str) -> Lattice1Worker:
