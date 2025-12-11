@@ -226,7 +226,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     emission = self.aligner.emission(
                         media_audio.tensor[
                             :, int(start * media_audio.sampling_rate) : int(end * media_audio.sampling_rate)
-                        ]
+                        ],
+                        ndarray=media_audio.ndarray[
+                            :, int(start * media_audio.sampling_rate) : int(end * media_audio.sampling_rate)
+                        ],
                     )
 
                     # Align segment

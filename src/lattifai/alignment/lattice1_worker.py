@@ -75,18 +75,20 @@ class Lattice1Worker:
         return 0.02  # 20 ms
 
     @torch.inference_mode()
-    def emission(self, audio: torch.Tensor) -> torch.Tensor:
+    def emission(self, audio: torch.Tensor, ndarray: Optional[np.ndarray] = None) -> torch.Tensor:
         _start = time.time()
         if self.extractor is not None:
             # audio -> features -> emission
+            if audio.shape[1] < 160:
+                audio = torch.nn.functional.pad(audio, (0, 320 - audio.shape[1]))
             features = self.extractor(audio)  # (1, T, D)
             if features.shape[1] > 6000:
-                features_list = torch.split(features, 6000, dim=1)
                 emissions = []
-                for features in features_list:
+                for start in range(0, features.size(1), 6000):
+                    _features = features[:, start : start + 6000, :]
                     ort_inputs = {
-                        "features": features.cpu().numpy(),
-                        "feature_lengths": np.array([features.size(1)], dtype=np.int64),
+                        "features": _features.cpu().numpy(),
+                        "feature_lengths": np.array([_features.size(1)], dtype=np.int64),
                     }
                     emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
                     emissions.append(emission)
@@ -101,20 +103,22 @@ class Lattice1Worker:
                 emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
                 emission = torch.from_numpy(emission).to(self.device)
         else:
+            if ndarray is None:
+                ndarray = audio.cpu().numpy()
+            if ndarray.shape[1] < 160:
+                ndarray = np.pad(ndarray, ((0, 0), (0, 320 - ndarray.shape[1])), mode="constant")
+
             CHUNK_SIZE = 60 * 16000  # 60 seconds
-            if audio.shape[1] > CHUNK_SIZE:
-                audio_list = torch.split(audio, CHUNK_SIZE, dim=1)
+            if ndarray.size[1] > CHUNK_SIZE:
                 emissions = []
-                for audios in audio_list:
+                for start in range(0, ndarray.size[1], CHUNK_SIZE):
                     emission = self.acoustic_ort.run(
                         None,
                         {
-                            "audios": audios.cpu().numpy(),
+                            "audios": audio[:, start : start + CHUNK_SIZE],
                         },
-                    )[
-                        0
-                    ]  # (1, T, vocab_size) numpy
-                    emissions.append(emission)
+                    )  # (1, T, vocab_size) numpy
+                    emissions.append(emission[0])
                 emission = torch.cat(
                     [torch.from_numpy(emission).to(self.device) for emission in emissions], dim=1
                 )  # (1, T, vocab_size)
@@ -122,12 +126,10 @@ class Lattice1Worker:
                 emission = self.acoustic_ort.run(
                     None,
                     {
-                        "audios": audio.cpu().numpy(),
+                        "audios": audio,
                     },
-                )[
-                    0
-                ]  # (1, T, vocab_size) numpy
-                emission = torch.from_numpy(emission).to(self.device)
+                )  # (1, T, vocab_size) numpy
+                emission = torch.from_numpy(emission[0]).to(self.device)
 
         self.timings["emission"] += time.time() - _start
         return emission  # (1, T, vocab_size) torch
@@ -201,7 +203,7 @@ class Lattice1Worker:
             def emission_iterator():
                 """Generate emissions for each audio chunk."""
                 for chunk in audio.iter_chunks(chunk_duration, 0.0):
-                    chunk_emission = self.emission(chunk.tensor.to(self.device))
+                    chunk_emission = self.emission(chunk.tensor, ndarray=chunk.ndarray)
                     yield (chunk_emission.to(device) * acoustic_scale)
 
             # Calculate total frames for supervision_segments
@@ -225,7 +227,7 @@ class Lattice1Worker:
             # Batch mode: compute full emission tensor and pass to align_segments
             if emission is None:
                 try:
-                    emission = self.emission(audio.tensor.to(self.device))  # (1, T, vocab_size)
+                    emission = self.emission(audio.tensor, ndarray=audio.ndarray)  # (1, T, vocab_size)
                 except Exception as e:
                     raise AlignmentError(
                         "Failed to compute acoustic features from audio",

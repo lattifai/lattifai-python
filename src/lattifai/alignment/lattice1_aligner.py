@@ -3,6 +3,7 @@
 from typing import Any, List, Optional, Tuple
 
 import colorful
+import numpy as np
 import torch
 
 from lattifai.audio2 import AudioData
@@ -41,8 +42,8 @@ class Lattice1Aligner(object):
 
         self.frame_shift = self.worker.frame_shift
 
-    def emission(self, audio: torch.Tensor) -> torch.Tensor:
-        return self.worker.emission(audio.to(self.worker.device))
+    def emission(self, audio: torch.Tensor, ndarray: Optional[np.ndarray] = None) -> torch.Tensor:
+        return self.worker.emission(audio, ndarray=ndarray)
 
     def alignment(
         self,

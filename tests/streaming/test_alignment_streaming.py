@@ -10,7 +10,6 @@ def test_alignment_config_streaming_disabled_by_default():
     config = AlignmentConfig()
     assert config.enable_streaming is False
     assert config.streaming_chunk_duration == 30.0
-    assert config.streaming_overlap_duration == 1.0
 
 
 def test_alignment_config_streaming_enabled():
@@ -24,10 +23,8 @@ def test_alignment_config_streaming_custom_parameters():
     config = AlignmentConfig(
         enable_streaming=True,
         streaming_chunk_duration=60.0,
-        streaming_overlap_duration=2.0,
     )
     assert config.streaming_chunk_duration == 60.0
-    assert config.streaming_overlap_duration == 2.0
 
 
 def test_alignment_config_streaming_chunk_duration_too_small():
@@ -48,43 +45,21 @@ def test_alignment_config_streaming_chunk_duration_too_large():
         )
 
 
-def test_alignment_config_streaming_overlap_too_small():
-    """Test validation for overlap too small."""
-    with pytest.raises(ValueError, match="streaming_overlap_duration must be between 0.5 and 5.0 seconds"):
-        AlignmentConfig(
-            enable_streaming=True,
-            streaming_overlap_duration=0.3,
-        )
-
-
-def test_alignment_config_streaming_overlap_too_large():
-    """Test validation for overlap too large."""
-    with pytest.raises(ValueError, match="streaming_overlap_duration must be between 0.5 and 5.0 seconds"):
-        AlignmentConfig(
-            enable_streaming=True,
-            streaming_overlap_duration=6.0,
-        )
-
-
 def test_alignment_config_streaming_valid_edge_cases():
     """Test valid edge cases for streaming parameters."""
-    # Minimum chunk with maximum overlap (still valid)
+    # Minimum chunk
     config1 = AlignmentConfig(
         enable_streaming=True,
         streaming_chunk_duration=10.0,  # Minimum allowed
-        streaming_overlap_duration=5.0,  # Maximum allowed, but < chunk
     )
     assert config1.streaming_chunk_duration == 10.0
-    assert config1.streaming_overlap_duration == 5.0
 
-    # Maximum chunk with minimum overlap
+    # Maximum chunk
     config2 = AlignmentConfig(
         enable_streaming=True,
         streaming_chunk_duration=120.0,  # Maximum allowed
-        streaming_overlap_duration=0.5,  # Minimum allowed
     )
     assert config2.streaming_chunk_duration == 120.0
-    assert config2.streaming_overlap_duration == 0.5
 
 
 def test_alignment_config_streaming_validation_only_when_enabled():
@@ -106,11 +81,9 @@ def test_alignment_config_streaming_with_other_parameters():
         strategy="entire",
         enable_streaming=True,
         streaming_chunk_duration=45.0,
-        streaming_overlap_duration=1.5,
     )
     assert config.enable_streaming is True
     assert config.streaming_chunk_duration == 45.0
-    assert config.streaming_overlap_duration == 1.5
     assert config.model_name == "LattifAI/Lattice-1"
     assert config.device == "cpu"
     assert config.batch_size == 2

@@ -73,12 +73,6 @@ class AlignmentConfig:
     - Larger chunks: Better alignment context, higher memory usage
     """
 
-    streaming_overlap_duration: float = 0.0
-    """Overlap (in seconds) between consecutive chunks when streaming is enabled.
-    Default: 1.0 second. Range: 0.0-5.0 seconds.
-    Overlap ensures smooth alignment at chunk boundaries and prevents timing discontinuities.
-    """
-
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
@@ -98,14 +92,4 @@ class AlignmentConfig:
             if not 10.0 <= self.streaming_chunk_duration <= 120.0:
                 raise ValueError(
                     f"streaming_chunk_duration must be between 10 and 120 seconds, got {self.streaming_chunk_duration}"
-                )
-            if not 0.5 <= self.streaming_overlap_duration <= 5.0:
-                raise ValueError(
-                    f"streaming_overlap_duration must be between 0.5 and 5.0 seconds, "
-                    f"got {self.streaming_overlap_duration}"
-                )
-            if self.streaming_overlap_duration >= self.streaming_chunk_duration:
-                raise ValueError(
-                    f"streaming_overlap_duration ({self.streaming_overlap_duration}) must be less than "
-                    f"streaming_chunk_duration ({self.streaming_chunk_duration})"
                 )
