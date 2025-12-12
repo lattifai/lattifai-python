@@ -2,7 +2,7 @@
 
 from collections import namedtuple
 from pathlib import Path
-from typing import BinaryIO, Iterable, Optional, Tuple, Union
+from typing import BinaryIO, Optional, Tuple, Union
 
 import numpy as np
 import soundfile as sf
@@ -16,10 +16,16 @@ from lattifai.errors import AudioLoadError
 ChannelSelectorType = Union[int, str]
 
 
-class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "device", "path"])):
+class AudioData(
+    namedtuple(
+        "AudioData", ["sampling_rate", "ndarray", "tensor", "device", "path", "streaming_chunk_secs", "overlap_secs"]
+    )
+):
     """Audio data container with sampling rate, numpy array, tensor, and device information.
 
     Supports iteration to stream audio chunks for processing long audio files.
+    The streaming_chunk_secs field indicates whether streaming mode should be used downstream.
+    The overlap_secs field specifies the overlap duration between consecutive chunks.
     """
 
     def __str__(self) -> str:
@@ -34,70 +40,32 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "
         """Initialize iterator for chunk-based audio streaming.
 
         Returns an iterator that yields audio chunks as AudioData instances.
-        Default chunk size is 30 seconds with 1 second overlap for alignment accuracy.
+        Uses streaming_chunk_secs and overlap_secs from the instance.
         """
-        self._chunk_duration = 30.0  # seconds
-        self._overlap_duration = 1.0  # seconds
-        self._current_offset = 0  # samples
-        self._chunk_size = int(self._chunk_duration * self.sampling_rate)
-        self._overlap_size = int(self._overlap_duration * self.sampling_rate)
-        self._step_size = self._chunk_size - self._overlap_size
-        self._total_samples = self.ndarray.shape[-1]
-        return self
-
-    def __next__(self):
-        """Get the next audio chunk.
-
-        Returns:
-            AudioData: Chunk of audio data with the same sampling rate.
-
-        Raises:
-            StopIteration: When all audio has been processed.
-        """
-        if self._current_offset >= self._total_samples:
-            raise StopIteration
-
-        # Calculate chunk boundaries
-        start = self._current_offset
-        end = min(start + self._chunk_size, self._total_samples)
-
-        # Extract chunk from ndarray and tensor
-        chunk_ndarray = self.ndarray[..., start:end]
-        chunk_tensor = self.tensor[..., start:end]
-
-        # Create new AudioData for this chunk
-        chunk = AudioData(
-            sampling_rate=self.sampling_rate,
-            ndarray=chunk_ndarray,
-            tensor=chunk_tensor,
-            device=self.device,
-            path=f"{self.path}[{start/self.sampling_rate:.2f}s-{end/self.sampling_rate:.2f}s]",
-        )
-
-        # Move to next chunk position (with overlap consideration)
-        self._current_offset += self._step_size
-
-        return chunk
+        return self.iter_chunks()
 
     def iter_chunks(
         self,
-        chunk_duration: float = 30.0,
-        overlap_duration: float = 0.0,
+        chunk_secs: Optional[float] = None,
+        overlap_secs: Optional[float] = None,
     ):
         """Iterate over audio chunks with configurable duration and overlap.
 
         Args:
-            chunk_duration: Duration of each chunk in seconds (default: 30.0).
-            overlap_duration: Overlap between consecutive chunks in seconds (default: 0.0).
+            chunk_secs: Duration of each chunk in seconds (default: uses streaming_chunk_secs or 600.0).
+            overlap_secs: Overlap between consecutive chunks in seconds (default: uses overlap_secs or 0.0).
 
         Yields:
             AudioData: Chunks of audio data.
 
         Example:
             >>> audio = loader("long_audio.wav")
-            >>> for chunk in audio.iter_chunks(chunk_duration=60.0, overlap_duration=2.0):
+            >>> for chunk in audio.iter_chunks(chunk_secs=60.0, overlap_secs=2.0):
             ...     process(chunk)
         """
+        chunk_duration = chunk_secs or self.streaming_chunk_secs or 600.0
+        overlap_duration = overlap_secs or self.overlap_secs or 0.0
+
         chunk_size = int(chunk_duration * self.sampling_rate)
         overlap_size = int(overlap_duration * self.sampling_rate)
         step_size = chunk_size - overlap_size
@@ -108,7 +76,7 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "
             start = current_offset
             end = min(start + chunk_size, total_samples)
 
-            # Extract chunk
+            # Extract chunk from ndarray and tensor
             chunk_ndarray = self.ndarray[..., start:end]
             chunk_tensor = self.tensor[..., start:end]
 
@@ -118,6 +86,8 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "tensor", "
                 tensor=chunk_tensor,
                 device=self.device,
                 path=f"{self.path}[{start/self.sampling_rate:.2f}s-{end/self.sampling_rate:.2f}s]",
+                streaming_chunk_secs=None,
+                overlap_secs=None,
             )
 
             current_offset += step_size
@@ -282,15 +252,17 @@ class AudioLoader:
         audio: Union[Pathlike, BinaryIO],
         sampling_rate: int = 16000,
         channel_selector: Optional[ChannelSelectorType] = "average",
+        streaming_chunk_secs: Optional[float] = None,
     ) -> AudioData:
         """
         Args:
             audio: Path to audio file or binary stream.
             channel_selector: How to select channels (default: "average").
             sampling_rate: Target sampling rate (default: use instance sampling_rate).
+            streaming_chunk_secs: Duration in seconds for streaming chunks (default: None, disabled).
 
         Returns:
-            AudioData namedtuple with sampling_rate, ndarray, and tensor fields.
+            AudioData namedtuple with sampling_rate, ndarray, tensor, and streaming_chunk_secs fields.
         """
         tensor = self._load_audio(audio, sampling_rate, channel_selector)
 
@@ -303,4 +275,6 @@ class AudioLoader:
             tensor=tensor,
             device=self.device,
             path=str(audio) if isinstance(audio, Pathlike) else "<BinaryIO>",
+            streaming_chunk_secs=streaming_chunk_secs,
+            overlap_secs=0.0,
         )

@@ -91,6 +91,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         input_caption_format: Optional[InputCaptionFormat] = None,
         split_sentence: Optional[bool] = None,
         channel_selector: Optional[str | int] = "average",
+        streaming_chunk_secs: Optional[float] = None,
     ) -> Caption:
         try:
             # Step 1: Get caption
@@ -100,6 +101,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 media_audio = self.audio_loader(
                     input_media,
                     channel_selector=channel_selector,
+                    streaming_chunk_secs=streaming_chunk_secs,
                 )
 
             if not input_caption:
@@ -436,6 +438,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         split_sentence: Optional[bool] = None,
         use_transcription: bool = False,
         channel_selector: Optional[str | int] = "average",
+        streaming_chunk_secs: Optional[float] = None,
     ) -> Caption:
         # Prepare output directory and media format
         output_dir = self._prepare_youtube_output_dir(output_dir)
@@ -471,6 +474,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             output_caption_path=output_caption_path,
             split_sentence=split_sentence,
             channel_selector=channel_selector,
+            streaming_chunk_secs=streaming_chunk_secs,
         )
 
         return caption

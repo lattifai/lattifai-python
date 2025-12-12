@@ -23,6 +23,8 @@ def test_audio_data_iter_default():
         tensor=tensor,
         device="cpu",
         path="test_audio.wav",
+        streaming_chunk_secs=30.0,  # Use 30s chunks for this test
+        overlap_secs=0.0,
     )
 
     # Iterate over chunks
@@ -63,10 +65,12 @@ def test_audio_data_iter_chunks_custom():
         tensor=tensor,
         device="cpu",
         path="test_audio.wav",
+        streaming_chunk_secs=None,
+        overlap_secs=0.0,
     )
 
     # Use 20s chunks with 2s overlap
-    chunks = list(audio.iter_chunks(chunk_duration=20.0, overlap_duration=2.0))
+    chunks = list(audio.iter_chunks(chunk_secs=20.0, overlap_secs=2.0))
 
     # Step size: 18s
     # Expected: ceil((100 - 20) / 18) + 1 = ceil(80/18) + 1 = 5 + 1 = 6
@@ -98,6 +102,8 @@ def test_audio_data_iter_short_audio():
         tensor=tensor,
         device="cpu",
         path="short_audio.wav",
+        streaming_chunk_secs=None,
+        overlap_secs=0.0,
     )
 
     chunks = list(audio)
@@ -122,10 +128,12 @@ def test_audio_data_iter_chunks_no_overlap():
         tensor=tensor,
         device="cpu",
         path="test_audio.wav",
+        streaming_chunk_secs=None,
+        overlap_secs=0.0,
     )
 
     # Use 20s chunks with no overlap
-    chunks = list(audio.iter_chunks(chunk_duration=20.0, overlap_duration=0.0))
+    chunks = list(audio.iter_chunks(chunk_secs=20.0, overlap_secs=0.0))
 
     # Expected: 60 / 20 = 3 chunks
     assert len(chunks) == 3
@@ -151,6 +159,8 @@ def test_audio_data_iter_multiple_iterations():
         tensor=tensor,
         device="cpu",
         path="test_audio.wav",
+        streaming_chunk_secs=None,
+        overlap_secs=0.0,
     )
 
     # First iteration
@@ -183,6 +193,8 @@ def test_audio_data_chunk_path_naming():
         tensor=tensor,
         device="cpu",
         path="test.wav",
+        streaming_chunk_secs=None,
+        overlap_secs=0.0,
     )
 
     chunks = list(audio)

@@ -17,7 +17,6 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 
 > **⚠️ Note on Current Limitations**:
 > 1. **Memory Usage**: We are aware of high memory consumption and are actively working on further optimizations.
-> 2. **Long Audio**: Currently, long audio files might face issues. Support for **long-form audio (up to 20 hours)** will be available shortly.
 
 ## Table of Contents
 
@@ -519,6 +518,56 @@ from lattifai import (
 ---
 
 ## Advanced Features
+
+### Long-Form Audio Support
+
+LattifAI now supports processing long audio files (up to 20 hours) through streaming mode. Enable streaming by setting the `streaming_chunk_secs` parameter:
+
+**Python SDK:**
+```python
+from lattifai import LattifAI
+
+client = LattifAI()
+
+# Enable streaming for long audio files
+caption = client.alignment(
+    input_media="long_audio.wav",
+    input_caption="subtitle.srt",
+    output_caption_path="output.srt",
+    streaming_chunk_secs=600.0,  # Process in 30-second chunks
+)
+```
+
+**CLI:**
+```bash
+# Enable streaming with chunk size
+lai alignment align long_audio.wav subtitle.srt output.srt \
+    media.streaming_chunk_secs=300.0
+
+# For YouTube videos
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID" \
+    media.streaming_chunk_secs=300.0
+```
+
+**MediaConfig:**
+```python
+from lattifai import LattifAI, MediaConfig
+
+client = LattifAI(
+    media_config=MediaConfig(
+        streaming_chunk_secs=600.0,  # Chunk duration in seconds (1-1800), default: 600 (10 minutes)
+    )
+)
+```
+
+**Notes:**
+- Chunk duration must be between 1 and 1800 seconds (minimum 1 second, maximum 30 minutes)
+- Default value: 600 seconds (10 minutes)
+- **Recommended: Use 60 seconds or larger for optimal performance**
+- Set to `None` to disable streaming
+- **Thanks to our precise implementation, streaming has virtually no impact on alignment accuracy**
+- Smaller chunks reduce memory usage with minimal quality trade-off
+- Recommended chunk size: 300-900 seconds (5-15 minutes) for optimal balance
 
 ### Word-Level Alignment
 

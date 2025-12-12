@@ -423,4 +423,5 @@ def process_alignment(
             input_caption=str(caption_path) if caption_path else None,
             output_caption_path=str(output_caption_path) if output_caption_path else None,
             split_sentence=split_sentence,
+            streaming_chunk_secs=None,  # Server API default: no streaming
         )

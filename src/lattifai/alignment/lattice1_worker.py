@@ -140,8 +140,6 @@ class Lattice1Worker:
         lattice_graph: Tuple[str, int, float],
         emission: Optional[torch.Tensor] = None,
         offset: float = 0.0,
-        streaming: bool = False,
-        chunk_duration: float = 30.0,
     ) -> Dict[str, Any]:
         """Process audio with LatticeGraph.
 
@@ -151,7 +149,6 @@ class Lattice1Worker:
             emission: Pre-computed emission tensor (ignored if streaming=True)
             offset: Time offset for the audio
             streaming: If True, use streaming mode for memory-efficient processing
-            chunk_duration: Duration of each chunk in seconds (only for streaming)
 
         Returns:
             Processed LatticeGraph
@@ -195,14 +192,14 @@ class Lattice1Worker:
 
         _start = time.time()
 
-        if emission is None and streaming:
+        if emission is None and audio.streaming_chunk_secs:
             # Streaming mode: pass emission iterator to align_segments
             # The align_segments function will automatically detect the iterator
             # and use k2.OnlineDenseIntersecter for memory-efficient processing
 
             def emission_iterator():
                 """Generate emissions for each audio chunk."""
-                for chunk in audio.iter_chunks(chunk_duration, 0.0):
+                for chunk in audio.iter_chunks():
                     chunk_emission = self.emission(chunk.tensor, ndarray=chunk.ndarray)
                     yield (chunk_emission.to(device) * acoustic_scale)
 

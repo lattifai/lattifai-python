@@ -5,6 +5,8 @@ max-line-length = 120
 per-file-ignores =
   src/lattifai/client.py: F841, E501, W503
   src/lattifai/*.py: E402, F401
+  src/lattifai/config/media.py: E501
+  src/lattifai/audio2.py: E226
   src/lattifai/bin/*.py: W503, F541, E501, F541, F811
   src/lattifai/workflow/*.py: W503
   src/lattifai/server/app.py: E501
