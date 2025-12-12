@@ -466,7 +466,7 @@ class LatticeTokenizer:
 
         alignments = [Supervision.from_dict(s) for s in result["supervisions"]]
 
-        if return_details:
+        if emission is not None and return_details:
             # Add emission confidence scores for segments and word-level alignments
             _add_confidence_scores(alignments, emission, labels[0], frame_shift, offset)
 

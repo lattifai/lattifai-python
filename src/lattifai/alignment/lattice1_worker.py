@@ -109,13 +109,13 @@ class Lattice1Worker:
                 ndarray = np.pad(ndarray, ((0, 0), (0, 320 - ndarray.shape[1])), mode="constant")
 
             CHUNK_SIZE = 60 * 16000  # 60 seconds
-            if ndarray.size[1] > CHUNK_SIZE:
+            if ndarray.shape[1] > CHUNK_SIZE:
                 emissions = []
-                for start in range(0, ndarray.size[1], CHUNK_SIZE):
+                for start in range(0, ndarray.shape[1], CHUNK_SIZE):
                     emission = self.acoustic_ort.run(
                         None,
                         {
-                            "audios": audio[:, start : start + CHUNK_SIZE],
+                            "audios": ndarray[:, start : start + CHUNK_SIZE],
                         },
                     )  # (1, T, vocab_size) numpy
                     emissions.append(emission[0])
@@ -126,7 +126,7 @@ class Lattice1Worker:
                 emission = self.acoustic_ort.run(
                     None,
                     {
-                        "audios": audio,
+                        "audios": ndarray,
                     },
                 )  # (1, T, vocab_size) numpy
                 emission = torch.from_numpy(emission[0]).to(self.device)
@@ -226,14 +226,7 @@ class Lattice1Worker:
         else:
             # Batch mode: compute full emission tensor and pass to align_segments
             if emission is None:
-                try:
-                    emission = self.emission(audio.tensor, ndarray=audio.ndarray)  # (1, T, vocab_size)
-                except Exception as e:
-                    raise AlignmentError(
-                        "Failed to compute acoustic features from audio",
-                        media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
-                        context={"original_error": str(e)},
-                    )
+                emission = self.emission(audio.tensor, ndarray=audio.ndarray)  # (1, T, vocab_size)
 
             try:
                 results, labels = align_segments(
