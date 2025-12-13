@@ -1,4 +1,4 @@
-name: test
+name: test_uv
 permissions:
   contents: read
 
