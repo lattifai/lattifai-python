@@ -192,7 +192,7 @@ class Lattice1Worker:
 
         _start = time.time()
 
-        if emission is None and audio.streaming_chunk_secs:
+        if emission is None and audio.streaming_mode:
             # Streaming mode: pass emission iterator to align_segments
             # The align_segments function will automatically detect the iterator
             # and use k2.OnlineDenseIntersecter for memory-efficient processing

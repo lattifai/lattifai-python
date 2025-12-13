@@ -1,6 +1,16 @@
+import os
 import sys
 import warnings
 from importlib.metadata import version
+
+# Suppress SWIG deprecation warnings before any imports
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=".*SwigPy.*")
+
+# Suppress PyTorch transformer nested tensor warning
+warnings.filterwarnings("ignore", category=UserWarning, message=".*enable_nested_tensor.*")
+
+# Disable tokenizers parallelism warning
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # Re-export I/O classes
 from .caption import Caption

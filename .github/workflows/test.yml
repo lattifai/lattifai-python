@@ -59,6 +59,7 @@ jobs:
           pip install -e ".[test]"  # Install with test dependencies including pytest-asyncio
           python tests/test_basic.py  # Run basic tests
           pytest tests/caption/test_text_parser.py -v
+          pytest ./tests/streaming
           bash tests/test_audio_formats.sh  # Run audio format tests
 
       - name: Test Cli Commands

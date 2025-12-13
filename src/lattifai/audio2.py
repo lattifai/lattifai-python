@@ -36,6 +36,13 @@ class AudioData(
         """Duration of the audio in seconds."""
         return self.ndarray.shape[-1] / self.sampling_rate
 
+    @property
+    def streaming_mode(self) -> bool:
+        """Indicates whether streaming mode is enabled based on streaming_chunk_secs."""
+        if self.streaming_chunk_secs is not None:
+            return self.duration > self.streaming_chunk_secs * 1.1
+        return False
+
     def __iter__(self):
         """Initialize iterator for chunk-based audio streaming.
 
