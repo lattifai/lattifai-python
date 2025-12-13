@@ -58,6 +58,27 @@ class AlignmentConfig:
     Default: 4.0 seconds. Useful for detecting scene changes or natural breaks in content.
     """
 
+    # Beam search parameters for forced alignment
+    search_beam: int = 200
+    """Search beam size for beam search decoding. Larger values explore more hypotheses but are slower.
+    Default: 200. Typical range: 20-500.
+    """
+
+    output_beam: int = 80
+    """Output beam size for keeping top hypotheses. Should be smaller than search_beam.
+    Default: 80. Typical range: 10-200.
+    """
+
+    min_active_states: int = 400
+    """Minimum number of active states during decoding. Controls memory and search space.
+    Default: 400. Typical range: 30-1000.
+    """
+
+    max_active_states: int = 10000
+    """Maximum number of active states during decoding. Prevents excessive memory usage.
+    Default: 10000. Typical range: 1000-20000.
+    """
+
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 

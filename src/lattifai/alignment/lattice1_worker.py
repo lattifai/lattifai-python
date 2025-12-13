@@ -17,11 +17,16 @@ from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
 class Lattice1Worker:
     """Worker for processing audio with LatticeGraph."""
 
-    def __init__(self, model_path: Pathlike, device: str = "cpu", num_threads: int = 8) -> None:
+    def __init__(
+        self, model_path: Pathlike, device: str = "cpu", num_threads: int = 8, config: Optional[Any] = None
+    ) -> None:
         try:
-            self.config = json.load(open(f"{model_path}/config.json"))
+            self.model_config = json.load(open(f"{model_path}/config.json"))
         except Exception as e:
             raise ModelLoadError(f"config from {model_path}", original_error=e)
+
+        # Store alignment config with beam search parameters
+        self.alignment_config = config
 
         # SessionOptions
         sess_options = ort.SessionOptions()
@@ -75,7 +80,7 @@ class Lattice1Worker:
         return 0.02  # 20 ms
 
     @torch.inference_mode()
-    def emission(self, ndarray: np.ndarray) -> torch.Tensor:
+    def emission(self, ndarray: np.ndarray, acoustic_scale: float = 1.0, device: Optional[str] = None) -> torch.Tensor:
         """Generate emission probabilities from audio ndarray.
 
         Args:
@@ -102,15 +107,16 @@ class Lattice1Worker:
                     emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
                     emissions.append(emission)
                 emission = torch.cat(
-                    [torch.from_numpy(emission).to(self.device) for emission in emissions], dim=1
+                    [torch.from_numpy(emission).to(device or self.device) for emission in emissions], dim=1
                 )  # (1, T, vocab_size)
+                del emissions
             else:
                 ort_inputs = {
                     "features": features.cpu().numpy(),
                     "feature_lengths": np.array([features.size(1)], dtype=np.int64),
                 }
                 emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
-                emission = torch.from_numpy(emission).to(self.device)
+                emission = torch.from_numpy(emission).to(device or self.device)
         else:
             if ndarray.shape[1] < 160:
                 ndarray = np.pad(ndarray, ((0, 0), (0, 320 - ndarray.shape[1])), mode="constant")
@@ -127,8 +133,9 @@ class Lattice1Worker:
                     )  # (1, T, vocab_size) numpy
                     emissions.append(emission[0])
                 emission = torch.cat(
-                    [torch.from_numpy(emission).to(self.device) for emission in emissions], dim=1
+                    [torch.from_numpy(emission).to(device or self.device) for emission in emissions], dim=1
                 )  # (1, T, vocab_size)
+                del emissions
             else:
                 emission = self.acoustic_ort.run(
                     None,
@@ -136,7 +143,10 @@ class Lattice1Worker:
                         "audios": ndarray,
                     },
                 )  # (1, T, vocab_size) numpy
-                emission = torch.from_numpy(emission[0]).to(self.device)
+                emission = torch.from_numpy(emission[0]).to(device or self.device)
+
+        if acoustic_scale != 1.0:
+            emission = emission.mul_(acoustic_scale)
 
         self.timings["emission"] += time.time() - _start
         return emission  # (1, T, vocab_size) torch
@@ -199,6 +209,12 @@ class Lattice1Worker:
 
         _start = time.time()
 
+        # Get beam search parameters from config or use defaults
+        search_beam = self.alignment_config.search_beam or 200
+        output_beam = self.alignment_config.output_beam or 80
+        min_active_states = self.alignment_config.min_active_states or 400
+        max_active_states = self.alignment_config.max_active_states or 10000
+
         if emission is None and audio.streaming_mode:
             # Streaming mode: pass emission iterator to align_segments
             # The align_segments function will automatically detect the iterator
@@ -207,8 +223,8 @@ class Lattice1Worker:
             def emission_iterator():
                 """Generate emissions for each audio chunk."""
                 for chunk in audio.iter_chunks():
-                    chunk_emission = self.emission(chunk.ndarray)
-                    yield (chunk_emission.to(device) * acoustic_scale)
+                    chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale, device=device)
+                    yield chunk_emission
 
             # Calculate total frames for supervision_segments
             total_frames = int(audio.duration / self.frame_shift)
@@ -217,10 +233,10 @@ class Lattice1Worker:
                 emission_iterator(),  # Pass iterator for streaming
                 decoding_graph.to(device),
                 torch.tensor([total_frames], dtype=torch.int32),
-                search_beam=200,
-                output_beam=80,
-                min_active_states=400,
-                max_active_states=10000,
+                search_beam=search_beam,
+                output_beam=output_beam,
+                min_active_states=min_active_states,
+                max_active_states=max_active_states,
                 subsampling_factor=1,
                 reject_low_confidence=False,
             )
@@ -230,26 +246,23 @@ class Lattice1Worker:
         else:
             # Batch mode: compute full emission tensor and pass to align_segments
             if emission is None:
-                emission = self.emission(audio.ndarray)  # (1, T, vocab_size)
+                emission = self.emission(
+                    audio.ndarray, acoustic_scale=acoustic_scale, device=device
+                )  # (1, T, vocab_size)
+            else:
+                emission = emission.to(device) * acoustic_scale
 
-            try:
-                results, labels = align_segments(
-                    emission.to(device) * acoustic_scale,
-                    decoding_graph.to(device),
-                    torch.tensor([emission.shape[1]], dtype=torch.int32),
-                    search_beam=200,
-                    output_beam=80,
-                    min_active_states=400,
-                    max_active_states=10000,
-                    subsampling_factor=1,
-                    reject_low_confidence=False,
-                )
-            except Exception as e:
-                raise AlignmentError(
-                    "Failed to perform forced alignment",
-                    media_path=str(audio) if not isinstance(audio, torch.Tensor) else "tensor",
-                    context={"original_error": str(e), "emission_shape": list(emission.shape), "device": str(device)},
-                )
+            results, labels = align_segments(
+                emission,
+                decoding_graph.to(device),
+                torch.tensor([emission.shape[1]], dtype=torch.int32),
+                search_beam=search_beam,
+                output_beam=output_beam,
+                min_active_states=min_active_states,
+                max_active_states=max_active_states,
+                subsampling_factor=1,
+                reject_low_confidence=False,
+            )
 
             emission_result = emission
 
@@ -259,9 +272,9 @@ class Lattice1Worker:
         return emission_result, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
 
 
-def _load_worker(model_path: str, device: str) -> Lattice1Worker:
+def _load_worker(model_path: str, device: str, config: Optional[Any] = None) -> Lattice1Worker:
     """Instantiate lattice worker with consistent error handling."""
     try:
-        return Lattice1Worker(model_path, device=device, num_threads=8)
+        return Lattice1Worker(model_path, device=device, num_threads=8, config=config)
     except Exception as e:
         raise ModelLoadError(f"worker from {model_path}", original_error=e)
