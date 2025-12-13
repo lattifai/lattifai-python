@@ -407,8 +407,14 @@ class LattifAIClientMixin:
 
             if "gemini" in self.transcriber.name.lower():
                 # write to temp file and use Caption read
-                with tempfile.NamedTemporaryFile(suffix=self.transcriber.file_suffix, delete=True) as tmp_file:
-                    tmp_path = Path(tmp_file.name)
+                # On Windows, we need to close the file before writing to it
+                tmp_file = tempfile.NamedTemporaryFile(
+                    suffix=self.transcriber.file_suffix, delete=False, mode="w", encoding="utf-8"
+                )
+                tmp_path = Path(tmp_file.name)
+                tmp_file.close()  # Close file before writing
+
+                try:
                     await asyncio.to_thread(
                         self.transcriber.write,
                         transcription,
@@ -418,6 +424,10 @@ class LattifAIClientMixin:
                     transcription = self._read_caption(
                         tmp_path, input_caption_format="gemini", normalize_text=False, verbose=False
                     )
+                finally:
+                    # Clean up temp file
+                    if tmp_path.exists():
+                        tmp_path.unlink()
 
             return transcription
 
