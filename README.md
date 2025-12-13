@@ -364,6 +364,8 @@ lai transcribe align \
 
 ```bash
 lai caption convert input.srt output.vtt
+lai caption convert input.srt output.json
+# Enable normalization to clean HTML entities and special characters:
 lai caption convert input.srt output.json normalize_text=true
 ```
 
@@ -454,10 +456,10 @@ from lattifai import LattifAI, CaptionConfig
 
 client = LattifAI(
     caption_config=CaptionConfig(
-        split_sentence=True,           # Smart sentence splitting
-        word_level=True,               # Word-level timestamps
-        normalize_text=True,           # Clean HTML entities
-        include_speaker_in_text=False, # Include speaker labels
+        split_sentence=True,           # Smart sentence splitting (default: False)
+        word_level=True,               # Word-level timestamps (default: False)
+        normalize_text=True,           # Clean HTML entities (default: True)
+        include_speaker_in_text=False, # Include speaker labels (default: True)
     )
 )
 ```

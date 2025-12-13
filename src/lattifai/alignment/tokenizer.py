@@ -335,7 +335,9 @@ class LatticeTokenizer:
                 flush_segment(s, None)
 
         assert len(speakers) == len(texts), f"len(speakers)={len(speakers)} != len(texts)={len(texts)}"
-        sentences = self.sentence_splitter.split(texts, threshold=0.15, strip_whitespace=strip_whitespace)
+        sentences = self.sentence_splitter.split(
+            texts, threshold=0.15, strip_whitespace=strip_whitespace, batch_size=16
+        )
 
         supervisions, remainder = [], ""
         for k, (_speaker, _sentences) in enumerate(zip(speakers, sentences)):
@@ -450,7 +452,7 @@ class LatticeTokenizer:
                 "destroy_lattice": True,
             },
         )
-        if response.status_code == 422:
+        if response.status_code == 400:
             raise LatticeDecodingError(
                 lattice_id,
                 original_error=Exception(LATTICE_DECODING_FAILURE_HELP),

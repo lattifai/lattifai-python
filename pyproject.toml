@@ -31,7 +31,7 @@ dependencies = [
     "msgpack",
     "g2p-phonemizer>=0.4.0",
     "av",
-    "wtpsplit>=2.1.6",
+    "wtpsplit>=2.1.7",
     # transcription
     "kaldi-native-fbank",
     "OmniSenseVoice>=0.4.0",

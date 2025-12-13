@@ -96,7 +96,9 @@ class Lattice1Aligner(object):
                 print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
                 if audio.streaming_chunk_secs:
                     print(
-                        colorful.yellow(f"         ⚡ Using streaming mode with {audio.streaming_chunk_secs}s chunks")
+                        colorful.yellow(
+                            f"         ⚡Using streaming mode with {audio.streaming_chunk_secs}s (chunk duration)"
+                        )
                     )
             try:
                 lattice_results = self.worker.alignment(

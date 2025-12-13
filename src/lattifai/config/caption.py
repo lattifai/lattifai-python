@@ -48,7 +48,7 @@ class CaptionConfig:
     include_speaker_in_text: bool = True
     """Preserve speaker labels in caption text content."""
 
-    normalize_text: bool = False
+    normalize_text: bool = True
     """Clean HTML entities and normalize whitespace in caption text."""
 
     split_sentence: bool = False

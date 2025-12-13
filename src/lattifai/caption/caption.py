@@ -307,7 +307,7 @@ class Caption:
         cls,
         path: Pathlike,
         format: Optional[str] = None,
-        normalize_text: bool = False,
+        normalize_text: bool = True,
     ) -> "Caption":
         """
         Read caption file and return Caption object.

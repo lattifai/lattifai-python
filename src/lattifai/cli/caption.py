@@ -63,7 +63,6 @@ def convert(
 def normalize(
     input_path: Pathlike,
     output_path: Pathlike,
-    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
 ):
     """
     Normalize caption text by cleaning HTML entities and whitespace.
@@ -81,9 +80,6 @@ def normalize(
     Args:
         input_path: Path to input caption file to normalize
         output_path: Path to output caption file (defaults to overwriting input file)
-        caption: Caption configuration for text normalization.
-            Fields: input_format, output_format, normalize_text (automatically enabled),
-                    encoding
 
     Examples:
         # Normalize and save to new file (positional arguments)
@@ -92,13 +88,9 @@ def normalize(
         # Normalize with format conversion
         lai caption normalize input.vtt output.srt
 
-        # Normalize with custom caption config
-        lai caption normalize input.srt output.srt \\
-            caption.encoding=utf-8
-
         # Using keyword arguments (traditional syntax)
-        lai caption normalize \\
-            input_path=input.srt \\
+        lai caption normalize \
+            input_path=input.srt \
             output_path=output.srt
     """
     from pathlib import Path
@@ -124,7 +116,6 @@ def shift(
     input_path: Pathlike,
     output_path: Pathlike,
     seconds: float,
-    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
 ):
     """
     Shift caption timestamps by a specified number of seconds.
@@ -140,8 +131,6 @@ def shift(
         output_path: Path to output caption file (can be same as input for in-place modification)
         seconds: Number of seconds to shift timestamps. Positive values delay captions,
                  negative values advance them earlier.
-        caption: Caption configuration for reading/writing.
-            Fields: input_format, output_format, encoding
 
     Examples:
         # Delay captions by 2 seconds (positional arguments)

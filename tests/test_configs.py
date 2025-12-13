@@ -126,7 +126,7 @@ class TestCaptionConfig:
         config = CaptionConfig()
         assert config.input_format == "auto"
         assert config.output_format == "srt"
-        assert config.normalize_text is False
+        assert config.normalize_text is True
         assert config.output_path is None
         assert config.include_speaker_in_text is True
         assert config.encoding == "utf-8"

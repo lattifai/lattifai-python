@@ -117,7 +117,7 @@ class TestCaptionConfigDefaults:
         assert config.input_format == "auto"
         assert config.output_format == "srt"
         assert config.include_speaker_in_text is True
-        assert config.normalize_text is False
+        assert config.normalize_text is True
         assert config.split_sentence is False
         assert config.word_level is False
         assert config.encoding == "utf-8"
