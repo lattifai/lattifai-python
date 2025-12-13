@@ -132,6 +132,7 @@ class Lattice1Worker:
                         },
                     )  # (1, T, vocab_size) numpy
                     emissions.append(emission[0])
+
                 emission = torch.cat(
                     [torch.from_numpy(emission).to(device or self.device) for emission in emissions], dim=1
                 )  # (1, T, vocab_size)
