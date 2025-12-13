@@ -3,6 +3,7 @@
 from typing import Any, List, Optional, Tuple
 
 import colorful
+import numpy as np
 import torch
 
 from lattifai.audio2 import AudioData
@@ -13,7 +14,7 @@ from lattifai.errors import (
     LatticeDecodingError,
     LatticeEncodingError,
 )
-from lattifai.utils import _resolve_model_path
+from lattifai.utils import _resolve_model_path, safe_print
 
 from .lattice1_worker import _load_worker
 from .tokenizer import _load_tokenizer
@@ -37,12 +38,20 @@ class Lattice1Aligner(object):
         model_path = _resolve_model_path(config.model_name)
 
         self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.model_name, config.device)
-        self.worker = _load_worker(model_path, config.device)
+        self.worker = _load_worker(model_path, config.device, config)
 
         self.frame_shift = self.worker.frame_shift
 
-    def emission(self, audio: torch.Tensor) -> torch.Tensor:
-        return self.worker.emission(audio.to(self.worker.device))
+    def emission(self, ndarray: np.ndarray) -> torch.Tensor:
+        """Generate emission probabilities from audio ndarray.
+
+        Args:
+            ndarray: Audio data as numpy array of shape (1, T) or (C, T)
+
+        Returns:
+            Emission tensor of shape (1, T, vocab_size)
+        """
+        return self.worker.emission(ndarray)
 
     def alignment(
         self,
@@ -72,23 +81,34 @@ class Lattice1Aligner(object):
         """
         try:
             if verbose:
-                print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
+                safe_print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
             try:
                 supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
                     supervisions, split_sentence=split_sentence
                 )
                 if verbose:
-                    print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
+                    safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
             except Exception as e:
                 text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
                 raise LatticeEncodingError(text_content, original_error=e)
 
             if verbose:
-                print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
+                safe_print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
+                if audio.streaming_chunk_secs:
+                    safe_print(
+                        colorful.yellow(
+                            f"         ⚡Using streaming mode with {audio.streaming_chunk_secs}s (chunk duration)"
+                        )
+                    )
             try:
-                lattice_results = self.worker.alignment(audio, lattice_graph, emission=emission, offset=offset)
+                lattice_results = self.worker.alignment(
+                    audio,
+                    lattice_graph,
+                    emission=emission,
+                    offset=offset,
+                )
                 if verbose:
-                    print(colorful.green("         ✓ Lattice search completed"))
+                    safe_print(colorful.green("         ✓ Lattice search completed"))
             except Exception as e:
                 raise AlignmentError(
                     f"Audio alignment failed for {audio}",
@@ -97,18 +117,18 @@ class Lattice1Aligner(object):
                 )
 
             if verbose:
-                print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
+                safe_print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
             try:
                 alignments = self.tokenizer.detokenize(
                     lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
                 )
                 if verbose:
-                    print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
+                    safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
             except LatticeDecodingError as e:
-                print(colorful.red("         x Failed to decode lattice alignment results"))
+                safe_print(colorful.red("         x Failed to decode lattice alignment results"))
                 raise e
             except Exception as e:
-                print(colorful.red("         x Failed to decode lattice alignment results"))
+                safe_print(colorful.red("         x Failed to decode lattice alignment results"))
                 raise LatticeDecodingError(lattice_id, original_error=e)
 
             return (supervisions, alignments)

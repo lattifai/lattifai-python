@@ -1,11 +1,48 @@
 """Shared utility helpers for the LattifAI SDK."""
 
 import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional, Type
 
 from lattifai.errors import ModelLoadError
+
+
+def safe_print(text: str, **kwargs) -> None:
+    """
+    Safely print text with Unicode characters, handling Windows encoding issues.
+
+    On Windows, the default console encoding (cp1252) can't handle many Unicode
+    characters like emojis. This function ensures text is printed correctly by
+    using UTF-8 encoding when necessary.
+
+    Args:
+        text: The text to print, may contain Unicode/emoji characters
+        **kwargs: Additional arguments passed to print()
+    """
+    try:
+        print(text, **kwargs)
+    except UnicodeEncodeError:
+        # On Windows, try to reconfigure stdout to use UTF-8
+        if sys.platform == "win32":
+            try:
+                # Try to encode with UTF-8 and print
+                if hasattr(sys.stdout, "buffer"):
+                    sys.stdout.buffer.write((text + "\n").encode("utf-8"))
+                    sys.stdout.flush()
+                else:
+                    # Fallback: replace problematic characters
+                    print(text.encode(sys.stdout.encoding, errors="replace").decode(sys.stdout.encoding), **kwargs)
+            except Exception:
+                # Last resort: remove emojis
+                import re
+
+                text_no_emoji = re.sub(r"[^\x00-\x7F\u4e00-\u9fff]+", "", text)
+                print(text_no_emoji, **kwargs)
+        else:
+            # Non-Windows: this shouldn't happen, but fallback gracefully
+            print(text.encode("utf-8", errors="replace").decode("utf-8"), **kwargs)
 
 
 def _get_cache_marker_path(cache_dir: Path) -> Path:

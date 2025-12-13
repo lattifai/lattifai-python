@@ -52,11 +52,22 @@ class MediaConfig:
     sample_rate: Optional[int] = None
     """Audio sample rate in Hz (e.g., 16000, 44100)."""
 
-    channels: Optional[int] = None
-    """Number of audio channels (1=mono, 2=stereo)."""
-
     channel_selector: Optional[str | int] = "average"
     """Audio channel selection strategy: 'average', 'left', 'right', or channel index."""
+
+    # Audio Streaming Configuration
+    streaming_chunk_secs: Optional[float] = 600.0
+    """Duration in seconds of each audio chunk for streaming mode.
+    When set to a value (e.g., 600.0), enables streaming mode for processing very long audio files (>1 hour).
+    Audio is processed in chunks to keep memory usage low (<4GB peak), suitable for 20+ hour files.
+    When None, disables streaming and loads entire audio into memory.
+    Valid range: 1-1800 seconds (minimum 1 second, maximum 30 minutes).
+    Default: 600 seconds (10 minutes).
+    Recommended: Use 60 seconds or larger for optimal performance.
+    - Smaller chunks: Lower memory usage, more frequent I/O
+    - Larger chunks: Better alignment context, higher memory usage
+    Note: Streaming may add slight processing overhead but enables handling arbitrarily long files.
+    """
 
     # Output / download configuration
     output_dir: Path = field(default_factory=lambda: Path.cwd())
@@ -87,11 +98,20 @@ class MediaConfig:
         self._normalize_media_format()
         self._process_input_path()
         self._process_output_path()
+        self._validate_streaming_config()
 
     def _setup_output_directory(self) -> None:
         """Ensure output directory exists and is valid."""
         resolved_output_dir = self._ensure_dir(self.output_dir)
         self.output_dir = resolved_output_dir
+
+    def _validate_streaming_config(self) -> None:
+        """Validate streaming configuration parameters."""
+        if self.streaming_chunk_secs is not None:
+            if not 1.0 <= self.streaming_chunk_secs <= 1800.0:
+                raise ValueError(
+                    f"streaming_chunk_secs must be between 1 and 1800 seconds (1 second to 30 minutes), got {self.streaming_chunk_secs}. Recommended: 60 seconds or larger."
+                )
 
     def _validate_default_formats(self) -> None:
         """Validate default audio and video formats."""

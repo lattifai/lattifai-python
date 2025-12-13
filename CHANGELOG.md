@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## [1.0.5] - 2025-12-14
+
+### Changed
+- Improved streaming transcription stability
+- Enhanced error handling and logging
+
+### Added
+- Streaming support for long audio processing with configurable chunk size and overlap
+- Progress tracking for audio chunk emission generation
+- SBV format support for reading and writing captions
+- Comprehensive test suite for all caption formats with coverage reports
+- Safe print utility for better Unicode handling across the codebase
+
+### Fixed
+- Chromium installation method updated to use snap for Ubuntu 24.04 compatibility in CI
+- Temporary file handling on Windows - ensure files are closed before writing and cleaned up afterwards
+- Unicode handling in console output with new safe_print utility
+- Audio data handling to remove tensor field and work directly with ndarray
+- Correct ndarray shape access in emission computation
+- Documentation URLs to include 'blob/main' for correct linking
+- Standardized spelling of 'LattifAI' across the codebase
+
+### Changed
+- Enhanced AudioData class with streaming mode detection and chunk iteration support
+- Updated Lattice1Worker with beam search parameters and streaming alignment capabilities
+- Improved audio processing for very short audio files
+- Modified AlignmentConfig with additional beam search configuration options
+- Updated batch size in sentence splitting for LatticeTokenizer
+- Refactored code structure for improved readability and maintainability
+- Enhanced CI workflow for cross-platform compatibility
+- Updated dependencies and enhanced transcribe function with client configuration
+- Renamed workflow from 'test' to 'test_uv' for clarity
+- Updated OmniSenseVoice dependency version to 0.4.2
+
 ## [1.0.4] - 2025-12-09
 
 ### Fixed

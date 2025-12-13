@@ -1,4 +1,43 @@
 ````markdown
+# Release Notes - LattifAI Python v1.0.5
+
+**Release Date:** December 14, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.0.5 is a maintenance release with improved streaming transcription stability and enhanced error handling.
+
+---
+
+## 🔧 Improvements
+
+### Streaming Transcription
+- Enhanced streaming stability and performance
+- Improved error handling and recovery
+- Better logging for debugging
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+lai --version
+# Expected: lattifai 1.0.5
+```
+
+---
+
+````markdown
 # Release Notes - LattifAI Python v1.0.4
 
 **Release Date:** December 09, 2025

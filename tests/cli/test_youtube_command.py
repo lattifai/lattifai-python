@@ -9,12 +9,14 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv(usecwd=True))
 
+LATTIFAI_TESTS_CLI_DRYRUN = bool(os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false"))
+
 
 def run_youtube_command(args, env=None):
     """Helper function to run the youtube command and return result"""
     cmd = ["lai", "alignment", "youtube", "-Y"]
 
-    if os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false").lower() == "true":
+    if LATTIFAI_TESTS_CLI_DRYRUN:
         cmd.append("--dryrun")
 
     cmd.extend(args)
@@ -67,10 +69,10 @@ class TestYoutubeCommand:
             "media.force_overwrite=true",
         ]
 
-        if device == "mps" and not torch.backends.mps.is_available():
+        if device == "mps" and not torch.backends.mps.is_available() and not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError):
                 _ = run_youtube_command(args)
-        elif device == "cuda" and not torch.cuda.is_available():
+        elif device == "cuda" and not torch.cuda.is_available() and not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError):
                 _ = run_youtube_command(args)
         else:
@@ -100,8 +102,10 @@ class TestYoutubeCommand:
             "media.force_overwrite=true",
             "caption.input_path=dummy.srt",
         ]
-
-        with pytest.raises(subprocess.CalledProcessError):
+        if not LATTIFAI_TESTS_CLI_DRYRUN:
+            with pytest.raises(subprocess.CalledProcessError):
+                _ = run_youtube_command(args)
+        else:
             _ = run_youtube_command(args)
 
     def test_youtube_help(self):
@@ -131,7 +135,7 @@ class TestYoutubeCommand:
             "alignment.device=cpu",
         ]
 
-        if lang_code != "en":
+        if lang_code != "en" and not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError) as exc_info:
                 _ = run_youtube_command(args)
 
@@ -151,8 +155,11 @@ class TestYoutubeCommand:
             "alignment.device=cpu",
         ]
 
-        with pytest.raises(subprocess.CalledProcessError) as exc_info:
-            _ = run_youtube_command(args)
+        if not LATTIFAI_TESTS_CLI_DRYRUN:
+            with pytest.raises(subprocess.CalledProcessError) as exc_info:
+                _ = run_youtube_command(args)
 
-        # Check exception details
-        assert exc_info.value.returncode == 1
+            # Check exception details
+            assert exc_info.value.returncode == 1
+        else:
+            _ = run_youtube_command(args)

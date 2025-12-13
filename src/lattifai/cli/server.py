@@ -4,6 +4,8 @@ import os
 import colorful
 import uvicorn
 
+from lattifai.utils import safe_print
+
 
 def main():
     """Launch the LattifAI Web Interface."""
@@ -29,7 +31,7 @@ def main():
 
     args = parser.parse_args()
 
-    print(colorful.bold_green("🚀 Launching LattifAI Backend Server..."))
+    safe_print(colorful.bold_green("🚀 Launching LattifAI Backend Server..."))
     print(colorful.cyan(f"Server running at http://localhost:{args.port}"))
     print(colorful.yellow(f"Host: {args.host}"))
     print(colorful.yellow(f"Auto-reload: {'disabled' if args.no_reload else 'enabled'}"))

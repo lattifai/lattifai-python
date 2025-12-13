@@ -43,8 +43,10 @@ jobs:
 
       - name: Install Chromium for yt-dlp cookies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
+          # Install Chromium using snap (Ubuntu 24.04's default method)
+          sudo snap install chromium
+          # Wait for snap to finish installation
+          sleep 5
           # Create a minimal Chrome profile directory for yt-dlp
           mkdir -p ~/.config/chromium/Default
           echo '{}' > ~/.config/chromium/Default/Preferences
@@ -59,6 +61,7 @@ jobs:
           pip install -e ".[test]"  # Install with test dependencies including pytest-asyncio
           python tests/test_basic.py  # Run basic tests
           pytest tests/caption/test_text_parser.py -v
+          pytest ./tests/streaming
           bash tests/test_audio_formats.sh  # Run audio format tests
 
       - name: Test Cli Commands

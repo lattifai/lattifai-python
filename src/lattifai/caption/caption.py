@@ -307,7 +307,7 @@ class Caption:
         cls,
         path: Pathlike,
         format: Optional[str] = None,
-        normalize_text: bool = False,
+        normalize_text: bool = True,
     ) -> "Caption":
         """
         Read caption file and return Caption object.
@@ -830,7 +830,7 @@ class Caption:
             if cls._is_youtube_vtt_with_word_timestamps(content):
                 return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
 
-        if format == "gemini" or str(caption).endswith("Gemini.md"):
+        if format == "gemini" or str(caption).endswith("Gemini.md") or str(caption).endswith("Gemini3.md"):
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(caption)
