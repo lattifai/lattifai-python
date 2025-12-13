@@ -43,8 +43,10 @@ jobs:
 
       - name: Install Chromium for yt-dlp cookies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y chromium-browser chromium-chromedriver
+          # Install Chromium using snap (Ubuntu 24.04's default method)
+          sudo snap install chromium
+          # Wait for snap to finish installation
+          sleep 5
           # Create a minimal Chrome profile directory for yt-dlp
           mkdir -p ~/.config/chromium/Default
           echo '{}' > ~/.config/chromium/Default/Preferences
