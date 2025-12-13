@@ -18,13 +18,10 @@ def test_audio_data_chunking():
     num_samples = int(duration * sampling_rate)
 
     ndarray = np.random.randn(1, num_samples).astype(np.float32) * 0.1
-    tensor = torch.from_numpy(ndarray)
 
     audio = AudioData(
         sampling_rate=sampling_rate,
         ndarray=ndarray,
-        tensor=tensor,
-        device="cpu",
         path="test_long_audio.wav",
         streaming_chunk_secs=None,
         overlap_secs=0.0,
@@ -62,8 +59,6 @@ def test_chunking_with_tail_frames():
             audio = AudioData(
                 sampling_rate=sampling_rate,
                 ndarray=np.random.randn(1, total_samples).astype(np.float32) * 0.1,
-                tensor=torch.from_numpy(np.random.randn(1, total_samples).astype(np.float32) * 0.1),
-                device="cpu",
                 path=f"test_tail_{r}.wav",
                 streaming_chunk_secs=None,
                 overlap_secs=0.0,

@@ -15,13 +15,10 @@ def test_audio_data_iter_default():
     num_samples = int(duration * sampling_rate)
 
     ndarray = np.random.randn(1, num_samples).astype(np.float32)
-    tensor = torch.from_numpy(ndarray)
 
     audio = AudioData(
         sampling_rate=sampling_rate,
         ndarray=ndarray,
-        tensor=tensor,
-        device="cpu",
         path="test_audio.wav",
         streaming_chunk_secs=30.0,  # Use 30s chunks for this test
         overlap_secs=0.0,
@@ -57,13 +54,10 @@ def test_audio_data_iter_chunks_custom():
     num_samples = int(duration * sampling_rate)
 
     ndarray = np.random.randn(1, num_samples).astype(np.float32)
-    tensor = torch.from_numpy(ndarray)
 
     audio = AudioData(
         sampling_rate=sampling_rate,
         ndarray=ndarray,
-        tensor=tensor,
-        device="cpu",
         path="test_audio.wav",
         streaming_chunk_secs=None,
         overlap_secs=0.0,
@@ -94,13 +88,10 @@ def test_audio_data_iter_short_audio():
     num_samples = int(duration * sampling_rate)
 
     ndarray = np.random.randn(1, num_samples).astype(np.float32)
-    tensor = torch.from_numpy(ndarray)
 
     audio = AudioData(
         sampling_rate=sampling_rate,
         ndarray=ndarray,
-        tensor=tensor,
-        device="cpu",
         path="short_audio.wav",
         streaming_chunk_secs=None,
         overlap_secs=0.0,
@@ -120,13 +111,10 @@ def test_audio_data_iter_chunks_no_overlap():
     num_samples = int(duration * sampling_rate)
 
     ndarray = np.random.randn(1, num_samples).astype(np.float32)
-    tensor = torch.from_numpy(ndarray)
 
     audio = AudioData(
         sampling_rate=sampling_rate,
         ndarray=ndarray,
-        tensor=tensor,
-        device="cpu",
         path="test_audio.wav",
         streaming_chunk_secs=None,
         overlap_secs=0.0,
@@ -151,13 +139,10 @@ def test_audio_data_iter_multiple_iterations():
     num_samples = int(duration * sampling_rate)
 
     ndarray = np.random.randn(1, num_samples).astype(np.float32)
-    tensor = torch.from_numpy(ndarray)
 
     audio = AudioData(
         sampling_rate=sampling_rate,
         ndarray=ndarray,
-        tensor=tensor,
-        device="cpu",
         path="test_audio.wav",
         streaming_chunk_secs=None,
         overlap_secs=0.0,
@@ -185,13 +170,10 @@ def test_audio_data_chunk_path_naming():
     num_samples = int(duration * sampling_rate)
 
     ndarray = np.random.randn(1, num_samples).astype(np.float32)
-    tensor = torch.from_numpy(ndarray)
 
     audio = AudioData(
         sampling_rate=sampling_rate,
         ndarray=ndarray,
-        tensor=tensor,
-        device="cpu",
         path="test.wav",
         streaming_chunk_secs=None,
         overlap_secs=0.0,

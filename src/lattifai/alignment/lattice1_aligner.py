@@ -42,8 +42,16 @@ class Lattice1Aligner(object):
 
         self.frame_shift = self.worker.frame_shift
 
-    def emission(self, audio: torch.Tensor, ndarray: Optional[np.ndarray] = None) -> torch.Tensor:
-        return self.worker.emission(audio, ndarray=ndarray)
+    def emission(self, ndarray: np.ndarray) -> torch.Tensor:
+        """Generate emission probabilities from audio ndarray.
+
+        Args:
+            ndarray: Audio data as numpy array of shape (1, T) or (C, T)
+
+        Returns:
+            Emission tensor of shape (1, T, vocab_size)
+        """
+        return self.worker.emission(ndarray)
 
     def alignment(
         self,

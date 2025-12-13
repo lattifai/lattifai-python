@@ -16,16 +16,13 @@ from lattifai.errors import AudioLoadError
 ChannelSelectorType = Union[int, str]
 
 
-class AudioData(
-    namedtuple(
-        "AudioData", ["sampling_rate", "ndarray", "tensor", "device", "path", "streaming_chunk_secs", "overlap_secs"]
-    )
-):
-    """Audio data container with sampling rate, numpy array, tensor, and device information.
+class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "path", "streaming_chunk_secs", "overlap_secs"])):
+    """Audio data container with sampling rate and numpy array.
 
     Supports iteration to stream audio chunks for processing long audio files.
     The streaming_chunk_secs field indicates whether streaming mode should be used downstream.
     The overlap_secs field specifies the overlap duration between consecutive chunks.
+    Note: tensor field removed to reduce memory usage. Convert ndarray to tensor on-demand.
     """
 
     def __str__(self) -> str:
@@ -83,15 +80,12 @@ class AudioData(
             start = current_offset
             end = min(start + chunk_size, total_samples)
 
-            # Extract chunk from ndarray and tensor
+            # Extract chunk from ndarray only
             chunk_ndarray = self.ndarray[..., start:end]
-            chunk_tensor = self.tensor[..., start:end]
 
             yield AudioData(
                 sampling_rate=self.sampling_rate,
                 ndarray=chunk_ndarray,
-                tensor=chunk_tensor,
-                device=self.device,
                 path=f"{self.path}[{start/self.sampling_rate:.2f}s-{end/self.sampling_rate:.2f}s]",
                 streaming_chunk_secs=None,
                 overlap_secs=None,
@@ -269,18 +263,17 @@ class AudioLoader:
             streaming_chunk_secs: Duration in seconds for streaming chunks (default: None, disabled).
 
         Returns:
-            AudioData namedtuple with sampling_rate, ndarray, tensor, and streaming_chunk_secs fields.
+            AudioData namedtuple with sampling_rate, ndarray, and streaming_chunk_secs fields.
         """
         tensor = self._load_audio(audio, sampling_rate, channel_selector)
 
-        # tensor is (1, T) or (C, T)
+        # tensor is (1, T) or (C, T), convert to numpy and free tensor memory
         ndarray = tensor.cpu().numpy()
+        del tensor
 
         return AudioData(
             sampling_rate=sampling_rate,
             ndarray=ndarray,
-            tensor=tensor,
-            device=self.device,
             path=str(audio) if isinstance(audio, Pathlike) else "<BinaryIO>",
             streaming_chunk_secs=streaming_chunk_secs,
             overlap_secs=0.0,

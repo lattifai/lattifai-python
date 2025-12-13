@@ -75,10 +75,19 @@ class Lattice1Worker:
         return 0.02  # 20 ms
 
     @torch.inference_mode()
-    def emission(self, audio: torch.Tensor, ndarray: Optional[np.ndarray] = None) -> torch.Tensor:
+    def emission(self, ndarray: np.ndarray) -> torch.Tensor:
+        """Generate emission probabilities from audio ndarray.
+
+        Args:
+            ndarray: Audio data as numpy array of shape (1, T) or (C, T)
+
+        Returns:
+            Emission tensor of shape (1, T, vocab_size)
+        """
         _start = time.time()
         if self.extractor is not None:
             # audio -> features -> emission
+            audio = torch.from_numpy(ndarray).to(self.device)
             if audio.shape[1] < 160:
                 audio = torch.nn.functional.pad(audio, (0, 320 - audio.shape[1]))
             features = self.extractor(audio)  # (1, T, D)
@@ -103,8 +112,6 @@ class Lattice1Worker:
                 emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
                 emission = torch.from_numpy(emission).to(self.device)
         else:
-            if ndarray is None:
-                ndarray = audio.cpu().numpy()
             if ndarray.shape[1] < 160:
                 ndarray = np.pad(ndarray, ((0, 0), (0, 320 - ndarray.shape[1])), mode="constant")
 
@@ -200,7 +207,7 @@ class Lattice1Worker:
             def emission_iterator():
                 """Generate emissions for each audio chunk."""
                 for chunk in audio.iter_chunks():
-                    chunk_emission = self.emission(chunk.tensor, ndarray=chunk.ndarray)
+                    chunk_emission = self.emission(chunk.ndarray)
                     yield (chunk_emission.to(device) * acoustic_scale)
 
             # Calculate total frames for supervision_segments
@@ -223,7 +230,7 @@ class Lattice1Worker:
         else:
             # Batch mode: compute full emission tensor and pass to align_segments
             if emission is None:
-                emission = self.emission(audio.tensor, ndarray=audio.ndarray)  # (1, T, vocab_size)
+                emission = self.emission(audio.ndarray)  # (1, T, vocab_size)
 
             try:
                 results, labels = align_segments(
