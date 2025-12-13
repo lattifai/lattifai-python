@@ -9,6 +9,7 @@ import torch
 from lhotse import FbankConfig
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
+from tqdm import tqdm
 
 from lattifai.audio2 import AudioData
 from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
@@ -222,10 +223,27 @@ class Lattice1Worker:
             # and use k2.OnlineDenseIntersecter for memory-efficient processing
 
             def emission_iterator():
-                """Generate emissions for each audio chunk."""
-                for chunk in audio.iter_chunks():
-                    chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale, device=device)
-                    yield chunk_emission
+                """Generate emissions for each audio chunk with progress tracking."""
+                total_duration = audio.duration
+                processed_duration = 0.0
+                total_minutes = int(total_duration / 60.0)
+
+                with tqdm(
+                    total=total_minutes,
+                    desc=f"Processing audio ({total_minutes} min)",
+                    unit="min",
+                    unit_scale=False,
+                    unit_divisor=1,
+                ) as pbar:
+                    for chunk in audio.iter_chunks():
+                        chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale, device=device)
+
+                        # Update progress based on chunk duration in minutes
+                        chunk_duration = int(chunk.duration / 60.0)
+                        pbar.update(chunk_duration)
+                        processed_duration += chunk_duration
+
+                        yield chunk_emission
 
             # Calculate total frames for supervision_segments
             total_frames = int(audio.duration / self.frame_shift)
