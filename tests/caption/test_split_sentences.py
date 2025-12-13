@@ -18,12 +18,13 @@ class FakeSplitter:
         self._outputs = outputs
         self.calls = []
 
-    def split(self, texts: List[str], threshold: float, strip_whitespace: bool) -> List[List[str]]:
+    def split(self, texts: List[str], threshold: float, strip_whitespace: bool, batch_size: int = 8) -> List[List[str]]:
         self.calls.append(
             {
                 "texts": list(texts),
                 "threshold": threshold,
                 "strip_whitespace": strip_whitespace,
+                "batch_size": batch_size,
             }
         )
         return copy.deepcopy(self._outputs)
