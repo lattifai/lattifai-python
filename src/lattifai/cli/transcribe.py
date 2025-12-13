@@ -81,6 +81,7 @@ def transcribe(
 
     from lattifai.audio2 import AudioLoader
     from lattifai.transcription import create_transcriber
+    from lattifai.utils import safe_print
 
     # Initialize configs with defaults
     client_config = client or ClientConfig()
@@ -119,18 +120,18 @@ def transcribe(
         transcription_config.lattice_model_path = _resolve_model_path("LattifAI/Lattice-1")
     transcriber = create_transcriber(transcription_config=transcription_config)
 
-    print(colorful.cyan(f"🎤 Starting transcription with {transcriber.name}..."))
-    print(colorful.cyan(f"    Input: {media_config.input_path}"))
+    safe_print(colorful.cyan(f"🎤 Starting transcription with {transcriber.name}..."))
+    safe_print(colorful.cyan(f"    Input: {media_config.input_path}"))
 
     # Perform transcription
     if is_url and transcriber.supports_url:
         # Check if transcriber supports URL directly
-        print(colorful.cyan("    Transcribing from URL directly..."))
+        safe_print(colorful.cyan("    Transcribing from URL directly..."))
         transcript = asyncio.run(transcriber.transcribe(media_config.input_path))
     else:
         if is_url:
             # Download media first, then transcribe
-            print(colorful.cyan("    Downloading media from URL..."))
+            safe_print(colorful.cyan("    Downloading media from URL..."))
             from lattifai.workflow.youtube import YouTubeDownloader
 
             downloader = YouTubeDownloader()
@@ -142,11 +143,11 @@ def transcribe(
                     force_overwrite=media_config.force_overwrite,
                 )
             )
-            print(colorful.cyan(f"    Media downloaded to: {input_path}"))
+            safe_print(colorful.cyan(f"    Media downloaded to: {input_path}"))
         else:
             input_path = Path(media_config.input_path)
 
-        print(colorful.cyan("    Loading audio..."))
+        safe_print(colorful.cyan("    Loading audio..."))
         # For files, load audio first
         audio_loader = AudioLoader(device=transcription_config.device)
         media_audio = audio_loader(
@@ -169,12 +170,12 @@ def transcribe(
             # For files, use input filename with suffix
             final_output = Path(media_config.input_path).with_suffix(".LattifAI.srt")
 
-    print(colorful.cyan(f"   Output: {final_output}"))
+    safe_print(colorful.cyan(f"   Output: {final_output}"))
 
     # Write output
     transcriber.write(transcript, final_output, encoding="utf-8", cache_audio_events=False)
 
-    print(colorful.green(f"🎉 Transcription completed: {final_output}"))
+    safe_print(colorful.green(f"🎉 Transcription completed: {final_output}"))
 
     return transcript
 

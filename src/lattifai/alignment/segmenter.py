@@ -7,6 +7,7 @@ import colorful
 from lattifai.audio2 import AudioData
 from lattifai.caption import Caption, Supervision
 from lattifai.config import AlignmentConfig
+from lattifai.utils import safe_print
 
 from .tokenizer import END_PUNCTUATION
 
@@ -153,7 +154,7 @@ class Segmenter:
 
         total_sups = sum(len(sups) if isinstance(sups, list) else 1 for _, _, sups, _ in segments)
 
-        print(colorful.cyan(f"📊 Created {len(segments)} alignment segments:"))
+        safe_print(colorful.cyan(f"📊 Created {len(segments)} alignment segments:"))
         for i, (start, end, sups, _) in enumerate(segments, 1):
             duration = end - start
             print(
@@ -163,4 +164,4 @@ class Segmenter:
                 )
             )
 
-        print(colorful.green(f"   Total: {total_sups} supervisions across {len(segments)} segments"))
+        safe_print(colorful.green(f"   Total: {total_sups} supervisions across {len(segments)} segments"))

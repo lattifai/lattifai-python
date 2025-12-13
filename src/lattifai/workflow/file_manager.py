@@ -1,4 +1,4 @@
-"""
+""".
 File existence management utilities for video processing workflows
 """
 
@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import colorful
+
+from lattifai.utils import safe_print
 
 try:
     import questionary
@@ -110,7 +112,7 @@ class FileExistenceManager:
             return "proceed"  # No existing files, proceed normally
 
         # Header with warning color
-        print(f'\n{colorful.bold_yellow("⚠️  Existing files found:")}')
+        safe_print(f'\n{colorful.bold_yellow("⚠️  Existing files found:")}')
 
         # Collect file paths for options
         file_paths = []
@@ -157,15 +159,15 @@ class FileExistenceManager:
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default=default_value)
 
         if choice == "overwrite":
-            print(f'{colorful.yellow("🔄 Overwriting existing files")}')
+            safe_print(f'{colorful.yellow("🔄 Overwriting existing files")}')
         elif choice == TRANSCRIBE_CHOICE:
             print(f'{colorful.magenta(f"✨ Will transcribe with {transcriber_name}")}')
         elif choice == "cancel":
-            print(f'{colorful.red("❌ Operation cancelled")}')
+            safe_print(f'{colorful.red("❌ Operation cancelled")}')
         elif choice in file_paths:
-            print(f'{colorful.green(f"✅ Using selected file: {choice}")}')
+            safe_print(f'{colorful.green(f"✅ Using selected file: {choice}")}')
         else:
-            print(f'{colorful.green("✅ Using existing files")}')
+            safe_print(f'{colorful.green("✅ Using existing files")}')
 
         return choice
 
@@ -189,7 +191,7 @@ class FileExistenceManager:
         del emoji  # Unused variable
 
         # Header with warning color
-        print(f'\n{colorful.bold_yellow(f"⚠️  Existing {label} files found:")}')
+        safe_print(f'\n{colorful.bold_yellow(f"⚠️  Existing {label} files found:")}')
 
         for file_path in sorted(files):
             print(f'   {colorful.green("•")} {file_path}')
@@ -203,11 +205,11 @@ class FileExistenceManager:
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default="use")
 
         if choice == "use":
-            print(f'{colorful.green(f"✅ Using existing {label} files")}')
+            safe_print(f'{colorful.green(f"✅ Using existing {label} files")}')
         elif choice == "overwrite":
-            print(f'{colorful.yellow(f"🔄 Overwriting {label} files")}')
+            safe_print(f'{colorful.yellow(f"🔄 Overwriting {label} files")}')
         elif choice == "cancel":
-            print(f'{colorful.red("❌ Operation cancelled")}')
+            safe_print(f'{colorful.red("❌ Operation cancelled")}')
 
         return choice
 
@@ -245,7 +247,7 @@ class FileExistenceManager:
             )
 
         # Multiple files: let user choose which one
-        print(f'\n{colorful.bold_yellow(f"⚠️  Multiple {file_type} files found:")}')
+        safe_print(f'\n{colorful.bold_yellow(f"⚠️  Multiple {file_type} files found:")}')
 
         # Create options with full file paths
         options = []
@@ -266,7 +268,7 @@ class FileExistenceManager:
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default=files[0])
 
         if choice == "cancel":
-            print(f'{colorful.red("❌ Operation cancelled")}')
+            safe_print(f'{colorful.red("❌ Operation cancelled")}')
         elif choice == "overwrite":
             overwrite_msg = f"🔄 Overwriting all {file_type} files"
             print(f"{colorful.yellow(overwrite_msg)}")
@@ -274,7 +276,7 @@ class FileExistenceManager:
             transcribe_msg = f"✨ Will transcribe with {transcriber_name}"
             print(f"{colorful.magenta(transcribe_msg)}")
         else:
-            print(f'{colorful.green(f"✅ Using: {choice}")}')
+            safe_print(f'{colorful.green(f"✅ Using: {choice}")}')
 
         return choice
 

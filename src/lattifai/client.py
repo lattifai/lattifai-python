@@ -18,6 +18,7 @@ from lattifai.errors import (
     LatticeEncodingError,
 )
 from lattifai.mixin import LattifAIClientMixin
+from lattifai.utils import safe_print
 
 if TYPE_CHECKING:
     from lattifai.diarization import LattifAIDiarizer  # noqa: F401
@@ -115,7 +116,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             alignment_strategy = self.aligner.config.strategy
 
             if alignment_strategy != "entire" or caption.transcription:
-                print(colorful.cyan(f"🔄 Using segmented alignment strategy: {alignment_strategy}"))
+                safe_print(colorful.cyan(f"🔄 Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.supervisions and alignment_strategy == "transcription":
                     # raise NotImplementedError("Transcription-based alignment is not yet implemented.")
@@ -128,7 +129,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     if not caption.transcription:
                         import asyncio
 
-                        print(colorful.cyan("📝 Transcribing media for alignment..."))
+                        safe_print(colorful.cyan("📝 Transcribing media for alignment..."))
                         if output_caption_path:
                             transcript_file = (
                                 Path(str(output_caption_path)).parent
@@ -261,7 +262,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
             # Step 5: Speaker diarization
             if self.diarization_config.enabled and self.diarizer:
-                print(colorful.cyan("🗣️  Performing speaker diarization..."))
+                safe_print(colorful.cyan("🗣️  Performing speaker diarization..."))
                 caption = self.speaker_diarization(
                     input_media=media_audio,
                     caption=caption,
@@ -310,7 +311,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         if output_caption_path:
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if diarization_file.exists():
-                print(colorful.cyan(f"Reading existing speaker diarization from {diarization_file}"))
+                safe_print(colorful.cyan(f"Reading existing speaker diarization from {diarization_file}"))
                 caption.read_speaker_diarization(diarization_file)
 
         diarization, alignments = self.diarizer.diarize_with_alignments(
@@ -441,7 +442,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_dir = self._prepare_youtube_output_dir(output_dir)
         media_format = self._determine_media_format(media_format)
 
-        print(colorful.cyan(f"🎬 Starting YouTube workflow for: {url}"))
+        safe_print(colorful.cyan(f"🎬 Starting YouTube workflow for: {url}"))
 
         # Step 1: Download media
         media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite)
@@ -463,7 +464,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_caption_path = self._generate_output_caption_path(output_caption_path, media_file, output_dir)
 
         # Step 4: Perform alignment
-        print(colorful.cyan("🔗 Performing forced alignment..."))
+        safe_print(colorful.cyan("🔗 Performing forced alignment..."))
 
         caption: Caption = self.alignment(
             input_media=media_audio,

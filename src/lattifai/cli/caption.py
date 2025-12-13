@@ -7,6 +7,7 @@ from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.config import CaptionConfig
+from lattifai.utils import safe_print
 
 
 @run.cli.entrypoint(name="convert", namespace="caption")
@@ -55,7 +56,7 @@ def convert(
     caption = Caption.read(input_path, normalize_text=normalize_text)
     caption.write(output_path, include_speaker_in_text=include_speaker_in_text)
 
-    print(f"✅ Converted {input_path} -> {output_path}")
+    safe_print(f"✅ Converted {input_path} -> {output_path}")
     return output_path
 
 
@@ -104,9 +105,9 @@ def normalize(
     caption_obj.write(output_path, include_speaker_in_text=True)
 
     if output_path == input_path:
-        print(f"✅ Normalized {input_path} (in-place)")
+        safe_print(f"✅ Normalized {input_path} (in-place)")
     else:
-        print(f"✅ Normalized {input_path} -> {output_path}")
+        safe_print(f"✅ Normalized {input_path} -> {output_path}")
 
     return output_path
 
@@ -170,9 +171,9 @@ def shift(
         direction = f"advanced by {abs(seconds)}s"
 
     if output_path == input_path:
-        print(f"✅ Shifted timestamps {direction} in {input_path} (in-place)")
+        safe_print(f"✅ Shifted timestamps {direction} in {input_path} (in-place)")
     else:
-        print(f"✅ Shifted timestamps {direction}: {input_path} -> {output_path}")
+        safe_print(f"✅ Shifted timestamps {direction}: {input_path} -> {output_path}")
 
     return output_path
 
