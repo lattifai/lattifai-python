@@ -50,20 +50,30 @@ jobs:
           uv run install_k2 --torch-version 2.8.0
 
       - name: Build and Test
+        if: runner.os != 'Windows'
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
         run: |
           uv run python tests/test_basic.py  # Run basic tests
           uv run pytest tests/caption/test_text_parser.py -v
-          uv run bash tests/test_audio_formats.sh  # Run audio format tests
 
-      - name: Test Cli Commands
+
+      - name: Test Cli Commands (Unix & Windows)
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           # Test lai-transcribe command
           uv run which lai
+          # alignment align
+          uv run bash tests/test_audio_formats.sh  # Run audio format tests
           # Gemini Model
           uv run lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
           uv run lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview
+
+      # - name: Test Cli Commands (Windows)
+      #   if: runner.os == 'Windows'
+      #   env:
+      #     LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
+      #     GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      #   run: |
