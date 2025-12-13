@@ -6,7 +6,7 @@ import nemo_run as run
 from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
-from lattifai.audio2 import AudioLoader, ChannelSelectorType
+from lattifai.audio2 import ChannelSelectorType
 from lattifai.cli.alignment import align as alignment_align
 from lattifai.config import (
     AlignmentConfig,
@@ -26,6 +26,7 @@ def transcribe(
     output_dir: Optional[Pathlike] = None,
     media_format: str = "mp3",
     channel_selector: Optional[ChannelSelectorType] = "average",
+    client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
 ):
     """
@@ -78,11 +79,18 @@ def transcribe(
     from pathlib import Path
 
     import colorful
+    from lattifai_core.client import SyncAPIClient
 
+    from lattifai.audio2 import AudioLoader
     from lattifai.transcription import create_transcriber
 
-    # Initialize transcription config with defaults
+    # Initialize configs with defaults
+    client_config = client or ClientConfig()
     transcription_config = transcription or TranscriptionConfig()
+
+    # Initialize client wrapper to properly set client_wrapper
+    client_wrapper = SyncAPIClient(config=client_config)
+    transcription_config.client_wrapper = client_wrapper
 
     # Validate input is required
     if not input:
