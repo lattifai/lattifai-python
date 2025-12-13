@@ -33,8 +33,7 @@ dependencies = [
     "av",
     "wtpsplit>=2.1.7",
     # transcription
-    "kaldi-native-fbank",
-    "OmniSenseVoice>=0.4.0",
+    "OmniSenseVoice>=0.4.2",
     "nemo_toolkit_asr[asr]>=2.7.0rc1",
     # diarization
     "pyannote-audio-notorchdeps>=4.0.2",  # not requires torch==2.8.0, torchaudio==2.8.0
