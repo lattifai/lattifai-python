@@ -18,7 +18,7 @@ maintainers = [
 requires-python = '>=3.10,<3.15'
 
 dependencies = [
-    "lattifai-core>=0.5.0",
+    "lattifai-core>=0.5.1",
     "lattifai-run>=1.0.1",
     "python-dotenv",
     "lhotse>=1.26.0",
@@ -34,7 +34,7 @@ dependencies = [
     "wtpsplit>=2.1.7",
     # transcription
     "OmniSenseVoice>=0.4.2",
-    "nemo_toolkit_asr[asr]>=2.7.0rc1",
+    "nemo_toolkit_asr[asr]>=2.7.0rc3",
     # diarization
     "pyannote-audio-notorchdeps>=4.0.2",  # not requires torch==2.8.0, torchaudio==2.8.0
     # agentic workflow
@@ -120,7 +120,7 @@ diarization = [
 ]
 transcription = [
     "OmniSenseVoice>=0.4.0",
-    "nemo_toolkit_asr[asr]>=2.7.0rc1",
+    "nemo_toolkit_asr[asr]>=2.7.0rc3",
 ]
 test = ['pytest', 'pytest-cov', 'pytest-asyncio', 'numpy']
 all = [
