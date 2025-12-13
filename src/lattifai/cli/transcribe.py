@@ -83,10 +83,13 @@ def transcribe(
     from lattifai.transcription import create_transcriber
 
     # Initialize configs with defaults
-
     client_config = client or ClientConfig()
     transcription_config = transcription or TranscriptionConfig()
     media_config = media or MediaConfig()
+
+    # Initialize client wrapper to properly set client_wrapper
+    client_wrapper = SyncAPIClient(config=client_config)
+    transcription_config.client_wrapper = client_wrapper
 
     # Initialize client wrapper to properly set client_wrapper
     client_wrapper = SyncAPIClient(config=client_config)
