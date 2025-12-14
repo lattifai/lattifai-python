@@ -214,7 +214,7 @@ class LatticeTokenizer:
             else:
                 with open(words_model_path, "rb") as f:
                     data = pickle.load(f)
-        except pickle.UnpicklingError as e:
+        except Exception as e:
             del e
             import msgpack
 
@@ -538,12 +538,9 @@ def _load_tokenizer(
     tokenizer_cls: Type[LatticeTokenizer] = LatticeTokenizer,
 ) -> LatticeTokenizer:
     """Instantiate tokenizer with consistent error handling."""
-    try:
-        return tokenizer_cls.from_pretrained(
-            client_wrapper=client_wrapper,
-            model_path=model_path,
-            model_name=model_name,
-            device=device,
-        )
-    except Exception as e:
-        raise ModelLoadError(f"tokenizer from {model_path}", original_error=e)
+    return tokenizer_cls.from_pretrained(
+        client_wrapper=client_wrapper,
+        model_path=model_path,
+        model_name=model_name,
+        device=device,
+    )
