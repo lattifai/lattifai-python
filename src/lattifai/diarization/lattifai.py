@@ -77,6 +77,8 @@ class LattifAIDiarizer:
         num_speakers: Optional[int] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
+        debug: bool = False,
+        output_path: Optional[str] = None,
     ) -> Tuple[TextGrid, List[Supervision]]:
         """Diarize the given media input and return alignments with refined speaker labels."""
         return self.diarizer.diarize_with_alignments(
@@ -86,4 +88,6 @@ class LattifAIDiarizer:
             num_speakers=num_speakers,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            debug=debug,
+            output_path=output_path,
         )
