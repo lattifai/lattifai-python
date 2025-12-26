@@ -493,15 +493,16 @@ class YouTubeDownloader:
                 self.logger.warning("No captions available for this video")
                 return None
             elif "HTTP Error 429" in error_msg or "Too Many Requests" in error_msg:
-                self.logger.error("YouTube rate limit exceeded. Please try again later or use a different method.")
-                raise RuntimeError(
+                # Return None to trigger auto-fallback to transcription if configured
+                self.logger.warning(
                     "YouTube rate limit exceeded (HTTP 429). "
-                    "Try again later or use --cookies option with authenticated cookies. "
-                    "See: https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
+                    "Will attempt transcription fallback if configured."
                 )
+                return None
             else:
                 self.logger.error(f"Failed to download transcript: {error_msg}")
-                raise RuntimeError(f"Failed to download transcript: {error_msg}")
+                # Return None to trigger auto-fallback instead of raising
+                return None
 
     async def list_available_captions(self, url: str) -> List[Dict[str, Any]]:
         """
