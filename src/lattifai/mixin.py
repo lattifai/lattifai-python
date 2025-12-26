@@ -553,7 +553,25 @@ class LattifAIClientMixin:
                         use_transcription=True,
                     )
                 elif not caption_file:
-                    raise RuntimeError("No caption file available and transcription was declined by user.")
+                    # No YouTube captions available - auto-fallback to transcription if configured
+                    if self.transcription_config and self.transcriber:
+                        safe_print(colorful.yellow(
+                            f"⚠️ No YouTube captions available. Auto-fallback to transcription with {transcriber_name}..."
+                        ))
+                        return await self._download_or_transcribe_caption(
+                            url=url,
+                            output_dir=output_dir,
+                            media_file=media_file,
+                            force_overwrite=force_overwrite,
+                            source_lang=source_lang,
+                            is_async=True,
+                            use_transcription=True,
+                        )
+                    else:
+                        raise RuntimeError(
+                            "No YouTube captions available and no transcription configured. "
+                            "Either provide a video with captions or configure transcription.model_name."
+                        )
 
             return caption_file
 
