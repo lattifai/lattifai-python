@@ -1,11 +1,9 @@
 """LattifAI speaker diarization implementation."""
 
 import logging
-from collections import defaultdict
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
-import torch
-from tgt import Interval, IntervalTier, TextGrid
+from tgt import TextGrid
 
 from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
@@ -77,6 +75,7 @@ class LattifAIDiarizer:
         num_speakers: Optional[int] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
+        alignment_fn: Optional[Callable] = None,
         debug: bool = False,
         output_path: Optional[str] = None,
     ) -> Tuple[TextGrid, List[Supervision]]:
@@ -88,6 +87,7 @@ class LattifAIDiarizer:
             num_speakers=num_speakers,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            alignment_fn=alignment_fn,
             debug=debug,
             output_path=output_path,
         )

@@ -320,6 +320,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             input_media,
             caption.alignments,
             diarization=caption.speaker_diarization,
+            alignment_fn=self.aligner.alignment,
             debug=self.diarizer.config.debug,
             output_path=output_caption_path,
         )
