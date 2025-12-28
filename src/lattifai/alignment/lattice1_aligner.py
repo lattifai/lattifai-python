@@ -144,7 +144,12 @@ class Lattice1Aligner(object):
                 safe_print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
             try:
                 alignments = self.tokenizer.detokenize(
-                    lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
+                    lattice_id,
+                    lattice_results,
+                    supervisions=supervisions,
+                    return_details=return_details,
+                    start_margin=self.config.start_margin,
+                    end_margin=self.config.end_margin,
                 )
                 if verbose:
                     safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
