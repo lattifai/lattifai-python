@@ -15,9 +15,6 @@
 
 Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](https://huggingface.co/Lattifai/Lattice-1) model.
 
-> **⚠️ Note on Current Limitations**:
-> 1. **Memory Usage**: We are aware of high memory consumption and are actively working on further optimizations.
-
 ## Table of Contents
 
 - [Installation](#installation)
@@ -38,7 +35,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 - [Advanced Features](#advanced-features)
   - [Word-Level Alignment](#word-level-alignment)
   - [Smart Sentence Splitting](#smart-sentence-splitting)
-  - [Speaker Diarization](#speaker-diarization-wip)
+  - [Speaker Diarization](#speaker-diarization)
   - [YAML Configuration Files](#yaml-configuration-files)
 - [Supported Formats](#supported-formats)
 - [Roadmap](#roadmap)
@@ -610,9 +607,7 @@ caption = client.alignment(
 )
 ```
 
-### Speaker Diarization (WIP)
-
-**Note:** This feature is currently under development and not yet fully available.
+### Speaker Diarization
 
 Speaker diarization automatically identifies and labels different speakers in audio. When enabled, the system will:
 - Detect speaker changes in the audio
@@ -622,6 +617,24 @@ Speaker diarization automatically identifies and labels different speakers in au
 **Speaker Name Handling:**
 - **Existing speaker labels in subtitles**: If your input captions already contain speaker names (e.g., `[Alice]`, `>> Bob:`, or `SPEAKER_01:`), the system will preserve them as much as possible during alignment
 - **Gemini Transcriber**: When using Gemini models for transcription (e.g., `gemini-2.5-pro`), the model can intelligently identify and extract speaker names from dialogue context, making it easier to generate speaker-aware transcripts
+
+**CLI:**
+```bash
+# Enable speaker diarization during alignment
+lai alignment align audio.wav subtitle.srt output.srt \
+    diarization.enabled=true
+
+# With additional diarization settings
+lai alignment align audio.wav subtitle.srt output.srt \
+    diarization.enabled=true \
+    diarization.device=cuda \
+    diarization.min_speakers=2 \
+    diarization.max_speakers=4
+
+# For YouTube videos with diarization
+lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID" \
+    diarization.enabled=true
+```
 
 **Python SDK:**
 ```python

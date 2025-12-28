@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## [1.1.0] - 2025-12-28
+
+### Added
+- Speaker diarization support
+- Support for Gemini 3 Flash Preview model (gemini-3-flash-preview)
+- ModelScope download support for alignment and transcription configurations
+- `start_margin` and `end_margin` parameters to alignment configuration and tokenizer
+- New CLI command: `lai-diarize` for speaker diarization workflows
+
+### Changed
+- Updated `nemo_toolkit_asr` dependency to version 2.7.0rc4
+- Upgraded `lattifai-core` dependency to 0.6.0
+- Added `scipy!=1.16.3` version constraint
+- Changed default value of `include_speaker_in_text` to False in convert function
+
+### Fixed
+- Improved error handling in tokenizer loading functions
+
 ## [1.0.5] - 2025-12-14
 
 ### Changed

@@ -1,4 +1,102 @@
 ````markdown
+# Release Notes - LattifAI Python v1.1.0
+
+**Release Date:** December 28, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.1.0 introduces **speaker diarization** support and improved model configuration with ModelScope integration.
+
+---
+
+## ✨ New Features
+
+### Speaker Diarization
+- Full speaker diarization support with configurable alignment
+- Integration with pyannote-audio for accurate speaker identification
+- DiarizationOutput type for structured speaker results
+- New CLI command: `lai-diarize` for speaker diarization workflows
+
+### ModelScope Integration
+- ModelScope download support for alignment and transcription models
+- Alternative model source for users in regions with limited HuggingFace access
+
+---
+
+## 🔧 Improvements
+
+### Alignment Enhancements
+- Added `start_margin` and `end_margin` parameters to alignment configuration
+- Improved margin handling in tokenizer for better boundary control
+- Enhanced error handling in tokenizer loading functions
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+python -c "import lattifai; print(lattifai.__version__)"
+# Expected: 1.1.0
+```
+
+### New Optional Dependencies
+
+For speaker diarization features:
+
+```bash
+pip install lattifai
+```
+
+---
+
+## 🚀 Quick Start with New Features
+
+### Speaker Diarization
+
+```python
+from lattifai import LattifAI
+from lattifai.config import AlignmentConfig, DiarizationConfig
+
+client = LattifAI(api_key="your-api-key")
+
+# Align with speaker diarization
+result = client.align(
+    input_media="audio.wav",
+    input_caption="transcript.txt",
+    output_path="output.srt",
+    config=AlignmentConfig(
+        diarization=DiarizationConfig(enabled=True)
+    )
+)
+```
+
+---
+
+## 📝 Breaking Changes
+
+- `include_speaker_in_text` default value changed from True to False in caption conversion
+
+---
+
+## 🔗 Links
+
+- [GitHub Repository](https://github.com/lattifai/lattifai-python)
+- [Documentation](https://github.com/lattifai/lattifai-python/blob/main/README.md)
+- [Changelog](https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md)
+
+---
+
+````markdown
 # Release Notes - LattifAI Python v1.0.5
 
 **Release Date:** December 14, 2025
