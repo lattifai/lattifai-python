@@ -322,6 +322,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             diarization=caption.speaker_diarization,
             alignment_fn=self.aligner.alignment,
             transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
+            separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
             debug=self.diarizer.config.debug,
             output_path=output_caption_path,
         )

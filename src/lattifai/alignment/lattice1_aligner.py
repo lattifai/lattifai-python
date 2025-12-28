@@ -54,6 +54,29 @@ class Lattice1Aligner(object):
         """
         return self.worker.emission(ndarray)
 
+    def separate(self, audio: np.ndarray) -> np.ndarray:
+        """Separate audio using separator model.
+
+        Args:
+            audio: np.ndarray object containing the audio to separate, shape (1, T)
+
+        Returns:
+            Separated audio as numpy array
+
+        Raises:
+            RuntimeError: If separator model is not available
+        """
+        if self.worker.separator_ort is None:
+            raise RuntimeError("Separator model not available. separator.onnx not found in model path.")
+
+        # Run separator model
+        separator_output = self.worker.separator_ort.run(
+            None,
+            {"audio": audio},
+        )
+
+        return separator_output[0]
+
     def alignment(
         self,
         audio: AudioData,

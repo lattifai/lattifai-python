@@ -1,6 +1,7 @@
 import json
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
@@ -72,6 +73,19 @@ class Lattice1Worker:
                 raise ModelLoadError(f"feature extractor for device {device}", original_error=e)
         else:
             self.extractor = None  # ONNX model includes feature extractor
+
+        # Initialize separator if available
+        separator_model_path = Path(model_path) / "separator.onnx"
+        if separator_model_path.exists():
+            try:
+                self.separator_ort = ort.InferenceSession(
+                    str(separator_model_path),
+                    providers=providers + ["CPUExecutionProvider"],
+                )
+            except Exception as e:
+                raise ModelLoadError(f"separator model from {model_path}", original_error=e)
+        else:
+            self.separator_ort = None
 
         self.device = torch.device(device)
         self.timings = defaultdict(lambda: 0.0)
