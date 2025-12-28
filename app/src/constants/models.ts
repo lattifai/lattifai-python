@@ -27,6 +27,11 @@ export const TRANSCRIPTION_MODELS: TranscriptionModel[] = [
         languages: 'Supports 100+ languages (Requires Gemini API Key)'
     },
     {
+        value: 'gemini-3-flash-preview',
+        label: 'Google Gemini 3 Flash Preview',
+        languages: 'Supports 100+ languages (Requires Gemini API Key)'
+    },
+    {
         value: 'nvidia/canary-1b-v2',
         label: 'NVIDIA Canary',
         languages: 'Multilingual support'

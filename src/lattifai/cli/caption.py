@@ -14,7 +14,7 @@ from lattifai.utils import safe_print
 def convert(
     input_path: Pathlike,
     output_path: Pathlike,
-    include_speaker_in_text: bool = True,
+    include_speaker_in_text: bool = False,
     normalize_text: bool = False,
 ):
     """

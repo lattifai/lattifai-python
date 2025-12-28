@@ -21,6 +21,9 @@ class AlignmentConfig:
     model_name: str = "LattifAI/Lattice-1"
     """Model identifier or path to local model directory (e.g., 'LattifAI/Lattice-1')."""
 
+    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
+    """Which model hub to use when resolving remote model names: 'huggingface' or 'modelscope'."""
+
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""
 
@@ -77,6 +80,17 @@ class AlignmentConfig:
     max_active_states: int = 10000
     """Maximum number of active states during decoding. Prevents excessive memory usage.
     Default: 10000. Typical range: 1000-20000.
+    """
+
+    # Alignment timing configuration
+    start_margin: float = 0.08
+    """Maximum start time margin (in seconds) to extend segment boundaries at the beginning.
+    Default: 0.08. Typical range: 0.0-0.5.
+    """
+
+    end_margin: float = 0.20
+    """Maximum end time margin (in seconds) to extend segment boundaries at the end.
+    Default: 0.20. Typical range: 0.0-0.5.
     """
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)

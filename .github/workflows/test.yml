@@ -64,6 +64,22 @@ jobs:
           pytest ./tests/streaming
           bash tests/test_audio_formats.sh  # Run audio format tests
 
+      - name: Test modelscope Integration
+        if: matrix.python-version == '3.10'
+        env:
+          LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
+        run: |
+          # modelscope/LattifAI/Lattice-1-Alpha
+          lai alignment align -Y media.input_path=tests/data/SA1.m4a \
+                                 caption.input_path=tests/data/SA1.TXT \
+                                 caption.output_path=tests/data/SA1.TextGrid \
+                                 alignment.model_name=LattifAI/Lattice-1-Alpha alignment.model_hub=modelscope
+          # modelscope/LattifAI/Lattice-1
+          lai alignment align -Y media.input_path=tests/data/SA1.m4a \
+                                 caption.input_path=tests/data/SA1.TXT \
+                                 caption.output_path=tests/data/SA1_Lattice1.TextGrid \
+                                 alignment.model_name=LattifAI/Lattice-1 alignment.model_hub=modelscope
+
       - name: Test Cli Commands
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
@@ -79,8 +95,9 @@ jobs:
           fi
           # Test lai-transcribe command
           # Gemini Model
-          lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
-          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview
+          lai-transcribe -Y tests/data/SA1.wav tests/data/SA1_gemini.md transcription.model_name=gemini-2.5-pro -v
+          # lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview
+          # lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-flash-preview
           # iic/SenseVoiceSmall
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=iic/SenseVoiceSmall
 

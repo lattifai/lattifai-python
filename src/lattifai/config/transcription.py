@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",
     "gemini-3-pro-preview",
+    "gemini-3-flash-preview",
     "nvidia/parakeet-tdt-0.6b-v3",
     "nvidia/canary-1b-v2",
     "iic/SenseVoiceSmall",
@@ -49,6 +50,9 @@ class TranscriptionConfig:
 
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
+
+    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
+    """Which model hub to use when resolving lattice models for transcription."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""

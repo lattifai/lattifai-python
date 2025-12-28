@@ -1,10 +1,9 @@
 """Shared utility helpers for the LattifAI SDK."""
 
-import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, Type
+from typing import Optional
 
 from lattifai.errors import ModelLoadError
 
@@ -88,42 +87,74 @@ def _create_cache_marker(cache_dir: Path) -> None:
     marker_path.touch()
 
 
-def _resolve_model_path(model_name_or_path: str) -> str:
-    """Resolve model path, downloading from Hugging Face when necessary."""
+def _resolve_model_path(model_name_or_path: str, model_hub: str = "huggingface") -> str:
+    """Resolve model path, downloading from the specified model hub when necessary.
+
+    Args:
+        model_name_or_path: Local path or remote model identifier.
+        model_hub: Which hub to use for downloads. Supported: "huggingface", "modelscope".
+    """
     if Path(model_name_or_path).expanduser().exists():
         return str(Path(model_name_or_path).expanduser())
 
-    from huggingface_hub import snapshot_download
-    from huggingface_hub.constants import HF_HUB_CACHE
-    from huggingface_hub.errors import LocalEntryNotFoundError
+    # Normalize hub name
+    hub = (model_hub or "huggingface").lower()
 
-    # Determine cache directory for this model
-    cache_dir = Path(HF_HUB_CACHE) / f'models--{model_name_or_path.replace("/", "--")}'
+    if hub not in ("huggingface", "modelscope"):
+        raise ValueError(f"Unsupported model_hub: {model_hub}. Supported: 'huggingface', 'modelscope'.")
 
-    # Check if we have a valid cached version
-    if _is_cache_valid(cache_dir):
-        # Return the snapshot path (latest version)
-        snapshots_dir = cache_dir / "snapshots"
-        if snapshots_dir.exists():
-            snapshot_dirs = [d for d in snapshots_dir.iterdir() if d.is_dir()]
-            if snapshot_dirs:
-                # Return the most recent snapshot
-                latest_snapshot = max(snapshot_dirs, key=lambda p: p.stat().st_mtime)
-                return str(latest_snapshot)
+    # If local path exists, return it regardless of hub
+    if Path(model_name_or_path).expanduser().exists():
+        return str(Path(model_name_or_path).expanduser())
 
-    try:
-        downloaded_path = snapshot_download(repo_id=model_name_or_path, repo_type="model")
-        _create_cache_marker(cache_dir)
-        return downloaded_path
-    except LocalEntryNotFoundError:
+    if hub == "huggingface":
+        from huggingface_hub import snapshot_download
+        from huggingface_hub.constants import HF_HUB_CACHE
+        from huggingface_hub.errors import LocalEntryNotFoundError
+
+        # Determine cache directory for this model
+        cache_dir = Path(HF_HUB_CACHE) / f'models--{model_name_or_path.replace("/", "--")}'
+
+        # Check if we have a valid cached version
+        if _is_cache_valid(cache_dir):
+            # Return the snapshot path (latest version)
+            snapshots_dir = cache_dir / "snapshots"
+            if snapshots_dir.exists():
+                snapshot_dirs = [d for d in snapshots_dir.iterdir() if d.is_dir()]
+                if snapshot_dirs:
+                    # Return the most recent snapshot
+                    latest_snapshot = max(snapshot_dirs, key=lambda p: p.stat().st_mtime)
+                    return str(latest_snapshot)
+
         try:
-            os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
             downloaded_path = snapshot_download(repo_id=model_name_or_path, repo_type="model")
             _create_cache_marker(cache_dir)
             return downloaded_path
-        except Exception as e:  # pragma: no cover - bubble up for caller context
-            raise ModelLoadError(model_name_or_path, original_error=e)
-    except Exception as e:  # pragma: no cover - unexpected download issue
+        except LocalEntryNotFoundError:
+            # Fall back to modelscope if HF entry not found
+            try:
+                from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot
+
+                downloaded_path = ms_snapshot(model_name_or_path)
+                return downloaded_path
+            except Exception as e:  # pragma: no cover - bubble up for caller context
+                raise ModelLoadError(model_name_or_path, original_error=e)
+        except Exception as e:  # pragma: no cover - unexpected download issue
+            import colorful
+
+            print(colorful.red | f"Error downloading from Hugging Face Hub: {e}. Trying ModelScope...")
+            from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot
+
+            downloaded_path = ms_snapshot(model_name_or_path)
+            return downloaded_path
+
+    # modelscope path
+    from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot
+
+    try:
+        downloaded_path = ms_snapshot(model_name_or_path)
+        return downloaded_path
+    except Exception as e:  # pragma: no cover
         raise ModelLoadError(model_name_or_path, original_error=e)
 
 

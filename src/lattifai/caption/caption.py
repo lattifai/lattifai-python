@@ -4,16 +4,18 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, TypeVar
 
 from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
 from tgt import TextGrid
 
-from ..config.caption import InputCaptionFormat, OutputCaptionFormat
+from ..config.caption import InputCaptionFormat, OutputCaptionFormat  # noqa: F401
 from .supervision import Supervision
 from .text_parser import normalize_text as normalize_text_fn
 from .text_parser import parse_speaker_text, parse_timestamp_text
+
+DiarizationOutput = TypeVar("DiarizationOutput")
 
 
 @dataclass
@@ -40,7 +42,7 @@ class Caption:
     # Audio Event Detection results
     audio_events: Optional[TextGrid] = None
     # Speaker Diarization results
-    speaker_diarization: Optional[TextGrid] = None
+    speaker_diarization: Optional[DiarizationOutput] = None
     # Alignment results
     alignments: List[Supervision] = field(default_factory=list)
 
@@ -272,7 +274,7 @@ class Caption:
         cls,
         transcription: List[Supervision],
         audio_events: Optional[TextGrid] = None,
-        speaker_diarization: Optional[TextGrid] = None,
+        speaker_diarization: Optional[DiarizationOutput] = None,
         language: Optional[str] = None,
         source_path: Optional[Pathlike] = None,
         metadata: Optional[Dict[str, str]] = None,
@@ -283,7 +285,7 @@ class Caption:
         Args:
             transcription: List of transcription supervision segments
             audio_events: Optional TextGrid with audio event detection results
-            speaker_diarization: Optional TextGrid with speaker diarization results
+            speaker_diarization: Optional DiarizationOutput with speaker diarization results
             language: Language code
             source_path: Source file path
             metadata: Additional metadata
@@ -384,9 +386,9 @@ class Caption:
         """
         Read speaker diarization TextGrid from file.
         """
-        from tgt import read_textgrid
+        from lattifai_core.diarization import DiarizationOutput
 
-        self.speaker_diarization = read_textgrid(path)
+        self.speaker_diarization = DiarizationOutput.read(path)
         return self.speaker_diarization
 
     def write_speaker_diarization(
@@ -399,9 +401,7 @@ class Caption:
         if not self.speaker_diarization:
             raise ValueError("No speaker diarization data to write.")
 
-        from tgt import write_to_file
-
-        write_to_file(self.speaker_diarization, path, format="long")
+        self.speaker_diarization.write(path)
         return path
 
     @staticmethod
@@ -451,7 +451,10 @@ class Caption:
                     else:
                         if include_speaker_in_text and sup.speaker is not None:
                             # Use [SPEAKER]: format for consistency with parsing
-                            text = f"[{sup.speaker}]: {sup.text}"
+                            if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
+                                text = f"[{sup.speaker}]: {sup.text}"
+                            else:
+                                text = f"{sup.text}"
                         else:
                             text = sup.text
                         f.write(f"[{sup.start:.2f}-{sup.end:.2f}] {text}\n")
@@ -471,7 +474,12 @@ class Caption:
             tg = TextGrid()
             supervisions, words, scores = [], [], {"utterances": [], "words": []}
             for supervision in sorted(alignments, key=lambda x: x.start):
-                if include_speaker_in_text and supervision.speaker is not None:
+                # Respect `original_speaker` custom flag: default to include speaker when missing
+                if (
+                    include_speaker_in_text
+                    and supervision.speaker is not None
+                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
+                ):
                     text = f"{supervision.speaker} {supervision.text}"
                 else:
                     text = supervision.text
@@ -526,7 +534,10 @@ class Caption:
                         )
                 else:
                     if include_speaker_in_text and sup.speaker is not None:
-                        text = f"{sup.speaker} {sup.text}"
+                        if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
+                            text = f"{sup.speaker} {sup.text}"
+                        else:
+                            text = f"{sup.text}"
                     else:
                         text = sup.text
                     subs.append(
@@ -829,8 +840,8 @@ class Caption:
                 content = f.read()
             if cls._is_youtube_vtt_with_word_timestamps(content):
                 return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
-        
-        #Match Gemini format: explicit format, or files ending with Gemini.md/Gemini3.md,
+
+        # Match Gemini format: explicit format, or files ending with Gemini.md/Gemini3.md,
         # or files containing "gemini" in the name with .md extension
         caption_str = str(caption).lower()
         is_gemini_format = (
@@ -1251,7 +1262,11 @@ class Caption:
             if include_speaker_in_text:
                 file.write("speaker\tstart\tend\ttext\n")
                 for supervision in alignments:
-                    speaker = supervision.speaker or ""
+                    # Respect `original_speaker` custom flag: default to True when missing
+                    include_speaker = supervision.speaker and (
+                        not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
+                    )
+                    speaker = supervision.speaker if include_speaker else ""
                     start_ms = round(1000 * supervision.start)
                     end_ms = round(1000 * supervision.end)
                     text = supervision.text.strip().replace("\t", " ")
@@ -1289,7 +1304,10 @@ class Caption:
                 writer = csv.writer(file)
                 writer.writerow(["speaker", "start", "end", "text"])
                 for supervision in alignments:
-                    speaker = supervision.speaker or ""
+                    include_speaker = supervision.speaker and (
+                        not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
+                    )
+                    speaker = supervision.speaker if include_speaker else ""
                     start_ms = round(1000 * supervision.start)
                     end_ms = round(1000 * supervision.end)
                     text = supervision.text.strip()
@@ -1327,7 +1345,12 @@ class Caption:
                 end = supervision.end
                 text = supervision.text.strip().replace("\t", " ")
 
-                if include_speaker_in_text and supervision.speaker:
+                # Respect `original_speaker` custom flag when adding speaker prefix
+                if (
+                    include_speaker_in_text
+                    and supervision.speaker
+                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
+                ):
                     text = f"[[{supervision.speaker}]]{text}"
 
                 file.write(f"{start}\t{end}\t{text}\n")
@@ -1373,9 +1396,13 @@ class Caption:
                 # Write timestamp line
                 file.write(f"{start_time},{end_time}\n")
 
-                # Write text (with optional speaker)
+                # Write text (with optional speaker). Respect `original_speaker` custom flag.
                 text = supervision.text.strip()
-                if include_speaker_in_text and supervision.speaker:
+                if (
+                    include_speaker_in_text
+                    and supervision.speaker
+                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
+                ):
                     text = f"{supervision.speaker}: {text}"
 
                 file.write(f"{text}\n")

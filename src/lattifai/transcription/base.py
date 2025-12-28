@@ -2,10 +2,12 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional, Union
+from typing import List, Optional, Union
+
+import numpy as np
 
 from lattifai.audio2 import AudioData
-from lattifai.caption import Caption
+from lattifai.caption import Caption, Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.logging import get_logger
 
@@ -94,6 +96,23 @@ class BaseTranscriber(ABC):
         Args:
             media_file: Path to media file or AudioData object.
             language: Optional language code for transcription.
+        """
+
+    @abstractmethod
+    def transcribe_numpy(
+        self,
+        audio: Union[np.ndarray, List[np.ndarray]],
+        language: Optional[str] = None,
+    ) -> Union[Supervision, List[Supervision]]:
+        """
+        Transcribe audio from a numpy array and return Supervision.
+
+        Args:
+            audio_array: Audio data as numpy array (shape: [samples]).
+            language: Optional language code for transcription.
+
+        Returns:
+            Supervision object with transcription info.
         """
 
     @abstractmethod

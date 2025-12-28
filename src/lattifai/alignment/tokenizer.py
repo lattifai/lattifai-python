@@ -434,6 +434,8 @@ class LatticeTokenizer:
         lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
         supervisions: List[Supervision],
         return_details: bool = False,
+        start_margin: float = 0.08,
+        end_margin: float = 0.20,
     ) -> List[Supervision]:
         emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
         response = self.client_wrapper.post(
@@ -448,6 +450,8 @@ class LatticeTokenizer:
                 "channel": channel,
                 "return_details": False if return_details is None else return_details,
                 "destroy_lattice": True,
+                "start_margin": start_margin,
+                "end_margin": end_margin,
             },
         )
         if response.status_code == 400:

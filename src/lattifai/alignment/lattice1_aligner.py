@@ -35,7 +35,8 @@ class Lattice1Aligner(object):
             raise ValueError("AlignmentConfig.client_wrapper is not set. It must be initialized by the client.")
 
         client_wrapper = config.client_wrapper
-        model_path = _resolve_model_path(config.model_name)
+        # Resolve model path using configured model hub
+        model_path = _resolve_model_path(config.model_name, getattr(config, "model_hub", "huggingface"))
 
         self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.model_name, config.device)
         self.worker = _load_worker(model_path, config.device, config)
@@ -52,6 +53,29 @@ class Lattice1Aligner(object):
             Emission tensor of shape (1, T, vocab_size)
         """
         return self.worker.emission(ndarray)
+
+    def separate(self, audio: np.ndarray) -> np.ndarray:
+        """Separate audio using separator model.
+
+        Args:
+            audio: np.ndarray object containing the audio to separate, shape (1, T)
+
+        Returns:
+            Separated audio as numpy array
+
+        Raises:
+            RuntimeError: If separator model is not available
+        """
+        if self.worker.separator_ort is None:
+            raise RuntimeError("Separator model not available. separator.onnx not found in model path.")
+
+        # Run separator model
+        separator_output = self.worker.separator_ort.run(
+            None,
+            {"audio": audio},
+        )
+
+        return separator_output[0]
 
     def alignment(
         self,
@@ -120,7 +144,12 @@ class Lattice1Aligner(object):
                 safe_print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
             try:
                 alignments = self.tokenizer.detokenize(
-                    lattice_id, lattice_results, supervisions=supervisions, return_details=return_details
+                    lattice_id,
+                    lattice_results,
+                    supervisions=supervisions,
+                    return_details=return_details,
+                    start_margin=self.config.start_margin,
+                    end_margin=self.config.end_margin,
                 )
                 if verbose:
                     safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))

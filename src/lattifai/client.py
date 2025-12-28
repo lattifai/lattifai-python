@@ -106,7 +106,13 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             if not input_caption:
-                caption = self._transcribe(media_audio, source_lang=self.caption_config.source_lang, is_async=False)
+                output_dir = None
+                if output_caption_path:
+                    output_dir = Path(str(output_caption_path)).parent
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                caption = self._transcribe(
+                    media_audio, source_lang=self.caption_config.source_lang, is_async=False, output_dir=output_dir
+                )
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
 
@@ -260,18 +266,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             caption.supervisions = supervisions
             caption.alignments = alignments
 
-            # Step 5: Speaker diarization
-            if self.diarization_config.enabled and self.diarizer:
-                safe_print(colorful.cyan("🗣️  Performing speaker diarization..."))
-                caption = self.speaker_diarization(
-                    input_media=media_audio,
-                    caption=caption,
-                    output_caption_path=output_caption_path,
-                )
-            elif output_caption_path:
+            if output_caption_path:
                 self._write_caption(caption, output_caption_path)
 
-            return caption
         except (CaptionProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
             # Re-raise our specific errors as-is
             raise
@@ -283,6 +280,17 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
+
+        # Step 5: Speaker diarization
+        if self.diarization_config.enabled and self.diarizer:
+            safe_print(colorful.cyan("🗣️  Performing speaker diarization..."))
+            caption = self.speaker_diarization(
+                input_media=media_audio,
+                caption=caption,
+                output_caption_path=output_caption_path,
+            )
+
+        return caption
 
     def speaker_diarization(
         self,
@@ -315,7 +323,14 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 caption.read_speaker_diarization(diarization_file)
 
         diarization, alignments = self.diarizer.diarize_with_alignments(
-            input_media, caption.alignments, diarization=caption.speaker_diarization
+            input_media,
+            caption.alignments,
+            diarization=caption.speaker_diarization,
+            alignment_fn=self.aligner.alignment,
+            transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
+            separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
+            debug=self.diarizer.config.debug,
+            output_path=output_caption_path,
         )
         caption.alignments = alignments
         caption.speaker_diarization = diarization
@@ -323,105 +338,6 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         # Write output if requested
         if output_caption_path:
             self._write_caption(caption, output_caption_path)
-
-            if self.diarizer.config.debug:
-                # debug
-                from tgt import Interval, IntervalTier, TextGrid, write_to_file
-
-                debug_tg = TextGrid()
-                transcript_tier = IntervalTier(
-                    start_time=0,
-                    end_time=input_media.duration,
-                    name="transcript",
-                    objects=[Interval(sup.start, sup.end, sup.text) for sup in caption.alignments],
-                )
-                debug_tg.add_tier(transcript_tier)
-
-                speaker_tier = IntervalTier(
-                    start_time=0,
-                    end_time=input_media.duration,
-                    name="speaker",
-                    objects=[Interval(sup.start, sup.end, sup.speaker) for sup in caption.alignments],
-                )
-                debug_tg.add_tier(speaker_tier)
-
-                from collections import defaultdict
-
-                spk2intervals = defaultdict(lambda: [])
-                num_multispk = 0
-
-                segments, skipks = [], []
-                for k, supervision in enumerate(caption.alignments):  # TODO: alignments 本身存在 overlap, eg: [event]
-                    # supervision = caption.alignments[k]
-                    if supervision.custom.get("speaker", []):
-                        num_multispk += 1
-                    else:
-                        continue
-
-                    if k in skipks:
-                        continue
-
-                    for speaker in supervision.custom.get("speaker", []):
-                        for name, start_time, end_time in speaker:
-                            spk2intervals[name].append(Interval(start_time, end_time, name))
-
-                    _segments = []
-                    if k > 0:
-                        _segments.append(caption.alignments[k - 1])
-                    _segments.append(supervision)
-                    while k + 1 < len(caption.alignments):
-                        skipks.append(k + 1)
-                        next_sup = caption.alignments[k + 1]
-                        if not next_sup.custom.get("speaker", []):
-                            k += 1
-                            break
-                        _segments.append(next_sup)
-                        k += 1
-
-                    if segments:
-                        if _segments[0].start >= segments[-1][-1].end:
-                            segments.append(_segments)
-                        else:
-                            if _segments[1:]:
-                                segments.append(_segments[1:])
-                            else:
-                                pass
-                    else:
-                        segments.append(_segments)
-
-                print(
-                    f"Number of multi-speaker segments: {num_multispk}/{len(caption.alignments)} segments: {len(segments)}"
-                )
-
-                for speaker, intervals in sorted(spk2intervals.items(), key=lambda x: x[0]):
-                    speaker_tier = IntervalTier(
-                        start_time=0, end_time=input_media.duration, name=speaker, objects=intervals
-                    )
-                    debug_tg.add_tier(speaker_tier)
-
-                for tier in caption.speaker_diarization.tiers:
-                    tier.name = f"Diarization-{tier.name}"
-                    debug_tg.add_tier(tier)
-
-                tier = IntervalTier(
-                    start_time=0,
-                    end_time=input_media.duration,
-                    name="resegment",
-                    objects=[
-                        Interval(round(sup.start, 2), round(sup.end, 2), sup.text)
-                        for _segments in segments
-                        for sup in _segments
-                    ],
-                )
-                debug_tg.add_tier(tier)
-
-                # if caption.audio_events:
-                #     for tier in caption.audio_events.tiers:
-                #         # tier.name = f"{tier.name}"
-                #         debug_tg.add_tier(tier)
-
-                debug_tgt_file = Path(str(output_caption_path)).with_suffix(".DiarizationDebug.TextGrid")
-                write_to_file(debug_tg, debug_tgt_file, format="long")
 
         return caption
 
