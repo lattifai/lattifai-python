@@ -10,9 +10,9 @@ per-file-ignores =
   src/lattifai/bin/*.py: W503, F541, E501, F541, F811
   src/lattifai/workflow/*.py: W503
   src/lattifai/server/app.py: E501
+  src/lattifai/caption/caption.py: W503
   tests/*/*.py: E501, F541, F401, F841, W605, E226
   tests/*.py: F541
-
 
 exclude =
   .git,

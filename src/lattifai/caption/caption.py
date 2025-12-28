@@ -4,13 +4,13 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
 from tgt import TextGrid
 
-from ..config.caption import InputCaptionFormat, OutputCaptionFormat
+from ..config.caption import InputCaptionFormat, OutputCaptionFormat  # noqa: F401
 from .supervision import Supervision
 from .text_parser import normalize_text as normalize_text_fn
 from .text_parser import parse_speaker_text, parse_timestamp_text
@@ -451,7 +451,10 @@ class Caption:
                     else:
                         if include_speaker_in_text and sup.speaker is not None:
                             # Use [SPEAKER]: format for consistency with parsing
-                            text = f"[{sup.speaker}]: {sup.text}"
+                            if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
+                                text = f"[{sup.speaker}]: {sup.text}"
+                            else:
+                                text = f"{sup.text}"
                         else:
                             text = sup.text
                         f.write(f"[{sup.start:.2f}-{sup.end:.2f}] {text}\n")
@@ -471,7 +474,12 @@ class Caption:
             tg = TextGrid()
             supervisions, words, scores = [], [], {"utterances": [], "words": []}
             for supervision in sorted(alignments, key=lambda x: x.start):
-                if include_speaker_in_text and supervision.speaker is not None:
+                # Respect `original_speaker` custom flag: default to include speaker when missing
+                if (
+                    include_speaker_in_text
+                    and supervision.speaker is not None
+                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
+                ):
                     text = f"{supervision.speaker} {supervision.text}"
                 else:
                     text = supervision.text
@@ -526,7 +534,10 @@ class Caption:
                         )
                 else:
                     if include_speaker_in_text and sup.speaker is not None:
-                        text = f"{sup.speaker} {sup.text}"
+                        if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
+                            text = f"{sup.speaker} {sup.text}"
+                        else:
+                            text = f"{sup.text}"
                     else:
                         text = sup.text
                     subs.append(
@@ -1242,7 +1253,11 @@ class Caption:
             if include_speaker_in_text:
                 file.write("speaker\tstart\tend\ttext\n")
                 for supervision in alignments:
-                    speaker = supervision.speaker or ""
+                    # Respect `original_speaker` custom flag: default to True when missing
+                    include_speaker = supervision.speaker and (
+                        not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
+                    )
+                    speaker = supervision.speaker if include_speaker else ""
                     start_ms = round(1000 * supervision.start)
                     end_ms = round(1000 * supervision.end)
                     text = supervision.text.strip().replace("\t", " ")
@@ -1280,7 +1295,10 @@ class Caption:
                 writer = csv.writer(file)
                 writer.writerow(["speaker", "start", "end", "text"])
                 for supervision in alignments:
-                    speaker = supervision.speaker or ""
+                    include_speaker = supervision.speaker and (
+                        not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
+                    )
+                    speaker = supervision.speaker if include_speaker else ""
                     start_ms = round(1000 * supervision.start)
                     end_ms = round(1000 * supervision.end)
                     text = supervision.text.strip()
@@ -1318,7 +1336,12 @@ class Caption:
                 end = supervision.end
                 text = supervision.text.strip().replace("\t", " ")
 
-                if include_speaker_in_text and supervision.speaker:
+                # Respect `original_speaker` custom flag when adding speaker prefix
+                if (
+                    include_speaker_in_text
+                    and supervision.speaker
+                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
+                ):
                     text = f"[[{supervision.speaker}]]{text}"
 
                 file.write(f"{start}\t{end}\t{text}\n")
@@ -1364,9 +1387,13 @@ class Caption:
                 # Write timestamp line
                 file.write(f"{start_time},{end_time}\n")
 
-                # Write text (with optional speaker)
+                # Write text (with optional speaker). Respect `original_speaker` custom flag.
                 text = supervision.text.strip()
-                if include_speaker_in_text and supervision.speaker:
+                if (
+                    include_speaker_in_text
+                    and supervision.speaker
+                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
+                ):
                     text = f"{supervision.speaker}: {text}"
 
                 file.write(f"{text}\n")
