@@ -4,7 +4,7 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypeVar
 
 from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
@@ -14,6 +14,8 @@ from ..config.caption import InputCaptionFormat, OutputCaptionFormat  # noqa: F4
 from .supervision import Supervision
 from .text_parser import normalize_text as normalize_text_fn
 from .text_parser import parse_speaker_text, parse_timestamp_text
+
+DiarizationOutput = TypeVar("DiarizationOutput")
 
 
 @dataclass
@@ -40,7 +42,7 @@ class Caption:
     # Audio Event Detection results
     audio_events: Optional[TextGrid] = None
     # Speaker Diarization results
-    speaker_diarization: Optional[TextGrid] = None
+    speaker_diarization: Optional[DiarizationOutput] = None
     # Alignment results
     alignments: List[Supervision] = field(default_factory=list)
 
@@ -272,7 +274,7 @@ class Caption:
         cls,
         transcription: List[Supervision],
         audio_events: Optional[TextGrid] = None,
-        speaker_diarization: Optional[TextGrid] = None,
+        speaker_diarization: Optional[DiarizationOutput] = None,
         language: Optional[str] = None,
         source_path: Optional[Pathlike] = None,
         metadata: Optional[Dict[str, str]] = None,
@@ -283,7 +285,7 @@ class Caption:
         Args:
             transcription: List of transcription supervision segments
             audio_events: Optional TextGrid with audio event detection results
-            speaker_diarization: Optional TextGrid with speaker diarization results
+            speaker_diarization: Optional DiarizationOutput with speaker diarization results
             language: Language code
             source_path: Source file path
             metadata: Additional metadata
@@ -384,9 +386,9 @@ class Caption:
         """
         Read speaker diarization TextGrid from file.
         """
-        from tgt import read_textgrid
+        from lattifai_core.diarization import DiarizationOutput
 
-        self.speaker_diarization = read_textgrid(path)
+        self.speaker_diarization = DiarizationOutput.read(path)
         return self.speaker_diarization
 
     def write_speaker_diarization(
@@ -399,9 +401,7 @@ class Caption:
         if not self.speaker_diarization:
             raise ValueError("No speaker diarization data to write.")
 
-        from tgt import write_to_file
-
-        write_to_file(self.speaker_diarization, path, format="long")
+        self.speaker_diarization.write(path)
         return path
 
     @staticmethod

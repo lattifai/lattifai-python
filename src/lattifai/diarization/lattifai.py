@@ -1,8 +1,11 @@
 """LattifAI speaker diarization implementation."""
 
 import logging
+from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
+import numpy as np
+from lattifai_core.diarization import DiarizationOutput
 from tgt import TextGrid
 
 from lattifai.audio2 import AudioData
@@ -58,7 +61,7 @@ class LattifAIDiarizer:
         num_speakers: Optional[int] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
-    ) -> TextGrid:
+    ) -> DiarizationOutput:
         """Perform speaker diarization on the input audio."""
         return self.diarizer.diarize(
             input_media,
@@ -71,14 +74,14 @@ class LattifAIDiarizer:
         self,
         input_media: AudioData,
         alignments: List[Supervision],
-        diarization: Optional[TextGrid] = None,
+        diarization: Optional[DiarizationOutput] = None,
         num_speakers: Optional[int] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
         alignment_fn: Optional[Callable] = None,
         debug: bool = False,
         output_path: Optional[str] = None,
-    ) -> Tuple[TextGrid, List[Supervision]]:
+    ) -> Tuple[DiarizationOutput, List[Supervision]]:
         """Diarize the given media input and return alignments with refined speaker labels."""
         return self.diarizer.diarize_with_alignments(
             input_media,
