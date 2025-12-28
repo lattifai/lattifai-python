@@ -829,8 +829,17 @@ class Caption:
                 content = f.read()
             if cls._is_youtube_vtt_with_word_timestamps(content):
                 return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
-
-        if format == "gemini" or str(caption).endswith("Gemini.md") or str(caption).endswith("Gemini3.md"):
+        
+        #Match Gemini format: explicit format, or files ending with Gemini.md/Gemini3.md,
+        # or files containing "gemini" in the name with .md extension
+        caption_str = str(caption).lower()
+        is_gemini_format = (
+            format == "gemini"
+            or str(caption).endswith("Gemini.md")
+            or str(caption).endswith("Gemini3.md")
+            or ("gemini" in caption_str and caption_str.endswith(".md"))
+        )
+        if is_gemini_format:
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(caption)
