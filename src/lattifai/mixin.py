@@ -184,7 +184,9 @@ class LattifAIClientMixin:
         from lattifai.utils import _resolve_model_path
 
         if transcription_config is not None:
-            transcription_config.lattice_model_path = _resolve_model_path(alignment_config.model_name)
+            transcription_config.lattice_model_path = _resolve_model_path(
+                alignment_config.model_name, getattr(alignment_config, "model_hub", "huggingface")
+            )
 
         # Set client_wrapper for all configs
         alignment_config.client_wrapper = self

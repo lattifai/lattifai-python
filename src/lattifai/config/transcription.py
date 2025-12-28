@@ -50,6 +50,9 @@ class TranscriptionConfig:
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
 
+    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
+    """Which model hub to use when resolving lattice models for transcription."""
+
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 

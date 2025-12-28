@@ -35,7 +35,8 @@ class Lattice1Aligner(object):
             raise ValueError("AlignmentConfig.client_wrapper is not set. It must be initialized by the client.")
 
         client_wrapper = config.client_wrapper
-        model_path = _resolve_model_path(config.model_name)
+        # Resolve model path using configured model hub
+        model_path = _resolve_model_path(config.model_name, getattr(config, "model_hub", "huggingface"))
 
         self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.model_name, config.device)
         self.worker = _load_worker(model_path, config.device, config)

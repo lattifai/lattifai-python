@@ -21,6 +21,9 @@ class AlignmentConfig:
     model_name: str = "LattifAI/Lattice-1"
     """Model identifier or path to local model directory (e.g., 'LattifAI/Lattice-1')."""
 
+    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
+    """Which model hub to use when resolving remote model names: 'huggingface' or 'modelscope'."""
+
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""
 
