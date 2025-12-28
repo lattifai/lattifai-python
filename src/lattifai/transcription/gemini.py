@@ -2,12 +2,14 @@
 
 import asyncio
 from pathlib import Path
-from typing import Optional, Union
+from typing import List, Optional, Union
 
+import numpy as np
 from google import genai
 from google.genai.types import GenerateContentConfig, Part, ThinkingConfig
 
 from lattifai.audio2 import AudioData
+from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.transcription.base import BaseTranscriber
 from lattifai.transcription.prompts import get_prompt_loader
@@ -117,6 +119,130 @@ class GeminiTranscriber(BaseTranscriber):
         except Exception as e:
             self.logger.error(f"Gemini transcription failed: {str(e)}")
             raise RuntimeError(f"Gemini transcription failed: {str(e)}")
+
+    def transcribe_numpy(
+        self,
+        audio: Union[np.ndarray, List[np.ndarray]],
+        language: Optional[str] = None,
+    ) -> Union[Supervision, List[Supervision]]:
+        """
+        Transcribe audio from a numpy array (or list of arrays) and return Supervision.
+
+        Note: Gemini API does not support word-level alignment. The returned
+        Supervision will contain only the full transcription text without alignment.
+
+        Args:
+            audio: Audio data as numpy array (shape: [samples]),
+                   or a list of such arrays for batch processing.
+            language: Optional language code for transcription.
+
+        Returns:
+            Supervision object (or list of Supervision objects) with transcription text (no alignment).
+
+        Raises:
+            ValueError: If API key not provided
+            RuntimeError: If transcription fails
+        """
+        # Handle batch processing
+        if isinstance(audio, list):
+            return [self.transcribe_numpy(arr, language=language) for arr in audio]
+
+        audio_array = audio
+        # Use default sample rate of 16000 Hz
+        sample_rate = 16000
+
+        if self.config.verbose:
+            self.logger.info(f"🎤 Starting Gemini transcription for numpy array (sample_rate={sample_rate})")
+
+        # Ensure audio is in the correct shape
+        if audio_array.ndim == 1:
+            audio_array = audio_array.reshape(1, -1)
+        elif audio_array.ndim > 2:
+            raise ValueError(f"Audio array must be 1D or 2D, got shape {audio_array.shape}")
+
+        # Save numpy array to temporary file
+        import tempfile
+
+        import soundfile as sf
+
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+            # Transpose to (samples, channels) for soundfile
+            sf.write(tmp_file.name, audio_array.T, sample_rate)
+            tmp_path = Path(tmp_file.name)
+
+        try:
+            # Transcribe using simple ASR prompt
+            import asyncio
+
+            transcript = asyncio.run(self._transcribe_with_simple_prompt(tmp_path, language=language))
+
+            # Create Supervision object from transcript
+            duration = audio_array.shape[-1] / sample_rate
+            supervision = Supervision(
+                id="gemini-transcription",
+                recording_id="numpy-array",
+                start=0.0,
+                duration=duration,
+                text=transcript,
+                speaker=None,
+                alignment=None,  # Gemini does not provide word-level alignment
+            )
+
+            return supervision
+
+        finally:
+            # Clean up temporary file
+            if tmp_path.exists():
+                tmp_path.unlink()
+
+    async def _transcribe_with_simple_prompt(self, media_file: Path, language: Optional[str] = None) -> str:
+        """
+        Transcribe audio using a simple ASR prompt instead of complex instructions.
+
+        Args:
+            media_file: Path to audio file
+            language: Optional language code
+
+        Returns:
+            Transcribed text
+        """
+        client = self._get_client()
+
+        # Upload audio file
+        if self.config.verbose:
+            self.logger.info("📤 Uploading audio file to Gemini...")
+        uploaded_file = client.files.upload(file=str(media_file))
+
+        # Simple ASR prompt
+        system_prompt = "Transcribe the audio."
+        if language:
+            system_prompt = f"Transcribe the audio in {language}."
+
+        # Create simple generation config
+        simple_config = GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_modalities=["TEXT"],
+        )
+
+        contents = Part.from_uri(file_uri=uploaded_file.uri, mime_type=uploaded_file.mime_type)
+        response = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model=self.config.model_name,
+                contents=contents,
+                config=simple_config,
+            ),
+        )
+
+        if not response.text:
+            raise RuntimeError("Empty response from Gemini API")
+
+        transcript = response.text.strip()
+
+        if self.config.verbose:
+            self.logger.info(f"✅ Transcription completed: {len(transcript)} characters")
+
+        return transcript
 
     def _get_transcription_prompt(self) -> str:
         """Get (and cache) transcription system prompt from prompts module."""

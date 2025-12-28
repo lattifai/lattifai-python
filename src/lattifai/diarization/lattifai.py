@@ -79,6 +79,7 @@ class LattifAIDiarizer:
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
         alignment_fn: Optional[Callable] = None,
+        transcribe_fn: Optional[Callable] = None,
         debug: bool = False,
         output_path: Optional[str] = None,
     ) -> Tuple[DiarizationOutput, List[Supervision]]:
@@ -91,6 +92,7 @@ class LattifAIDiarizer:
             min_speakers=min_speakers,
             max_speakers=max_speakers,
             alignment_fn=alignment_fn,
+            transcribe_fn=transcribe_fn,
             debug=debug,
             output_path=output_path,
         )

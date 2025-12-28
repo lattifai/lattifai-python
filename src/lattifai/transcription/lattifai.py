@@ -1,10 +1,12 @@
 """Transcription module with config-driven architecture."""
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import List, Optional, Union
+
+import numpy as np
 
 from lattifai.audio2 import AudioData
-from lattifai.caption import Caption
+from lattifai.caption import Caption, Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.transcription.base import BaseTranscriber
 from lattifai.transcription.prompts import get_prompt_loader  # noqa: F401
@@ -73,6 +75,32 @@ class LattifAITranscriber(BaseTranscriber):
         )
 
         return caption
+
+    def transcribe_numpy(
+        self,
+        audio: Union[np.ndarray, List[np.ndarray]],
+        language: Optional[str] = None,
+    ) -> Union[Supervision, List[Supervision]]:
+        """
+        Transcribe audio from a numpy array (or list of arrays) and return Supervision.
+
+        Args:
+            audio: Audio data as numpy array (shape: [samples]),
+                   or a list of such arrays for batch processing.
+            language: Optional language code for transcription.
+
+        Returns:
+            Supervision object (or list of Supervision objects) with transcription and alignment info.
+        """
+        if self._transcriber is None:
+            from lattifai_core.transcription import LattifAITranscriber as CoreLattifAITranscriber
+
+            self._transcriber = CoreLattifAITranscriber.from_pretrained(model_config=self.config)
+
+        # Delegate to core transcriber which handles both single arrays and lists
+        return self._transcriber.transcribe(
+            audio, language=language, return_hypotheses=True, progress_bar=False, timestamps=True
+        )[0]
 
     def write(
         self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_audio_events: bool = True
