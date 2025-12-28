@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",
     "gemini-3-pro-preview",
+    "gemini-3-flash-preview",
     "nvidia/parakeet-tdt-0.6b-v3",
     "nvidia/canary-1b-v2",
     "iic/SenseVoiceSmall",

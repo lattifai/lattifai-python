@@ -106,7 +106,13 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 )
 
             if not input_caption:
-                caption = self._transcribe(media_audio, source_lang=self.caption_config.source_lang, is_async=False)
+                output_dir = None
+                if output_caption_path:
+                    output_dir = Path(str(output_caption_path)).parent
+                    output_dir.mkdir(parents=True, exist_ok=True)
+                caption = self._transcribe(
+                    media_audio, source_lang=self.caption_config.source_lang, is_async=False, output_dir=output_dir
+                )
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
 

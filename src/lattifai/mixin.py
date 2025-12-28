@@ -382,6 +382,7 @@ class LattifAIClientMixin:
         media_file: Union[str, Path, AudioData],
         source_lang: Optional[str],
         is_async: bool = False,
+        output_dir: Optional[Path] = None,
     ) -> Caption:
         """
         Get captions by downloading or transcribing.
@@ -408,6 +409,9 @@ class LattifAIClientMixin:
             safe_print(colorful.green("         ✓ Transcription completed."))
 
             if "gemini" in self.transcriber.name.lower():
+                safe_print(colorful.yellow("🔍 Gemini raw output:"))
+                safe_print(colorful.yellow(f"{transcription[:1000]}..."))  # Print first 1000 chars
+
                 # write to temp file and use Caption read
                 # On Windows, we need to close the file before writing to it
                 tmp_file = tempfile.NamedTemporaryFile(
@@ -430,6 +434,18 @@ class LattifAIClientMixin:
                     # Clean up temp file
                     if tmp_path.exists():
                         tmp_path.unlink()
+            else:
+                safe_print(colorful.yellow(f"🔍 {self.transcriber.name} raw output:"))
+                if isinstance(transcription, Caption):
+                    safe_print(colorful.yellow(f"Caption with {len(transcription.transcription)} segments"))
+                    if transcription.transcription:
+                        safe_print(colorful.yellow(f"First segment: {transcription.transcription[0].text}"))
+
+            if output_dir:
+                # Generate transcript file path
+                transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
+                await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
+                safe_print(colorful.green(f"         ✓ Transcription saved to: {transcript_file}"))
 
             return transcription
 
