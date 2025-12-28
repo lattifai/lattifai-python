@@ -840,8 +840,8 @@ class Caption:
                 content = f.read()
             if cls._is_youtube_vtt_with_word_timestamps(content):
                 return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
-        
-        #Match Gemini format: explicit format, or files ending with Gemini.md/Gemini3.md,
+
+        # Match Gemini format: explicit format, or files ending with Gemini.md/Gemini3.md,
         # or files containing "gemini" in the name with .md extension
         caption_str = str(caption).lower()
         is_gemini_format = (
