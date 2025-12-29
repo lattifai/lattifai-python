@@ -121,6 +121,7 @@ class LatticeTokenizer:
     def __init__(self, client_wrapper: Any):
         self.client_wrapper = client_wrapper
         self.model_name = ""
+        self.model_hub: Optional[str] = None
         self.words: List[str] = []
         self.g2p_model: Any = None  # Placeholder for G2P model
         self.dictionaries = defaultdict(lambda: [])
@@ -142,10 +143,20 @@ class LatticeTokenizer:
         elif device.startswith("mps") and ort.get_all_providers().count("MPSExecutionProvider") > 0:
             providers.append("MPSExecutionProvider")
 
-        sat = SaT(
-            "sat-3l-sm",
-            ort_providers=providers + ["CPUExecutionProvider"],
-        )
+        if self.model_hub == "modelscope":
+            from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot
+
+            downloaded_path = ms_snapshot("LattifAI/OmniTokenizer")
+            sat = SaT(
+                f"{downloaded_path}/sat-3l-sm",
+                tokenizer_name_or_path=f"{downloaded_path}/xlm-roberta-base",
+                ort_providers=providers + ["CPUExecutionProvider"],
+            )
+        else:
+            sat = SaT(
+                "sat-3l-sm",
+                ort_providers=providers + ["CPUExecutionProvider"],
+            )
         self.sentence_splitter = sat
 
     @staticmethod
@@ -200,6 +211,7 @@ class LatticeTokenizer:
         client_wrapper: Any,
         model_path: str,
         model_name: str,
+        model_hub: Optional[str] = None,
         device: str = "cpu",
         compressed: bool = True,
     ) -> TokenizerT:
@@ -227,6 +239,7 @@ class LatticeTokenizer:
 
         tokenizer = cls(client_wrapper=client_wrapper)
         tokenizer.model_name = model_name
+        tokenizer.model_hub = model_hub
         tokenizer.words = data["words"]
         tokenizer.dictionaries = defaultdict(list, data["dictionaries"])
         tokenizer.oov_word = data["oov_word"]
@@ -539,6 +552,7 @@ def _load_tokenizer(
     model_name: str,
     device: str,
     *,
+    model_hub: Optional[str] = None,
     tokenizer_cls: Type[LatticeTokenizer] = LatticeTokenizer,
 ) -> LatticeTokenizer:
     """Instantiate tokenizer with consistent error handling."""
@@ -546,5 +560,6 @@ def _load_tokenizer(
         client_wrapper=client_wrapper,
         model_path=model_path,
         model_name=model_name,
+        model_hub=model_hub,
         device=device,
     )

@@ -38,7 +38,9 @@ class Lattice1Aligner(object):
         # Resolve model path using configured model hub
         model_path = _resolve_model_path(config.model_name, getattr(config, "model_hub", "huggingface"))
 
-        self.tokenizer = _load_tokenizer(client_wrapper, model_path, config.model_name, config.device)
+        self.tokenizer = _load_tokenizer(
+            client_wrapper, model_path, config.model_name, config.device, model_hub=config.model_hub
+        )
         self.worker = _load_worker(model_path, config.device, config)
 
         self.frame_shift = self.worker.frame_shift
