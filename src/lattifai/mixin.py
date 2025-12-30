@@ -491,10 +491,13 @@ class LattifAIClientMixin:
                     safe_print(colorful.green(f"📄 Using provided caption file: {caption_path}"))
                     return str(caption_path)
                 else:
-                    raise FileNotFoundError(f"Provided caption path does not exist: {caption_path}")
-
-            # Generate transcript file path
-            transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
+                    safe_print(colorful.red(f"Provided caption path does not exist: {caption_path}, use transcription"))
+                    use_transcription = True
+                    transcript_file = caption_path
+                    caption_path.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                # Generate transcript file path
+                transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
 
             if use_transcription:
                 # Transcription mode: use Transcriber to transcribe
