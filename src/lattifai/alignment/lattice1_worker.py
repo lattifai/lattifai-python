@@ -80,7 +80,7 @@ class Lattice1Worker:
             try:
                 self.separator_ort = ort.InferenceSession(
                     str(separator_model_path),
-                    providers=providers + ["CPUExecutionProvider"],
+                    providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
                 )
             except Exception as e:
                 raise ModelLoadError(f"separator model from {model_path}", original_error=e)

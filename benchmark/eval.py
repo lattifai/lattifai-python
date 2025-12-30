@@ -229,7 +229,7 @@ Examples:
                 header = ["Model"] + [
                     "DER" if key == "diarization error rate" else f"{key} (s)" for key, _ in ordered_items
                 ]
-                values = [model_display] + [f"{val:.2f}" for _, val in ordered_items]
+                values = [model_display] + [f"{val:.4f}" for _, val in ordered_items]
 
                 # Print table
                 print("Metric Details:")

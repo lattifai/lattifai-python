@@ -70,13 +70,11 @@ class Lattice1Aligner(object):
         """
         if self.worker.separator_ort is None:
             raise RuntimeError("Separator model not available. separator.onnx not found in model path.")
-
         # Run separator model
         separator_output = self.worker.separator_ort.run(
             None,
-            {"audio": audio},
+            {"audios": audio},
         )
-
         return separator_output[0]
 
     def alignment(

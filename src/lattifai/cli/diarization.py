@@ -8,7 +8,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
-from lattifai.config import CaptionConfig, ClientConfig, DiarizationConfig, MediaConfig
+from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, MediaConfig
 from lattifai.utils import safe_print
 
 __all__ = ["diarize"]
@@ -22,6 +22,7 @@ def diarize(
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
+    alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
     diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
 ):
     """Run speaker diarization on aligned captions and audio."""
@@ -53,6 +54,7 @@ def diarize(
 
     client_instance = LattifAI(
         client_config=client,
+        alignment_config=alignment,
         caption_config=caption_config,
         diarization_config=diarization_config,
     )
