@@ -63,18 +63,12 @@ class Lattice1Worker:
         except Exception as e:
             raise ModelLoadError(f"acoustic model from {model_path}", original_error=e)
 
+        # Get vocab_size from model output
+        self.vocab_size = self.acoustic_ort.get_outputs()[0].shape[-1]
+
         # get input_names
         input_names = [inp.name for inp in self.acoustic_ort.get_inputs()]
-        if "audios" not in input_names:
-            try:
-                config = FbankConfig(num_mel_bins=80, device=device, snip_edges=False)
-                config_dict = config.to_dict()
-                config_dict.pop("device")
-                self.extractor = Wav2LogFilterBank(**config_dict).to(device).eval()
-            except Exception as e:
-                raise ModelLoadError(f"feature extractor for device {device}", original_error=e)
-        else:
-            self.extractor = None  # ONNX model includes feature extractor
+        assert "audios" in input_names, f"Input name audios not found in {input_names}"
 
         # Initialize separator if available
         separator_model_path = Path(model_path) / "separator.onnx"
@@ -96,84 +90,58 @@ class Lattice1Worker:
     def frame_shift(self) -> float:
         return 0.02  # 20 ms
 
-    @torch.inference_mode()
-    def emission(self, ndarray: np.ndarray, acoustic_scale: float = 1.0, device: Optional[str] = None) -> torch.Tensor:
+    def emission(self, ndarray: np.ndarray, acoustic_scale: float = 1.0) -> np.ndarray:
         """Generate emission probabilities from audio ndarray.
 
         Args:
             ndarray: Audio data as numpy array of shape (1, T) or (C, T)
 
         Returns:
-            Emission tensor of shape (1, T, vocab_size)
+            Emission numpy array of shape (1, T, vocab_size)
         """
         _start = time.time()
-        if self.extractor is not None:
-            # audio -> features -> emission
-            audio = torch.from_numpy(ndarray).to(self.device)
-            if audio.shape[1] < 160:
-                audio = torch.nn.functional.pad(audio, (0, 320 - audio.shape[1]))
-            features = self.extractor(audio)  # (1, T, D)
-            if features.shape[1] > 6000:
-                emissions = []
-                for start in range(0, features.size(1), 6000):
-                    _features = features[:, start : start + 6000, :]
-                    ort_inputs = {
-                        "features": _features.cpu().numpy(),
-                        "feature_lengths": np.array([_features.size(1)], dtype=np.int64),
-                    }
-                    emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
-                    emissions.append(emission)
-                emission = torch.cat(
-                    [torch.from_numpy(emission).to(device or self.device) for emission in emissions], dim=1
-                )  # (1, T, vocab_size)
-                del emissions
-            else:
-                ort_inputs = {
-                    "features": features.cpu().numpy(),
-                    "feature_lengths": np.array([features.size(1)], dtype=np.int64),
-                }
-                emission = self.acoustic_ort.run(None, ort_inputs)[0]  # (1, T, vocab_size) numpy
-                emission = torch.from_numpy(emission).to(device or self.device)
+
+        if ndarray.shape[1] < 160:
+            ndarray = np.pad(ndarray, ((0, 0), (0, 320 - ndarray.shape[1])), mode="constant")
+
+        CHUNK_SIZE = 60 * 16000  # 60 seconds
+        total_samples = ndarray.shape[1]
+
+        if total_samples > CHUNK_SIZE:
+            frame_samples = int(16000 * self.frame_shift)
+            emissions = np.empty((1, total_samples // frame_samples + 1, self.vocab_size), dtype=np.float32)
+            for start in range(0, total_samples, CHUNK_SIZE):
+                chunk = ndarray[:, start : start + CHUNK_SIZE]
+                if chunk.shape[1] < 160:
+                    chunk = np.pad(chunk, ((0, 0), (0, 320 - chunk.shape[1])), mode="constant")
+
+                emission_out = self.acoustic_ort.run(None, {"audios": chunk})[0]
+                if acoustic_scale != 1.0:
+                    emission_out *= acoustic_scale
+                sf = start // frame_samples  # start frame
+                lf = sf + emission_out.shape[1]  # last frame
+                emissions[0, sf:lf, :] = emission_out
+            emissions[:, lf:, :] = 0.0
         else:
-            if ndarray.shape[1] < 160:
-                ndarray = np.pad(ndarray, ((0, 0), (0, 320 - ndarray.shape[1])), mode="constant")
+            emission_out = self.acoustic_ort.run(
+                None,
+                {
+                    "audios": ndarray,
+                },
+            )  # (1, T, vocab_size) numpy
+            emissions = emission_out[0]
 
-            CHUNK_SIZE = 60 * 16000  # 60 seconds
-            if ndarray.shape[1] > CHUNK_SIZE:
-                emissions = []
-                for start in range(0, ndarray.shape[1], CHUNK_SIZE):
-                    emission = self.acoustic_ort.run(
-                        None,
-                        {
-                            "audios": ndarray[:, start : start + CHUNK_SIZE],
-                        },
-                    )  # (1, T, vocab_size) numpy
-                    emissions.append(emission[0])
-
-                emission = torch.cat(
-                    [torch.from_numpy(emission).to(device or self.device) for emission in emissions], dim=1
-                )  # (1, T, vocab_size)
-                del emissions
-            else:
-                emission = self.acoustic_ort.run(
-                    None,
-                    {
-                        "audios": ndarray,
-                    },
-                )  # (1, T, vocab_size) numpy
-                emission = torch.from_numpy(emission[0]).to(device or self.device)
-
-        if acoustic_scale != 1.0:
-            emission = emission.mul_(acoustic_scale)
+            if acoustic_scale != 1.0:
+                emissions *= acoustic_scale
 
         self.timings["emission"] += time.time() - _start
-        return emission  # (1, T, vocab_size) torch
+        return emissions  # (1, T, vocab_size) numpy
 
     def alignment(
         self,
         audio: AudioData,
         lattice_graph: Tuple[str, int, float],
-        emission: Optional[torch.Tensor] = None,
+        emission: Optional[np.ndarray] = None,
         offset: float = 0.0,
     ) -> Dict[str, Any]:
         """Process audio with LatticeGraph.
@@ -181,7 +149,7 @@ class Lattice1Worker:
         Args:
             audio: AudioData object
             lattice_graph: LatticeGraph data
-            emission: Pre-computed emission tensor (ignored if streaming=True)
+            emission: Pre-computed emission numpy array (ignored if streaming=True)
             offset: Time offset for the audio
             streaming: If True, use streaming mode for memory-efficient processing
 
@@ -194,36 +162,24 @@ class Lattice1Worker:
             AlignmentError: If alignment process fails
         """
         try:
-            import k2
+            import k2py as k2
         except ImportError:
-            raise DependencyError("k2", install_command="pip install install-k2 && python -m install_k2")
-
-        try:
-            from lattifai_core.lattice.decode import align_segments
-        except ImportError:
-            raise DependencyError("lattifai_core", install_command="Contact support for lattifai_core installation")
+            raise DependencyError("k2py", install_command="pip install k2py")
 
         lattice_graph_str, final_state, acoustic_scale = lattice_graph
 
         _start = time.time()
         try:
-            # Create decoding graph
-            decoding_graph = k2.Fsa.from_str(lattice_graph_str, acceptor=False)
-            decoding_graph.requires_grad_(False)
-            decoding_graph = k2.arc_sort(decoding_graph)
-            decoding_graph.skip_id = int(final_state)
-            decoding_graph.return_id = int(final_state + 1)
+            # Create decoding graph using k2py
+            graph_dict = k2.CreateFsaVecFromStr(lattice_graph_str, int(final_state), False)
+            decoding_graph = graph_dict["fsa"]
+            aux_labels = graph_dict["aux_labels"]
         except Exception as e:
             raise AlignmentError(
                 "Failed to create decoding graph from lattice",
                 context={"original_error": str(e), "lattice_graph_length": len(lattice_graph_str)},
             )
         self.timings["decoding_graph"] += time.time() - _start
-
-        if self.device.type == "mps":
-            device = "cpu"  # k2 does not support mps yet
-        else:
-            device = self.device
 
         _start = time.time()
 
@@ -234,71 +190,55 @@ class Lattice1Worker:
         max_active_states = self.alignment_config.max_active_states or 10000
 
         if emission is None and audio.streaming_mode:
-            # Streaming mode: pass emission iterator to align_segments
-            # The align_segments function will automatically detect the iterator
-            # and use k2.OnlineDenseIntersecter for memory-efficient processing
-
-            def emission_iterator():
-                """Generate emissions for each audio chunk with progress tracking."""
-                total_duration = audio.duration
-                processed_duration = 0.0
-                total_minutes = int(total_duration / 60.0)
-
-                with tqdm(
-                    total=total_minutes,
-                    desc=f"Processing audio ({total_minutes} min)",
-                    unit="min",
-                    unit_scale=False,
-                    unit_divisor=1,
-                ) as pbar:
-                    for chunk in audio.iter_chunks():
-                        chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale, device=device)
-
-                        # Update progress based on chunk duration in minutes
-                        chunk_duration = int(chunk.duration / 60.0)
-                        pbar.update(chunk_duration)
-                        processed_duration += chunk_duration
-
-                        yield chunk_emission
-
-            # Calculate total frames for supervision_segments
-            total_frames = int(audio.duration / self.frame_shift)
-
-            results, labels = align_segments(
-                emission_iterator(),  # Pass iterator for streaming
-                decoding_graph.to(device),
-                torch.tensor([total_frames], dtype=torch.int32),
-                search_beam=search_beam,
-                output_beam=output_beam,
-                min_active_states=min_active_states,
-                max_active_states=max_active_states,
-                subsampling_factor=1,
-                reject_low_confidence=False,
+            # Initialize OnlineDenseIntersecter for streaming
+            intersecter = k2.OnlineDenseIntersecter(
+                decoding_graph,
+                aux_labels,
+                float(search_beam),
+                float(output_beam),
+                int(min_active_states),
+                int(max_active_states),
             )
 
-            # For streaming, don't return emission tensor to save memory
+            # Streaming mode
+            total_duration = audio.duration
+            total_minutes = int(total_duration / 60.0)
+
+            with tqdm(
+                total=total_minutes,
+                desc=f"Processing audio ({total_minutes} min)",
+                unit="min",
+                unit_scale=False,
+                unit_divisor=1,
+            ) as pbar:
+                for chunk in audio.iter_chunks():
+                    # explicitly utilize self.device for extractor if needed, though result is numpy
+                    chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale)
+                    intersecter.decode(chunk_emission[0])
+
+                    # Update progress
+                    chunk_duration = int(chunk.duration / 60.0)
+                    pbar.update(chunk_duration)
+
             emission_result = None
+            # Get results from intersecter
+            results, labels = intersecter.finish()
         else:
-            # Batch mode: compute full emission tensor and pass to align_segments
+            # Batch mode
             if emission is None:
-                emission = self.emission(
-                    audio.ndarray, acoustic_scale=acoustic_scale, device=device
-                )  # (1, T, vocab_size)
+                emission = self.emission(audio.ndarray, acoustic_scale=acoustic_scale)  # (1, T, vocab_size)
             else:
-                emission = emission.to(device) * acoustic_scale
-
-            results, labels = align_segments(
-                emission,
-                decoding_graph.to(device),
-                torch.tensor([emission.shape[1]], dtype=torch.int32),
-                search_beam=search_beam,
-                output_beam=output_beam,
-                min_active_states=min_active_states,
-                max_active_states=max_active_states,
-                subsampling_factor=1,
-                reject_low_confidence=False,
+                if acoustic_scale != 1.0:
+                    emission *= acoustic_scale
+            # Use AlignSegments directly
+            results, labels = k2.AlignSegments(
+                graph_dict,
+                emission[0],  # Pass the prepared scores
+                float(search_beam),
+                float(output_beam),
+                int(min_active_states),
+                int(max_active_states),
             )
-
             emission_result = emission
 
         self.timings["align_segments"] += time.time() - _start
