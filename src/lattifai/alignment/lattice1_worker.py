@@ -7,7 +7,6 @@ from typing import Any, Dict, Optional, Tuple
 import colorful
 import numpy as np
 import onnxruntime as ort
-import torch
 from lhotse import FbankConfig
 from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
@@ -83,7 +82,6 @@ class Lattice1Worker:
         else:
             self.separator_ort = None
 
-        self.device = torch.device(device)
         self.timings = defaultdict(lambda: 0.0)
 
     @property
@@ -212,7 +210,6 @@ class Lattice1Worker:
                 unit_divisor=1,
             ) as pbar:
                 for chunk in audio.iter_chunks():
-                    # explicitly utilize self.device for extractor if needed, though result is numpy
                     chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale)
                     intersecter.decode(chunk_emission[0])
 

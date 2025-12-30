@@ -4,7 +4,6 @@ from typing import Any, List, Optional, Tuple
 
 import colorful
 import numpy as np
-import torch
 
 from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
@@ -45,14 +44,14 @@ class Lattice1Aligner(object):
 
         self.frame_shift = self.worker.frame_shift
 
-    def emission(self, ndarray: np.ndarray) -> torch.Tensor:
+    def emission(self, ndarray: np.ndarray) -> np.ndarray:
         """Generate emission probabilities from audio ndarray.
 
         Args:
             ndarray: Audio data as numpy array of shape (1, T) or (C, T)
 
         Returns:
-            Emission tensor of shape (1, T, vocab_size)
+            Emission numpy array of shape (1, T, vocab_size)
         """
         return self.worker.emission(ndarray)
 
@@ -83,7 +82,7 @@ class Lattice1Aligner(object):
         supervisions: List[Supervision],
         split_sentence: Optional[bool] = False,
         return_details: Optional[bool] = False,
-        emission: Optional[torch.Tensor] = None,
+        emission: Optional[np.ndarray] = None,
         offset: float = 0.0,
         verbose: bool = True,
     ) -> Tuple[List[Supervision], List[Supervision]]:

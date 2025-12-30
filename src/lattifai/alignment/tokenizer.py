@@ -5,7 +5,6 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
 import numpy as np
-import torch
 
 from lattifai.alignment.phonemizer import G2Phonemizer
 from lattifai.caption import Supervision
@@ -445,7 +444,7 @@ class LatticeTokenizer:
     def detokenize(
         self,
         lattice_id: str,
-        lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
+        lattice_results: Tuple[np.ndarray, Any, Any, float, float],
         supervisions: List[Supervision],
         return_details: bool = False,
         start_margin: float = 0.08,
