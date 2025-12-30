@@ -56,6 +56,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Initialize base API client
         super().__init__(config=client_config)
+        self.config = client_config
 
         # Initialize all configs with defaults
         alignment_config, transcription_config, diarization_config = self._init_configs(
@@ -268,6 +269,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
+
+            # Profile if enabled
+            if self.config.profile:
+                self.aligner.profile()
 
         except (CaptionProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
             # Re-raise our specific errors as-is

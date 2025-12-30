@@ -4,6 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+import colorful
 import numpy as np
 import onnxruntime as ort
 import torch
@@ -14,6 +15,7 @@ from tqdm import tqdm
 
 from lattifai.audio2 import AudioData
 from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
+from lattifai.utils import safe_print
 
 
 class Lattice1Worker:
@@ -303,6 +305,41 @@ class Lattice1Worker:
 
         channel = 0
         return emission_result, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
+
+    def profile(self) -> None:
+        """Print formatted profiling statistics."""
+        if not self.timings:
+            return
+
+        safe_print(colorful.bold(colorful.cyan("\n⏱️  Alignment Profiling")))
+        safe_print(colorful.gray("─" * 44))
+        safe_print(
+            f"{colorful.bold('Phase'.ljust(21))} "
+            f"{colorful.bold('Time'.ljust(12))} "
+            f"{colorful.bold('Percent'.rjust(8))}"
+        )
+        safe_print(colorful.gray("─" * 44))
+
+        total_time = sum(self.timings.values())
+
+        # Sort by duration descending
+        sorted_stats = sorted(self.timings.items(), key=lambda x: x[1], reverse=True)
+
+        for name, duration in sorted_stats:
+            percentage = (duration / total_time * 100) if total_time > 0 else 0.0
+            # Name: Cyan, Time: Yellow, Percent: Gray
+            safe_print(
+                f"{name:<20} "
+                f"{colorful.yellow(f'{duration:7.4f}s'.ljust(12))} "
+                f"{colorful.gray(f'{percentage:.2f}%'.rjust(8))}"
+            )
+
+        safe_print(colorful.gray("─" * 44))
+        # Pad "Total Time" before coloring to ensure correct alignment (ANSI codes don't count for width)
+        safe_print(
+            f"{colorful.bold('Total Time'.ljust(20))} "
+            f"{colorful.bold(colorful.yellow(f'{total_time:7.4f}s'.ljust(12)))}\n"
+        )
 
 
 def _load_worker(model_path: str, device: str, config: Optional[Any] = None) -> Lattice1Worker:

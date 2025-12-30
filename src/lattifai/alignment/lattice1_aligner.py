@@ -166,3 +166,7 @@ class Lattice1Aligner(object):
             raise
         except Exception as e:
             raise e
+
+    def profile(self) -> None:
+        """Print profiling statistics."""
+        self.worker.profile()

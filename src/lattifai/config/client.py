@@ -26,6 +26,11 @@ class ClientConfig:
     default_headers: Optional[Dict[str, str]] = field(default=None)
     """Optional static headers to include in all requests."""
 
+    profile: bool = False
+    """Enable profiling of client operations tasks.
+    When True, prints detailed timing information for various stages of the process.
+    """
+
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 

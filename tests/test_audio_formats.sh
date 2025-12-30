@@ -1,6 +1,6 @@
 set -e
 
-lai alignment align -Y media.input_path=tests/data/SA1.m4a caption.input_path=tests/data/SA1.TXT caption.output_path=tests/data/SA1.TextGrid
+lai alignment align -Y media.input_path=tests/data/SA1.m4a caption.input_path=tests/data/SA1.TXT caption.output_path=tests/data/SA1.TextGrid client.profile=true
 lai alignment align -Y media.input_path=tests/data/SA1.mp4 caption.input_path=tests/data/SA1.TXT caption.output_path=tests/data/SA1.vtt alignment.model_hub=modelscope caption.split_sentence=true
 
 lai alignment align -Y media.input_path=tests/data/SA1.ogg caption.input_path=tests/data/SA1.TXT caption.output_path=tests/data/SA1.vtt
