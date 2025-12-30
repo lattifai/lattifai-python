@@ -21,7 +21,7 @@ Dialogue: 0,0:00:23.38,0:00:24.16,Default,,0,0,0,,That's it.
 Dialogue: 0,0:00:24.50,0:00:33.62,Default,,0,0,0,,We will start with why it's so important to us to have a product that we can make freely available and broadly available to everyone.
 Dialogue: 0,0:00:34.14,0:00:41.30,Default,,0,0,0,,And we're always trying to find out ways to reduce friction, so everyone can use ChatGPT wherever they are.
 Dialogue: 0,0:00:41.38,0:00:51.94,Default,,0,0,0,,So today, we'll be releasing the desktop version of ChatGPT and a refreshed UI that makes it simpler to use, much more natural as well.
-Dialogue: 0,0:00:53.06,0:01:00.66,Default,,0,0,0,,But the big news today is that we are launching our new flagship model, and we are calling it GPT-4o.
+Dialogue: 0,0:00:53.06,0:01:00.74,Default,,0,0,0,,But the big news today is that we are launching our new flagship model, and we are calling it GPT-4o.
 Dialogue: 0,0:01:01.92,0:01:11.22,Default,,0,0,0,,The special thing about GPT-4o is that it brings GPT-4 level intelligence to everyone, including our free users.
 Dialogue: 0,0:01:11.82,0:01:22.80,Default,,0,0,0,,We'll be showing some live demos today to show the full extent of the capabilities of our new model, and we'll be rolling them out iteratively over the next few weeks.
 Dialogue: 0,0:01:23.60,0:01:26.12,Default,Mira Murati:,0,0,0,,All right, so let's get started.
@@ -34,7 +34,7 @@ Dialogue: 0,0:02:12.86,0:02:16.50,Default,,0,0,0,,Along with it, we have also re
 Dialogue: 0,0:02:17.76,0:02:34.72,Default,,0,0,0,,We know that these models get more and more complex, but we want the experience of interaction to actually become more natural, easy, and for you not to focus on the UI at all, but just focus on the collaboration with ChatGPT.
 Dialogue: 0,0:02:36.84,0:02:37.96,Default,Mira Murati:,0,0,0,,And now, the big news.
 Dialogue: 0,0:02:38.90,0:02:42.92,Default,,0,0,0,,Today, we are releasing our newest flagship model.
-Dialogue: 0,0:02:43.42,0:02:44.90,Default,,0,0,0,,This is GPT-4o.
+Dialogue: 0,0:02:43.42,0:02:44.96,Default,,0,0,0,,This is GPT-4o.
 Dialogue: 0,0:02:52.98,0:03:04.74,Default,Mira Murati:,0,0,0,,GPT-4o provides GPT-4 level intelligence, but it is much faster, and it improves on its capabilities across text, vision, and audio.
 Dialogue: 0,0:03:05.62,0:03:13.10,Default,,0,0,0,,For the past couple of years, we've been very focused on improving the intelligence of these models, and they've gotten pretty good.
 Dialogue: 0,0:03:13.96,0:03:20.66,Default,,0,0,0,,But this is the first time that we are really making a huge step forward when it comes to the ease of use.
@@ -44,7 +44,7 @@ Dialogue: 0,0:03:52.78,0:04:05.78,Default,,0,0,0,,You know, the ease of our dial
 Dialogue: 0,0:04:06.34,0:04:10.42,Default,,0,0,0,,All of these things are actually quite complex for—for these models.
 Dialogue: 0,0:04:10.68,0:04:18.80,Default,,0,0,0,,And until now, with Voice Mode, we had three models that come together to deliver this experience.
 Dialogue: 0,0:04:19.12,0:04:27.24,Default,,0,0,0,,We have transcription, intelligence, and then text-to-speech, all come together in orchestration to deliver Voice Mode.
-Dialogue: 0,0:04:27.90,0:04:37.10,Default,,0,0,0,,This also brings a lot of latency to the experience, and it really breaks that immersion in the collaboration with ChatGPT.
+Dialogue: 0,0:04:27.90,0:04:37.16,Default,,0,0,0,,This also brings a lot of latency to the experience, and it really breaks that immersion in the collaboration with ChatGPT.
 Dialogue: 0,0:04:37.88,0:04:42.32,Default,,0,0,0,,But now, with GPT-4o, this all happens natively.
 Dialogue: 0,0:04:42.96,0:04:48.90,Default,,0,0,0,,GPT-4o reasons across voice, text, and vision.
 Dialogue: 0,0:04:50.30,0:04:59.46,Default,,0,0,0,,And with these incredible efficiencies, it also allows us to bring the GPT-4 class intelligence to our free users.
@@ -60,7 +60,7 @@ Dialogue: 0,0:06:08.42,0:06:10.86,Default,,0,0,0,,And you can also use vision.
 Dialogue: 0,0:06:10.90,0:06:24.68,Default,,0,0,0,,So now you can upload, um, screenshots, photos, documents containing both text and images, and you can start conversations with ChatGPT about all of this content.
 Dialogue: 0,0:06:24.88,0:06:35.18,Default,,0,0,0,,You can also use Memory, where it makes ChatGPT far more useful and helpful because now it has a sense of continuity across all of your conversations.
 Dialogue: 0,0:06:35.94,0:06:53.42,Default,,0,0,0,,And you can use Browse, where you can search for real-time information in your conversation, and Advanced Data Analysis, where you can upload charts or any information and it will analyze this information, it will give you answers, and so on.
-Dialogue: 0,0:06:55.48,0:07:05.12,Default,Mira Murati:,0,0,0,,Lastly, we have also improved on the quality and speed in fifty different languages for ChatGPT.
+Dialogue: 0,0:06:55.48,0:07:05.14,Default,Mira Murati:,0,0,0,,Lastly, we have also improved on the quality and speed in fifty different languages for ChatGPT.
 Dialogue: 0,0:07:05.16,0:07:12.38,Default,,0,0,0,,And this is very, very important because we want to be able to bring this experience to as many people out there as possible.
 Dialogue: 0,0:07:13.52,0:07:28.20,Default,,0,0,0,,So we're very, very excited to bring GPT-4o to all of our free users out there, and for the paid users, they will continue to have up to five times the capacity limits of our free users.
 Dialogue: 0,0:07:29.68,0:07:36.18,Default,Mira Murati:,0,0,0,,But GPT-4o is not only available in ChatGPT, we're also bringing it to the API.
@@ -165,7 +165,7 @@ Dialogue: 0,0:13:47.30,0:13:47.96,Default,Barret Zoph:,0,0,0,,Yeah, absolutely.
 Dialogue: 0,0:13:47.96,0:13:53.96,Default,,0,0,0,,Like as you can see, you know, you can chat with ChatGPT in real time, but you can also interact with it um, with video as well.
 Dialogue: 0,0:13:54.46,0:13:54.78,Default,,0,0,0,,Okay.
 Dialogue: 0,0:13:55.50,0:13:57.52,Default,,0,0,0,,So let me boot up ChatGPT.
-Dialogue: 0,0:13:59.50,0:14:00.10,Default,,0,0,0,,Hey, ChatGPT.
+Dialogue: 0,0:13:59.50,0:14:00.52,Default,,0,0,0,,Hey, ChatGPT.
 Dialogue: 0,0:14:01.94,0:14:02.96,Default,ChatGPT:,0,0,0,,Hello there.
 Dialogue: 0,0:14:02.96,0:14:04.02,Default,,0,0,0,,How's it going?
 Dialogue: 0,0:14:04.60,0:14:05.60,Default,Barret Zoph:,0,0,0,,It's going really well.
@@ -184,12 +184,12 @@ Dialogue: 0,0:14:26.80,0:14:28.04,Default,Barret Zoph:,0,0,0,,No, I didn't show 
 Dialogue: 0,0:14:28.04,0:14:29.26,Default,,0,0,0,,Just give me help along the way.
 Dialogue: 0,0:14:29.26,0:14:30.04,Default,,0,0,0,,One second.
 Dialogue: 0,0:14:32.12,0:14:34.30,Default,ChatGPT:,0,0,0,,Whoops, I got too excited.
-Dialogue: 0,0:14:34.74,0:14:35.72,Default,,0,0,0,,I'm ready when you are.
-Dialogue: 0,0:14:35.72,0:14:46.24,Default,Barret Zoph:,0,0,0,,Okay, so I'm—
-Dialogue: 0,0:14:46.24,0:14:46.44,Default,,0,0,0,,[Writing sounds]
-Dialogue: 0,0:14:46.44,0:14:49.34,Default,Barret Zoph:,0,0,0,,So, ChatGPT, what equation did I write down there?
+Dialogue: 0,0:14:34.74,0:14:35.50,Default,,0,0,0,,I'm ready when you are.
+Dialogue: 0,0:14:35.50,0:14:35.62,Default,Barret Zoph:,0,0,0,,Okay, so I'm—
+Dialogue: 0,0:14:35.62,0:14:39.92,Default,,0,0,0,,[Writing sounds]
+Dialogue: 0,0:14:44.94,0:14:49.34,Default,Barret Zoph:,0,0,0,,So, ChatGPT, what equation did I write down there?
 Dialogue: 0,0:14:50.10,0:14:52.70,Default,ChatGPT:,0,0,0,,Ah, I see it now.
-Dialogue: 0,0:14:52.80,0:14:56.66,Default,,0,0,0,,You wrote down 3x plus 1 equals 4.
+Dialogue: 0,0:14:52.80,0:14:56.76,Default,,0,0,0,,You wrote down 3x plus 1 equals 4.
 Dialogue: 0,0:14:56.86,0:14:57.94,Default,Barret Zoph:,0,0,0,,Yep, exactly.
 Dialogue: 0,0:14:57.96,0:15:00.44,Default,,0,0,0,,So what's the first step I should take to try to solve this?
 Dialogue: 0,0:15:01.28,0:15:07.70,Default,ChatGPT:,0,0,0,,The first step is to get all the terms with x on one side and the constants on the other side.
@@ -265,8 +265,8 @@ Dialogue: 0,0:18:21.12,0:18:25.52,Default,Barret Zoph:,0,0,0,,So I'm going to op
 Dialogue: 0,0:18:27.92,0:18:28.40,Default,,0,0,0,,Okay.
 Dialogue: 0,0:18:28.54,0:18:35.64,Default,,0,0,0,,And to give a bit of background what's going on, so here we have um, a computer and on the screen we have some code, and then the ChatGPT voice app is on the right.
 Dialogue: 0,0:18:35.80,0:18:39.44,Default,,0,0,0,,So ChatGPT will be able to hear me but it can't see anything on the screen.
-Dialogue: 0,0:18:39.66,0:18:45.24,Default,,0,0,0,,So I'm going to highlight the code, command C it and then that will send it to ChatGPT and then I'm going to talk about the code to ChatGPT.
-Dialogue: 0,0:18:46.88,0:18:47.82,Default,,0,0,0,,Hey, ChatGPT.
+Dialogue: 0,0:18:39.66,0:18:45.52,Default,,0,0,0,,So I'm going to highlight the code, command C it and then that will send it to ChatGPT and then I'm going to talk about the code to ChatGPT.
+Dialogue: 0,0:18:46.88,0:18:47.88,Default,,0,0,0,,Hey, ChatGPT.
 Dialogue: 0,0:18:49.16,0:18:49.78,Default,ChatGPT:,0,0,0,,Hey there.
 Dialogue: 0,0:18:49.78,0:18:50.70,Default,,0,0,0,,How’s it going?
 Dialogue: 0,0:18:51.10,0:18:52.04,Default,Barret Zoph:,0,0,0,,Yeah, it's going really well.
@@ -297,7 +297,7 @@ Dialogue: 0,0:20:17.08,0:20:17.96,Default,ChatGPT:,0,0,0,,Absolutely.
 Dialogue: 0,0:20:18.02,0:20:18.86,Default,,0,0,0,,Take your time.
 Dialogue: 0,0:20:18.88,0:20:20.88,Default,,0,0,0,,I'm excited to see the plot when you're ready.
 Dialogue: 0,0:20:21.12,0:20:31.08,Default,Barret Zoph:,0,0,0,,Yeah, so so far ChatGPT has only been able to see the code, and now I'm going to run it and then I'll use the vision capabilities of the ChatGPT desktop app so it can actually see everything going on on the screen as well.
-Dialogue: 0,0:20:38.04,0:20:39.14,Default,,0,0,0,,Okay, ChatGPT.
+Dialogue: 0,0:20:38.04,0:20:39.16,Default,,0,0,0,,Okay, ChatGPT.
 Dialogue: 0,0:20:39.48,0:20:40.96,Default,,0,0,0,,I'm sharing with you the plot now.
 Dialogue: 0,0:20:40.96,0:20:44.14,Default,,0,0,0,,I'm wondering if you can give me a really brief one-sentence overview of what you see.
 Dialogue: 0,0:20:45.70,0:20:56.80,Default,ChatGPT:,0,0,0,,The plot displays smoothed average, minimum, and maximum temperature throughout 2018, with a notable annotation marking a big rainfall event in late September.
@@ -335,12 +335,12 @@ Dialogue: 0,0:22:33.40,0:22:35.84,Default,,0,0,0,,So, I would like you to functi
 Dialogue: 0,0:22:35.84,0:22:45.42,Default,,0,0,0,,I have a friend here who only speaks Italian, and I only speak English, and uh every time you hear English I want you to translate it to Italian and if you hear Italian I want you to translate it back to English.
 Dialogue: 0,0:22:45.42,0:22:46.04,Default,,0,0,0,,Is that good?
 Dialogue: 0,0:22:47.02,0:22:47.86,Default,ChatGPT:,0,0,0,,Perfetto.
-Dialogue: 0,0:22:50.78,0:22:56.06,Default,Mira Murati:,0,0,0,,Mark, io mi chiedo se le balene potessero parlare, cosa ci direbbero?
+Dialogue: 0,0:22:50.78,0:22:56.00,Default,Mira Murati:,0,0,0,,Mark, io mi chiedo se le balene potessero parlare, cosa ci direbbero?
 Dialogue: 0,0:22:56.90,0:23:01.38,Default,ChatGPT:,0,0,0,,Mike, she wonders if whales could talk, what would they tell us?
 Dialogue: 0,0:23:01.62,0:23:02.98,Default,Mark Chen:,0,0,0,,Um, they might ask
 Dialogue: 0,0:23:02.98,0:23:04.98,Default,,0,0,0,,uh, how do we solve linear equations?
 Dialogue: 0,0:23:06.12,0:23:12.10,Default,ChatGPT:,0,0,0,,Potrebbero chiederci come risolviamo le equazioni lineari.
-Dialogue: 0,0:23:12.88,0:23:14.04,Default,Mira Murati:,0,0,0,,Sicuramente sì.
+Dialogue: 0,0:23:12.88,0:23:14.18,Default,Mira Murati:,0,0,0,,Sicuramente sì.
 Dialogue: 0,0:23:16.52,0:23:17.64,Default,ChatGPT:,0,0,0,,Certainly yes.
 Dialogue: 0,0:23:18.22,0:23:18.58,Default,Mark Chen:,0,0,0,,Great.
 Dialogue: 0,0:23:18.58,0:23:19.70,Default,,0,0,0,,It looks like it works.
