@@ -36,7 +36,7 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "path", "st
     @property
     def streaming_mode(self) -> bool:
         """Indicates whether streaming mode is enabled based on streaming_chunk_secs."""
-        if self.streaming_chunk_secs is not None:
+        if self.streaming_chunk_secs:
             return self.duration > self.streaming_chunk_secs * 1.1
         return False
 
