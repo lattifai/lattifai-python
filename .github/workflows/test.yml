@@ -32,6 +32,26 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Free Disk Space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          
+          # Remove unnecessary pre-installed software
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          
+          # Clean up Docker
+          docker system prune -a -f
+          
+          # Clean APT cache
+          sudo apt-get clean
+          
+          echo "Disk space after cleanup:"
+          df -h
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip setuptools
