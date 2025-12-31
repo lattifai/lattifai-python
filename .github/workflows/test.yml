@@ -47,7 +47,7 @@ jobs:
           docker system prune -a -f || true
           
           # Clean APT cache
-          sudo apt-get clean
+          sudo apt-get clean || true
           
           echo "Disk space after cleanup:"
           df -h
