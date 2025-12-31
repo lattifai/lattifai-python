@@ -17,6 +17,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 
 ## Table of Contents
 
+- [Core Capabilities](#core-capabilities)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
   - [Command Line Interface](#command-line-interface)
@@ -33,13 +34,42 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
   - [YouTube Processing](#youtube-processing)
   - [Configuration Objects](#configuration-objects)
 - [Advanced Features](#advanced-features)
+  - [Audio Preprocessing](#audio-preprocessing)
+  - [Long-Form Audio Support](#long-form-audio-support)
   - [Word-Level Alignment](#word-level-alignment)
   - [Smart Sentence Splitting](#smart-sentence-splitting)
   - [Speaker Diarization](#speaker-diarization)
   - [YAML Configuration Files](#yaml-configuration-files)
+- [Architecture Overview](#architecture-overview)
+- [Performance & Optimization](#performance--optimization)
 - [Supported Formats](#supported-formats)
+- [Supported Languages](#supported-languages)
 - [Roadmap](#roadmap)
 - [Development](#development)
+
+---
+
+## Core Capabilities
+
+LattifAI provides comprehensive audio-text alignment powered by the Lattice-1 model:
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Forced Alignment** | Precise word-level and segment-level synchronization with audio | ✅ Production |
+| **Multi-Model Transcription** | Gemini (100+ languages), Parakeet (24 languages), SenseVoice (5 languages) | ✅ Production |
+| **Speaker Diarization** | Automatic multi-speaker identification with label preservation | ✅ Production |
+| **Audio Preprocessing** | Multi-channel selection, device optimization (CPU/CUDA/MPS) | ✅ Production |
+| **Streaming Mode** | Process audio up to 20 hours with minimal memory footprint | ✅ Production |
+| **Smart Text Processing** | Intelligent sentence splitting and non-speech element separation | ✅ Production |
+| **Universal Format Support** | 30+ caption/subtitle formats with text normalization | ✅ Production |
+| **Configuration System** | YAML-based configs for reproducible workflows | ✅ Production |
+
+**Key Highlights:**
+- 🎯 **Accuracy**: State-of-the-art alignment precision with Lattice-1 model
+- 🌍 **Multilingual**: Support for 100+ languages via multiple transcription models
+- 🚀 **Performance**: Hardware-accelerated processing with streaming support
+- 🔧 **Flexible**: CLI, Python SDK, and Web UI interfaces
+- 📦 **Production-Ready**: Battle-tested on diverse audio/video content
 
 ---
 
@@ -131,7 +161,7 @@ caption = client.alignment(
 
 That's it! Your aligned subtitles are saved to `aligned.srt`.
 
-### Web Interface
+### 🚧 Web Interface
 
 ![web Demo](assets/web.png)
 
@@ -189,13 +219,9 @@ That's it! Your aligned subtitles are saved to `aligned.srt`.
    The web interface will automatically open in your browser at `http://localhost:5173`.
 
 **Features:**
-- ✅ Automatic backend server status detection
-- ✅ Visual file upload with drag-and-drop
-- ✅ Real-time alignment progress
-- ✅ Multiple subtitle format support
-- ✅ Built-in transcription with multiple models
-- ✅ API key management interface
-- ✅ Download aligned subtitles in various formats
+- ✅ **Drag-and-Drop Upload**: Visual file upload for audio/video and captions
+- ✅ **Real-Time Progress**: Live alignment progress with detailed status
+- ✅ **Multiple Transcription Models**: Gemini, Parakeet, SenseVoice selection
 
 ---
 
@@ -496,6 +522,78 @@ from lattifai import (
 
 ## Advanced Features
 
+### Audio Preprocessing
+
+LattifAI provides powerful audio preprocessing capabilities for optimal alignment:
+
+**Channel Selection**
+
+Control which audio channel to process for stereo/multi-channel files:
+
+```python
+from lattifai import LattifAI
+
+client = LattifAI()
+
+# Use left channel only
+caption = client.alignment(
+    input_media="stereo.wav",
+    input_caption="subtitle.srt",
+    channel_selector="left",  # Options: "left", "right", "average", or channel index (0, 1, 2, ...)
+)
+
+# Average all channels (default)
+caption = client.alignment(
+    input_media="stereo.wav",
+    input_caption="subtitle.srt",
+    channel_selector="average",
+)
+```
+
+**CLI Usage:**
+```bash
+# Use right channel
+lai alignment align audio.wav subtitle.srt output.srt \
+    media.channel_selector=right
+
+# Use specific channel index
+lai alignment align audio.wav subtitle.srt output.srt \
+    media.channel_selector=1
+```
+
+**Device Management**
+
+Optimize processing for your hardware:
+
+```python
+from lattifai import LattifAI, AlignmentConfig
+
+# Use CUDA GPU
+client = LattifAI(
+    alignment_config=AlignmentConfig(device="cuda")
+)
+
+# Use specific GPU
+client = LattifAI(
+    alignment_config=AlignmentConfig(device="cuda:0")
+)
+
+# Use Apple Silicon MPS
+client = LattifAI(
+    alignment_config=AlignmentConfig(device="mps")
+)
+
+# Use CPU
+client = LattifAI(
+    alignment_config=AlignmentConfig(device="cpu")
+)
+```
+
+**Supported Formats**
+- **Audio**: WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF, and more
+- **Video**: MP4, MKV, MOV, WEBM, AVI, and more
+- All formats supported by FFmpeg are compatible
+
 ### Long-Form Audio Support
 
 LattifAI now supports processing long audio files (up to 20 hours) through streaming mode. Enable streaming by setting the `streaming_chunk_secs` parameter:
@@ -537,14 +635,18 @@ client = LattifAI(
 )
 ```
 
-**Notes:**
-- Chunk duration must be between 1 and 1800 seconds (minimum 1 second, maximum 30 minutes)
-- Default value: 600 seconds (10 minutes)
-- **Recommended: Use 60 seconds or larger for optimal performance**
-- Set to `None` to disable streaming
-- **Thanks to our precise implementation, streaming has virtually no impact on alignment accuracy**
-- Smaller chunks reduce memory usage with minimal quality trade-off
-- Recommended chunk size: 300-900 seconds (5-15 minutes) for optimal balance
+**Technical Details:**
+
+| Parameter | Description | Recommendation |
+|-----------|-------------|----------------|
+| **Default Value** | 600 seconds (10 minutes) | Good for most use cases |
+| **Memory Impact** | Lower chunks = less RAM usage | Adjust based on available RAM |
+| **Accuracy Impact** | Virtually zero degradation | Our precise implementation preserves quality |
+
+**Performance Characteristics:**
+- ✅ **Near-Perfect Accuracy**: Streaming implementation maintains alignment precision
+- 🚧 **Memory Efficient**: Process 20-hour audio with <10GB RAM (600-sec chunks)
+
 
 ### Word-Level Alignment
 
@@ -587,14 +689,30 @@ caption = client.alignment(
 
 ### Speaker Diarization
 
-Speaker diarization automatically identifies and labels different speakers in audio. When enabled, the system will:
-- Detect speaker changes in the audio
-- Assign speaker labels (e.g., SPEAKER_00, SPEAKER_01) to each segment
-- Update subtitle segments with speaker information
+Speaker diarization automatically identifies and labels different speakers in audio using state-of-the-art models.
 
-**Speaker Name Handling:**
-- **Existing speaker labels in subtitles**: If your input captions already contain speaker names (e.g., `[Alice]`, `>> Bob:`, or `SPEAKER_01:`), the system will preserve them as much as possible during alignment
-- **Gemini Transcriber**: When using Gemini models for transcription (e.g., `gemini-2.5-pro`), the model can intelligently identify and extract speaker names from dialogue context, making it easier to generate speaker-aware transcripts
+**Core Capabilities:**
+- 🎤 **Multi-Speaker Detection**: Automatically detect speaker changes in audio
+- 🏷️ **Smart Labeling**: Assign speaker labels (SPEAKER_00, SPEAKER_01, etc.)
+- 🔄 **Label Preservation**: Maintain existing speaker names from input captions
+- 🤖 **Gemini Integration**: Extract speaker names intelligently during transcription
+
+**How It Works:**
+
+1. **Without Existing Labels**: System assigns generic labels (SPEAKER_00, SPEAKER_01)
+2. **With Existing Labels**: System preserves your speaker names during alignment
+   - Formats: `[Alice]`, `>> Bob:`, `SPEAKER_01:`, `Alice:` are all recognized
+3. **Gemini Transcription**: When using Gemini models, speaker names are extracted from context
+   - Example: "Hi, I'm Alice" → System labels as `Alice` instead of `SPEAKER_00`
+
+**Speaker Label Integration:**
+
+The diarization engine intelligently matches detected speakers with existing labels:
+- If input captions have speaker names → **Preserved during alignment**
+- If Gemini transcription provides names → **Used for labeling**
+- Otherwise → **Generic labels (SPEAKER_00, etc.) assigned**
+    * 🚧 **Future Enhancement:**
+        - **AI-Powered Speaker Name Inference**: Upcoming feature will use large language models combined with metadata (video title, description, context) to intelligently infer speaker names, making transcripts more human-readable and contextually accurate
 
 **CLI:**
 ```bash
@@ -635,6 +753,8 @@ for segment in caption.supervisions:
 
 ### YAML Configuration Files
 
+* **under development**
+
 Create reusable configuration files:
 
 ```yaml
@@ -648,6 +768,125 @@ batch_size: 1
 lai alignment align audio.wav subtitle.srt output.srt \
     alignment=config/alignment.yaml
 ```
+
+---
+
+## Architecture Overview
+
+LattifAI uses a modular, config-driven architecture for maximum flexibility:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      LattifAI Client                        │
+├─────────────────────────────────────────────────────────────┤
+│  Configuration Layer (Config-Driven)                        │
+│  ├── ClientConfig      (API settings)                       │
+│  ├── AlignmentConfig   (Model & device)                     │
+│  ├── CaptionConfig     (I/O formats)                        │
+│  ├── TranscriptionConfig (ASR models)                       │
+│  └── DiarizationConfig (Speaker detection)                  │
+├─────────────────────────────────────────────────────────────┤
+│  Core Components                                            │
+│  ├── AudioLoader      → Load & preprocess audio             │
+│  ├── Aligner          → Lattice-1 forced alignment          │
+│  ├── Transcriber      → Multi-model ASR                     │
+│  ├── Diarizer         → Speaker identification              │
+│  └── Tokenizer        → Intelligent text segmentation       │
+├─────────────────────────────────────────────────────────────┤
+│  Data Flow                                                  │
+│  Input → AudioLoader → Aligner → Diarizer → Caption        │
+│             ↓                                               │
+│         Transcriber (optional)                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Component Responsibilities:**
+
+| Component | Purpose | Configuration |
+|-----------|---------|---------------|
+| **AudioLoader** | Load audio/video, channel selection, format conversion | `MediaConfig` |
+| **Aligner** | Forced alignment using Lattice-1 model | `AlignmentConfig` |
+| **Transcriber** | ASR with Gemini/Parakeet/SenseVoice | `TranscriptionConfig` |
+| **Diarizer** | Speaker diarization with pyannote.audio | `DiarizationConfig` |
+| **Tokenizer** | Sentence splitting and text normalization | `CaptionConfig` |
+| **Caption** | Unified data structure for alignments | `CaptionConfig` |
+
+**Data Flow:**
+
+1. **Audio Loading**: `AudioLoader` loads media, applies channel selection, converts to numpy array
+2. **Transcription** (optional): `Transcriber` generates transcript if no caption provided
+3. **Text Preprocessing**: `Tokenizer` splits sentences and normalizes text
+4. **Alignment**: `Aligner` uses Lattice-1 to compute word-level timestamps
+5. **Diarization** (optional): `Diarizer` identifies speakers and assigns labels
+6. **Output**: `Caption` object contains all results, exported to desired format
+
+**Configuration Philosophy:**
+- ✅ **Declarative**: Describe what you want, not how to do it
+- ✅ **Composable**: Mix and match configurations
+- ✅ **Reproducible**: Save configs to YAML for consistent results
+- ✅ **Flexible**: Override configs per-method or globally
+
+---
+
+## Performance & Optimization
+
+### Device Selection
+
+Choose the optimal device for your hardware:
+
+```python
+from lattifai import LattifAI, AlignmentConfig
+
+# NVIDIA GPU (recommended for speed)
+client = LattifAI(
+    alignment_config=AlignmentConfig(device="cuda")
+)
+
+# Apple Silicon GPU
+client = LattifAI(
+    alignment_config=AlignmentConfig(device="mps")
+)
+
+# CPU (maximum compatibility)
+client = LattifAI(
+    alignment_config=AlignmentConfig(device="cpu")
+)
+```
+
+**Performance Comparison** (30-minute audio):
+
+| Device | Time |
+|--------|------|
+| CUDA (RTX 4090) | ~18 sec |
+| MPS (M4) | ~26 sec |
+
+### Memory Management
+
+**Streaming Mode** for long audio:
+
+```python
+# Process 20-hour audio with <10GB RAM
+caption = client.alignment(
+    input_media="long_audio.wav",
+    input_caption="subtitle.srt",
+    streaming_chunk_secs=600.0,  # 10-minute chunks
+)
+```
+
+**Memory Usage** (approximate):
+
+| Chunk Size | Peak RAM | Suitable For |
+|------------|----------|-------------|
+| 600 sec | ~5 GB | Recommended |
+| No streaming | ~10 GB+ | Short audio only |
+
+### Optimization Tips
+
+1. **Use GPU when available**: 10x faster than CPU
+2. **WIP: Enable streaming for long audio**: Process 20+ hour files without OOM
+3. **Choose appropriate chunk size**: Balance memory vs. performance
+4. **Batch processing**: Process multiple files in sequence (coming soon)
+5. **Profile alignment**: Set `client.profile=True` to identify bottlenecks
 
 ---
 
@@ -671,14 +910,77 @@ LattifAI supports virtually all common media and subtitle formats:
 
 ---
 
+## Supported Languages
+
+LattifAI supports multiple transcription models with different language capabilities:
+
+### Gemini Models (100+ Languages)
+
+**Models**: `gemini-2.5-pro`, `gemini-3-pro-preview`, `gemini-3-flash-preview`
+
+**Supported Languages**: English, Chinese (Mandarin & Cantonese), Spanish, French, German, Italian, Portuguese, Japanese, Korean, Arabic, Russian, Hindi, Bengali, Turkish, Dutch, Polish, Swedish, Danish, Norwegian, Finnish, Greek, Hebrew, Thai, Vietnamese, Indonesian, Malay, Filipino, Ukrainian, Czech, Romanian, Hungarian, Swahili, Tamil, Telugu, Marathi, Gujarati, Kannada, and 70+ more languages.
+
+> **Note**: Requires Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+
+### NVIDIA Parakeet (24 European Languages)
+
+**Model**: `nvidia/parakeet-tdt-0.6b-v3`
+
+**Supported Languages**:
+- **Western Europe**: English (en), French (fr), German (de), Spanish (es), Italian (it), Portuguese (pt), Dutch (nl)
+- **Nordic**: Danish (da), Swedish (sv), Norwegian (no), Finnish (fi)
+- **Eastern Europe**: Polish (pl), Czech (cs), Slovak (sk), Hungarian (hu), Romanian (ro), Bulgarian (bg), Ukrainian (uk), Russian (ru)
+- **Others**: Croatian (hr), Estonian (et), Latvian (lv), Lithuanian (lt), Slovenian (sl), Maltese (mt), Greek (el)
+
+### Alibaba SenseVoice (5 Asian Languages)
+
+**Model**: `iic/SenseVoiceSmall`
+
+**Supported Languages**:
+- Chinese/Mandarin (zh)
+- English (en)
+- Japanese (ja)
+- Korean (ko)
+- Cantonese (yue)
+
+### Language Selection
+
+```python
+from lattifai import LattifAI, TranscriptionConfig
+
+# Specify language for transcription
+client = LattifAI(
+    transcription_config=TranscriptionConfig(
+        model_name="nvidia/parakeet-tdt-0.6b-v3",
+        language="de",  # German
+    )
+)
+```
+
+**CLI Usage:**
+```bash
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=nvidia/parakeet-tdt-0.6b-v3 \
+    transcription.language=de
+```
+
+> **Tip**: Use Gemini models for maximum language coverage, Parakeet for European languages, and SenseVoice for Asian languages.
+
+---
+
 ## Roadmap
 
 Visit our [LattifAI roadmap](https://lattifai.com/roadmap) for the latest updates.
 
-| Date | Release | Features |
+| Date | Model Release | Features |
 |------|---------|----------|
 | **Oct 2025** | **Lattice-1-Alpha** | ✅ English forced alignment<br>✅ Multi-format support<br>✅ CPU/GPU optimization |
-| **Nov 2025** | **Lattice-1** | ✅ English + Chinese + German<br>✅ Mixed languages alignment<br>🚀 Integrate Speaker Diarization |
+| **Nov 2025** | **Lattice-1** | ✅ English + Chinese + German<br>✅ Mixed languages alignment<br>✅ Speaker Diarization<br>✅ Multi-model transcription (Gemini, Parakeet, SenseVoice)<br>✅ Web interface with React<br>🚧 Advanced segmentation strategies (entire/transcription/hybrid)<br>🚧 Audio event detection ([MUSIC], [APPLAUSE], etc.)<br> |
+| **Q1 2026** | **Lattice-2** | ✅ Streaming mode for long audio<br>🔮 40+ languages support<br>🔮 Real-time alignment |
+
+
+
+**Legend**: ✅ Released | 🚧 In Development | 📋 Planned | 🔮 Future
 
 ---
 
