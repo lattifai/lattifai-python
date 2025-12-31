@@ -25,6 +25,7 @@ def youtube(
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
     diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
+    use_transcription: bool = False,
 ):
     """
     Download media from YouTube (when needed) and align captions.
@@ -55,6 +56,11 @@ def youtube(
             Fields: gemini_api_key, model_name, language, device
         diarization: Speaker diarization configuration.
             Fields: enabled, num_speakers, min_speakers, max_speakers, device
+        use_transcription: If True, skip YouTube caption download and directly use
+            transcription.model_name to transcribe. If False (default), first try to
+            download YouTube captions; if download fails (no captions available or
+            errors like HTTP 429), automatically fallback to transcription if
+            transcription.model_name is configured.
 
     Examples:
         # Download from YouTube and align (positional argument)
@@ -108,7 +114,11 @@ def youtube(
         transcription_config=transcription,
         diarization_config=diarization,
     )
+
     # Call the client's youtube method
+    # If use_transcription=True, skip YouTube caption download and use transcription directly.
+    # If use_transcription=False (default), try YouTube captions first; on failure,
+    # automatically fallback to transcription if transcription.model_name is configured.
     return lattifai_client.youtube(
         url=media_config.input_path,
         output_dir=media_config.output_dir,
@@ -118,6 +128,7 @@ def youtube(
         split_sentence=caption_config.split_sentence,
         channel_selector=media_config.channel_selector,
         streaming_chunk_secs=media_config.streaming_chunk_secs,
+        use_transcription=use_transcription,
     )
 
 
