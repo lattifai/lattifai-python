@@ -14,9 +14,6 @@ resolution-markers = [
     "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 
-[options]
-prerelease-mode = "allow"
-
 [[package]]
 name = "absl-py"
 version = "2.3.1"
@@ -2808,6 +2805,7 @@ dependencies = [
     { name = "lattifai-core" },
     { name = "lattifai-run" },
     { name = "lhotse" },
+    { name = "modelscope" },
     { name = "msgpack" },
     { name = "nemo-toolkit-asr", extra = ["asr"] },
     { name = "omnisensevoice" },
@@ -2875,6 +2873,7 @@ requires-dist = [
     { name = "lattifai-core", specifier = ">=0.6.0" },
     { name = "lattifai-run", specifier = ">=1.0.1" },
     { name = "lhotse", specifier = ">=1.26.0" },
+    { name = "modelscope", specifier = "==1.33.0" },
     { name = "msgpack" },
     { name = "nemo-toolkit-asr", extras = ["asr"], specifier = ">=2.7.0rc4" },
     { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'transcription'", specifier = ">=2.7.0rc3" },
@@ -3475,7 +3474,7 @@ wheels = [
 
 [[package]]
 name = "modelscope"
-version = "1.32.0"
+version = "1.33.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -3484,9 +3483,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6d/4d/a0961c29177906dff58de5c328a0b183ca8ebf33961fe5a91ddbfd4fae9c/modelscope-1.32.0.tar.gz", hash = "sha256:b717c11cef11c57d1d47b69da06f5888e634925e72de9adc3ccb1d29c74c9821", size = 4556707, upload-time = "2025-11-18T02:39:31.81Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/02/db35ce865e66fd212fcf0cb5b43db3a3474cf82fae8d835b56ce7dba9247/modelscope-1.33.0.tar.gz", hash = "sha256:5d9ca8eb934cabea236104ed774b3ddf352f96c705272876108aaa25a3bb0b38", size = 4558673, upload-time = "2025-12-10T03:50:01.05Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/92/b24fd3d91d87bf2189a422d6acea736505616b54706eadf141d2298c7a1b/modelscope-1.32.0-py3-none-any.whl", hash = "sha256:b47711464766ac626b1ad72772619f05881deeeefdfc7c0b6495d4463963e24e", size = 6048504, upload-time = "2025-11-18T02:39:29.219Z" },
+    { url = "https://files.pythonhosted.org/packages/86/05/63f01821681b2be5d1739b4aad7b186c28d4ead2c5c99a9fc4aa53c13c19/modelscope-1.33.0-py3-none-any.whl", hash = "sha256:d9bdd566303f813d762e133410007eaf1b78f065c871228ab38640919b707489", size = 6050040, upload-time = "2025-12-10T03:49:58.428Z" },
 ]
 
 [[package]]
