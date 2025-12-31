@@ -61,7 +61,7 @@
 
         .metrics-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
@@ -111,12 +111,14 @@
 
         .metric-formula {
             margin: 0.5rem 0 0 0;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #718096;
             font-family: 'Courier New', monospace;
             background: white;
             padding: 0.5rem;
             border-radius: 4px;
+            white-space: nowrap;
+            overflow-x: auto;
         }
 
         .table-container {
@@ -205,31 +207,35 @@
 
         .insights-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
         }
 
         .insight-card {
-            padding: 1.5rem;
+            padding: 2rem;
             background: #f7fafc;
             border-left: 4px solid #667eea;
             border-radius: 8px;
         }
 
         .insight-card h3 {
-            margin: 0 0 0.75rem 0;
-            font-size: 1.2rem;
+            margin: 0 0 1rem 0;
+            font-size: 1.3rem;
             color: #2d3748;
+            font-weight: 600;
         }
 
         .insight-card p {
             margin: 0;
             color: #4a5568;
+            font-size: 1.05rem;
+            line-height: 1.8;
         }
 
         .insight-card strong {
             color: #667eea;
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 1.1rem;
         }
 
         .footer {
@@ -287,28 +293,28 @@
             <div class="metrics-grid">
                 <div class="metric-card" data-metric="der">
                     <h3>DER ↓ <span class="good-threshold">&lt; 20%</span></h3>
-                    <p class="metric-description">Diarization Error Rate - Speaker diarization quality</p>
-                    <p class="metric-formula">Formula: (false alarm + missed detection + confusion) / total</p>
+                    <p class="metric-description">Speaker diarization quality - measures speaker segment timing errors</p>
+                    <p class="metric-formula">DER = (False Alarm + Missed Detection + Confusion) / Total Time</p>
                 </div>
                 <div class="metric-card" data-metric="jer">
                     <h3>JER ↓</h3>
-                    <p class="metric-description">Jaccard Error Rate - Temporal overlap of speaker segments</p>
-                    <p class="metric-formula">Formula: 1 - (Intersection / Union)</p>
+                    <p class="metric-description">Temporal overlap quality - measures how well speaker segments align</p>
+                    <p class="metric-formula">JER = 1 - (Intersection ∩ Union)</p>
                 </div>
                 <div class="metric-card" data-metric="wer">
                     <h3>WER ↓ <span class="good-threshold">&lt; 10%</span></h3>
-                    <p class="metric-description">Word Error Rate - Transcription accuracy</p>
-                    <p class="metric-formula">Formula: (Substitutions + Deletions + Insertions) / Total Words</p>
+                    <p class="metric-description">Transcription accuracy - measures word-level errors in text</p>
+                    <p class="metric-formula">WER = (Substitutions + Deletions + Insertions) / Total Words</p>
                 </div>
                 <div class="metric-card" data-metric="sca">
                     <h3>SCA ↑</h3>
-                    <p class="metric-description">Speaker Count Accuracy - Speaker counting accuracy</p>
-                    <p class="metric-formula">Formula: Correct Predictions / Total Samples</p>
+                    <p class="metric-description">Speaker counting accuracy - percentage of correct speaker counts</p>
+                    <p class="metric-formula">SCA = Correct Predictions / Total Samples</p>
                 </div>
                 <div class="metric-card" data-metric="scer">
                     <h3>SCER ↓</h3>
-                    <p class="metric-description">Speaker Counting Error Rate - Relative error in speaker count</p>
-                    <p class="metric-formula">Formula: |Hypothesis Count - Reference Count| / Reference Count</p>
+                    <p class="metric-description">Speaker counting error rate - relative deviation from true count</p>
+                    <p class="metric-formula">SCER = |Predicted - Actual| / Actual Speaker Count</p>
                 </div>
             </div>
         </section>
@@ -328,62 +334,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr>
-                            <td class="model-name">Ground Truth</td>
-                            <td class="metric-value" data-metric="der"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                            <td class="metric-value" data-metric="jer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                            <td class="metric-value" data-metric="wer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
-                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                        </tr>
-                        <tr>
-                            <td class="model-name">Gemini 2.5 Pro</td>
-                            <td class="metric-value" data-metric="der"><span class="value">0.6303</span><span class="percentage">(63.03%)</span></td>
-                            <td class="metric-value" data-metric="jer"><span class="value">0.6532</span><span class="percentage">(65.32%)</span></td>
-                            <td class="metric-value" data-metric="wer"><span class="value">0.1511</span><span class="percentage">(15.11%)</span></td>
-                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
-                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                        </tr>
-                        <tr>
-                            <td class="model-name">Gemini 2.5 Pro <span class="lattifai-badge">✨ + LattifAI</span></td>
-                            <td class="metric-value best-value" data-metric="der"><span class="value">0.2256</span><span class="percentage">(22.56%)</span></td>
-                            <td class="metric-value" data-metric="jer"><span class="value">0.3178</span><span class="percentage">(31.78%)</span></td>
-                            <td class="metric-value" data-metric="wer"><span class="value">0.1511</span><span class="percentage">(15.11%)</span></td>
-                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
-                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                        </tr>
-                        <tr>
-                            <td class="model-name">Gemini 3 Pro Preview</td>
-                            <td class="metric-value" data-metric="der"><span class="value">0.6433</span><span class="percentage">(64.33%)</span></td>
-                            <td class="metric-value" data-metric="jer"><span class="value">0.6637</span><span class="percentage">(66.37%)</span></td>
-                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0494</span><span class="percentage">(4.94%)</span></td>
-                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
-                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                        </tr>
-                        <tr>
-                            <td class="model-name">Gemini 3 Pro Preview <span class="lattifai-badge">✨ + LattifAI</span></td>
-                            <td class="metric-value" data-metric="der"><span class="value">0.2265</span><span class="percentage">(22.65%)</span></td>
-                            <td class="metric-value" data-metric="jer"><span class="value">0.3656</span><span class="percentage">(36.56%)</span></td>
-                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0494</span><span class="percentage">(4.94%)</span></td>
-                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
-                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                        </tr>
-                        <tr>
-                            <td class="model-name">Gemini 3 Flash Preview</td>
-                            <td class="metric-value" data-metric="der"><span class="value">0.6047</span><span class="percentage">(60.47%)</span></td>
-                            <td class="metric-value" data-metric="jer"><span class="value">0.6318</span><span class="percentage">(63.18%)</span></td>
-                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0454</span><span class="percentage">(4.54%)</span></td>
-                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
-                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                        </tr>
-                        <tr>
-                            <td class="model-name">Gemini 3 Flash Preview <span class="lattifai-badge">✨ + LattifAI</span></td>
-                            <td class="metric-value best-value" data-metric="der"><span class="value">0.1142</span><span class="percentage">(11.42%)</span></td>
-                            <td class="metric-value best-value" data-metric="jer"><span class="value">0.1363</span><span class="percentage">(13.63%)</span></td>
-                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0454</span><span class="percentage">(4.54%)</span></td>
-                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
-                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
-                        </tr>
+                        <!-- Data will be loaded from README.md -->
                     </tbody>
                 </table>
             </div>
@@ -437,6 +388,139 @@
     </div>
 
     <script>
+        // Load and parse benchmark data from README.md
+        async function loadBenchmarkData() {
+            try {
+                const response = await fetch('README.md');
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch README.md: ${response.status}`);
+                }
+                const text = await response.text();
+                console.log('Successfully loaded README.md');
+
+                // Parse markdown table - match from header to end of table
+                const tableRegex = /\| Model \| DER[^\n]*\n\|[-\s|]+\n((?:\|[^\n]+\n?)+)/;
+                const tableMatch = text.match(tableRegex);
+
+                if (!tableMatch) {
+                    console.error('Could not find benchmark table in README.md');
+                    console.log('Trying alternative regex...');
+                    // Try simpler match
+                    const lines = text.split('\n');
+                    const headerIndex = lines.findIndex(l => l.includes('| Model | DER'));
+                    if (headerIndex >= 0) {
+                        console.log('Found header at line:', headerIndex);
+                        console.log('Header:', lines[headerIndex]);
+                        // Get next few lines after the separator
+                        const dataLines = lines.slice(headerIndex + 2, headerIndex + 10).filter(l => l.trim().startsWith('|'));
+                        console.log('Found', dataLines.length, 'data lines');
+                        parseTableLines(dataLines);
+                    } else {
+                        console.error('Could not find table header');
+                    }
+                    return;
+                }
+
+                const tableLines = tableMatch[1].split('\n').filter(line => line.trim().startsWith('|'));
+                console.log('Found', tableLines.length, 'data rows');
+                parseTableLines(tableLines);
+
+            } catch (error) {
+                console.error('Error loading benchmark data from README.md:', error);
+                console.log('Tip: If opening HTML directly (file://), use a local server:');
+                console.log('  python -m http.server 8000');
+                console.log('  Then open: http://localhost:8000/benchmark/index.html');
+            }
+        }
+
+        function parseTableLines(tableLines) {
+            const rows = [];
+
+            for (let i = 0; i < tableLines.length; i++) {
+                const cells = tableLines[i].split('|').map(cell => cell.trim()).filter(Boolean);
+                console.log('Row', i, '- cells:', cells.length, cells);
+
+                if (cells.length >= 6) {
+                    rows.push({
+                        model: cells[0],
+                        der: cells[1],
+                        jer: cells[2],
+                        wer: cells[3],
+                        sca: cells[4],
+                        scer: cells[5]
+                    });
+                }
+            }
+
+            console.log('Parsed', rows.length, 'rows');
+            if (rows.length > 0) {
+                renderBenchmarkTable(rows);
+            } else {
+                console.error('No rows were successfully parsed');
+            }
+        }
+
+        function parseValue(str) {
+            const match = str.match(/([\d.]+)\s*\(\s*([\d.]+)%\)/);
+            if (match) {
+                return { value: match[1], percentage: match[2] };
+            }
+            return { value: str, percentage: '0' };
+        }
+
+        function renderBenchmarkTable(rows) {
+            const tbody = document.querySelector('.benchmark-table tbody');
+            if (!tbody) {
+                console.error('Could not find table tbody');
+                return;
+            }
+            tbody.innerHTML = '';
+
+            // Find best values for each metric (excluding Ground Truth)
+            const bestValues = {
+                der: Math.min(...rows.slice(1).map(r => parseFloat(parseValue(r.der).value))),
+                jer: Math.min(...rows.slice(1).map(r => parseFloat(parseValue(r.jer).value))),
+                wer: Math.min(...rows.slice(1).map(r => parseFloat(parseValue(r.wer).value))),
+                sca: Math.max(...rows.slice(1).map(r => parseFloat(parseValue(r.sca).value))),
+                scer: Math.min(...rows.slice(1).map(r => parseFloat(parseValue(r.scer).value)))
+            };
+
+            rows.forEach((row, index) => {
+                const tr = document.createElement('tr');
+
+                // Model name cell
+                const isLattifAI = row.model.includes('LattifAI');
+                const modelName = row.model.replace(/\s*\+\s*LattifAI\s*$/, '');
+                const modelCell = document.createElement('td');
+                modelCell.className = 'model-name';
+                modelCell.innerHTML = modelName + (isLattifAI ? ' <span class="lattifai-badge">✨ + LattifAI</span>' : '');
+                tr.appendChild(modelCell);
+
+                // Metric cells
+                ['der', 'jer', 'wer', 'sca', 'scer'].forEach(metric => {
+                    const td = document.createElement('td');
+                    td.className = 'metric-value';
+                    td.setAttribute('data-metric', metric);
+
+                    const parsed = parseValue(row[metric]);
+                    const value = parseFloat(parsed.value);
+                    const isBest = index > 0 && (
+                        (metric === 'sca' && value === bestValues[metric]) ||
+                        (metric !== 'sca' && value === bestValues[metric])
+                    );
+
+                    if (isBest) {
+                        td.classList.add('best-value');
+                    }
+
+                    td.innerHTML = `<span class="value">${parsed.percentage}%</span>`;
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+        }
+
         // Interactive metric highlighting
         let selectedMetric = null;
 
@@ -466,6 +550,9 @@
                 }
             });
         });
+
+        // Load data when page loads
+        loadBenchmarkData();
     </script>
 </body>
 </html>
