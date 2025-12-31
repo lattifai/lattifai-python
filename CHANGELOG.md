@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## [1.2.0] - 2025-12-31
+
+### Added
+- k2py integration: Complete migration from k2 to k2py for improved performance
+- Hugging Face model revision support: Specify model revisions and fetch latest commit SHA
+
+### Changed
+- **Reduced PyTorch dependency**: Switched to NumPy for emission processing
+- Updated modelscope dependency to version 1.33.0
+- Refactored acoustic model to process raw audio with ONNX runtime and return numpy emissions
+- Relocated caption file processing logic to run after yt-dlp execution
+- Removed k2 installation steps from test workflows
+
+### Fixed
+- Better error handling in caption file processing
+- Enhanced no-caption return paths in YouTube downloads
+
 ## [1.1.0] - 2025-12-28
 
 ### Added

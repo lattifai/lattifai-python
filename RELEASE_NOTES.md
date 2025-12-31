@@ -1,4 +1,119 @@
 ````markdown
+# Release Notes - LattifAI Python v1.2.0
+
+**Release Date:** December 31, 2025
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.2.0 introduces a major architectural improvement by migrating from k2 to k2py and adding support for Hugging Face model revisions.
+
+---
+
+## ✨ New Features
+
+### k2py Integration
+- Complete migration from k2 to k2py for improved performance and compatibility
+- Direct ONNX runtime integration for acoustic model processing
+- Raw audio processing with NumPy-based emission generation
+
+### Hugging Face Model Revision Support
+- Support for specifying model revisions when downloading from Hugging Face
+- Automatic fetching of latest commit SHA for up-to-date model downloads
+- Improved model cache management
+
+### ModelScope Updates
+- Updated modelscope dependency to version 1.33.0
+- Enhanced model downloading capabilities
+
+---
+
+## 🔧 Improvements
+
+### Dependency Optimization
+- **Removed PyTorch dependency** - significantly reduced installation size and complexity
+- Switched to NumPy for emission processing
+- Lighter weight installation with improved startup performance
+
+### Audio Processing
+- Enhanced audio loader with comprehensive format support
+- Improved streaming mode detection
+- Better handling of various audio formats and properties
+
+### Caption Processing
+- Refined YouTube caption file processing logic
+- Improved caption file handling after yt-dlp execution
+- Better error handling for no-caption scenarios
+
+---
+
+## 🛠️ CI/CD Improvements
+
+- Removed k2 installation steps from test workflows (now using k2py)
+
+---
+
+## 📦 Installation & Upgrade
+
+### Upgrade from Previous Versions:
+
+```bash
+pip install --upgrade lattifai
+```
+
+After upgrading, verify the version:
+
+```bash
+python -c "import lattifai; print(lattifai.__version__)"
+# Expected: 1.2.0
+```
+
+### Installation Benefits
+
+With PyTorch dependency removed, the installation is now:
+- Much faster (no large PyTorch download)
+- Lighter weight (significantly reduced disk space)
+- Easier to deploy in constrained environments
+
+---
+
+## 🚀 Quick Start
+
+Usage remains the same as previous versions:
+
+```python
+from lattifai import LattifAI
+from lattifai.config import AlignmentConfig
+
+client = LattifAI(api_key="your-api-key")
+
+# Align audio with captions
+result = client.align(
+    input_media="audio.wav",
+    input_caption="transcript.txt",
+    output_path="output.srt",
+    config=AlignmentConfig()
+)
+```
+
+---
+
+## 📝 Breaking Changes
+
+- None - This release maintains API compatibility with v1.1.0
+
+---
+
+## 🔗 Links
+
+- [GitHub Repository](https://github.com/lattifai/lattifai-python)
+- [Documentation](https://github.com/lattifai/lattifai-python/blob/main/README.md)
+- [Changelog](https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md)
+
+---
+
+````markdown
 # Release Notes - LattifAI Python v1.1.0
 
 **Release Date:** December 28, 2025
