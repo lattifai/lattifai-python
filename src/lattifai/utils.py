@@ -65,12 +65,32 @@ def _resolve_model_path(model_name_or_path: str, model_hub: str = "huggingface")
         return str(Path(model_name_or_path).expanduser())
 
     if hub == "huggingface":
-        from huggingface_hub import snapshot_download
-        from huggingface_hub.constants import HF_HUB_CACHE
+        from huggingface_hub import HfApi, snapshot_download
         from huggingface_hub.errors import LocalEntryNotFoundError
 
+        # Support repo_id@revision syntax
+        hf_repo_id = model_name_or_path
+        revision = None
+        if "@" in model_name_or_path:
+            hf_repo_id, revision = model_name_or_path.split("@", 1)
+
+        # If no specific revision/commit is provided, try to fetch the real latest SHA
+        # to bypass Hugging Face's model_info (metadata) sync lag.
+        if not revision:
+            try:
+                api = HfApi()
+                refs = api.list_repo_refs(repo_id=hf_repo_id, repo_type="model")
+                # Look for the default branch (usually 'main')
+                for branch in refs.branches:
+                    if branch.name == "main":
+                        revision = branch.target_commit
+                        break
+            except Exception:
+                # Fallback to default behavior if API call fails
+                revision = None
+
         try:
-            downloaded_path = snapshot_download(repo_id=model_name_or_path, repo_type="model")
+            downloaded_path = snapshot_download(repo_id=hf_repo_id, repo_type="model", revision=revision)
             return downloaded_path
         except LocalEntryNotFoundError:
             # Fall back to modelscope if HF entry not found
