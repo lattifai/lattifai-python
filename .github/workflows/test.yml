@@ -38,13 +38,13 @@ jobs:
           df -h
           
           # Remove unnecessary pre-installed software
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
           
           # Clean up Docker
-          docker system prune -a -f
+          docker system prune -a -f || true
           
           # Clean APT cache
           sudo apt-get clean
