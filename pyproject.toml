@@ -18,6 +18,7 @@ maintainers = [
 requires-python = '>=3.10,<3.15'
 
 dependencies = [
+    "k2py>=0.2.1",
     "lattifai-core>=0.6.0",
     "lattifai-run>=1.0.1",
     "python-dotenv",
@@ -33,6 +34,7 @@ dependencies = [
     "g2p-phonemizer>=0.4.0",
     "av",
     "wtpsplit>=2.1.7",
+    "modelscope==1.33.0",
     # transcription
     "OmniSenseVoice>=0.4.2",
     "nemo_toolkit_asr[asr]>=2.7.0rc4",

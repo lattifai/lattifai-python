@@ -43,11 +43,6 @@ jobs:
         run: |
           uv sync --prerelease=allow --all-extras
 
-      - name: Install k2
-        run: |
-          uv pip install install-k2>=0.1.0
-          uv pip install pip
-          uv run install_k2 --torch-version 2.8.0
 
       - name: Build and Test
         if: runner.os != 'Windows'
@@ -69,7 +64,7 @@ jobs:
           uv run bash tests/test_audio_formats.sh  # Run audio format tests
           # Gemini Model
           uv run lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
-          uv run lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview
+          uv run lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-flash-preview
 
       - name: Test Web App Installation
         run: |

@@ -4,7 +4,7 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
 
-import torch
+import numpy as np
 
 from lattifai.alignment.phonemizer import G2Phonemizer
 from lattifai.caption import Supervision
@@ -444,7 +444,7 @@ class LatticeTokenizer:
     def detokenize(
         self,
         lattice_id: str,
-        lattice_results: Tuple[torch.Tensor, Any, Any, float, float],
+        lattice_results: Tuple[np.ndarray, Any, Any, float, float],
         supervisions: List[Supervision],
         return_details: bool = False,
         start_margin: float = 0.08,
@@ -494,7 +494,7 @@ class LatticeTokenizer:
 
 def _add_confidence_scores(
     supervisions: List[Supervision],
-    emission: torch.Tensor,
+    emission: np.ndarray,
     labels: List[int],
     frame_shift: float,
     offset: float = 0.0,
@@ -512,17 +512,17 @@ def _add_confidence_scores(
         labels: Token labels corresponding to aligned tokens
         frame_shift: Frame shift in seconds for converting frames to time
     """
-    tokens = torch.tensor(labels, dtype=torch.int64, device=emission.device)
+    tokens = np.array(labels, dtype=np.int64)
 
     for supervision in supervisions:
         start_frame = int((supervision.start - offset) / frame_shift)
         end_frame = int((supervision.end - offset) / frame_shift)
 
         # Compute segment-level confidence
-        probabilities = emission[0, start_frame:end_frame].softmax(dim=-1)
+        probabilities = np.exp(emission[0, start_frame:end_frame])
         aligned = probabilities[range(0, end_frame - start_frame), tokens[start_frame:end_frame]]
-        diffprobs = (probabilities.max(dim=-1).values - aligned).cpu()
-        supervision.score = round(1.0 - diffprobs.mean().item(), ndigits=4)
+        diffprobs = np.max(probabilities, axis=-1) - aligned
+        supervision.score = round(1.0 - diffprobs.mean(), ndigits=4)
 
         # Compute word-level confidence if alignment exists
         if hasattr(supervision, "alignment") and supervision.alignment:
@@ -530,7 +530,7 @@ def _add_confidence_scores(
             for w, item in enumerate(words):
                 start = int((item.start - offset) / frame_shift) - start_frame
                 end = int((item.end - offset) / frame_shift) - start_frame
-                words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean().item(), ndigits=4))
+                words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean(), ndigits=4))
 
 
 def _update_alignments_speaker(supervisions: List[Supervision], alignments: List[Supervision]) -> List[Supervision]:

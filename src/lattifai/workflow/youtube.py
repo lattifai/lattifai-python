@@ -429,79 +429,77 @@ class YouTubeDownloader:
             result = await loop.run_in_executor(
                 None, lambda: subprocess.run(ytdlp_options, capture_output=True, text=True, check=True)
             )
-
             # Only log success message, not full yt-dlp output
             self.logger.debug(f"yt-dlp output: {result.stdout.strip()}")
-
-            # Find the downloaded transcript file
-            caption_patterns = [
-                f"{video_id}.*vtt",
-                f"{video_id}.*srt",
-                f"{video_id}.*sub",
-                f"{video_id}.*sbv",
-                f"{video_id}.*ssa",
-                f"{video_id}.*ass",
-            ]
-
-            caption_files = []
-            for pattern in caption_patterns:
-                _caption_files = list(target_dir.glob(pattern))
-                for caption_file in _caption_files:
-                    self.logger.info(f"📥 Downloaded caption: {caption_file}")
-                caption_files.extend(_caption_files)
-
-            if not caption_files:
-                self.logger.warning("No caption available for this video")
-                return None
-
-            # If only one caption file, return it directly
-            if len(caption_files) == 1:
-                self.logger.info(f"✅ Using caption: {caption_files[0]}")
-                return str(caption_files[0])
-
-            # Multiple caption files found, let user choose
-            if FileExistenceManager.is_interactive_mode():
-                self.logger.info(f"📋 Found {len(caption_files)} caption files")
-                caption_choice = FileExistenceManager.prompt_file_selection(
-                    file_type="caption",
-                    files=[str(f) for f in caption_files],
-                    operation="use",
-                    transcriber_name=transcriber_name,
-                )
-
-                if caption_choice == "cancel":
-                    raise RuntimeError("Caption selection cancelled by user")
-                elif caption_choice == TRANSCRIBE_CHOICE:
-                    return caption_choice
-                elif caption_choice:
-                    self.logger.info(f"✅ Selected caption: {caption_choice}")
-                    return caption_choice
-                else:
-                    # Fallback to first file
-                    self.logger.info(f"✅ Using first caption: {caption_files[0]}")
-                    return str(caption_files[0])
-            else:
-                # Non-interactive mode: use first file
-                self.logger.info(f"✅ Using first caption: {caption_files[0]}")
-                return str(caption_files[0])
-
         except subprocess.CalledProcessError as e:
             error_msg = e.stderr.strip() if e.stderr else str(e)
 
             # Check for specific error conditions
             if "No automatic or manual captions found" in error_msg:
                 self.logger.warning("No captions available for this video")
-                return None
             elif "HTTP Error 429" in error_msg or "Too Many Requests" in error_msg:
                 self.logger.error("YouTube rate limit exceeded. Please try again later or use a different method.")
-                raise RuntimeError(
+                self.logger.error(
                     "YouTube rate limit exceeded (HTTP 429). "
                     "Try again later or use --cookies option with authenticated cookies. "
                     "See: https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp"
                 )
             else:
                 self.logger.error(f"Failed to download transcript: {error_msg}")
-                raise RuntimeError(f"Failed to download transcript: {error_msg}")
+
+        # Find the downloaded transcript file
+        caption_patterns = [
+            f"{video_id}.*vtt",
+            f"{video_id}.*srt",
+            f"{video_id}.*sub",
+            f"{video_id}.*sbv",
+            f"{video_id}.*ssa",
+            f"{video_id}.*ass",
+        ]
+
+        caption_files = []
+        for pattern in caption_patterns:
+            _caption_files = list(target_dir.glob(pattern))
+            for caption_file in _caption_files:
+                self.logger.info(f"📥 Downloaded caption: {caption_file}")
+            caption_files.extend(_caption_files)
+
+        # If only one caption file, return it directly
+        if len(caption_files) == 1:
+            self.logger.info(f"✅ Using caption: {caption_files[0]}")
+            return str(caption_files[0])
+
+        # Multiple caption files found, let user choose
+        if FileExistenceManager.is_interactive_mode():
+            self.logger.info(f"📋 Found {len(caption_files)} caption files")
+            caption_choice = FileExistenceManager.prompt_file_selection(
+                file_type="caption",
+                files=[str(f) for f in caption_files],
+                operation="use",
+                transcriber_name=transcriber_name,
+            )
+
+            if caption_choice == "cancel":
+                raise RuntimeError("Caption selection cancelled by user")
+            elif caption_choice == TRANSCRIBE_CHOICE:
+                return caption_choice
+            elif caption_choice:
+                self.logger.info(f"✅ Selected caption: {caption_choice}")
+                return caption_choice
+            elif caption_files:
+                # Fallback to first file
+                self.logger.info(f"✅ Using first caption: {caption_files[0]}")
+                return str(caption_files[0])
+            else:
+                self.logger.warning("No caption files available after download")
+                return None
+        elif caption_files:
+            # Non-interactive mode: use first file
+            self.logger.info(f"✅ Using first caption: {caption_files[0]}")
+            return str(caption_files[0])
+        else:
+            self.logger.warning("No caption files available after download")
+            return None
 
     async def list_available_captions(self, url: str) -> List[Dict[str, Any]]:
         """

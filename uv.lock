@@ -14,9 +14,6 @@ resolution-markers = [
     "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 
-[options]
-prerelease-mode = "allow"
-
 [[package]]
 name = "absl-py"
 version = "2.3.1"
@@ -2586,6 +2583,27 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/19/c9e1596b5572c786b93428d0904280e964c930fae7e6c9368ed9e1b63922/julius-0.2.7.tar.gz", hash = "sha256:3c0f5f5306d7d6016fcc95196b274cae6f07e2c9596eed314e4e7641554fbb08", size = 59640, upload-time = "2022-09-19T16:13:34.2Z" }
 
 [[package]]
+name = "k2py"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/38/cc/2ea4eb717c81b06a2e14550b58764e98816b1eea905f274c78fab5887a67/k2py-0.2.1-cp310-cp310-macosx_15_0_arm64.whl", hash = "sha256:07e4d7a16a7c2993b3d159bcc4b37b50414c291e9636ac4f65bc5c4c9c4007a1", size = 309019, upload-time = "2025-12-30T10:02:31.011Z" },
+    { url = "https://files.pythonhosted.org/packages/18/62/ee316531fdd7c80e695d3fb9a35c3359be2d3123d213225383a07593db01/k2py-0.2.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a28389859ff5de44cfdb6e1def21987b91f830032990e94dfba4994510a1d242", size = 470343, upload-time = "2025-12-30T10:02:32.888Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/e7/a1caed440f978c687c223ade88dbafb5811b5c17dce7994c7f20fab5e0c4/k2py-0.2.1-cp310-cp310-win_amd64.whl", hash = "sha256:c68098e41de8bc8fa370c640cda148e13cf5881909e24e62500bc24889e2ba92", size = 302541, upload-time = "2025-12-30T10:02:34.27Z" },
+    { url = "https://files.pythonhosted.org/packages/4f/f1/aad23829ac528827e844222506f1a9743d49ca10d369de1600ec33d63b17/k2py-0.2.1-cp311-cp311-macosx_15_0_arm64.whl", hash = "sha256:1768633d96ef982c8c6c09728eb0ca5297a170dddff5d951bdb311e50f96b98f", size = 310445, upload-time = "2025-12-30T10:02:36.026Z" },
+    { url = "https://files.pythonhosted.org/packages/2e/3c/e67ae5cf202e3883bb1c5f560c1d488cf329839717594534275897700e56/k2py-0.2.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:681fb086f35920325379818d47673612de18a44498123d7436b4ccbc03fef0a2", size = 471506, upload-time = "2025-12-30T10:02:37.887Z" },
+    { url = "https://files.pythonhosted.org/packages/8b/56/d76b2267e33c3ce03635d90036ba1c634fd030280d779cb30aa988f4d301/k2py-0.2.1-cp311-cp311-win_amd64.whl", hash = "sha256:96c333ff6de0a8cfe4ebed6f69eda54138dc567950de569aae3da7240082f88f", size = 301188, upload-time = "2025-12-30T10:02:39.271Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/da/59c4d34e8feb81538bf8481a4333c00b80785e2a456b4a61f45674000d1b/k2py-0.2.1-cp312-cp312-macosx_15_0_arm64.whl", hash = "sha256:bae1fc9f2a77e39770e04498d737089b91f0a5cd8cc293e3a4861bdc8c816562", size = 310410, upload-time = "2025-12-30T10:02:41.349Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/42/86c79debda96cfc1b1fa165f03ec287af5bb2b8333b4db5d1160f6b98f68/k2py-0.2.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:98237022ad3db9108758d10a70a144119cce7ba99850df1c5345146264d0fee3", size = 473200, upload-time = "2025-12-30T10:02:42.774Z" },
+    { url = "https://files.pythonhosted.org/packages/84/b4/d07b7c10b4ae5d55bdbd41f1e7faf943af19a068f47c1e1e20e65c7cea56/k2py-0.2.1-cp312-cp312-win_amd64.whl", hash = "sha256:778626a49256011bb89155ab966ff7e8f91adcf4cf31a584d298496761c53c89", size = 302060, upload-time = "2025-12-30T10:02:44.087Z" },
+    { url = "https://files.pythonhosted.org/packages/82/49/ffbabcbcd4e4630b92fa9038136fe09a46b39810c9bf83ffa48de8df1622/k2py-0.2.1-cp313-cp313-macosx_15_0_arm64.whl", hash = "sha256:b8aa887e2b4a6213a2f4b4be7c55d48107d3ac40269c9428050e7a718a0c7990", size = 310391, upload-time = "2025-12-30T10:02:45.8Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/fc/a08444ff2bda1caf5af037c334e47a66da6dc9ca470c7b8f8a5562b19ece/k2py-0.2.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9628de0815afc678e0ec65e9e32aad509a6790b9d1ae7b2489817acf4ec43c70", size = 473686, upload-time = "2025-12-30T10:02:47.181Z" },
+    { url = "https://files.pythonhosted.org/packages/80/50/ff87a74300f81f6ecd52bf7f0944b40a260232a2f27121a0a58b148177ea/k2py-0.2.1-cp313-cp313-win_amd64.whl", hash = "sha256:6e2f527ba39d3ab7126db68afc75e6faaa45436510736d12e3237fbd7c6df3e1", size = 302111, upload-time = "2025-12-30T10:02:49.097Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/c8/c9ea2a5dbb661d0fc6b94f7f714e96e0e18dd929deb940187f61fe6e2bf0/k2py-0.2.1-cp314-cp314-macosx_15_0_arm64.whl", hash = "sha256:24449840926a8d423774d6ea00cefdf451afc8184fe8deeb8ea1fbc0e33abef2", size = 310919, upload-time = "2025-12-30T10:02:50.839Z" },
+    { url = "https://files.pythonhosted.org/packages/68/50/4c484df1d0dab11c7fd9ce7ab348170b55b34ec570dac535a027ebd017e5/k2py-0.2.1-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:2dac092e7c531ea4f7ec252fcf53ea472f517355f3a24567bbaadb24673feb4e", size = 473784, upload-time = "2025-12-30T10:02:52.485Z" },
+]
+
+[[package]]
 name = "kaldi-native-fbank"
 version = "1.22.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2783,9 +2801,11 @@ dependencies = [
     { name = "g2p-phonemizer" },
     { name = "google-genai" },
     { name = "jinja2" },
+    { name = "k2py" },
     { name = "lattifai-core" },
     { name = "lattifai-run" },
     { name = "lhotse" },
+    { name = "modelscope" },
     { name = "msgpack" },
     { name = "nemo-toolkit-asr", extra = ["asr"] },
     { name = "omnisensevoice" },
@@ -2849,9 +2869,11 @@ requires-dist = [
     { name = "g2p-phonemizer", specifier = ">=0.4.0" },
     { name = "google-genai", specifier = ">=1.22.0" },
     { name = "jinja2", specifier = ">=3.1.4" },
+    { name = "k2py", specifier = ">=0.2.1" },
     { name = "lattifai-core", specifier = ">=0.6.0" },
     { name = "lattifai-run", specifier = ">=1.0.1" },
     { name = "lhotse", specifier = ">=1.26.0" },
+    { name = "modelscope", specifier = "==1.33.0" },
     { name = "msgpack" },
     { name = "nemo-toolkit-asr", extras = ["asr"], specifier = ">=2.7.0rc4" },
     { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'transcription'", specifier = ">=2.7.0rc3" },
@@ -3452,7 +3474,7 @@ wheels = [
 
 [[package]]
 name = "modelscope"
-version = "1.32.0"
+version = "1.33.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -3461,9 +3483,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6d/4d/a0961c29177906dff58de5c328a0b183ca8ebf33961fe5a91ddbfd4fae9c/modelscope-1.32.0.tar.gz", hash = "sha256:b717c11cef11c57d1d47b69da06f5888e634925e72de9adc3ccb1d29c74c9821", size = 4556707, upload-time = "2025-11-18T02:39:31.81Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/02/db35ce865e66fd212fcf0cb5b43db3a3474cf82fae8d835b56ce7dba9247/modelscope-1.33.0.tar.gz", hash = "sha256:5d9ca8eb934cabea236104ed774b3ddf352f96c705272876108aaa25a3bb0b38", size = 4558673, upload-time = "2025-12-10T03:50:01.05Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/92/b24fd3d91d87bf2189a422d6acea736505616b54706eadf141d2298c7a1b/modelscope-1.32.0-py3-none-any.whl", hash = "sha256:b47711464766ac626b1ad72772619f05881deeeefdfc7c0b6495d4463963e24e", size = 6048504, upload-time = "2025-11-18T02:39:29.219Z" },
+    { url = "https://files.pythonhosted.org/packages/86/05/63f01821681b2be5d1739b4aad7b186c28d4ead2c5c99a9fc4aa53c13c19/modelscope-1.33.0-py3-none-any.whl", hash = "sha256:d9bdd566303f813d762e133410007eaf1b78f065c871228ab38640919b707489", size = 6050040, upload-time = "2025-12-10T03:49:58.428Z" },
 ]
 
 [[package]]

@@ -32,6 +32,26 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Free Disk Space
+        run: |
+          echo "Disk space before cleanup:"
+          df -h
+          
+          # Remove unnecessary pre-installed software
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          
+          # Clean up Docker
+          docker system prune -a -f || true
+          
+          # Clean APT cache
+          sudo apt-get clean || true
+          
+          echo "Disk space after cleanup:"
+          df -h
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip setuptools
@@ -56,8 +76,6 @@ jobs:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          pip install install-k2>=0.1.0
-          install_k2
           pip install -e ".[test]"  # Install with test dependencies including pytest-asyncio
           python tests/test_basic.py  # Run basic tests
           pytest tests/caption/test_text_parser.py -v

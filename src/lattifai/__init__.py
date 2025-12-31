@@ -52,28 +52,27 @@ except Exception:
     __version__ = "0.1.0"  # fallback version
 
 
-# Check and auto-install k2 if not present
-def _check_and_install_k2():
-    """Check if k2 is installed and attempt to install it if not."""
+# Check and auto-install k2py if not present
+def _check_and_install_k2py():
+    """Check if k2py is installed and attempt to install it if not."""
     try:
-        import k2
+        import k2py
     except ImportError:
         import subprocess
 
-        print("k2 is not installed. Attempting to install k2...")
+        print("k2py is not installed. Attempting to install k2py...")
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "install-k2"])
-            subprocess.check_call([sys.executable, "-m", "install_k2"])
-            import k2  # Try importing again after installation
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "k2py"])
+            import k2py  # Try importing again after installation
 
-            print("k2 installed successfully.")
+            print("k2py installed successfully.")
         except Exception as e:
-            warnings.warn(f"Failed to install k2 automatically. Please install it manually. Error: {e}")
+            warnings.warn(f"Failed to install k2py automatically. Please install it manually. Error: {e}")
     return True
 
 
-# Auto-install k2 on first import
-_check_and_install_k2()
+# Auto-install k2py on first import
+_check_and_install_k2py()
 
 
 __all__ = [
