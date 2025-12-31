@@ -2,6 +2,24 @@
 
 Evaluate subtitle alignment quality using DER, JER, WER, SCA, and SCER metrics.
 
+## 📊 Interactive Visualization
+
+**[View Interactive Benchmark Results](./index.html)**
+
+Open `index.html` in your browser for an interactive visualization with:
+- Click-to-highlight metric comparison
+- Detailed metric explanations
+- Key performance insights
+- Responsive design for all devices
+
+```bash
+# Open in browser
+open benchmark/index.html
+
+# Or navigate in your browser to:
+file:///path/to/lattifai-python/benchmark/index.html
+```
+
 ## Metrics
 
 **DER (Diarization Error Rate)** - Speaker diarization quality

@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LattifAI Benchmarks - Performance Evaluation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f7fa;
+        }
+
+        .benchmark-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .benchmark-header {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            color: white;
+        }
+
+        .benchmark-header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        .benchmark-subtitle {
+            margin: 0;
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .section h2 {
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            color: #2d3748;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            padding: 1.5rem;
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .metric-card.selected {
+            border-color: #667eea;
+            background: #edf2f7;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .metric-card h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.4rem;
+            color: #667eea;
+        }
+
+        .good-threshold {
+            font-size: 0.85rem;
+            background: #48bb78;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 500;
+            margin-left: 0.5rem;
+        }
+
+        .metric-description {
+            margin: 0.5rem 0;
+            font-size: 0.95rem;
+            color: #4a5568;
+        }
+
+        .metric-formula {
+            margin: 0.5rem 0 0 0;
+            font-size: 0.9rem;
+            color: #718096;
+            font-family: 'Courier New', monospace;
+            background: white;
+            padding: 0.5rem;
+            border-radius: 4px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .benchmark-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
+        }
+
+        .benchmark-table thead {
+            background: #f7fafc;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .benchmark-table th {
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #2d3748;
+            white-space: nowrap;
+        }
+
+        .benchmark-table th.highlighted {
+            background: #edf2f7;
+            color: #667eea;
+        }
+
+        .benchmark-table td {
+            padding: 1rem;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .benchmark-table tbody tr:hover {
+            background: #f7fafc;
+        }
+
+        .benchmark-table tbody tr:first-child {
+            background: #faf5ff;
+            font-weight: 600;
+        }
+
+        .model-name {
+            font-weight: 500;
+            color: #2d3748;
+        }
+
+        .lattifai-badge {
+            display: inline-block;
+            margin-left: 0.5rem;
+            font-size: 0.75rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .metric-value {
+            text-align: center;
+        }
+
+        .metric-value.highlighted {
+            background: #edf2f7;
+        }
+
+        .metric-value.best-value {
+            background: #c6f6d5;
+            font-weight: 600;
+        }
+
+        .value {
+            display: block;
+            font-size: 1rem;
+            color: #2d3748;
+        }
+
+        .percentage {
+            display: block;
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 0.2rem;
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .insight-card {
+            padding: 1.5rem;
+            background: #f7fafc;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+        }
+
+        .insight-card h3 {
+            margin: 0 0 0.75rem 0;
+            font-size: 1.2rem;
+            color: #2d3748;
+        }
+
+        .insight-card p {
+            margin: 0;
+            color: #4a5568;
+        }
+
+        .insight-card strong {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: #718096;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .benchmark-container {
+                padding: 1rem;
+            }
+
+            .benchmark-header h1 {
+                font-size: 1.8rem;
+            }
+
+            .metrics-grid,
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .benchmark-table {
+                font-size: 0.85rem;
+            }
+
+            .benchmark-table th,
+            .benchmark-table td {
+                padding: 0.75rem 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="benchmark-container">
+        <header class="benchmark-header">
+            <h1>LattifAI Benchmark Results</h1>
+            <p class="benchmark-subtitle">
+                Subtitle alignment quality evaluation using industry-standard metrics
+            </p>
+        </header>
+
+        <section class="section">
+            <h2>Metrics Overview</h2>
+            <div class="metrics-grid">
+                <div class="metric-card" data-metric="der">
+                    <h3>DER ↓ <span class="good-threshold">&lt; 20%</span></h3>
+                    <p class="metric-description">Diarization Error Rate - Speaker diarization quality</p>
+                    <p class="metric-formula">Formula: (false alarm + missed detection + confusion) / total</p>
+                </div>
+                <div class="metric-card" data-metric="jer">
+                    <h3>JER ↓</h3>
+                    <p class="metric-description">Jaccard Error Rate - Temporal overlap of speaker segments</p>
+                    <p class="metric-formula">Formula: 1 - (Intersection / Union)</p>
+                </div>
+                <div class="metric-card" data-metric="wer">
+                    <h3>WER ↓ <span class="good-threshold">&lt; 10%</span></h3>
+                    <p class="metric-description">Word Error Rate - Transcription accuracy</p>
+                    <p class="metric-formula">Formula: (Substitutions + Deletions + Insertions) / Total Words</p>
+                </div>
+                <div class="metric-card" data-metric="sca">
+                    <h3>SCA ↑</h3>
+                    <p class="metric-description">Speaker Count Accuracy - Speaker counting accuracy</p>
+                    <p class="metric-formula">Formula: Correct Predictions / Total Samples</p>
+                </div>
+                <div class="metric-card" data-metric="scer">
+                    <h3>SCER ↓</h3>
+                    <p class="metric-description">Speaker Counting Error Rate - Relative error in speaker count</p>
+                    <p class="metric-formula">Formula: |Hypothesis Count - Reference Count| / Reference Count</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Benchmark Comparison</h2>
+            <div class="table-container">
+                <table class="benchmark-table">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th data-metric="der">DER ↓</th>
+                            <th data-metric="jer">JER ↓</th>
+                            <th data-metric="wer">WER ↓</th>
+                            <th data-metric="sca">SCA ↑</th>
+                            <th data-metric="scer">SCER ↓</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="model-name">Ground Truth</td>
+                            <td class="metric-value" data-metric="der"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                            <td class="metric-value" data-metric="jer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                            <td class="metric-value" data-metric="wer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
+                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                        </tr>
+                        <tr>
+                            <td class="model-name">Gemini 2.5 Pro</td>
+                            <td class="metric-value" data-metric="der"><span class="value">0.6303</span><span class="percentage">(63.03%)</span></td>
+                            <td class="metric-value" data-metric="jer"><span class="value">0.6532</span><span class="percentage">(65.32%)</span></td>
+                            <td class="metric-value" data-metric="wer"><span class="value">0.1511</span><span class="percentage">(15.11%)</span></td>
+                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
+                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                        </tr>
+                        <tr>
+                            <td class="model-name">Gemini 2.5 Pro <span class="lattifai-badge">✨ + LattifAI</span></td>
+                            <td class="metric-value best-value" data-metric="der"><span class="value">0.2256</span><span class="percentage">(22.56%)</span></td>
+                            <td class="metric-value" data-metric="jer"><span class="value">0.3178</span><span class="percentage">(31.78%)</span></td>
+                            <td class="metric-value" data-metric="wer"><span class="value">0.1511</span><span class="percentage">(15.11%)</span></td>
+                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
+                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                        </tr>
+                        <tr>
+                            <td class="model-name">Gemini 3 Pro Preview</td>
+                            <td class="metric-value" data-metric="der"><span class="value">0.6433</span><span class="percentage">(64.33%)</span></td>
+                            <td class="metric-value" data-metric="jer"><span class="value">0.6637</span><span class="percentage">(66.37%)</span></td>
+                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0494</span><span class="percentage">(4.94%)</span></td>
+                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
+                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                        </tr>
+                        <tr>
+                            <td class="model-name">Gemini 3 Pro Preview <span class="lattifai-badge">✨ + LattifAI</span></td>
+                            <td class="metric-value" data-metric="der"><span class="value">0.2265</span><span class="percentage">(22.65%)</span></td>
+                            <td class="metric-value" data-metric="jer"><span class="value">0.3656</span><span class="percentage">(36.56%)</span></td>
+                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0494</span><span class="percentage">(4.94%)</span></td>
+                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
+                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                        </tr>
+                        <tr>
+                            <td class="model-name">Gemini 3 Flash Preview</td>
+                            <td class="metric-value" data-metric="der"><span class="value">0.6047</span><span class="percentage">(60.47%)</span></td>
+                            <td class="metric-value" data-metric="jer"><span class="value">0.6318</span><span class="percentage">(63.18%)</span></td>
+                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0454</span><span class="percentage">(4.54%)</span></td>
+                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
+                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                        </tr>
+                        <tr>
+                            <td class="model-name">Gemini 3 Flash Preview <span class="lattifai-badge">✨ + LattifAI</span></td>
+                            <td class="metric-value best-value" data-metric="der"><span class="value">0.1142</span><span class="percentage">(11.42%)</span></td>
+                            <td class="metric-value best-value" data-metric="jer"><span class="value">0.1363</span><span class="percentage">(13.63%)</span></td>
+                            <td class="metric-value best-value" data-metric="wer"><span class="value">0.0454</span><span class="percentage">(4.54%)</span></td>
+                            <td class="metric-value" data-metric="sca"><span class="value">1.0000</span><span class="percentage">(100.00%)</span></td>
+                            <td class="metric-value" data-metric="scer"><span class="value">0.0000</span><span class="percentage">(0.00%)</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Key Insights</h2>
+            <div class="insights-grid">
+                <div class="insight-card">
+                    <h3>🎯 Alignment Precision</h3>
+                    <p>
+                        LattifAI reduces DER by up to <strong>64.2%</strong> compared to Gemini models alone,
+                        significantly improving speaker diarization accuracy.
+                    </p>
+                </div>
+                <div class="insight-card">
+                    <h3>⚡ Best Performance</h3>
+                    <p>
+                        <strong>Gemini 3 Flash Preview + LattifAI</strong> achieves the best DER (11.42%) and
+                        JER (13.63%) while maintaining excellent WER (4.54%).
+                    </p>
+                </div>
+                <div class="insight-card">
+                    <h3>🌍 Consistent Quality</h3>
+                    <p>
+                        All models maintain <strong>100% SCA</strong> and <strong>0% SCER</strong>,
+                        demonstrating perfect speaker count accuracy.
+                    </p>
+                </div>
+                <div class="insight-card">
+                    <h3>📊 Temporal Accuracy</h3>
+                    <p>
+                        JER improvements show that LattifAI significantly enhances temporal overlap precision,
+                        reducing errors by up to <strong>78.4%</strong>.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <p>
+                All benchmarks can be reproduced using the commands in
+                <a href="https://github.com/lattifai/lattifai-python/tree/main/benchmark" target="_blank" rel="noopener noreferrer">
+                    benchmark/README.md
+                </a>
+            </p>
+            <p style="margin-top: 1rem;">
+                Learn more at <a href="https://lattifai.com" target="_blank" rel="noopener noreferrer">lattifai.com</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Interactive metric highlighting
+        let selectedMetric = null;
+
+        document.querySelectorAll('.metric-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const metric = this.getAttribute('data-metric');
+
+                if (selectedMetric === metric) {
+                    // Deselect
+                    selectedMetric = null;
+                    document.querySelectorAll('.metric-card').forEach(c => c.classList.remove('selected'));
+                    document.querySelectorAll('th[data-metric]').forEach(th => th.classList.remove('highlighted'));
+                    document.querySelectorAll('td[data-metric]').forEach(td => td.classList.remove('highlighted'));
+                } else {
+                    // Select new metric
+                    selectedMetric = metric;
+                    document.querySelectorAll('.metric-card').forEach(c => c.classList.remove('selected'));
+                    this.classList.add('selected');
+
+                    // Highlight table columns
+                    document.querySelectorAll('th[data-metric]').forEach(th => th.classList.remove('highlighted'));
+                    document.querySelectorAll('td[data-metric]').forEach(td => td.classList.remove('highlighted'));
+
+                    document.querySelectorAll(`[data-metric="${metric}"]`).forEach(el => {
+                        el.classList.add('highlighted');
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
