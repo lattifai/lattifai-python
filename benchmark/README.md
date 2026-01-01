@@ -13,11 +13,16 @@ Open `index.html` in your browser for an interactive visualization with:
 - Responsive design for all devices
 
 ```bash
-# Open in browser
+# Open directly in browser (may have CORS issues with file://)
 open benchmark/index.html
 
-# Or navigate in your browser to:
-file:///path/to/lattifai-python/benchmark/index.html
+# Or start a local HTTP server (recommended)
+cd benchmark
+python -m http.server 8000
+# Then open: http://localhost:8000/index.html
+
+# Alternative with Python 2
+python -m SimpleHTTPServer 8000
 ```
 
 ## Metrics
@@ -48,11 +53,11 @@ file:///path/to/lattifai-python/benchmark/index.html
 | Model | DER ↓ | JER ↓ | WER ↓ | SCA ↑ | SCER ↓ |
 |--------|--------|--------|--------|--------|--------|
 | Ground Truth | 0.0000 (0.00%) | 0.0000 (0.00%) | 0.0000 (0.00%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
-| Gemini 2.5 Pro | 0.6303 (63.03%) | 0.6532 (65.32%) | 0.1511 (15.11%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
-| Gemini 2.5 Pro + LattifAI | 0.2256 (22.56%) | 0.3178 (31.78%) | 0.1511 (15.11%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
-| Gemini 3 Pro Preview | 0.6433 (64.33%) | 0.6637 (66.37%) | 0.0494 (4.94%) | 1.0000 (100.00%) | 0.0000 (0.00%) |
+| Gemini 2.5 Pro | 0.3610 (36.10%) | 0.3917 (39.17%) | 0.1511 (15.11%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
+| Gemini 2.5 Pro + LattifAI | 0.2252 (22.52%) | 0.3160 (31.60%) | 0.1511 (15.11%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
+| Gemini 3 Pro Preview | 0.5343 (53.43%) | 0.5679 (56.79%) | 0.0494 ( 4.94%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
 | Gemini 3 Pro Preview + LattifAI | 0.2265 (22.65%) | 0.3656 (36.56%) | 0.0494 ( 4.94%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
-| Gemini 3 Flash Preview | 0.6047 (60.47%) | 0.6318 (63.18%) | 0.0454 ( 4.54%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
+| Gemini 3 Flash Preview | 0.3044 (30.44%) | 0.3042 (30.42%) | 0.0454 ( 4.54%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
 | Gemini 3 Flash Preview + LattifAI | 0.1142 (11.42%) | 0.1363 (13.63%) | 0.0454 ( 4.54%) | 1.0000 (100.00%) | 0.0000 ( 0.00%) |
 
 **Command to reproduce:**
@@ -78,7 +83,7 @@ lai alignment youtube -Y \
     transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
 
 # Gemini 2.5 Pro
-lai caption convert ./data/Introducing_GPT-4o_Gemini.md ./data/Introducing_GPT-4o_Gemini.ass include_speaker_in_text=false
+lai caption convert -Y ./data/Introducing_GPT-4o_Gemini.md ./data/Introducing_GPT-4o_Gemini.ass include_speaker_in_text=false
 
 python eval.py -r data/Introducing_GPT-4o_GroundTruth.ass -hyp data/Introducing_GPT-4o_Gemini.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 2.5 Pro"
@@ -95,7 +100,7 @@ lai alignment youtube -Y \
     transcription.model_name=gemini-3-pro-preview \
     transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
 
-lai caption convert ./data/Introducing_GPT-4o_Gemini3.md ./data/Introducing_GPT-4o_Gemini3.ass include_speaker_in_text=false
+lai caption convert -Y ./data/Introducing_GPT-4o_Gemini3.md ./data/Introducing_GPT-4o_Gemini3.ass include_speaker_in_text=false
 
 python eval.py -r data/Introducing_GPT-4o_GroundTruth.ass -hyp data/Introducing_GPT-4o_Gemini3.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 3 Pro Preview"
@@ -112,7 +117,7 @@ lai alignment youtube -Y \
     caption.output_path=./data/Introducing_GPT-4o_Gemini3_Flash_LattifAI.ass \
     transcription.model_name=gemini-3-flash-preview \
     transcription.gemini_api_key="YOUR_GEMINI_API_KEY"
-lai caption convert ./data/Introducing_GPT-4o_Gemini3_Flash.md ./data/Introducing_GPT-4o_Gemini3_Flash.ass include_speaker_in_text=false
+lai caption convert -Y ./data/Introducing_GPT-4o_Gemini3_Flash.md ./data/Introducing_GPT-4o_Gemini3_Flash.ass include_speaker_in_text=false
 
 python eval.py -r data/Introducing_GPT-4o_GroundTruth.ass -hyp data/Introducing_GPT-4o_Gemini3_Flash.ass \
   --metrics der jer wer sca scer --collar 0.0 --model-name "Gemini 3 Flash Preview"

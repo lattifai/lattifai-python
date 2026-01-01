@@ -342,33 +342,29 @@
 
         <section class="section">
             <h2>Key Insights</h2>
-            <div class="insights-grid">
+            <div class="insights-grid" id="insights-container">
                 <div class="insight-card">
                     <h3>🎯 Alignment Precision</h3>
-                    <p>
-                        LattifAI reduces DER by up to <strong>64.2%</strong> compared to Gemini models alone,
-                        significantly improving speaker diarization accuracy.
+                    <p id="insight-der">
+                        Loading insights...
                     </p>
                 </div>
                 <div class="insight-card">
                     <h3>⚡ Best Performance</h3>
-                    <p>
-                        <strong>Gemini 3 Flash Preview + LattifAI</strong> achieves the best DER (11.42%) and
-                        JER (13.63%) while maintaining excellent WER (4.54%).
+                    <p id="insight-best">
+                        Loading insights...
                     </p>
                 </div>
                 <div class="insight-card">
                     <h3>🌍 Consistent Quality</h3>
-                    <p>
-                        All models maintain <strong>100% SCA</strong> and <strong>0% SCER</strong>,
-                        demonstrating perfect speaker count accuracy.
+                    <p id="insight-sca">
+                        Loading insights...
                     </p>
                 </div>
                 <div class="insight-card">
                     <h3>📊 Temporal Accuracy</h3>
-                    <p>
-                        JER improvements show that LattifAI significantly enhances temporal overlap precision,
-                        reducing errors by up to <strong>78.4%</strong>.
+                    <p id="insight-jer">
+                        Loading insights...
                     </p>
                 </div>
             </div>
@@ -455,9 +451,92 @@
             console.log('Parsed', rows.length, 'rows');
             if (rows.length > 0) {
                 renderBenchmarkTable(rows);
+                updateKeyInsights(rows);
             } else {
                 console.error('No rows were successfully parsed');
             }
+        }
+
+        function updateKeyInsights(rows) {
+            // Find LattifAI and non-LattifAI pairs (excluding Ground Truth)
+            const modelPairs = [];
+            const lattifaiRows = rows.filter(r => r.model.includes('LattifAI'));
+
+            lattifaiRows.forEach(lattifaiRow => {
+                const baseModelName = lattifaiRow.model.replace(/\s*\+\s*LattifAI\s*$/, '');
+                const baseRow = rows.find(r => r.model === baseModelName);
+                if (baseRow) {
+                    modelPairs.push({ base: baseRow, lattifai: lattifaiRow, name: baseModelName });
+                }
+            });
+
+            // Calculate DER improvements
+            let maxDerImprovement = 0;
+            let maxDerModel = '';
+            modelPairs.forEach(pair => {
+                const baseDer = parseFloat(parseValue(pair.base.der).value);
+                const lattifaiDer = parseFloat(parseValue(pair.lattifai.der).value);
+                const improvement = ((baseDer - lattifaiDer) / baseDer) * 100;
+                if (improvement > maxDerImprovement) {
+                    maxDerImprovement = improvement;
+                    maxDerModel = pair.name;
+                }
+            });
+
+            // Calculate JER improvements
+            let maxJerImprovement = 0;
+            let maxJerModel = '';
+            modelPairs.forEach(pair => {
+                const baseJer = parseFloat(parseValue(pair.base.jer).value);
+                const lattifaiJer = parseFloat(parseValue(pair.lattifai.jer).value);
+                const improvement = ((baseJer - lattifaiJer) / baseJer) * 100;
+                if (improvement > maxJerImprovement) {
+                    maxJerImprovement = improvement;
+                    maxJerModel = pair.name;
+                }
+            });
+
+            // Find best overall model
+            const lattifaiModels = rows.filter(r => r.model.includes('LattifAI'));
+            let bestModel = null;
+            let bestDer = Infinity;
+            lattifaiModels.forEach(row => {
+                const der = parseFloat(parseValue(row.der).value);
+                if (der < bestDer) {
+                    bestDer = der;
+                    bestModel = row;
+                }
+            });
+
+            // Check SCA and SCER consistency
+            const nonGroundTruth = rows.slice(1);
+            const allSca = nonGroundTruth.every(r => parseFloat(parseValue(r.sca).value) === 1.0);
+            const allScer = nonGroundTruth.every(r => parseFloat(parseValue(r.scer).value) === 0.0);
+
+            // Update insight cards
+            document.getElementById('insight-der').innerHTML =
+                `LattifAI reduces DER by up to <strong>${maxDerImprovement.toFixed(1)}%</strong> compared to Gemini models alone, ` +
+                `significantly improving speaker diarization accuracy.`;
+
+            if (bestModel) {
+                const der = parseValue(bestModel.der).percentage;
+                const jer = parseValue(bestModel.jer).percentage;
+                const wer = parseValue(bestModel.wer).percentage;
+                const modelName = bestModel.model.replace(/\s*\+\s*LattifAI\s*$/, '');
+
+                document.getElementById('insight-best').innerHTML =
+                    `<strong>${modelName} + LattifAI</strong> achieves the best DER (${der}%) and ` +
+                    `JER (${jer}%) while maintaining excellent WER (${wer}%).`;
+            }
+
+            document.getElementById('insight-sca').innerHTML =
+                allSca && allScer
+                    ? `All models maintain <strong>100% SCA</strong> and <strong>0% SCER</strong>, demonstrating perfect speaker count accuracy.`
+                    : `Models show consistent speaker count accuracy with high SCA scores.`;
+
+            document.getElementById('insight-jer').innerHTML =
+                `JER improvements show that LattifAI significantly enhances temporal overlap precision, ` +
+                `reducing errors by up to <strong>${maxJerImprovement.toFixed(1)}%</strong>.`;
         }
 
         function parseValue(str) {

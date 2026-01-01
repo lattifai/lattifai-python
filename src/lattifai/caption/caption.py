@@ -467,7 +467,6 @@ class Caption:
                     sup_dict = sup.to_dict()
                     json_data.append(sup_dict)
                 json.dump(json_data, f, ensure_ascii=False, indent=4)
-
         elif str(output_path).lower().endswith(".textgrid"):
             from tgt import Interval, IntervalTier, TextGrid, write_to_file
 
@@ -506,7 +505,6 @@ class Caption:
                 tg.add_tier(IntervalTier(name="word_scores", objects=scores["words"]))
 
             write_to_file(tg, output_path, format="long")
-
         elif str(output_path)[-4:].lower() == ".tsv":
             cls._write_tsv(alignments, output_path, include_speaker_in_text)
         elif str(output_path)[-4:].lower() == ".csv":

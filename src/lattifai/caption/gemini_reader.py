@@ -15,7 +15,8 @@ class GeminiSegment:
     """Represents a segment in the Gemini transcript with metadata."""
 
     text: str
-    timestamp: Optional[float] = None
+    timestamp: Optional[float] = None  # For backward compatibility (start time)
+    end_timestamp: Optional[float] = None  # End time when timestamp is at the end
     speaker: Optional[str] = None
     section: Optional[str] = None
     segment_type: str = "dialogue"  # 'dialogue', 'event', or 'section_header'
@@ -26,6 +27,11 @@ class GeminiSegment:
         """Return start time in seconds."""
         return self.timestamp if self.timestamp is not None else 0.0
 
+    @property
+    def end(self) -> Optional[float]:
+        """Return end time in seconds if available."""
+        return self.end_timestamp
+
 
 class GeminiReader:
     """Parser for YouTube transcript format with speaker labels and timestamps."""
@@ -34,8 +40,12 @@ class GeminiReader:
     TIMESTAMP_PATTERN = re.compile(r"\[(\d{1,2}):(\d{2}):(\d{2})\]|\[(\d{1,2}):(\d{2})\]")
     SECTION_HEADER_PATTERN = re.compile(r"^##\s*\[(\d{1,2}):(\d{2}):(\d{2})\]\s*(.+)$")
     SPEAKER_PATTERN = re.compile(r"^\*\*(.+?[:：])\*\*\s*(.+)$")
-    EVENT_PATTERN = re.compile(r"^\[([^\]]+)\]\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$")
-    INLINE_TIMESTAMP_PATTERN = re.compile(r"^(.+?)\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$")
+    # Event pattern: [Event] [HH:MM:SS] or [Event] [MM:SS] - prioritize HH:MM:SS format
+    EVENT_PATTERN = re.compile(r"^\[([^\]]+)\]\s*\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]$")
+    # Timestamp at the end indicates end time
+    INLINE_TIMESTAMP_END_PATTERN = re.compile(r"^(.+?)\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$")
+    # Timestamp at the beginning indicates start time
+    INLINE_TIMESTAMP_START_PATTERN = re.compile(r"^\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]\s*(.+)$")
 
     # New patterns for YouTube link format: [[MM:SS](URL&t=seconds)]
     YOUTUBE_SECTION_PATTERN = re.compile(r"^##\s*\[\[(\d{1,2}):(\d{2})\]\([^)]*&t=(\d+)\)\]\s*(.+)$")
@@ -144,18 +154,22 @@ class GeminiReader:
             if event_match:
                 groups = event_match.groups()
                 event_text = groups[0]
-                # Parse timestamp - can be HH:MM:SS (groups 1,2,3) or MM:SS (groups 4,5)
-                if groups[1] is not None:  # HH:MM:SS format
-                    timestamp = cls.parse_timestamp(groups[1], groups[2], groups[3])
-                elif groups[4] is not None:  # MM:SS format
-                    timestamp = cls.parse_timestamp(groups[4], groups[5])
+                # Parse timestamp - groups: (event_text, hours/minutes, minutes/seconds, seconds_optional)
+                hours_or_minutes = groups[1]
+                minutes_or_seconds = groups[2]
+                seconds_optional = groups[3]
+
+                if seconds_optional is not None:
+                    # HH:MM:SS format
+                    timestamp = cls.parse_timestamp(hours_or_minutes, minutes_or_seconds, seconds_optional)
                 else:
-                    timestamp = None
+                    # MM:SS format
+                    timestamp = cls.parse_timestamp(hours_or_minutes, minutes_or_seconds)
 
                 if include_events and timestamp is not None:
                     segments.append(
                         GeminiSegment(
-                            text=event_text.strip(),
+                            text=f"[{event_text.strip()}]",
                             timestamp=timestamp,
                             section=current_section,
                             segment_type="event",
@@ -170,34 +184,44 @@ class GeminiReader:
                 speaker, text_with_timestamp = speaker_match.groups()
                 current_speaker = speaker.strip()
 
-                # Extract timestamp from the end of the text
-                timestamp_match = cls.INLINE_TIMESTAMP_PATTERN.match(text_with_timestamp.strip())
+                # Check for timestamp at the beginning (start time)
+                start_match = cls.INLINE_TIMESTAMP_START_PATTERN.match(text_with_timestamp.strip())
+                # Check for timestamp at the end (end time)
+                end_match = cls.INLINE_TIMESTAMP_END_PATTERN.match(text_with_timestamp.strip())
                 youtube_match = cls.YOUTUBE_INLINE_PATTERN.match(text_with_timestamp.strip())
 
-                if timestamp_match:
-                    groups = timestamp_match.groups()
-                    text = groups[0]
+                start_timestamp = None
+                end_timestamp = None
+                text = text_with_timestamp.strip()
+
+                if start_match:
+                    groups = start_match.groups()
+                    # Parse timestamp - can be HH:MM:SS (groups 0,1,2) or MM:SS (groups 3,4)
+                    if groups[0] is not None:  # HH:MM:SS format
+                        start_timestamp = cls.parse_timestamp(groups[0], groups[1], groups[2])
+                    elif groups[3] is not None:  # MM:SS format
+                        start_timestamp = cls.parse_timestamp(groups[3], groups[4])
+                    text = groups[5]  # Text is after timestamp
+                elif end_match:
+                    groups = end_match.groups()
+                    text = groups[0]  # Text is before timestamp
                     # Parse timestamp - can be HH:MM:SS (groups 1,2,3) or MM:SS (groups 4,5)
                     if groups[1] is not None:  # HH:MM:SS format
-                        timestamp = cls.parse_timestamp(groups[1], groups[2], groups[3])
+                        end_timestamp = cls.parse_timestamp(groups[1], groups[2], groups[3])
                     elif groups[4] is not None:  # MM:SS format
-                        timestamp = cls.parse_timestamp(groups[4], groups[5])
-                    else:
-                        timestamp = None
+                        end_timestamp = cls.parse_timestamp(groups[4], groups[5])
                 elif youtube_match:
                     groups = youtube_match.groups()
                     text = groups[0]
-                    # Extract seconds from URL parameter
+                    # Extract seconds from URL parameter (treat as end time)
                     url_seconds = groups[3]
-                    timestamp = cls.parse_timestamp(url_seconds)
-                else:
-                    text = text_with_timestamp.strip()
-                    timestamp = None
+                    end_timestamp = cls.parse_timestamp(url_seconds)
 
                 segments.append(
                     GeminiSegment(
                         text=text.strip(),
-                        timestamp=timestamp,
+                        timestamp=start_timestamp,
+                        end_timestamp=end_timestamp,
                         speaker=current_speaker,
                         section=current_section,
                         segment_type="dialogue",
@@ -207,25 +231,50 @@ class GeminiReader:
                 current_speaker = None  # Reset speaker after use
                 continue
 
-            # Parse plain text with timestamp at the end
-            inline_match = cls.INLINE_TIMESTAMP_PATTERN.match(line)
+            # Parse plain text with timestamp (check both positions)
+            start_match = cls.INLINE_TIMESTAMP_START_PATTERN.match(line)
+            end_match = cls.INLINE_TIMESTAMP_END_PATTERN.match(line)
             youtube_inline_match = cls.YOUTUBE_INLINE_PATTERN.match(line)
 
-            if inline_match:
-                groups = inline_match.groups()
-                text = groups[0]
-                # Parse timestamp - can be HH:MM:SS (groups 1,2,3) or MM:SS (groups 4,5)
-                if groups[1] is not None:  # HH:MM:SS format
-                    timestamp = cls.parse_timestamp(groups[1], groups[2], groups[3])
-                elif groups[4] is not None:  # MM:SS format
-                    timestamp = cls.parse_timestamp(groups[4], groups[5])
-                else:
-                    timestamp = None
+            start_timestamp = None
+            end_timestamp = None
+            text = None
+
+            if start_match:
+                groups = start_match.groups()
+                # Parse timestamp - can be HH:MM:SS (groups 0,1,2) or MM:SS (groups 3,4)
+                if groups[0] is not None:  # HH:MM:SS format
+                    start_timestamp = cls.parse_timestamp(groups[0], groups[1], groups[2])
+                elif groups[3] is not None:  # MM:SS format
+                    start_timestamp = cls.parse_timestamp(groups[3], groups[4])
+                text = groups[5]  # Text is after timestamp
 
                 segments.append(
                     GeminiSegment(
                         text=text.strip(),
-                        timestamp=timestamp,
+                        timestamp=start_timestamp,
+                        end_timestamp=None,
+                        speaker=current_speaker,
+                        section=current_section,
+                        segment_type="dialogue",
+                        line_number=line_num,
+                    )
+                )
+                continue
+            elif end_match:
+                groups = end_match.groups()
+                text = groups[0]  # Text is before timestamp
+                # Parse timestamp - can be HH:MM:SS (groups 1,2,3) or MM:SS (groups 4,5)
+                if groups[1] is not None:  # HH:MM:SS format
+                    end_timestamp = cls.parse_timestamp(groups[1], groups[2], groups[3])
+                elif groups[4] is not None:  # MM:SS format
+                    end_timestamp = cls.parse_timestamp(groups[4], groups[5])
+
+                segments.append(
+                    GeminiSegment(
+                        text=text.strip(),
+                        timestamp=None,
+                        end_timestamp=end_timestamp,
                         speaker=current_speaker,
                         section=current_section,
                         segment_type="dialogue",
@@ -236,14 +285,15 @@ class GeminiReader:
             elif youtube_inline_match:
                 groups = youtube_inline_match.groups()
                 text = groups[0]
-                # Extract seconds from URL parameter
+                # Extract seconds from URL parameter (treat as end time)
                 url_seconds = groups[3]
-                timestamp = cls.parse_timestamp(url_seconds)
+                end_timestamp = cls.parse_timestamp(url_seconds)
 
                 segments.append(
                     GeminiSegment(
                         text=text.strip(),
-                        timestamp=timestamp,
+                        timestamp=None,
+                        end_timestamp=end_timestamp,
                         speaker=current_speaker,
                         section=current_section,
                         segment_type="dialogue",
@@ -280,38 +330,79 @@ class GeminiReader:
         Returns:
                 List of Supervision objects ready for alignment
         """
-        segments = cls.read(transcript_path, include_events=False, include_sections=False)
+        segments = cls.read(transcript_path, include_events=True, include_sections=False)
 
-        # Filter to only dialogue segments with timestamps
-        dialogue_segments = [s for s in segments if s.segment_type == "dialogue" and s.timestamp is not None]
+        # Filter to dialogue and event segments with timestamps (either start or end)
+        dialogue_segments = [
+            s
+            for s in segments
+            if s.segment_type in ("dialogue", "event") and (s.timestamp is not None or s.end_timestamp is not None)
+        ]
 
         if not dialogue_segments:
             raise ValueError(f"No dialogue segments with timestamps found in {transcript_path}")
 
-        # Sort by timestamp
-        dialogue_segments.sort(key=lambda x: x.timestamp)
+        # Sort by timestamp (use start time if available, otherwise end time)
+        dialogue_segments.sort(key=lambda x: x.timestamp if x.timestamp is not None else x.end_timestamp)
 
         # Convert to Supervision objects
         supervisions: List[Supervision] = []
+        prev_end_time = 0.0
 
         for i, segment in enumerate(dialogue_segments):
-            # Estimate duration based on next segment
-            if i < len(dialogue_segments) - 1:
-                duration = dialogue_segments[i + 1].timestamp - segment.timestamp
-            else:
-                # Last segment: estimate based on text length (rough heuristic)
-                words = len(segment.text.split())
-                duration = words * 0.3  # ~0.3 seconds per word
+            seg_start = None
+            seg_end = None
 
-            supervisions.append(
-                Supervision(
-                    text=segment.text,
-                    start=segment.timestamp,
-                    duration=max(duration, min_duration),
-                    id=f"segment_{i:05d}",
-                    speaker=segment.speaker,
-                )
-            )
+            # Determine start and end times based on available timestamps
+            if segment.timestamp is not None:
+                # Has start time
+                seg_start = segment.timestamp
+                if segment.end_timestamp is not None:
+                    # Has both start and end
+                    seg_end = segment.end_timestamp
+                else:
+                    # Only has start, estimate end
+                    if i < len(dialogue_segments) - 1:
+                        # Use next segment's time
+                        next_seg = dialogue_segments[i + 1]
+                        if next_seg.timestamp is not None:
+                            seg_end = next_seg.timestamp
+                        elif next_seg.end_timestamp is not None:
+                            # Next has only end, estimate its start and use that
+                            words_next = len(next_seg.text.split())
+                            estimated_duration_next = words_next * 0.3
+                            seg_end = next_seg.end_timestamp - estimated_duration_next
+
+                    if seg_end is None:
+                        # Estimate based on text length
+                        words = len(segment.text.split())
+                        seg_end = seg_start + words * 0.3
+
+            elif segment.end_timestamp is not None:
+                # Only has end time, need to infer start
+                seg_end = segment.end_timestamp
+                # Use previous segment's end time as start, or estimate based on text
+                if prev_end_time > 0:
+                    seg_start = prev_end_time
+                else:
+                    # Estimate start based on text length
+                    words = len(segment.text.split())
+                    estimated_duration = words * 0.3
+                    seg_start = seg_end - estimated_duration
+
+            if seg_start is not None and seg_end is not None:
+                duration = max(seg_end - seg_start, min_duration)
+                if segment.segment_type == "dialogue":
+                    supervisions.append(
+                        Supervision(
+                            text=segment.text,
+                            start=seg_start,
+                            duration=duration,
+                            id=f"segment_{i:05d}",
+                            speaker=segment.speaker,
+                        )
+                    )
+                prev_end_time = seg_start + duration
 
         # Optionally merge consecutive segments from same speaker
         if merge_consecutive:
