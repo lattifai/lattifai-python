@@ -28,11 +28,11 @@ class AlignmentConfig:
     """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""
 
     batch_size: int = 1
-    """Batch size for inference (number of samples processed simultaneously)."""
+    """Batch size for inference (number of samples processed simultaneously, NotImplemented yet)."""
 
     # Segmented Alignment for Long Audio
     trust_caption_timestamps: bool = False
-    """When True, use original caption timestamps as strong reference constraints during alignment.
+    """When True, use original caption.supervisions' timestamps as strong reference constraints during alignment.
     The alignment process will still adjust timestamps but stay close to the input timing.
     Use this when you want to re-segment caption sentence boundaries (caption.split_sentence=True)
     while preserving the approximate timing from the original captions.

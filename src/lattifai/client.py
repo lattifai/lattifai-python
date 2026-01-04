@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, Union
 
 import colorful
 from lattifai_core.client import SyncAPIClient
-from lhotse.utils import Pathlike
+from lhotse.utils import Pathlike, fastcopy
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
@@ -98,7 +98,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         try:
             # Step 1: Get caption
             if isinstance(input_media, AudioData):
-                media_audio = input_media
+                if streaming_chunk_secs:
+                    media_audio = fastcopy(input_media, streaming_chunk_secs=streaming_chunk_secs)
+                else:
+                    media_audio = input_media
             else:
                 media_audio = self.audio_loader(
                     input_media,
@@ -130,30 +133,29 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     assert (
                         "gemini" not in self.transcriber.name.lower()
                     ), "Transcription-based alignment is not supported with Gemini transcriber."
-                    assert (
-                        caption.supervisions
-                    ), "Input caption should contain supervisions when using transcription-based alignment."
                     if not caption.transcription:
                         import asyncio
 
-                        safe_print(colorful.cyan("📝 Transcribing media for alignment..."))
                         if output_caption_path:
                             transcript_file = (
                                 Path(str(output_caption_path)).parent
                                 / f"{Path(str(media_audio)).stem}_{self.transcriber.file_name}"
                             )
                             if transcript_file.exists():
-                                # print(colorful.cyan(f"Reading existing transcription from {transcript_file}"))
+                                safe_print(colorful.cyan(f"Reading existing transcription from {transcript_file}"))
                                 transcript = self._read_caption(transcript_file, verbose=False)
                                 caption.transcription = transcript.supervisions
                                 caption.audio_events = transcript.audio_events
 
                         if not caption.transcription:
+                            safe_print(colorful.cyan("📝 Transcribing media for alignment..."))
                             transcript = asyncio.run(
                                 self.transcriber.transcribe(media_audio, language=self.caption_config.source_lang)
                             )
                             caption.transcription = transcript.transcription
                             caption.audio_events = transcript.audio_events
+
+                        assert caption.transcription, "Transcription is empty after transcription step."
 
                     # Align caption.supervisions with transcription to get segments
                     import regex
@@ -220,6 +222,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         )
 
                 # align each segment
+                sr = media_audio.sampling_rate
                 supervisions, alignments = [], []
                 for i, (start, end, _supervisions, skipalign) in enumerate(segments, 1):
                     print(
@@ -234,10 +237,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
                     offset = round(start, 4)
                     # Extract audio slice
-                    audio_slice_ndarray = media_audio.ndarray[
-                        :, int(start * media_audio.sampling_rate) : int(end * media_audio.sampling_rate)
-                    ]
-                    emission = self.aligner.emission(audio_slice_ndarray)
+                    audio_slice = media_audio.ndarray[:, int(start * sr) : int(end * sr)]
+                    emission = self.aligner.emission(audio_slice)
 
                     # Align segment
                     _supervisions, _alignments = self.aligner.alignment(

@@ -108,12 +108,7 @@ def transcribe(
     is_url = media_config.is_input_remote()
 
     # Prepare output paths
-    if is_url:
-        # For URLs, use output_dir from media_config or current directory
-        output_path = media_config.output_dir
-    else:
-        # For files, use input path directory
-        output_path = Path(media_config.input_path).parent
+    output_dir = media_config.output_dir or Path(media_config.input_path).parent
 
     # Create transcriber
     if not transcription_config.lattice_model_path:
@@ -140,7 +135,7 @@ def transcribe(
             input_path = asyncio.run(
                 downloader.download_media(
                     url=media_config.input_path,
-                    output_dir=str(output_path),
+                    output_dir=str(output_dir),
                     media_format=media_config.normalize_format(),
                     force_overwrite=media_config.force_overwrite,
                 )
@@ -167,7 +162,7 @@ def transcribe(
         if is_url:
             # For URLs, generate output filename based on transcriber
             output_format = transcriber.file_suffix.lstrip(".")
-            final_output = output_path / f"youtube_LattifAI_{transcriber.name}.{output_format}"
+            final_output = output_dir / f"youtube_LattifAI_{transcriber.name}.{output_format}"
         else:
             # For files, use input filename with suffix
             final_output = Path(media_config.input_path).with_suffix(".LattifAI.srt")
