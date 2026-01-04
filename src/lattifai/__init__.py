@@ -1,5 +1,4 @@
 import os
-import sys
 import warnings
 from importlib.metadata import version
 
@@ -50,29 +49,6 @@ try:
     __version__ = version("lattifai")
 except Exception:
     __version__ = "0.1.0"  # fallback version
-
-
-# Check and auto-install k2py if not present
-def _check_and_install_k2py():
-    """Check if k2py is installed and attempt to install it if not."""
-    try:
-        import k2py
-    except ImportError:
-        import subprocess
-
-        print("k2py is not installed. Attempting to install k2py...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "k2py"])
-            import k2py  # Try importing again after installation
-
-            print("k2py installed successfully.")
-        except Exception as e:
-            warnings.warn(f"Failed to install k2py automatically. Please install it manually. Error: {e}")
-    return True
-
-
-# Auto-install k2py on first import
-_check_and_install_k2py()
 
 
 __all__ = [

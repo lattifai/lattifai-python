@@ -290,12 +290,12 @@ class LattifAIClientMixin:
             diarization_file = Path(str(input_caption)).with_suffix(".SpkDiar")
             if diarization_file.exists():
                 if verbose:
-                    safe_print(colorful.cyan(f"📖 Step 1b: Reading speaker diarization from {diarization_file}"))
+                    safe_print(colorful.cyan(f"📖 Step1b: Reading speaker diarization from {diarization_file}"))
                 caption.read_speaker_diarization(diarization_file)
             events_file = Path(str(input_caption)).with_suffix(".AED")
             if events_file.exists():
                 if verbose:
-                    safe_print(colorful.cyan(f"📖 Step 1c: Reading audio events from {events_file}"))
+                    safe_print(colorful.cyan(f"📖 Step1c: Reading audio events from {events_file}"))
                 from tgt import read_textgrid
 
                 caption.audio_events = read_textgrid(events_file)
@@ -404,6 +404,14 @@ class LattifAIClientMixin:
             # Transcription mode: use Transcriber to transcribe
             self._validate_transcription_setup()
 
+            if output_dir:
+                # Generate transcript file path
+                transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
+                if transcript_file.exists():
+                    safe_print(colorful.cyan(f"    Using existing transcript file: {transcript_file}"))
+                    transcription = self._read_caption(transcript_file, normalize_text=False)
+                    return transcription
+
             safe_print(colorful.cyan(f"🎤 Transcribing({self.transcriber.name}) media: {str(media_file)} ..."))
             transcription = await self.transcriber.transcribe_file(media_file, language=source_lang)
             safe_print(colorful.green("         ✓ Transcription completed."))
@@ -442,8 +450,6 @@ class LattifAIClientMixin:
                         safe_print(colorful.yellow(f"First segment: {transcription.transcription[0].text}"))
 
             if output_dir:
-                # Generate transcript file path
-                transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
                 await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
                 safe_print(colorful.green(f"         ✓ Transcription saved to: {transcript_file}"))
 

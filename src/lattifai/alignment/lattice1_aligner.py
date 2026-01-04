@@ -117,7 +117,7 @@ class Lattice1Aligner(object):
 
             if verbose:
                 safe_print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
-                if audio.streaming_chunk_secs:
+                if audio.streaming_mode:
                     safe_print(
                         colorful.yellow(
                             f"         ⚡Using streaming mode with {audio.streaming_chunk_secs}s (chunk duration)"

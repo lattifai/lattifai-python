@@ -313,6 +313,8 @@ class LatticeTokenizer:
 
         Carefull about speaker changes.
         """
+        self.init_sentence_splitter()
+
         texts, speakers = [], []
         text_len, sidx = 0, 0
 
@@ -417,7 +419,6 @@ class LatticeTokenizer:
 
     def tokenize(self, supervisions: List[Supervision], split_sentence: bool = False) -> Tuple[str, Dict[str, Any]]:
         if split_sentence:
-            self.init_sentence_splitter()
             supervisions = self.split_sentences(supervisions)
 
         pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])

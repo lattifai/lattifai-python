@@ -7,8 +7,6 @@ from typing import Any, Dict, Optional, Tuple
 import colorful
 import numpy as np
 import onnxruntime as ort
-from lhotse import FbankConfig
-from lhotse.features.kaldi.layers import Wav2LogFilterBank
 from lhotse.utils import Pathlike
 from tqdm import tqdm
 
@@ -159,10 +157,7 @@ class Lattice1Worker:
             DependencyError: If required dependencies are missing
             AlignmentError: If alignment process fails
         """
-        try:
-            import k2py as k2
-        except ImportError:
-            raise DependencyError("k2py", install_command="pip install k2py")
+        import k2py as k2
 
         lattice_graph_str, final_state, acoustic_scale = lattice_graph
 
