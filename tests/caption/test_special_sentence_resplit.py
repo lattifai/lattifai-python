@@ -5,7 +5,7 @@ Test the special sentence type re-splitting functionality
 
 import sys
 
-from lattifai.alignment.tokenizer import LatticeTokenizer
+from lattifai.alignment.sentence_splitter import SentenceSplitter
 
 
 def test_resplit_special_sentence_types():
@@ -30,7 +30,7 @@ def test_resplit_special_sentence_types():
     failed = 0
 
     for i, (input_text, expected_output) in enumerate(test_cases, 1):
-        result = LatticeTokenizer._resplit_special_sentence_types(input_text)
+        result = SentenceSplitter._resplit_special_sentence_types(input_text)
         is_passed = result == expected_output
 
         status = "✓ PASS" if is_passed else "✗ FAIL"

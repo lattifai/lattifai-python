@@ -84,30 +84,6 @@ def demonstrate_alignment_error():
         print()
 
 
-def demonstrate_dependency_error():
-    """Demonstrate dependency error with installation guidance."""
-    print("📦 Demonstrating dependency error handling...")
-
-    from lattifai.errors import DependencyError
-
-    try:
-        # Simulate missing k2 dependency
-        raise DependencyError(
-            "k2",
-            install_command="pip install install-k2 && python -m install_k2",
-            context={"import_attempted": "k2", "system": "macOS"},
-        )
-    except DependencyError as e:
-        print("Caught DependencyError:")
-        print(f'Missing dependency: {e.context.get("dependency_name")}')
-        print(f'Install command: {e.context.get("install_command")}')
-        print("User-facing error message:")
-        print("-" * 60)
-        print(str(e))
-        print("-" * 60)
-        print()
-
-
 def demonstrate_text_processing_error():
     """Demonstrate text processing error with content preview."""
     print("📝 Demonstrating text processing error handling...")
@@ -141,7 +117,6 @@ def main():
     demonstrate_audio_error()
     demonstrate_configuration_error()
     demonstrate_alignment_error()
-    demonstrate_dependency_error()
     demonstrate_text_processing_error()
 
     print("🎉 Error handling demonstration complete!")

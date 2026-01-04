@@ -9,7 +9,7 @@ from lattifai.caption import Caption, Supervision
 from lattifai.config import AlignmentConfig
 from lattifai.utils import safe_print
 
-from .tokenizer import END_PUNCTUATION
+from .sentence_splitter import END_PUNCTUATION
 
 
 class Segmenter:

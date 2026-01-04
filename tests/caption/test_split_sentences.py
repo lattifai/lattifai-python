@@ -4,11 +4,6 @@ import types
 from typing import List, Optional, Tuple
 
 from lattifai import Caption
-
-if "k2" not in sys.modules:
-    sys.modules["k2"] = types.ModuleType("k2")
-
-
 from lattifai.alignment.tokenizer import LatticeTokenizer
 from lattifai.caption import Supervision
 
@@ -17,6 +12,7 @@ class FakeSplitter:
     def __init__(self, outputs: List[List[str]]):
         self._outputs = outputs
         self.calls = []
+        self._splitter = self  # Mock the internal splitter
 
     def split(self, texts: List[str], threshold: float, strip_whitespace: bool, batch_size: int = 8) -> List[List[str]]:
         self.calls.append(
@@ -28,6 +24,115 @@ class FakeSplitter:
             }
         )
         return copy.deepcopy(self._outputs)
+
+    def split_sentences(self, supervisions: List[Supervision], strip_whitespace: bool = True) -> List[Supervision]:
+        """Mock split_sentences method that delegates to the real implementation."""
+        from lattifai.alignment.sentence_splitter import SentenceSplitter
+
+        # Call the actual split_sentences logic from SentenceSplitter
+        # but use our mock split() method
+        texts, speakers = [], []
+        text_len, sidx = 0, 0
+
+        def flush_segment(end_idx: int, speaker: Optional[str] = None):
+            """Flush accumulated text from sidx to end_idx with given speaker."""
+            nonlocal text_len, sidx
+            if sidx <= end_idx:
+                if len(speakers) < len(texts) + 1:
+                    speakers.append(speaker)
+                text = " ".join(sup.text for sup in supervisions[sidx : end_idx + 1])
+                texts.append(text)
+                sidx = end_idx + 1
+                text_len = 0
+
+        for s, supervision in enumerate(supervisions):
+            text_len += len(supervision.text)
+            is_last = s == len(supervisions) - 1
+
+            if supervision.speaker:
+                # Flush previous segment without speaker (if any)
+                if sidx < s:
+                    flush_segment(s - 1, None)
+                    text_len = len(supervision.text)
+
+                # Check if we should flush this speaker's segment now
+                next_has_speaker = not is_last and supervisions[s + 1].speaker
+                if is_last or next_has_speaker:
+                    flush_segment(s, supervision.speaker)
+                else:
+                    speakers.append(supervision.speaker)
+
+            elif text_len >= 2000 or is_last:
+                flush_segment(s, None)
+
+        assert len(speakers) == len(texts), f"len(speakers)={len(speakers)} != len(texts)={len(texts)}"
+        sentences = self.split(texts, threshold=0.15, strip_whitespace=strip_whitespace, batch_size=8)
+
+        supervisions, remainder = [], ""
+        for k, (_speaker, _sentences) in enumerate(zip(speakers, sentences)):
+            # Prepend remainder from previous iteration to the first sentence
+            if _sentences and remainder:
+                _sentences[0] = remainder + _sentences[0]
+                remainder = ""
+
+            if not _sentences:
+                continue
+
+            # Process and re-split special sentence types
+            processed_sentences = []
+            for s, _sentence in enumerate(_sentences):
+                if remainder:
+                    _sentence = remainder + _sentence
+                    remainder = ""
+                # Detect and split special sentence types
+                resplit_parts = SentenceSplitter._resplit_special_sentence_types(_sentence)
+                if any(resplit_parts[-1].endswith(sp) for sp in [":", "："]):
+                    if s < len(_sentences) - 1:
+                        _sentences[s + 1] = resplit_parts[-1] + " " + _sentences[s + 1]
+                    else:  # last part
+                        remainder = resplit_parts[-1] + " "
+                    processed_sentences.extend(resplit_parts[:-1])
+                else:
+                    processed_sentences.extend(resplit_parts)
+            _sentences = processed_sentences
+
+            if not _sentences:
+                if remainder:
+                    _sentences, remainder = [remainder.strip()], ""
+                else:
+                    continue
+
+            END_PUNCTUATION = '.!?"]。！？"】'
+            if any(_sentences[-1].endswith(ep) for ep in END_PUNCTUATION):
+                supervisions.extend(
+                    Supervision(text=text, speaker=(_speaker if s == 0 else None)) for s, text in enumerate(_sentences)
+                )
+                _speaker = None  # reset speaker after use
+            else:
+                supervisions.extend(
+                    Supervision(text=text, speaker=(_speaker if s == 0 else None))
+                    for s, text in enumerate(_sentences[:-1])
+                )
+                remainder = _sentences[-1] + " " + remainder
+                if k < len(speakers) - 1 and speakers[k + 1] is not None:  # next speaker is set
+                    supervisions.append(
+                        Supervision(text=remainder.strip(), speaker=_speaker if len(_sentences) == 1 else None)
+                    )
+                    remainder = ""
+                elif len(_sentences) == 1:
+                    if k == len(speakers) - 1:
+                        pass  # keep _speaker for the last supervision
+                    else:
+                        assert speakers[k + 1] is None
+                        speakers[k + 1] = _speaker
+                else:
+                    assert len(_sentences) > 1
+                    _speaker = None  # reset speaker if sentence not ended
+
+        if remainder.strip():
+            supervisions.append(Supervision(text=remainder.strip(), speaker=_speaker))
+
+        return supervisions
 
 
 def make_supervision(idx: int, text: str, speaker: Optional[str]) -> Supervision:
