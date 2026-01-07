@@ -297,7 +297,7 @@ class LatticeTokenizer:
         end_margin: float = 0.20,
     ) -> List[Supervision]:
         emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
-        if isinstance(supervisions, Supervision):
+        if isinstance(supervisions[0], Supervision):
             response = self.client_wrapper.post(
                 "detokenize",
                 json={
@@ -352,7 +352,7 @@ class LatticeTokenizer:
             # Add emission confidence scores for segments and word-level alignments
             _add_confidence_scores(alignments, emission, labels[0], frame_shift, offset)
 
-        if isinstance(supervisions, Supervision):
+        if isinstance(supervisions[0], Supervision):
             alignments = _update_alignments_speaker(supervisions, alignments)
         else:
             # NOTE: Text Diff Alignment >> speaker has been handled in the backend service
