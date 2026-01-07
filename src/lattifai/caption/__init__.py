@@ -1,7 +1,3 @@
-from typing import List, Optional
-
-from lhotse.utils import Pathlike
-
 from ..config.caption import InputCaptionFormat
 from .caption import Caption
 from .gemini_reader import GeminiReader, GeminiSegment

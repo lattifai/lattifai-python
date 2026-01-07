@@ -11,6 +11,7 @@ per-file-ignores =
   src/lattifai/workflow/*.py: W503
   src/lattifai/server/app.py: E501
   src/lattifai/caption/caption.py: W503
+  src/lattifai/alignment/text_align.py: W503, E501
   tests/*/*.py: E501, F541, F401, F841, W605, E226
   tests/*.py: F541
 

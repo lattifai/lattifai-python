@@ -2,7 +2,7 @@ import gzip
 import pickle
 import re
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar
+from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 
@@ -16,13 +16,9 @@ from lattifai.errors import (
 )
 
 from .phonemizer import G2Phonemizer
+from .punctuation import PUNCTUATION, PUNCTUATION_SPACE
 from .sentence_splitter import SentenceSplitter
-
-PUNCTUATION = '!"#$%&()*+,-./:;<=>?@[\\]^_`{|}~'
-PUNCTUATION_SPACE = PUNCTUATION + " "
-STAR_TOKEN = "※"
-
-GROUPING_SEPARATOR = "✹"
+from .text_align import TextAlignResult
 
 MAXIMUM_WORD_LENGTH = 40
 
@@ -80,8 +76,11 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True, attach_punct
         ['Kühlschrank']
         >>> tokenize_multilingual_text("Hello, World!", attach_punctuation=True)
         ['Hello,', ' ', 'World!']
+        >>> tokenize_multilingual_text("[AED], World!", keep_spaces=False, attach_punctuation=True)
+        ['[AED],', 'World!']
     """
     # Regex pattern:
+    # - \[[A-Z_]+\] matches bracketed annotations like [APPLAUSE], [MUSIC], [SPEAKER_01]
     # - [a-zA-Z0-9\u00C0-\u024F]+ matches Latin letters (including accented chars like ü, ö, ä, ß, é, etc.)
     # - (?:'[a-zA-Z]{1,2})? optionally matches contractions like 's, 't, 'm, 'll, 're, 've
     # - [\u4e00-\u9fff] matches CJK characters
@@ -90,7 +89,7 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True, attach_punct
     # - \u00C0-\u00FF: Latin-1 Supplement (À-ÿ)
     # - \u0100-\u017F: Latin Extended-A
     # - \u0180-\u024F: Latin Extended-B
-    pattern = re.compile(r"([a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
+    pattern = re.compile(r"(\[[A-Z_]+\]|[a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
 
     # filter(None, ...) removes any empty strings from re.findall results
     tokens = list(filter(None, pattern.findall(text)))
@@ -245,19 +244,37 @@ class LatticeTokenizer:
         self.init_sentence_splitter()
         return self.sentence_splitter.split_sentences(supervisions, strip_whitespace=strip_whitespace)
 
-    def tokenize(self, supervisions: List[Supervision], split_sentence: bool = False) -> Tuple[str, Dict[str, Any]]:
-        if split_sentence:
-            supervisions = self.split_sentences(supervisions)
+    def tokenize(
+        self, supervisions: Union[List[Supervision], TextAlignResult], split_sentence: bool = False, boost: float = 0.0
+    ) -> Tuple[str, Dict[str, Any]]:
+        if isinstance(supervisions[0], Supervision):
+            if split_sentence:
+                supervisions = self.split_sentences(supervisions)
 
-        pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
-        response = self.client_wrapper.post(
-            "tokenize",
-            json={
-                "model_name": self.model_name,
-                "supervisions": [s.to_dict() for s in supervisions],
-                "pronunciation_dictionaries": pronunciation_dictionaries,
-            },
-        )
+            pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
+            response = self.client_wrapper.post(
+                "tokenize",
+                json={
+                    "model_name": self.model_name,
+                    "supervisions": [s.to_dict() for s in supervisions],
+                    "pronunciation_dictionaries": pronunciation_dictionaries,
+                },
+            )
+        else:
+            pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions[0]])
+            pronunciation_dictionaries.update(self.prenormalize([s.text for s in supervisions[1]]))
+
+            response = self.client_wrapper.post(
+                "difftokenize",
+                json={
+                    "model_name": self.model_name,
+                    "supervisions": [s.to_dict() for s in supervisions[0]],
+                    "transcription": [s.to_dict() for s in supervisions[1]],
+                    "pronunciation_dictionaries": pronunciation_dictionaries,
+                    "boost": boost,
+                },
+            )
+
         if response.status_code == 402:
             raise QuotaExceededError(response.json().get("detail", "Quota exceeded"))
         if response.status_code != 200:
@@ -274,28 +291,47 @@ class LatticeTokenizer:
         self,
         lattice_id: str,
         lattice_results: Tuple[np.ndarray, Any, Any, float, float],
-        supervisions: List[Supervision],
+        supervisions: Union[List[Supervision], TextAlignResult],
         return_details: bool = False,
         start_margin: float = 0.08,
         end_margin: float = 0.20,
     ) -> List[Supervision]:
         emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
-        response = self.client_wrapper.post(
-            "detokenize",
-            json={
-                "model_name": self.model_name,
-                "lattice_id": lattice_id,
-                "frame_shift": frame_shift,
-                "results": [t.to_dict() for t in results[0]],
-                "labels": labels[0],
-                "offset": offset,
-                "channel": channel,
-                "return_details": False if return_details is None else return_details,
-                "destroy_lattice": True,
-                "start_margin": start_margin,
-                "end_margin": end_margin,
-            },
-        )
+        if isinstance(supervisions, Supervision):
+            response = self.client_wrapper.post(
+                "detokenize",
+                json={
+                    "model_name": self.model_name,
+                    "lattice_id": lattice_id,
+                    "frame_shift": frame_shift,
+                    "results": [t.to_dict() for t in results[0]],
+                    "labels": labels[0],
+                    "offset": offset,
+                    "channel": channel,
+                    "return_details": False if return_details is None else return_details,
+                    "destroy_lattice": True,
+                    "start_margin": start_margin,
+                    "end_margin": end_margin,
+                },
+            )
+        else:
+            response = self.client_wrapper.post(
+                "diffdetokenize",
+                json={
+                    "model_name": self.model_name,
+                    "lattice_id": lattice_id,
+                    "frame_shift": frame_shift,
+                    "results": [t.to_dict() for t in results[0]],
+                    "labels": labels[0],
+                    "offset": offset,
+                    "channel": channel,
+                    "return_details": False if return_details is None else return_details,
+                    "destroy_lattice": True,
+                    "start_margin": start_margin,
+                    "end_margin": end_margin,
+                },
+            )
+
         if response.status_code == 400:
             raise LatticeDecodingError(
                 lattice_id,
@@ -316,7 +352,11 @@ class LatticeTokenizer:
             # Add emission confidence scores for segments and word-level alignments
             _add_confidence_scores(alignments, emission, labels[0], frame_shift, offset)
 
-        alignments = _update_alignments_speaker(supervisions, alignments)
+        if isinstance(supervisions, Supervision):
+            alignments = _update_alignments_speaker(supervisions, alignments)
+        else:
+            # NOTE: Text Diff Alignment >> speaker has been handled in the backend service
+            pass
 
         return alignments
 

@@ -7,7 +7,7 @@ import colorful
 from lattifai_core.client import SyncAPIClient
 from lhotse.utils import Pathlike
 
-from lattifai.alignment import Lattice1Aligner, Segmenter
+from lattifai.alignment import Lattice1Aligner, Segmenter, align_supervisions_and_transcription
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.caption import Caption, InputCaptionFormat
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
@@ -123,9 +123,12 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             alignment_strategy = self.aligner.config.strategy
 
             if alignment_strategy != "entire" or caption.transcription:
-                safe_print(colorful.cyan(f"🔄 Using segmented alignment strategy: {alignment_strategy}"))
+                safe_print(colorful.cyan(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.supervisions and alignment_strategy == "transcription":
+                    assert (
+                        "gemini" not in self.transcriber.name.lower()
+                    ), f"Transcription-based alignment is not supported for {self.transcriber.name}(Gemini's timestamp is not reliable)."
                     if not caption.transcription:
                         transcript = self._transcribe(
                             media_audio,
@@ -137,115 +140,24 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         caption.audio_events = transcript.audio_events
                     assert caption.transcription, "Transcription is empty after transcription step."
 
-                    # Align caption.supervisions with transcription to get segments
-                    import regex
-                    from error_align import error_align  # noqa: F401
-                    from error_align.utils import DELIMITERS, NUMERIC_TOKEN, STANDARD_TOKEN, OpType
-
-                    JOIN_TOKEN = "❄"
-                    if JOIN_TOKEN not in DELIMITERS:
-                        DELIMITERS.add(JOIN_TOKEN)
-
-                    def custom_tokenizer(text: str) -> list:
-                        """Default tokenizer that splits text into words based on whitespace.
-
-                        Args:
-                            text (str): The input text to tokenize.
-
-                        Returns:
-                            list: A list of tokens (words).
-
-                        """
-                        # Escape JOIN_TOKEN for use in regex pattern
-                        escaped_join_token = regex.escape(JOIN_TOKEN)
-                        return list(
-                            regex.finditer(
-                                rf"({NUMERIC_TOKEN})|({STANDARD_TOKEN}|{escaped_join_token})",
-                                text,
-                                regex.UNICODE | regex.VERBOSE,
-                            )
-                        )
-
                     if split_sentence or self.caption_config.split_sentence:
                         caption.supervisions = self.aligner.tokenizer.split_sentences(caption.supervisions)
 
-                    ref = f"{JOIN_TOKEN}".join(sup.text for sup in caption.supervisions)
-                    hyp = f"{JOIN_TOKEN}".join(sup.text for sup in caption.transcription)
-                    alignments = error_align(ref, hyp, tokenizer=custom_tokenizer)
+                    matches = align_supervisions_and_transcription(
+                        caption, max_duration=media_audio.duration, verbose=True
+                    )
 
-                    idx = 0
-                    for k, align in enumerate(alignments):
-                        if align.hyp == JOIN_TOKEN and align.op_type == OpType.MATCH:
-                            # safe_print(f"Segment {k}: JOIN_TOKEN detected, creating segment.")
-
-                            # Find first non-None ref_slice starting from idx
-                            ref_start = 0
-                            for i in range(idx, k + 1):
-                                if i < len(alignments) and alignments[i].ref_slice is not None:
-                                    ref_start = alignments[i].ref_slice.start
-                                    break
-
-                            # Find last non-None ref_slice up to current position
-                            ref_stop = len(ref)
-                            for i in range(k, idx - 1, -1):
-                                if i < len(alignments) and alignments[i].ref_slice is not None:
-                                    ref_stop = alignments[i].ref_slice.stop
-                                    break
-
-                            # Find first non-None hyp_slice starting from idx
-                            hyp_start = 0
-                            for i in range(idx, k + 1):
-                                if i < len(alignments) and alignments[i].hyp_slice is not None:
-                                    hyp_start = alignments[i].hyp_slice.start
-                                    break
-
-                            # Find last non-None hyp_slice up to current position
-                            hyp_stop = len(hyp)
-                            for i in range(k, idx - 1, -1):
-                                if i < len(alignments) and alignments[i].hyp_slice is not None:
-                                    hyp_stop = alignments[i].hyp_slice.stop
-                                    break
-
-                            safe_print(f"[REF]: {ref[ref_start:ref_stop]}")
-                            safe_print(f"[HYP]: {hyp[hyp_start:hyp_stop]}\n")
-                            idx = k + 1
-
-                    # last part - handle remaining alignments after last JOIN_TOKEN
-                    if idx < len(alignments):
-                        # Find first non-None ref_slice starting from idx
-                        ref_start = 0
-                        for i in range(idx, len(alignments)):
-                            if alignments[i].ref_slice is not None:
-                                ref_start = alignments[i].ref_slice.start
-                                break
-
-                        # Find last non-None ref_slice from end
-                        ref_stop = len(ref)
-                        for i in range(len(alignments) - 1, idx - 1, -1):
-                            if alignments[i].ref_slice is not None:
-                                ref_stop = alignments[i].ref_slice.stop
-                                break
-
-                        # Find first non-None hyp_slice starting from idx
-                        hyp_start = 0
-                        for i in range(idx, len(alignments)):
-                            if alignments[i].hyp_slice is not None:
-                                hyp_start = alignments[i].hyp_slice.start
-                                break
-
-                        # Find last non-None hyp_slice from end
-                        hyp_stop = len(hyp)
-                        for i in range(len(alignments) - 1, idx - 1, -1):
-                            if alignments[i].hyp_slice is not None:
-                                hyp_stop = alignments[i].hyp_slice.stop
-                                break
-
-                        safe_print(f"[REF]: {ref[ref_start:ref_stop + 1]}")
-                        safe_print(f"[HYP]: {hyp[hyp_start:hyp_stop + 1]}\n")
-
-                    raise NotImplementedError("Transcription-based segmentation is not yet implemented.")
+                    skipalign = False
+                    matches = sorted(matches, key=lambda x: x[2].WER.WER)  # sort by WER
+                    segments = [(m[3].start[1], m[3].end[1], m, skipalign) for m in matches]
+                    for segment in segments:
+                        # transcription segments -> sentence splitting
+                        segment[2][1] = self.aligner.tokenizer.split_sentences(segment[2][1])
                 else:
                     if caption.transcription:
+                        assert (
+                            "gemini" not in self.transcriber.name.lower()
+                        ), f"Transcription-based alignment is not supported for {self.transcriber.name}(Gemini's timestamp is not reliable)."
                         if not caption.supervisions:  # youtube + transcription case
                             segments = [(sup.start, sup.end, [sup], not sup.text) for sup in caption.transcription]
                         else:
@@ -266,7 +178,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 sr = media_audio.sampling_rate
                 supervisions, alignments = [], []
                 for i, (start, end, _supervisions, skipalign) in enumerate(segments, 1):
-                    print(
+                    safe_print(
                         colorful.green(
                             f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s"
                         )
@@ -295,6 +207,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
                     supervisions.extend(_supervisions)
                     alignments.extend(_alignments)
+
+                # sort by start
+                alignments = sorted(alignments, key=lambda x: x.start)
             else:
                 # Step 2-4: Standard single-pass alignment
                 supervisions, alignments = self.aligner.alignment(

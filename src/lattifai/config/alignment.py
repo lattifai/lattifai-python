@@ -93,6 +93,13 @@ class AlignmentConfig:
     Default: 0.20. Typical range: 0.0-0.5.
     """
 
+    boost: float = 5.0
+    """Boost for preferring supervisions over transcription in diff alignment decoding graph.
+    A positive value encourages the decoder to prefer supervision text over ASR transcription.
+    Only effective when strategy='transcription'. Has no effect with 'entire' or 'caption' strategies.
+    Default: 5.0. Typical range: 0.0-10.0.
+    """
+
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 

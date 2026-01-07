@@ -16,45 +16,6 @@ maintainers = [
   { name = 'Lattice', email = 'tech@lattifai.com' },
 ]
 requires-python = '>=3.10,<3.15'
-
-dependencies = [
-    "k2py>=0.2.1",
-    "lattifai-core>=0.6.0",
-    "lattifai-run>=1.0.1",
-    "python-dotenv",
-    "lhotse>=1.26.0",
-    "colorful>=0.5.6",
-    "pysubs2",
-    "praatio",
-    "tgt",
-    "onnx>=1.16.0",
-    "onnxruntime",
-    "msgpack",
-    "scipy!=1.16.3",
-    "g2p-phonemizer>=0.4.0",
-    "av",
-    "wtpsplit>=2.1.7",
-    "modelscope==1.33.0",
-    # analysis and alignment
-    "error-align>=0.1.0b6",
-    # transcription
-    "OmniSenseVoice>=0.4.2",
-    "nemo_toolkit_asr[asr]>=2.7.0rc4",
-    # diarization
-    "pyannote-audio-notorchdeps>=4.0.2",  # not requires torch==2.8.0, torchaudio==2.8.0
-    # agentic workflow
-    "questionary>=2.0",
-    "yt-dlp",
-    "pycryptodome",
-    "google-genai>=1.22.0",
-    # web
-    "fastapi>=0.111.0",
-    "uvicorn>=0.30.0",
-    "python-multipart>=0.0.9",
-    "jinja2>=3.1.4",
-]
-
-
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Intended Audience :: Developers',
@@ -72,6 +33,68 @@ classifiers = [
     'Topic :: Multimedia :: Video',
     'Topic :: Scientific/Engineering :: Artificial Intelligence',
 ]
+dependencies = [
+    "lattifai[core]",
+    "lattifai[alignment]",
+    "lattifai[transcription]",
+    "lattifai[workflow]",
+    "lattifai[server]"
+]
+
+[project.optional-dependencies]
+# Core dependencies, previously in the main dependencies section
+core = [
+    "k2py>=0.2.1",
+    "lattifai-core>=0.6.0",
+    "lattifai-run>=1.0.1",
+    "python-dotenv",
+    "msgpack",
+    "scipy!=1.16.3",
+    "av",
+]
+# Minimal installation for alignment only
+alignment = [
+    "lhotse>=1.26.0",
+    "colorful>=0.5.6",
+    "pysubs2",
+    "praatio",
+    "tgt",
+    "onnx>=1.16.0",
+    "onnxruntime",
+    "g2p-phonemizer>=0.4.0",
+    "wtpsplit>=2.1.7",
+    "modelscope>=1.33.0",
+    "error-align>=0.1.0b6",
+]
+# transcription & diarization
+transcription = [
+    # transcription
+    "OmniSenseVoice>=0.4.2",
+    "nemo_toolkit_asr[asr]>=2.7.0rc4",
+    "google-genai>=1.22.0",
+    # diarization
+    "pyannote-audio-notorchdeps>=4.0.2"
+]
+# workflow
+workflow = [
+    "questionary>=2.0",
+    "yt-dlp",
+    "pycryptodome"
+]
+# server
+server = [
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "python-multipart>=0.0.9",
+    "jinja2>=3.1.4"
+]
+# development dependencies
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.23.0",
+]
+
 
 [project.urls]
 Homepage = 'https://github.com/lattifai/lattifai-python'
@@ -88,6 +111,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md'
 "laicap-convert" = "lattifai.cli.caption:main_convert"
 "laicap-normalize" = "lattifai.cli.caption:main_normalize"
 "laicap-shift" = "lattifai.cli.caption:main_shift"
+"laicap-diff" = "lattifai.cli.caption:main_diff"
 "lai-server" = "lattifai.cli.server:main"
 "lai-app-install" = "lattifai.cli.app_installer:main"
 
@@ -119,36 +143,6 @@ lattifai = "src/lattifai"
 "lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]
 "lattifai" = ["app/**/*"]
 
-[project.optional-dependencies]
-numpy = ['numpy']
-diarization = [
-    "torch-audiomentations==0.12.0",  # not constraint to torchaudio>=0.9.0,<2.9
-    "pyannote.audio>=4.0.2",  # Requires torch==2.8.0, torchaudio==2.8.0
-]
-transcription = [
-    "OmniSenseVoice>=0.4.0",
-    "nemo_toolkit_asr[asr]>=2.7.0rc3",
-]
-test = ['pytest', 'pytest-cov', 'pytest-asyncio', 'numpy']
-all = [
-    "numpy",
-    "pytest",
-    "pytest-cov",
-    "pytest-asyncio",
-    "pyannote.audio>=4.0.2",
-]
-
 [tool.pytest.ini_options]
 addopts = "--durations=10"
 testpaths = ["tests"]
-
-[tool.coverage.run]
-omit = [
-]
-
-[dependency-groups]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-cov>=4.1.0",
-    "pytest-asyncio>=0.23.0",
-]

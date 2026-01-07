@@ -408,7 +408,7 @@ class LattifAIClientMixin:
                 # Generate transcript file path
                 transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
                 if transcript_file.exists():
-                    safe_print(colorful.cyan(f"    Using existing transcript file: {transcript_file}"))
+                    safe_print(colorful.cyan(f"     Using existing transcript file: {transcript_file}"))
                     transcription = self._read_caption(transcript_file, normalize_text=False)
                     return transcription
 

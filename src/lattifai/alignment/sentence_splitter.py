@@ -1,15 +1,14 @@
 import re
 from typing import List, Optional
 
+from lattifai.alignment.punctuation import END_PUNCTUATION
 from lattifai.caption import Supervision
-
-END_PUNCTUATION = '.!?"]。！？"】'
 
 
 class SentenceSplitter:
     """Lazy-initialized sentence splitter using wtpsplit."""
 
-    def __init__(self, device: str = "cpu", model_hub: Optional[str] = None, lazy_init: bool = True):
+    def __init__(self, device: str = "cpu", model_hub: Optional[str] = "modelscope", lazy_init: bool = True):
         """Initialize sentence splitter with lazy loading.
 
         Args:
@@ -18,9 +17,8 @@ class SentenceSplitter:
         """
         self.device = device
         self.model_hub = model_hub
-        if lazy_init:
-            self._splitter = None
-        else:
+        self._splitter = None
+        if not lazy_init:
             self._init_splitter()
 
     def _init_splitter(self):
@@ -53,6 +51,95 @@ class SentenceSplitter:
                 ort_providers=providers + ["CPUExecutionProvider"],
             )
         self._splitter = sat
+
+    @staticmethod
+    def _distribute_time_info(
+        input_supervisions: List[Supervision],
+        split_texts: List[str],
+    ) -> List[Supervision]:
+        """Distribute time information from input supervisions to split sentences.
+
+        Args:
+            input_supervisions: Original supervisions with time information
+            split_texts: List of split sentence texts
+
+        Returns:
+            List of Supervision objects with distributed time information
+        """
+        if not input_supervisions:
+            return [Supervision(text=text, id="", recording_id="", start=0, duration=0) for text in split_texts]
+
+        # Build concatenated input text
+        input_text = " ".join(sup.text for sup in input_supervisions)
+
+        # Pre-compute supervision position mapping for O(1) lookup
+        # Format: [(start_pos, end_pos, supervision), ...]
+        sup_ranges = []
+        char_pos = 0
+        for sup in input_supervisions:
+            sup_start = char_pos
+            sup_end = char_pos + len(sup.text)
+            sup_ranges.append((sup_start, sup_end, sup))
+            char_pos = sup_end + 1  # +1 for space separator
+
+        # Process each split text
+        result = []
+        search_start = 0
+        sup_idx = 0  # Track current supervision index to skip processed ones
+
+        for split_text in split_texts:
+            text_start = input_text.find(split_text, search_start)
+            assert text_start != -1, f"Could not find split text '{split_text}' in input supervisions."
+
+            text_end = text_start + len(split_text)
+            search_start = text_end
+
+            # Find overlapping supervisions, starting from last used index
+            first_sup = None
+            last_sup = None
+            first_char_idx = None
+            last_char_idx = None
+
+            # Start from sup_idx, which is the first supervision that might overlap
+            for i in range(sup_idx, len(sup_ranges)):
+                sup_start, sup_end, sup = sup_ranges[i]
+
+                # Skip if no overlap (before text_start)
+                if sup_end <= text_start:
+                    sup_idx = i + 1  # Update starting point for next iteration
+                    continue
+
+                # Stop if no overlap (after text_end)
+                if sup_start >= text_end:
+                    break
+
+                # Found overlap
+                if first_sup is None:
+                    first_sup = sup
+                    first_char_idx = max(0, text_start - sup_start)
+
+                last_sup = sup
+                last_char_idx = min(len(sup.text) - 1, text_end - 1 - sup_start)
+
+            assert (
+                first_sup is not None and last_sup is not None
+            ), f"Could not find supervisions for split text: {split_text}"
+
+            # Calculate timing
+            start_time = first_sup.start + (first_char_idx / len(first_sup.text)) * first_sup.duration
+            end_time = last_sup.start + ((last_char_idx + 1) / len(last_sup.text)) * last_sup.duration
+
+            result.append(
+                Supervision(
+                    id="",
+                    text=split_text,
+                    start=start_time,
+                    duration=end_time - start_time,
+                    recording_id=first_sup.recording_id,
+                )
+            )
+
+        return result
 
     @staticmethod
     def _resplit_special_sentence_types(sentence: str) -> List[str]:
@@ -151,12 +238,18 @@ class SentenceSplitter:
         assert len(speakers) == len(texts), f"len(speakers)={len(speakers)} != len(texts)={len(texts)}"
         sentences = self._splitter.split(texts, threshold=0.15, strip_whitespace=strip_whitespace, batch_size=8)
 
-        supervisions, remainder = [], ""
+        # First pass: collect all split texts with their speakers
+        split_texts_with_speakers = []
+        remainder = ""
+        remainder_speaker = None
+
         for k, (_speaker, _sentences) in enumerate(zip(speakers, sentences)):
             # Prepend remainder from previous iteration to the first sentence
             if _sentences and remainder:
                 _sentences[0] = remainder + _sentences[0]
+                _speaker = remainder_speaker if remainder_speaker else _speaker
                 remainder = ""
+                remainder_speaker = None
 
             if not _sentences:
                 continue
@@ -186,22 +279,21 @@ class SentenceSplitter:
                     continue
 
             if any(_sentences[-1].endswith(ep) for ep in END_PUNCTUATION):
-                supervisions.extend(
-                    Supervision(text=text, speaker=(_speaker if s == 0 else None)) for s, text in enumerate(_sentences)
+                split_texts_with_speakers.extend(
+                    (text, _speaker if s == 0 else None) for s, text in enumerate(_sentences)
                 )
                 _speaker = None  # reset speaker after use
             else:
-                supervisions.extend(
-                    Supervision(text=text, speaker=(_speaker if s == 0 else None))
-                    for s, text in enumerate(_sentences[:-1])
+                split_texts_with_speakers.extend(
+                    (text, _speaker if s == 0 else None) for s, text in enumerate(_sentences[:-1])
                 )
                 remainder = _sentences[-1] + " " + remainder
                 if k < len(speakers) - 1 and speakers[k + 1] is not None:  # next speaker is set
-                    supervisions.append(
-                        Supervision(text=remainder.strip(), speaker=_speaker if len(_sentences) == 1 else None)
-                    )
+                    split_texts_with_speakers.append((remainder.strip(), _speaker if len(_sentences) == 1 else None))
                     remainder = ""
+                    remainder_speaker = None
                 elif len(_sentences) == 1:
+                    remainder_speaker = _speaker
                     if k == len(speakers) - 1:
                         pass  # keep _speaker for the last supervision
                     else:
@@ -210,8 +302,18 @@ class SentenceSplitter:
                 else:
                     assert len(_sentences) > 1
                     _speaker = None  # reset speaker if sentence not ended
+                    remainder_speaker = None
 
         if remainder.strip():
-            supervisions.append(Supervision(text=remainder.strip(), speaker=_speaker))
+            split_texts_with_speakers.append((remainder.strip(), remainder_speaker))
 
-        return supervisions
+        # Second pass: distribute time information
+        split_texts = [text for text, _ in split_texts_with_speakers]
+        result_supervisions = self._distribute_time_info(supervisions, split_texts)
+
+        # Third pass: add speaker information
+        for sup, (_, speaker) in zip(result_supervisions, split_texts_with_speakers):
+            if speaker:
+                sup.speaker = speaker
+
+        return result_supervisions

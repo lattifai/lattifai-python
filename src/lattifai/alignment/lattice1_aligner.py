@@ -1,6 +1,6 @@
 """Lattice-1 Aligner implementation."""
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 import colorful
 import numpy as np
@@ -16,6 +16,7 @@ from lattifai.errors import (
 from lattifai.utils import _resolve_model_path, safe_print
 
 from .lattice1_worker import _load_worker
+from .text_align import TextAlignResult
 from .tokenizer import _load_tokenizer
 
 ClientType = Any
@@ -79,7 +80,7 @@ class Lattice1Aligner(object):
     def alignment(
         self,
         audio: AudioData,
-        supervisions: List[Supervision],
+        supervisions: Union[List[Supervision], TextAlignResult],
         split_sentence: Optional[bool] = False,
         return_details: Optional[bool] = False,
         emission: Optional[np.ndarray] = None,
@@ -107,12 +108,19 @@ class Lattice1Aligner(object):
                 safe_print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
             try:
                 supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
-                    supervisions, split_sentence=split_sentence
+                    supervisions, split_sentence=split_sentence, boost=self.config.boost
                 )
                 if verbose:
                     safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
             except Exception as e:
-                text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
+                if isinstance(supervisions, Supervision):
+                    text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
+                else:
+                    text_content = ""
+                    if supervisions[0]:
+                        text_content = " ".join([sup.text for sup in supervisions[0]])
+                    if supervisions[1]:
+                        text_content += " | " + " ".join([sup.text for sup in supervisions[1]])
                 raise LatticeEncodingError(text_content, original_error=e)
 
             if verbose:
