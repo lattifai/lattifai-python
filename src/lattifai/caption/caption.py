@@ -157,7 +157,7 @@ class Caption:
                 speaker=sup.speaker,
                 id=sup.id,
                 language=sup.language,
-                alignment=sup.alignment if hasattr(sup, "alignment") else None,
+                alignment=getattr(sup, "alignment", None),
                 custom=sup.custom,
             )
             for sup in self.supervisions
@@ -521,6 +521,15 @@ class Caption:
         self.speaker_diarization.write(path)
         return path
 
+    @staticmethod
+    def _format_sbv_timestamp(seconds: float) -> str:
+        """Format timestamp for SBV format as H:MM:SS.mmm."""
+        h = int(seconds // 3600)
+        m = int((seconds % 3600) // 60)
+        s = int(seconds % 60)
+        ms = int((seconds % 1) * 1000)
+        return f"{h}:{m:02d}:{s:02d}.{ms:03d}"
+
     @classmethod
     def _generate_caption_content(
         cls,
@@ -583,10 +592,7 @@ class Caption:
             if include_speaker_in_text:
                 lines.append("speaker\tstart\tend\ttext")
                 for sup in alignments:
-                    include_speaker = sup.speaker and (
-                        not sup.has_custom("original_speaker") or sup.custom["original_speaker"]
-                    )
-                    speaker = sup.speaker if include_speaker else ""
+                    speaker = sup.speaker if cls._should_include_speaker(sup, True) else ""
                     start_ms = round(1000 * sup.start)
                     end_ms = round(1000 * sup.end)
                     text = sup.text.strip().replace("\t", " ")
@@ -611,10 +617,7 @@ class Caption:
             if include_speaker_in_text:
                 writer.writerow(["speaker", "start", "end", "text"])
                 for sup in alignments:
-                    include_speaker = sup.speaker and (
-                        not sup.has_custom("original_speaker") or sup.custom["original_speaker"]
-                    )
-                    speaker = sup.speaker if include_speaker else ""
+                    speaker = sup.speaker if cls._should_include_speaker(sup, True) else ""
                     start_ms = round(1000 * sup.start)
                     end_ms = round(1000 * sup.end)
                     writer.writerow([speaker, start_ms, end_ms, sup.text.strip()])
@@ -632,11 +635,7 @@ class Caption:
             lines = []
             for sup in alignments:
                 text = sup.text.strip().replace("\t", " ")
-                if (
-                    include_speaker_in_text
-                    and sup.speaker
-                    and (not sup.has_custom("original_speaker") or sup.custom["original_speaker"])
-                ):
+                if cls._should_include_speaker(sup, include_speaker_in_text):
                     text = f"[[{sup.speaker}]]{text}"
                 lines.append(f"{sup.start}\t{sup.end}\t{text}")
             return "\n".join(lines).encode("utf-8")
@@ -645,27 +644,12 @@ class Caption:
         elif output_format == "sbv":
             lines = []
             for i, sup in enumerate(alignments):
-                start_h = int(sup.start // 3600)
-                start_m = int((sup.start % 3600) // 60)
-                start_s = int(sup.start % 60)
-                start_ms = int((sup.start % 1) * 1000)
-
-                end_h = int(sup.end // 3600)
-                end_m = int((sup.end % 3600) // 60)
-                end_s = int(sup.end % 60)
-                end_ms = int((sup.end % 1) * 1000)
-
-                start_time = f"{start_h}:{start_m:02d}:{start_s:02d}.{start_ms:03d}"
-                end_time = f"{end_h}:{end_m:02d}:{end_s:02d}.{end_ms:03d}"
-
+                start_time = cls._format_sbv_timestamp(sup.start)
+                end_time = cls._format_sbv_timestamp(sup.end)
                 lines.append(f"{start_time},{end_time}")
 
                 text = sup.text.strip()
-                if (
-                    include_speaker_in_text
-                    and sup.speaker
-                    and (not sup.has_custom("original_speaker") or sup.custom["original_speaker"])
-                ):
+                if cls._should_include_speaker(sup, include_speaker_in_text):
                     text = f"{sup.speaker}: {text}"
                 lines.append(text)
 
@@ -692,13 +676,9 @@ class Caption:
                             )
                         )
                 else:
-                    if include_speaker_in_text and sup.speaker is not None:
-                        if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
-                            text = f"{sup.speaker} {sup.text}"
-                        else:
-                            text = sup.text
-                    else:
-                        text = sup.text
+                    text = sup.text
+                    if cls._should_include_speaker(sup, include_speaker_in_text):
+                        text = f"{sup.speaker} {sup.text}"
                     subs.append(
                         pysubs2.SSAEvent(
                             start=int(sup.start * 1000),
@@ -723,13 +703,20 @@ class Caption:
         Returns:
             List of AlignmentItem objects, or None if no alignment data present
         """
-        if not hasattr(supervision, "alignment") or not supervision.alignment:
-            return None
+        alignment = getattr(supervision, "alignment", None)
+        return alignment.get("word") if alignment else None
 
-        if "word" not in supervision.alignment:
-            return None
+    @staticmethod
+    def _get_file_extension(path: Pathlike) -> str:
+        """Get lowercase file extension without dot."""
+        return Path(path).suffix.lstrip(".").lower()
 
-        return supervision.alignment["word"]
+    @staticmethod
+    def _should_include_speaker(supervision: Supervision, include_speaker_in_text: bool) -> bool:
+        """Check if speaker should be included in output text."""
+        if not include_speaker_in_text or not supervision.speaker:
+            return False
+        return not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
 
     @classmethod
     def _write_caption(
@@ -749,7 +736,9 @@ class Caption:
         Returns:
             Path to written file
         """
-        if str(output_path)[-4:].lower() == ".txt":
+        ext = cls._get_file_extension(output_path)
+
+        if ext == "txt":
             with open(output_path, "w", encoding="utf-8") as f:
                 for sup in alignments:
                     word_items = cls._parse_alignment_from_supervision(sup)
@@ -757,33 +746,24 @@ class Caption:
                         for item in word_items:
                             f.write(f"[{item.start:.2f}-{item.end:.2f}] {item.symbol}\n")
                     else:
-                        if include_speaker_in_text and sup.speaker is not None:
-                            # Use [SPEAKER]: format for consistency with parsing
-                            if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
-                                text = f"[{sup.speaker}]: {sup.text}"
-                            else:
-                                text = f"{sup.text}"
-                        else:
-                            text = sup.text
+                        text = sup.text
+                        if cls._should_include_speaker(sup, include_speaker_in_text):
+                            text = f"[{sup.speaker}]: {sup.text}"
                         f.write(f"[{sup.start:.2f}-{sup.end:.2f}] {text}\n")
 
-        elif str(output_path)[-5:].lower() == ".json":
+        elif ext == "json":
             with open(output_path, "w", encoding="utf-8") as f:
-                # Enhanced JSON export with word-level alignment
-                json_data = []
-                for sup in alignments:
-                    sup_dict = sup.to_dict()
-                    json_data.append(sup_dict)
+                json_data = [sup.to_dict() for sup in alignments]
                 json.dump(json_data, f, ensure_ascii=False, indent=4)
-        elif str(output_path).lower().endswith(".textgrid"):
+        elif ext == "textgrid":
             cls._write_textgrid(alignments, output_path, include_speaker_in_text)
-        elif str(output_path)[-4:].lower() == ".tsv":
+        elif ext == "tsv":
             cls._write_tsv(alignments, output_path, include_speaker_in_text)
-        elif str(output_path)[-4:].lower() == ".csv":
+        elif ext == "csv":
             cls._write_csv(alignments, output_path, include_speaker_in_text)
-        elif str(output_path)[-4:].lower() == ".aud":
+        elif ext == "aud":
             cls._write_aud(alignments, output_path, include_speaker_in_text)
-        elif str(output_path)[-4:].lower() == ".sbv":
+        elif ext == "sbv":
             cls._write_sbv(alignments, output_path, include_speaker_in_text)
         else:
             import pysubs2
@@ -803,13 +783,9 @@ class Caption:
                             )
                         )
                 else:
-                    if include_speaker_in_text and sup.speaker is not None:
-                        if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
-                            text = f"{sup.speaker} {sup.text}"
-                        else:
-                            text = f"{sup.text}"
-                    else:
-                        text = sup.text
+                    text = sup.text
+                    if cls._should_include_speaker(sup, include_speaker_in_text):
+                        text = f"{sup.speaker} {sup.text}"
                     subs.append(
                         pysubs2.SSAEvent(
                             start=int(sup.start * 1000),
@@ -820,7 +796,7 @@ class Caption:
                     )
 
             # MicroDVD format requires framerate to be specified
-            output_ext = str(output_path).lower().split(".")[-1]
+            output_ext = cls._get_file_extension(output_path)
             if output_ext == "sub":
                 # Default to 25 fps for MicroDVD format if not specified
                 subs.save(output_path, fps=25.0)
@@ -1136,34 +1112,33 @@ class Caption:
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(caption)
-        elif format and (format == "textgrid" or (not is_string_content and str(caption).lower().endswith("textgrid"))):
-            # Internel usage
+        elif format == "textgrid" or (not is_string_content and cls._get_file_extension(caption) == "textgrid"):
+            # Internal usage
             from tgt import read_textgrid
 
             tgt = read_textgrid(caption)
-            supervisions = []
-            for tier in tgt.tiers:
-                supervisions.extend(
-                    [
-                        Supervision(
-                            text=interval.text,
-                            start=interval.start_time,
-                            duration=interval.end_time - interval.start_time,
-                            speaker=tier.name,
-                        )
-                        for interval in tier.intervals
-                    ]
+            supervisions = [
+                Supervision(
+                    text=interval.text,
+                    start=interval.start_time,
+                    duration=interval.end_time - interval.start_time,
+                    speaker=tier.name,
                 )
+                for tier in tgt.tiers
+                for interval in tier.intervals
+            ]
             supervisions = sorted(supervisions, key=lambda x: x.start)
-        elif format == "tsv" or (not is_string_content and str(caption)[-4:].lower() == ".tsv"):
+        elif format == "tsv" or (not is_string_content and cls._get_file_extension(caption) == "tsv"):
             supervisions = cls._parse_tsv(caption, normalize_text)
-        elif format == "csv" or (not is_string_content and str(caption)[-4:].lower() == ".csv"):
+        elif format == "csv" or (not is_string_content and cls._get_file_extension(caption) == "csv"):
             supervisions = cls._parse_csv(caption, normalize_text)
-        elif format == "aud" or (not is_string_content and str(caption)[-4:].lower() == ".aud"):
+        elif format == "aud" or (not is_string_content and cls._get_file_extension(caption) == "aud"):
             supervisions = cls._parse_aud(caption, normalize_text)
-        elif format == "sbv" or (not is_string_content and str(caption)[-4:].lower() == ".sbv"):
+        elif format == "sbv" or (not is_string_content and cls._get_file_extension(caption) == "sbv"):
             supervisions = cls._parse_sbv(caption, normalize_text)
-        elif format == "txt" or (format == "auto" and not is_string_content and str(caption)[-4:].lower() == ".txt"):
+        elif format == "txt" or (
+            format == "auto" and not is_string_content and cls._get_file_extension(caption) == "txt"
+        ):
             if is_string_content or not Path(str(caption)).exists():  # str content
                 lines = [line.strip() for line in str(caption).split("\n")]
                 if normalize_text:
@@ -1543,15 +1518,9 @@ class Caption:
         tg = TextGrid()
         supervisions, words, scores = [], [], {"utterances": [], "words": []}
         for supervision in sorted(alignments, key=lambda x: x.start):
-            # Respect `original_speaker` custom flag: default to include speaker when missing
-            if (
-                include_speaker_in_text
-                and supervision.speaker is not None
-                and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
-            ):
+            text = supervision.text
+            if cls._should_include_speaker(supervision, include_speaker_in_text):
                 text = f"{supervision.speaker} {supervision.text}"
-            else:
-                text = supervision.text
             supervisions.append(Interval(supervision.start, supervision.end, text or ""))
             # Extract word-level alignment using helper function
             word_items = cls._parse_alignment_from_supervision(supervision)
@@ -1597,11 +1566,7 @@ class Caption:
             if include_speaker_in_text:
                 file.write("speaker\tstart\tend\ttext\n")
                 for supervision in alignments:
-                    # Respect `original_speaker` custom flag: default to True when missing
-                    include_speaker = supervision.speaker and (
-                        not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
-                    )
-                    speaker = supervision.speaker if include_speaker else ""
+                    speaker = supervision.speaker if cls._should_include_speaker(supervision, True) else ""
                     start_ms = round(1000 * supervision.start)
                     end_ms = round(1000 * supervision.end)
                     text = supervision.text.strip().replace("\t", " ")
@@ -1639,10 +1604,7 @@ class Caption:
                 writer = csv.writer(file)
                 writer.writerow(["speaker", "start", "end", "text"])
                 for supervision in alignments:
-                    include_speaker = supervision.speaker and (
-                        not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
-                    )
-                    speaker = supervision.speaker if include_speaker else ""
+                    speaker = supervision.speaker if cls._should_include_speaker(supervision, True) else ""
                     start_ms = round(1000 * supervision.start)
                     end_ms = round(1000 * supervision.end)
                     text = supervision.text.strip()
@@ -1680,12 +1642,7 @@ class Caption:
                 end = supervision.end
                 text = supervision.text.strip().replace("\t", " ")
 
-                # Respect `original_speaker` custom flag when adding speaker prefix
-                if (
-                    include_speaker_in_text
-                    and supervision.speaker
-                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
-                ):
+                if cls._should_include_speaker(supervision, include_speaker_in_text):
                     text = f"[[{supervision.speaker}]]{text}"
 
                 file.write(f"{start}\t{end}\t{text}\n")
@@ -1715,29 +1672,15 @@ class Caption:
         with open(output_path, "w", encoding="utf-8") as file:
             for i, supervision in enumerate(alignments):
                 # Format timestamps as H:MM:SS.mmm
-                start_h = int(supervision.start // 3600)
-                start_m = int((supervision.start % 3600) // 60)
-                start_s = int(supervision.start % 60)
-                start_ms = int((supervision.start % 1) * 1000)
-
-                end_h = int(supervision.end // 3600)
-                end_m = int((supervision.end % 3600) // 60)
-                end_s = int(supervision.end % 60)
-                end_ms = int((supervision.end % 1) * 1000)
-
-                start_time = f"{start_h}:{start_m:02d}:{start_s:02d}.{start_ms:03d}"
-                end_time = f"{end_h}:{end_m:02d}:{end_s:02d}.{end_ms:03d}"
+                start_time = cls._format_sbv_timestamp(supervision.start)
+                end_time = cls._format_sbv_timestamp(supervision.end)
 
                 # Write timestamp line
                 file.write(f"{start_time},{end_time}\n")
 
-                # Write text (with optional speaker). Respect `original_speaker` custom flag.
+                # Write text (with optional speaker)
                 text = supervision.text.strip()
-                if (
-                    include_speaker_in_text
-                    and supervision.speaker
-                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
-                ):
+                if cls._should_include_speaker(supervision, include_speaker_in_text):
                     text = f"{supervision.speaker}: {text}"
 
                 file.write(f"{text}\n")
