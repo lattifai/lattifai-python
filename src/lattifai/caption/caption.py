@@ -1,10 +1,12 @@
 """Caption data structure for storing subtitle information with metadata."""
 
+import io
 import json
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Dict, List, Optional, TypeVar, Union
 
 from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
@@ -270,6 +272,53 @@ class Caption:
         )
 
     @classmethod
+    def from_string(
+        cls,
+        content: str,
+        format: str,
+        normalize_text: bool = True,
+    ) -> "Caption":
+        """
+        Create Caption from string content.
+
+        Args:
+            content: Caption content as string
+            format: Caption format (e.g., 'srt', 'vtt', 'ass')
+            normalize_text: Whether to normalize text during reading
+
+        Returns:
+            New Caption instance
+
+        Example:
+            >>> srt_content = \"\"\"1
+            ... 00:00:00,000 --> 00:00:02,000
+            ... Hello world\"\"\"
+            >>> caption = Caption.from_string(srt_content, format=\"srt\")
+        """
+        buffer = io.StringIO(content)
+        return cls.read(buffer, format=format, normalize_text=normalize_text)
+
+    def to_bytes(self, output_format: Optional[str] = None, include_speaker_in_text: bool = True) -> bytes:
+        """
+        Convert caption to bytes.
+
+        Args:
+            output_format: Output format (e.g., 'srt', 'vtt', 'ass'). Defaults to source_format or 'srt'
+            include_speaker_in_text: Whether to include speaker labels in text
+
+        Returns:
+            Caption content as bytes
+
+        Example:
+            >>> caption = Caption.read(\"input.srt\")
+            >>> # Get as bytes in original format
+            >>> data = caption.to_bytes()
+            >>> # Get as bytes in specific format
+            >>> vtt_data = caption.to_bytes(output_format=\"vtt\")
+        """
+        return self.write(None, output_format=output_format, include_speaker_in_text=include_speaker_in_text)
+
+    @classmethod
     def from_transcription_results(
         cls,
         transcription: List[Supervision],
@@ -307,25 +356,59 @@ class Caption:
     @classmethod
     def read(
         cls,
-        path: Pathlike,
+        path: Union[Pathlike, io.BytesIO, io.StringIO],
         format: Optional[str] = None,
         normalize_text: bool = True,
     ) -> "Caption":
         """
-        Read caption file and return Caption object.
+        Read caption file or in-memory data and return Caption object.
 
         Args:
-            path: Path to caption file
-            format: Caption format (auto-detected if not provided)
+            path: Path to caption file, or BytesIO/StringIO object with caption content
+            format: Caption format (auto-detected if not provided, required for in-memory data)
             normalize_text: Whether to normalize text during reading
 
         Returns:
             Caption object containing supervisions and metadata
 
         Example:
+            >>> # From file
             >>> caption = Caption.read("subtitles.srt")
+            >>> # From in-memory data
+            >>> import io
+            >>> data = io.BytesIO(b"1\n00:00:00,000 --> 00:00:02,000\nHello world")
+            >>> caption = Caption.read(data, format="srt")
             >>> print(f"Loaded {len(caption)} segments")
         """
+        # Handle in-memory data (BytesIO/StringIO)
+        if isinstance(path, (io.BytesIO, io.StringIO)):
+            if not format:
+                raise ValueError("format parameter is required when reading from BytesIO/StringIO")
+
+            # Read content from in-memory buffer
+            if isinstance(path, io.BytesIO):
+                content = path.read()
+                if isinstance(content, bytes):
+                    content = content.decode("utf-8")
+            else:  # StringIO
+                content = path.read()
+
+            # Reset buffer position for potential re-reading
+            path.seek(0)
+
+            # Parse supervisions from string content
+            supervisions = cls._parse_supervisions(content, format.lower(), normalize_text)
+
+            return cls(
+                supervisions=supervisions,
+                language=None,
+                kind=None,
+                source_format=format.lower(),
+                source_path=None,
+                metadata={},
+            )
+
+        # Handle file path (existing logic)
         caption_path = Path(str(path)) if not isinstance(path, Path) else path
 
         # Detect format if not provided
@@ -352,22 +435,33 @@ class Caption:
 
     def write(
         self,
-        path: Pathlike,
+        path: Union[Pathlike, io.BytesIO, None] = None,
+        output_format: Optional[str] = None,
         include_speaker_in_text: bool = True,
-    ) -> Pathlike:
+    ) -> Union[Pathlike, bytes]:
         """
-        Write caption to file.
+        Write caption to file or return as bytes.
 
         Args:
-            path: Path to output caption file
+            path: Path to output caption file, BytesIO object, or None to return bytes
+            output_format: Output format (e.g., 'srt', 'vtt', 'ass'). If not provided:
+                - For file paths: detected from file extension
+                - For BytesIO/None: uses source_format or defaults to 'srt'
             include_speaker_in_text: Whether to include speaker labels in text
 
         Returns:
-            Path to the written file
+            Path to the written file if path is a file path, or bytes if path is BytesIO/None
 
         Example:
             >>> caption = Caption.read("input.srt")
+            >>> # Write to file
             >>> caption.write("output.vtt", include_speaker_in_text=False)
+            >>> # Write to BytesIO with explicit format
+            >>> import io
+            >>> buffer = io.BytesIO()
+            >>> caption.write(buffer, output_format="vtt")
+            >>> # Get as bytes in specific format
+            >>> data = caption.write(None, output_format="ass")
         """
         if self.alignments:
             alignments = self.alignments
@@ -377,6 +471,29 @@ class Caption:
         if not alignments:
             alignments = self.transcription
 
+        # Determine output format
+        if output_format:
+            # Use explicitly provided format
+            output_format = output_format.lower()
+        elif isinstance(path, (io.BytesIO, type(None))):
+            # Use source_format or default to srt
+            output_format = self.source_format or "srt"
+        else:
+            # Get format from file path
+            output_format = Path(str(path)).suffix.lstrip(".").lower() or "srt"
+
+        # Handle in-memory operations without temporary files
+        if isinstance(path, (io.BytesIO, type(None))):
+            content = self._generate_caption_content(alignments, output_format, include_speaker_in_text)
+
+            if isinstance(path, io.BytesIO):
+                # Write to BytesIO
+                path.write(content)
+                path.seek(0)
+
+            return content
+
+        # Handle file path (existing logic)
         return self._write_caption(alignments, path, include_speaker_in_text)
 
     def read_speaker_diarization(
@@ -403,6 +520,197 @@ class Caption:
 
         self.speaker_diarization.write(path)
         return path
+
+    @classmethod
+    def _generate_caption_content(
+        cls,
+        alignments: List[Supervision],
+        output_format: str,
+        include_speaker_in_text: bool = True,
+    ) -> bytes:
+        """
+        Generate caption content in memory without temporary files.
+
+        Args:
+            alignments: List of supervision segments
+            output_format: Output format (e.g., 'srt', 'vtt', 'ass')
+            include_speaker_in_text: Whether to include speaker in text
+
+        Returns:
+            Caption content as bytes
+        """
+        output_format = output_format.lower()
+
+        # Handle text format
+        if output_format == "txt":
+            lines = []
+            for sup in alignments:
+                word_items = cls._parse_alignment_from_supervision(sup)
+                if word_items:
+                    for item in word_items:
+                        lines.append(f"[{item.start:.2f}-{item.end:.2f}] {item.symbol}")
+                else:
+                    if include_speaker_in_text and sup.speaker is not None:
+                        if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
+                            text = f"[{sup.speaker}]: {sup.text}"
+                        else:
+                            text = sup.text
+                    else:
+                        text = sup.text
+                    lines.append(f"[{sup.start:.2f}-{sup.end:.2f}] {text}")
+            return "\n".join(lines).encode("utf-8")
+
+        # Handle JSON format
+        elif output_format == "json":
+            json_data = [sup.to_dict() for sup in alignments]
+            return json.dumps(json_data, ensure_ascii=False, indent=4).encode("utf-8")
+
+        # Handle TextGrid format (requires file writing via tgt library)
+        elif output_format == "textgrid":
+            # TextGrid requires file I/O due to tgt library implementation
+            with tempfile.NamedTemporaryFile(suffix=".textgrid", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            try:
+                cls._write_textgrid(alignments, tmp_path, include_speaker_in_text)
+                with open(tmp_path, "rb") as f:
+                    return f.read()
+            finally:
+                tmp_path.unlink(missing_ok=True)
+
+        # Handle TSV format
+        elif output_format == "tsv":
+            lines = []
+            if include_speaker_in_text:
+                lines.append("speaker\tstart\tend\ttext")
+                for sup in alignments:
+                    include_speaker = sup.speaker and (
+                        not sup.has_custom("original_speaker") or sup.custom["original_speaker"]
+                    )
+                    speaker = sup.speaker if include_speaker else ""
+                    start_ms = round(1000 * sup.start)
+                    end_ms = round(1000 * sup.end)
+                    text = sup.text.strip().replace("\t", " ")
+                    lines.append(f"{speaker}\t{start_ms}\t{end_ms}\t{text}")
+            else:
+                lines.append("start\tend\ttext")
+                for sup in alignments:
+                    start_ms = round(1000 * sup.start)
+                    end_ms = round(1000 * sup.end)
+                    text = sup.text.strip().replace("\t", " ")
+                    lines.append(f"{start_ms}\t{end_ms}\t{text}")
+            return "\n".join(lines).encode("utf-8")
+
+        # Handle CSV format
+        elif output_format == "csv":
+            import csv
+            from io import StringIO
+
+            output = StringIO()
+            writer = csv.writer(output)
+
+            if include_speaker_in_text:
+                writer.writerow(["speaker", "start", "end", "text"])
+                for sup in alignments:
+                    include_speaker = sup.speaker and (
+                        not sup.has_custom("original_speaker") or sup.custom["original_speaker"]
+                    )
+                    speaker = sup.speaker if include_speaker else ""
+                    start_ms = round(1000 * sup.start)
+                    end_ms = round(1000 * sup.end)
+                    writer.writerow([speaker, start_ms, end_ms, sup.text.strip()])
+            else:
+                writer.writerow(["start", "end", "text"])
+                for sup in alignments:
+                    start_ms = round(1000 * sup.start)
+                    end_ms = round(1000 * sup.end)
+                    writer.writerow([start_ms, end_ms, sup.text.strip()])
+
+            return output.getvalue().encode("utf-8")
+
+        # Handle AUD format
+        elif output_format == "aud":
+            lines = []
+            for sup in alignments:
+                text = sup.text.strip().replace("\t", " ")
+                if (
+                    include_speaker_in_text
+                    and sup.speaker
+                    and (not sup.has_custom("original_speaker") or sup.custom["original_speaker"])
+                ):
+                    text = f"[[{sup.speaker}]]{text}"
+                lines.append(f"{sup.start}\t{sup.end}\t{text}")
+            return "\n".join(lines).encode("utf-8")
+
+        # Handle SBV format
+        elif output_format == "sbv":
+            lines = []
+            for i, sup in enumerate(alignments):
+                start_h = int(sup.start // 3600)
+                start_m = int((sup.start % 3600) // 60)
+                start_s = int(sup.start % 60)
+                start_ms = int((sup.start % 1) * 1000)
+
+                end_h = int(sup.end // 3600)
+                end_m = int((sup.end % 3600) // 60)
+                end_s = int(sup.end % 60)
+                end_ms = int((sup.end % 1) * 1000)
+
+                start_time = f"{start_h}:{start_m:02d}:{start_s:02d}.{start_ms:03d}"
+                end_time = f"{end_h}:{end_m:02d}:{end_s:02d}.{end_ms:03d}"
+
+                lines.append(f"{start_time},{end_time}")
+
+                text = sup.text.strip()
+                if (
+                    include_speaker_in_text
+                    and sup.speaker
+                    and (not sup.has_custom("original_speaker") or sup.custom["original_speaker"])
+                ):
+                    text = f"{sup.speaker}: {text}"
+                lines.append(text)
+
+                if i < len(alignments) - 1:
+                    lines.append("")
+
+            return "\n".join(lines).encode("utf-8")
+
+        # Handle pysubs2 formats (srt, vtt, ass, ssa, ttml, json)
+        else:
+            import pysubs2
+
+            subs = pysubs2.SSAFile()
+            for sup in alignments:
+                word_items = cls._parse_alignment_from_supervision(sup)
+                if word_items:
+                    for word in word_items:
+                        subs.append(
+                            pysubs2.SSAEvent(
+                                start=int(word.start * 1000),
+                                end=int(word.end * 1000),
+                                text=word.symbol,
+                                name=sup.speaker or "",
+                            )
+                        )
+                else:
+                    if include_speaker_in_text and sup.speaker is not None:
+                        if not sup.has_custom("original_speaker") or sup.custom["original_speaker"]:
+                            text = f"{sup.speaker} {sup.text}"
+                        else:
+                            text = sup.text
+                    else:
+                        text = sup.text
+                    subs.append(
+                        pysubs2.SSAEvent(
+                            start=int(sup.start * 1000),
+                            end=int(sup.end * 1000),
+                            text=text or "",
+                            name=sup.speaker or "",
+                        )
+                    )
+
+            # Generate string content and convert to bytes
+            content_str = subs.to_string(format_=output_format)
+            return content_str.encode("utf-8")
 
     @staticmethod
     def _parse_alignment_from_supervision(supervision: Any) -> Optional[List[AlignmentItem]]:
@@ -468,43 +776,7 @@ class Caption:
                     json_data.append(sup_dict)
                 json.dump(json_data, f, ensure_ascii=False, indent=4)
         elif str(output_path).lower().endswith(".textgrid"):
-            from tgt import Interval, IntervalTier, TextGrid, write_to_file
-
-            tg = TextGrid()
-            supervisions, words, scores = [], [], {"utterances": [], "words": []}
-            for supervision in sorted(alignments, key=lambda x: x.start):
-                # Respect `original_speaker` custom flag: default to include speaker when missing
-                if (
-                    include_speaker_in_text
-                    and supervision.speaker is not None
-                    and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
-                ):
-                    text = f"{supervision.speaker} {supervision.text}"
-                else:
-                    text = supervision.text
-                supervisions.append(Interval(supervision.start, supervision.end, text or ""))
-                # Extract word-level alignment using helper function
-                word_items = cls._parse_alignment_from_supervision(supervision)
-                if word_items:
-                    for item in word_items:
-                        words.append(Interval(item.start, item.end, item.symbol))
-                        if item.score is not None:
-                            scores["words"].append(Interval(item.start, item.end, f"{item.score:.2f}"))
-                if supervision.has_custom("score"):
-                    scores["utterances"].append(
-                        Interval(supervision.start, supervision.end, f"{supervision.score:.2f}")
-                    )
-
-            tg.add_tier(IntervalTier(name="utterances", objects=supervisions))
-            if words:
-                tg.add_tier(IntervalTier(name="words", objects=words))
-
-            if scores["utterances"]:
-                tg.add_tier(IntervalTier(name="utterance_scores", objects=scores["utterances"]))
-            if scores["words"]:
-                tg.add_tier(IntervalTier(name="word_scores", objects=scores["words"]))
-
-            write_to_file(tg, output_path, format="long")
+            cls._write_textgrid(alignments, output_path, include_speaker_in_text)
         elif str(output_path)[-4:].lower() == ".tsv":
             cls._write_tsv(alignments, output_path, include_speaker_in_text)
         elif str(output_path)[-4:].lower() == ".csv":
@@ -815,13 +1087,13 @@ class Caption:
 
     @classmethod
     def _parse_supervisions(
-        cls, caption: Pathlike, format: Optional[str], normalize_text: Optional[bool] = False
+        cls, caption: Union[Pathlike, str], format: Optional[str], normalize_text: Optional[bool] = False
     ) -> List[Supervision]:
         """
-        Parse supervisions from caption file.
+        Parse supervisions from caption file or string content.
 
         Args:
-            caption: Caption file path or content
+            caption: Caption file path or string content
             format: Caption format
             normalize_text: Whether to normalize text
 
@@ -831,28 +1103,40 @@ class Caption:
         if format:
             format = format.lower()
 
+        # Check if caption is string content (not a file path)
+        is_string_content = isinstance(caption, str) and ("\n" in caption or len(caption) > 500)
+
         # Check for YouTube VTT with word-level timestamps first
-        caption_path = Path(str(caption))
-        if caption_path.exists():
-            with open(caption_path, "r", encoding="utf-8") as f:
-                content = f.read()
+        if is_string_content:
+            content = caption
             if cls._is_youtube_vtt_with_word_timestamps(content):
                 return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
+        else:
+            caption_path = Path(str(caption))
+            if caption_path.exists():
+                with open(caption_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                if cls._is_youtube_vtt_with_word_timestamps(content):
+                    return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
 
         # Match Gemini format: explicit format, or files ending with Gemini.md/Gemini3.md,
         # or files containing "gemini" in the name with .md extension
-        caption_str = str(caption).lower()
-        is_gemini_format = (
-            format == "gemini"
-            or str(caption).endswith("Gemini.md")
-            or str(caption).endswith("Gemini3.md")
-            or ("gemini" in caption_str and caption_str.endswith(".md"))
-        )
+        if not is_string_content:
+            caption_str = str(caption).lower()
+            is_gemini_format = (
+                format == "gemini"
+                or str(caption).endswith("Gemini.md")
+                or str(caption).endswith("Gemini3.md")
+                or ("gemini" in caption_str and caption_str.endswith(".md"))
+            )
+        else:
+            is_gemini_format = format == "gemini"
+
         if is_gemini_format:
             from .gemini_reader import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(caption)
-        elif format and (format == "textgrid" or str(caption).lower().endswith("textgrid")):
+        elif format and (format == "textgrid" or (not is_string_content and str(caption).lower().endswith("textgrid"))):
             # Internel usage
             from tgt import read_textgrid
 
@@ -871,17 +1155,19 @@ class Caption:
                     ]
                 )
             supervisions = sorted(supervisions, key=lambda x: x.start)
-        elif format == "tsv" or str(caption)[-4:].lower() == ".tsv":
+        elif format == "tsv" or (not is_string_content and str(caption)[-4:].lower() == ".tsv"):
             supervisions = cls._parse_tsv(caption, normalize_text)
-        elif format == "csv" or str(caption)[-4:].lower() == ".csv":
+        elif format == "csv" or (not is_string_content and str(caption)[-4:].lower() == ".csv"):
             supervisions = cls._parse_csv(caption, normalize_text)
-        elif format == "aud" or str(caption)[-4:].lower() == ".aud":
+        elif format == "aud" or (not is_string_content and str(caption)[-4:].lower() == ".aud"):
             supervisions = cls._parse_aud(caption, normalize_text)
-        elif format == "sbv" or str(caption)[-4:].lower() == ".sbv":
+        elif format == "sbv" or (not is_string_content and str(caption)[-4:].lower() == ".sbv"):
             supervisions = cls._parse_sbv(caption, normalize_text)
-        elif format == "txt" or (format == "auto" and str(caption)[-4:].lower() == ".txt"):
-            if not Path(str(caption)).exists():  # str
+        elif format == "txt" or (format == "auto" and not is_string_content and str(caption)[-4:].lower() == ".txt"):
+            if is_string_content or not Path(str(caption)).exists():  # str content
                 lines = [line.strip() for line in str(caption).split("\n")]
+                if normalize_text:
+                    lines = [normalize_text_fn(line) for line in lines]
             else:  # file
                 path_str = str(caption)
                 with open(path_str, encoding="utf-8") as f:
@@ -1236,6 +1522,57 @@ class Caption:
                 continue
 
         return supervisions
+
+    @classmethod
+    def _write_textgrid(
+        cls,
+        alignments: List[Supervision],
+        output_path: Pathlike,
+        include_speaker_in_text: bool = True,
+    ) -> None:
+        """
+        Write caption to TextGrid format.
+
+        Args:
+            alignments: List of supervision segments to write
+            output_path: Path to output TextGrid file
+            include_speaker_in_text: Whether to include speaker in text
+        """
+        from tgt import Interval, IntervalTier, TextGrid, write_to_file
+
+        tg = TextGrid()
+        supervisions, words, scores = [], [], {"utterances": [], "words": []}
+        for supervision in sorted(alignments, key=lambda x: x.start):
+            # Respect `original_speaker` custom flag: default to include speaker when missing
+            if (
+                include_speaker_in_text
+                and supervision.speaker is not None
+                and (not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"])
+            ):
+                text = f"{supervision.speaker} {supervision.text}"
+            else:
+                text = supervision.text
+            supervisions.append(Interval(supervision.start, supervision.end, text or ""))
+            # Extract word-level alignment using helper function
+            word_items = cls._parse_alignment_from_supervision(supervision)
+            if word_items:
+                for item in word_items:
+                    words.append(Interval(item.start, item.end, item.symbol))
+                    if item.score is not None:
+                        scores["words"].append(Interval(item.start, item.end, f"{item.score:.2f}"))
+            if supervision.has_custom("score"):
+                scores["utterances"].append(Interval(supervision.start, supervision.end, f"{supervision.score:.2f}"))
+
+        tg.add_tier(IntervalTier(name="utterances", objects=supervisions))
+        if words:
+            tg.add_tier(IntervalTier(name="words", objects=words))
+
+        if scores["utterances"]:
+            tg.add_tier(IntervalTier(name="utterance_scores", objects=scores["utterances"]))
+        if scores["words"]:
+            tg.add_tier(IntervalTier(name="word_scores", objects=scores["words"]))
+
+        write_to_file(tg, output_path, format="long")
 
     @classmethod
     def _write_tsv(

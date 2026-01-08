@@ -33,7 +33,7 @@ Thank you for being here today. [00:00:19]
 ### 1. Read Transcript with Metadata
 
 ```python
-from lattifai.io import GeminiReader
+from lattifai.caption import GeminiReader
 
 segments = GeminiReader.read(
 	'videoid_Gemini.md',
@@ -47,7 +47,7 @@ for seg in segments:
 ### 2. Extract Dialogue for Alignment
 
 ```python
-from lattifai.io import GeminiReader
+from lattifai.caption import GeminiReader
 supervisions = GeminiReader.extract_for_alignment(
 	'videoid_Gemini.md',
 	merge_consecutive=False,
