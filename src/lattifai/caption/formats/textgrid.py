@@ -5,7 +5,9 @@ TextGrid is Praat's native annotation format, commonly used in phonetics researc
 
 import tempfile
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Union
+
+from lhotse.utils import Pathlike
 
 from ..supervision import Supervision
 from . import register_format
@@ -127,3 +129,28 @@ class TextGridFormat(FormatHandler):
             return tmp_path.read_bytes()
         finally:
             tmp_path.unlink(missing_ok=True)
+
+    @classmethod
+    def extract_metadata(cls, source: Union[Pathlike, str], **kwargs) -> Dict[str, str]:
+        """Extract metadata from TextGrid."""
+        import re
+        from pathlib import Path
+
+        metadata = {}
+        if cls.is_content(source):
+            content = source[:4096]
+        else:
+            try:
+                with open(source, "r", encoding="utf-8") as f:
+                    content = f.read(4096)
+            except Exception:
+                return {}
+
+        match = re.search(r"xmin\s*=\s*([\d.]+)", content)
+        if match:
+            metadata["xmin"] = match.group(1)
+        match = re.search(r"xmax\s*=\s*([\d.]+)", content)
+        if match:
+            metadata["xmax"] = match.group(1)
+
+        return metadata

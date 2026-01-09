@@ -1,19 +1,15 @@
 """Caption data structure for storing subtitle information with metadata."""
 
 import io
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, TypeVar, Union
 
-from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
 from tgt import TextGrid
 
 from ..config.caption import InputCaptionFormat, OutputCaptionFormat  # noqa: F401
 from .formats import detect_format, get_reader, get_writer
-from .parsers.text_parser import normalize_text as normalize_text_fn
-from .parsers.text_parser import parse_speaker_text
 from .supervision import Supervision
 
 DiarizationOutput = TypeVar("DiarizationOutput")
@@ -51,6 +47,7 @@ class Caption:
     kind: Optional[str] = None
     source_format: Optional[str] = None
     source_path: Optional[Pathlike] = None
+    word_level: bool = False
     metadata: Dict[str, str] = field(default_factory=dict)
 
     def __len__(self) -> int:
@@ -334,66 +331,59 @@ class Caption:
 
         Returns:
             Caption object containing supervisions and metadata
-
-        Example:
-            >>> # From file
-            >>> caption = Caption.read("subtitles.srt")
-            >>> # From in-memory data
-            >>> import io
-            >>> data = io.BytesIO(b"1\n00:00:00,000 --> 00:00:02,000\nHello world")
-            >>> caption = Caption.read(data, format="srt")
-            >>> print(f"Loaded {len(caption)} segments")
         """
-        # Handle in-memory data (BytesIO/StringIO)
-        if isinstance(path, (io.BytesIO, io.StringIO)):
-            if not format:
-                raise ValueError("format parameter is required when reading from BytesIO/StringIO")
-
-            # Read content from in-memory buffer
-            if isinstance(path, io.BytesIO):
-                content = path.read()
-                if isinstance(content, bytes):
-                    content = content.decode("utf-8")
-            else:  # StringIO
-                content = path.read()
-
-            # Reset buffer position for potential re-reading
-            path.seek(0)
-
-            # Parse supervisions from string content
-            supervisions = cls._parse_supervisions(content, format.lower(), normalize_text)
-
-            return cls(
-                supervisions=supervisions,
-                language=None,
-                kind=None,
-                source_format=format.lower(),
-                source_path=None,
-                metadata={},
-            )
-
-        # Handle file path (existing logic)
-        caption_path = Path(str(path)) if not isinstance(path, Path) else path
-
         # Detect format if not provided
         if not format:
-            format = detect_format(path)
-        else:
-            format = format.lower()
+            if isinstance(path, (io.BytesIO, io.StringIO)):
+                raise ValueError("format parameter is required when reading from BytesIO/StringIO")
+            format = detect_format(str(path))
 
-        # Extract metadata from file
-        metadata = cls._extract_metadata(path, format)
+        if not format:
+            # Fallback to extension
+            if not isinstance(path, (io.BytesIO, io.StringIO)):
+                format = Path(str(path)).suffix.lstrip(".").lower()
 
-        # Parse supervisions
-        supervisions = cls._parse_supervisions(path, format, normalize_text)
+        if not format:
+            format = "srt"  # Last resort default
+
+        # Get content if it's an in-memory buffer
+        source = path
+        if isinstance(path, io.BytesIO):
+            source = path.read().decode("utf-8")
+        elif isinstance(path, io.StringIO):
+            source = path.read()
+
+        # Reset buffer position if it was a stream
+        if isinstance(path, (io.BytesIO, io.StringIO)):
+            path.seek(0)
+
+        # Get reader and perform extraction
+        reader_cls = get_reader(format)
+        if not reader_cls:
+            # Use pysubs2 as a generic fallback if no specific reader exists
+            from .formats.pysubs2 import Pysubs2Format
+
+            reader_cls = Pysubs2Format
+
+        supervisions = reader_cls.read(source, normalize_text=normalize_text)
+        metadata = reader_cls.extract_metadata(source)
 
         # Create Caption object
+        source_path = None
+        if isinstance(path, (str, Path)) and not ("\n" in str(path) or len(str(path)) > 500):
+            try:
+                p = Path(str(path))
+                if p.exists():
+                    source_path = str(p)
+            except (OSError, ValueError):
+                pass
+
         return cls(
             supervisions=supervisions,
             language=metadata.get("language"),
             kind=metadata.get("kind"),
             source_format=format,
-            source_path=str(caption_path) if caption_path.exists() else None,
+            source_path=source_path,
             metadata=metadata,
         )
 
@@ -408,62 +398,65 @@ class Caption:
 
         Args:
             path: Path to output caption file, BytesIO object, or None to return bytes
-            output_format: Output format (e.g., 'srt', 'vtt', 'ass'). If not provided:
-                - For file paths: detected from file extension
-                - For BytesIO/None: uses source_format or defaults to 'srt'
+            output_format: Output format (e.g., 'srt', 'vtt', 'ass')
             include_speaker_in_text: Whether to include speaker labels in text
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
-
-        Example:
-            >>> caption = Caption.read("input.srt")
-            >>> # Write to file
-            >>> caption.write("output.vtt", include_speaker_in_text=False)
-            >>> # Write to BytesIO with explicit format
-            >>> import io
-            >>> buffer = io.BytesIO()
-            >>> caption.write(buffer, output_format="vtt")
-            >>> # Get as bytes in specific format
-            >>> data = caption.write(None, output_format="ass")
         """
         if self.alignments:
-            alignments = self.alignments
+            supervisions = self.alignments
+        elif self.supervisions:
+            supervisions = self.supervisions
         else:
-            alignments = self.supervisions
-
-        if not alignments:
-            alignments = self.transcription
+            supervisions = self.transcription
 
         # Determine output format
         if output_format:
-            # Use explicitly provided format
             output_format = output_format.lower()
         elif isinstance(path, (io.BytesIO, type(None))):
-            # Use source_format or default to srt
             output_format = self.source_format or "srt"
         else:
-            # Get format from file path
-            output_format = Path(str(path)).suffix.lstrip(".").lower() or "srt"
+            output_format = detect_format(str(path)) or Path(str(path)).suffix.lstrip(".").lower() or "srt"
 
-        # Handle in-memory operations without temporary files
-        if isinstance(path, (io.BytesIO, type(None))):
-            content = self._generate_caption_content(alignments, output_format, include_speaker_in_text)
+        # Special casing for professional formats as before
+        ext = output_format
+        if isinstance(path, (str, Path)):
+            path_str = str(path)
+            if path_str.endswith("_avid.txt"):
+                ext = "avid_ds"
+            elif "audition" in path_str.lower() and path_str.endswith(".csv"):
+                ext = "audition_csv"
+            elif "edimarker" in path_str.lower() and path_str.endswith(".csv"):
+                ext = "edimarker_csv"
+            elif "imsc" in path_str.lower() and path_str.endswith(".ttml"):
+                ext = "imsc1"
+            elif "ebu" in path_str.lower() and path_str.endswith(".ttml"):
+                ext = "ebu_tt_d"
 
-            if isinstance(path, io.BytesIO):
-                # Write to BytesIO
-                path.write(content)
-                path.seek(0)
+        # Use YouTube VTT if word-level is requested for VTT output
+        if ext == "vtt" and self.word_level:
+            ext = "youtube_vtt"
 
-            return content
+        writer_cls = get_writer(ext)
+        if not writer_cls:
+            from .formats.pysubs2 import Pysubs2Format
 
-        # Handle file path (existing logic)
-        return self._write_caption(alignments, path, include_speaker_in_text, output_format)
+            writer_cls = Pysubs2Format
+
+        if isinstance(path, (str, Path)):
+            return writer_cls.write(supervisions, path, include_speaker=include_speaker_in_text)
+
+        content = writer_cls.to_bytes(supervisions, include_speaker=include_speaker_in_text)
+        if isinstance(path, io.BytesIO):
+            path.write(content)
+            path.seek(0)
+        return content
 
     def read_speaker_diarization(
         self,
         path: Pathlike,
-    ) -> TextGrid:
+    ) -> "DiarizationOutput":
         """
         Read speaker diarization TextGrid from file.
         """
@@ -484,484 +477,6 @@ class Caption:
 
         self.speaker_diarization.write(path)
         return path
-
-    @classmethod
-    def _generate_caption_content(
-        cls,
-        alignments: List[Supervision],
-        output_format: str,
-        include_speaker_in_text: bool = True,
-    ) -> bytes:
-        """
-        Generate caption content in memory without temporary files.
-
-        Args:
-            alignments: List of supervision segments
-            output_format: Output format (e.g., 'srt', 'vtt', 'ass')
-            include_speaker_in_text: Whether to include speaker in text
-
-        Returns:
-            Caption content as bytes
-        """
-        output_format = output_format.lower()
-        writer_cls = get_writer(output_format)
-
-        if writer_cls:
-            return writer_cls.to_bytes(alignments, include_speaker=include_speaker_in_text)
-
-        # Fallback to pysubs2 for any other formats it might support
-        import pysubs2
-
-        subs = pysubs2.SSAFile()
-        for sup in alignments:
-            # Extract word-level alignment if present
-            alignment = getattr(sup, "alignment", None)
-            word_items = alignment.get("word") if alignment else None
-
-            if word_items:
-                for word in word_items:
-                    subs.append(
-                        pysubs2.SSAEvent(
-                            start=int(word.start * 1000),
-                            end=int(word.end * 1000),
-                            text=word.symbol,
-                            name=sup.speaker or "",
-                        )
-                    )
-            else:
-                text = sup.text
-                if cls._should_include_speaker(sup, include_speaker_in_text):
-                    text = f"{sup.speaker} {sup.text}"
-                subs.append(
-                    pysubs2.SSAEvent(
-                        start=int(sup.start * 1000),
-                        end=int(sup.end * 1000),
-                        text=text or "",
-                        name=sup.speaker or "",
-                    )
-                )
-
-        # Generate string content and convert to bytes
-        content_str = subs.to_string(format_=output_format)
-        return content_str.encode("utf-8")
-
-    @staticmethod
-    def _get_file_extension(path: Pathlike) -> str:
-        """Get lowercase file extension without dot."""
-        return Path(path).suffix.lstrip(".").lower()
-
-    @staticmethod
-    def _should_include_speaker(supervision: Supervision, include_speaker_in_text: bool) -> bool:
-        """Check if speaker should be included in output text."""
-        if not include_speaker_in_text or not supervision.speaker:
-            return False
-        return not supervision.has_custom("original_speaker") or supervision.custom["original_speaker"]
-
-    @classmethod
-    def _write_caption(
-        cls,
-        alignments: List[Supervision],
-        output_path: Pathlike,
-        include_speaker_in_text: bool = True,
-        output_format: Optional[str] = None,
-    ) -> Pathlike:
-        """
-        Write caption to file in various formats.
-
-        Args:
-            alignments: List of supervision segments to write
-            output_path: Path to output file
-            include_speaker_in_text: Whether to include speaker in text
-            output_format: Explicit output format (overrides file extension detection)
-
-        Returns:
-            Path to written file
-        """
-        output_path = Path(str(output_path))
-        # Use explicit format if provided, otherwise detect from extension
-        ext = output_format.lower() if output_format else cls._get_file_extension(output_path)
-
-        # Handle special professional NLE naming conventions
-        if not output_format:
-            if str(output_path).endswith("_avid.txt"):
-                ext = "avid_ds"
-            elif "audition" in str(output_path).lower() and ext == "csv":
-                ext = "audition_csv"
-            elif "edimarker" in str(output_path).lower() and ext == "csv":
-                ext = "edimarker_csv"
-            elif "imsc" in str(output_path).lower() and ext == "ttml":
-                ext = "imsc1"
-            elif "ebu" in str(output_path).lower() and ext == "ttml":
-                ext = "ebu_tt_d"
-
-        writer_cls = get_writer(ext)
-        if writer_cls:
-            writer_cls.write(alignments, output_path, include_speaker=include_speaker_in_text)
-            return output_path
-
-        # Fallback to manual writing via _generate_caption_content
-        content = cls._generate_caption_content(alignments, ext, include_speaker_in_text)
-        output_path.write_bytes(content)
-
-        return output_path
-
-    @classmethod
-    def _extract_metadata(cls, caption: Pathlike, format: Optional[str]) -> Dict[str, str]:
-        """
-        Extract metadata from caption file header.
-
-        Args:
-            caption: Caption file path or content
-            format: Caption format
-
-        Returns:
-            Dictionary of metadata key-value pairs
-        """
-        metadata = {}
-        caption_path = Path(str(caption))
-
-        if not caption_path.exists():
-            return metadata
-
-        try:
-            with open(caption_path, "r", encoding="utf-8") as f:
-                content = f.read(2048)  # Read first 2KB for metadata
-
-            # WebVTT metadata extraction
-            if format == "vtt" or content.startswith("WEBVTT"):
-                lines = content.split("\n")
-                for line in lines[:10]:  # Check first 10 lines
-                    line = line.strip()
-                    if line.startswith("Kind:"):
-                        metadata["kind"] = line.split(":", 1)[1].strip()
-                    elif line.startswith("Language:"):
-                        metadata["language"] = line.split(":", 1)[1].strip()
-                    elif line.startswith("NOTE"):
-                        # Extract metadata from NOTE comments
-                        match = re.search(r"NOTE\s+(\w+):\s*(.+)", line)
-                        if match:
-                            key, value = match.groups()
-                            metadata[key.lower()] = value.strip()
-
-            # SRT doesn't have standard metadata, but check for BOM
-            elif format == "srt":
-                if content.startswith("\ufeff"):
-                    metadata["encoding"] = "utf-8-sig"
-
-            # TextGrid metadata
-            elif format == "textgrid" or caption_path.suffix.lower() == ".textgrid":
-                match = re.search(r"xmin\s*=\s*([\d.]+)", content)
-                if match:
-                    metadata["xmin"] = match.group(1)
-                match = re.search(r"xmax\s*=\s*([\d.]+)", content)
-                if match:
-                    metadata["xmax"] = match.group(1)
-
-        except Exception:
-            # If metadata extraction fails, continue with empty metadata
-            pass
-
-        return metadata
-
-    @classmethod
-    def _parse_youtube_vtt_with_word_timestamps(
-        cls, content: str, normalize_text: Optional[bool] = False
-    ) -> List[Supervision]:
-        """
-        Parse YouTube VTT format with word-level timestamps.
-
-        YouTube auto-generated captions use this format:
-        Word1<00:00:10.559><c> Word2</c><00:00:11.120><c> Word3</c>...
-
-        Args:
-            content: VTT file content
-            normalize_text: Whether to normalize text
-
-        Returns:
-            List of Supervision objects with word-level alignments
-        """
-        supervisions = []
-
-        # Pattern to match timestamp lines: 00:00:14.280 --> 00:00:17.269 align:start position:0%
-        timestamp_pattern = re.compile(r"(\d{2}:\d{2}:\d{2}[.,]\d{3})\s*-->\s*(\d{2}:\d{2}:\d{2}[.,]\d{3})")
-
-        # Pattern to match word-level timestamps: <00:00:10.559><c> word</c>
-        word_timestamp_pattern = re.compile(r"<(\d{2}:\d{2}:\d{2}[.,]\d{3})><c>\s*([^<]+)</c>")
-
-        # Pattern to match the first word (before first timestamp)
-        first_word_pattern = re.compile(r"^([^<\n]+?)<(\d{2}:\d{2}:\d{2}[.,]\d{3})>")
-
-        def parse_timestamp(ts: str) -> float:
-            """Convert timestamp string to seconds."""
-            ts = ts.replace(",", ".")
-            parts = ts.split(":")
-            hours = int(parts[0])
-            minutes = int(parts[1])
-            seconds = float(parts[2])
-            return hours * 3600 + minutes * 60 + seconds
-
-        lines = content.split("\n")
-        i = 0
-        while i < len(lines):
-            line = lines[i].strip()
-
-            # Look for timestamp line
-            ts_match = timestamp_pattern.search(line)
-            if ts_match:
-                cue_start = parse_timestamp(ts_match.group(1))
-                cue_end = parse_timestamp(ts_match.group(2))
-
-                # Read the next non-empty lines for cue content
-                cue_lines = []
-                i += 1
-                while i < len(lines) and lines[i].strip() and not timestamp_pattern.search(lines[i]):
-                    cue_lines.append(lines[i])
-                    i += 1
-
-                # Process cue content
-                for cue_line in cue_lines:
-                    cue_line = cue_line.strip()
-                    if not cue_line:
-                        continue
-
-                    # Check if this line has word-level timestamps
-                    word_matches = word_timestamp_pattern.findall(cue_line)
-                    if word_matches:
-                        # This line has word-level timing
-                        word_alignments = []
-
-                        # Get the first word (before the first timestamp)
-                        first_match = first_word_pattern.match(cue_line)
-                        if first_match:
-                            first_word = first_match.group(1).strip()
-                            first_word_next_ts = parse_timestamp(first_match.group(2))
-                            if first_word:
-                                # First word starts at cue_start
-                                word_alignments.append(
-                                    AlignmentItem(
-                                        symbol=first_word,
-                                        start=cue_start,
-                                        duration=first_word_next_ts - cue_start,
-                                    )
-                                )
-
-                        # Process remaining words with timestamps
-                        for idx, (ts, word) in enumerate(word_matches):
-                            word_start = parse_timestamp(ts)
-                            word = word.strip()
-                            if not word:
-                                continue
-
-                            # Calculate duration based on next word's timestamp or cue end
-                            if idx + 1 < len(word_matches):
-                                next_ts = parse_timestamp(word_matches[idx + 1][0])
-                                duration = next_ts - word_start
-                            else:
-                                duration = cue_end - word_start
-
-                            word_alignments.append(
-                                AlignmentItem(
-                                    symbol=word,
-                                    start=word_start,
-                                    duration=max(0.01, duration),  # Ensure positive duration
-                                )
-                            )
-
-                        if word_alignments:
-                            # Create supervision with word-level alignment
-                            full_text = " ".join(item.symbol for item in word_alignments)
-                            if normalize_text:
-                                full_text = normalize_text_fn(full_text)
-
-                            sup_start = word_alignments[0].start
-                            sup_end = word_alignments[-1].start + word_alignments[-1].duration
-
-                            supervisions.append(
-                                Supervision(
-                                    text=full_text,
-                                    start=sup_start,
-                                    duration=sup_end - sup_start,
-                                    alignment={"word": word_alignments},
-                                )
-                            )
-                    else:
-                        # Plain text line without word-level timing - skip duplicate lines
-                        # (YouTube VTT often repeats the previous line without timestamps)
-                        pass
-
-                continue
-            i += 1
-
-        # Merge consecutive supervisions to form complete utterances
-        if supervisions:
-            supervisions = cls._merge_youtube_vtt_supervisions(supervisions)
-
-        return supervisions
-
-    @classmethod
-    def _merge_youtube_vtt_supervisions(cls, supervisions: List[Supervision]) -> List[Supervision]:
-        """
-        Merge consecutive YouTube VTT supervisions into complete utterances.
-
-        YouTube VTT splits utterances across multiple cues. This method merges
-        cues that are close together in time.
-
-        Args:
-            supervisions: List of supervisions to merge
-
-        Returns:
-            List of merged supervisions
-        """
-        if not supervisions:
-            return supervisions
-
-        merged = []
-        current = supervisions[0]
-
-        for next_sup in supervisions[1:]:
-            # Check if next supervision is close enough to merge (within 0.5 seconds)
-            gap = next_sup.start - (current.start + current.duration)
-
-            if gap < 0.5 and current.alignment and next_sup.alignment:
-                # Merge alignments
-                current_words = current.alignment.get("word", [])
-                next_words = next_sup.alignment.get("word", [])
-                merged_words = list(current_words) + list(next_words)
-
-                # Create merged supervision
-                merged_text = current.text + " " + next_sup.text
-                merged_end = next_sup.start + next_sup.duration
-
-                current = Supervision(
-                    text=merged_text,
-                    start=current.start,
-                    duration=merged_end - current.start,
-                    alignment={"word": merged_words},
-                )
-            else:
-                merged.append(current)
-                current = next_sup
-
-        merged.append(current)
-        return merged
-
-    @classmethod
-    def _is_youtube_vtt_with_word_timestamps(cls, content: str) -> bool:
-        """
-        Check if content is YouTube VTT format with word-level timestamps.
-
-        Args:
-            content: File content to check
-
-        Returns:
-            True if content contains YouTube-style word timestamps
-        """
-        # Look for pattern like <00:00:10.559><c> word</c>
-        return bool(re.search(r"<\d{2}:\d{2}:\d{2}[.,]\d{3}><c>", content))
-
-    @classmethod
-    def _parse_supervisions(
-        cls, caption: Union[Pathlike, str], format: Optional[str], normalize_text: Optional[bool] = False
-    ) -> List[Supervision]:
-        """
-        Parse supervisions from caption file or string content.
-
-        Args:
-            caption: Caption file path or string content
-            format: Caption format
-            normalize_text: Whether to normalize text
-
-        Returns:
-            List of Supervision objects
-        """
-        if format:
-            format = format.lower()
-
-        # Check if caption is string content (not a file path)
-        is_string_content = isinstance(caption, str) and ("\n" in caption or len(caption) > 500)
-
-        # Check for YouTube VTT with word-level timestamps first
-        if is_string_content:
-            content = caption
-            if cls._is_youtube_vtt_with_word_timestamps(content):
-                return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
-        else:
-            caption_path = Path(str(caption))
-            if caption_path.exists():
-                with open(caption_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                if cls._is_youtube_vtt_with_word_timestamps(content):
-                    return cls._parse_youtube_vtt_with_word_timestamps(content, normalize_text)
-
-        # Detect format if not provided
-        fmt = format
-        if not fmt and not is_string_content:
-            fmt = detect_format(caption)
-
-        if fmt:
-            reader_cls = get_reader(fmt)
-            if reader_cls:
-                try:
-                    return reader_cls.read(caption, normalize_text=normalize_text)
-                except Exception as e:
-                    print(f"Failed to parse caption with Reader: {fmt}, Exception: {e}, falling back.")
-
-        # Fallback to generic pysubs2 parser or specialized Gemini parser if it failed
-        try:
-            return cls._parse_caption(caption, format=format, normalize_text=normalize_text)
-        except Exception as e:
-            # Final fallback to GeminiReader if it's potentially markdown
-            if not is_string_content and str(caption).lower().endswith(".md"):
-                from .formats.gemini import GeminiReader
-
-                return GeminiReader.extract_for_alignment(caption)
-            raise e
-
-    @classmethod
-    def _parse_caption(
-        cls, caption: Pathlike, format: Optional[OutputCaptionFormat], normalize_text: Optional[bool] = False
-    ) -> List[Supervision]:
-        """
-        Parse caption using pysubs2.
-
-        Args:
-            caption: Caption file path or content
-            format: Caption format
-            normalize_text: Whether to normalize text
-
-        Returns:
-            List of Supervision objects
-        """
-        import pysubs2
-
-        try:
-            subs: pysubs2.SSAFile = pysubs2.load(
-                caption, encoding="utf-8", format_=format if format != "auto" else None
-            )  # file
-        except IOError:
-            try:
-                subs: pysubs2.SSAFile = pysubs2.SSAFile.from_string(
-                    caption, format_=format if format != "auto" else None
-                )  # str
-            except Exception as e:
-                del e
-                subs: pysubs2.SSAFile = pysubs2.load(caption, encoding="utf-8")  # auto detect format
-
-        # Parse supervisions
-        supervisions = []
-        for event in subs.events:
-            if normalize_text:
-                event.text = normalize_text_fn(event.text)
-            speaker, text = parse_speaker_text(event.text)
-            supervisions.append(
-                Supervision(
-                    text=text,
-                    speaker=speaker or event.name,
-                    start=event.start / 1000.0 if event.start is not None else None,
-                    duration=(event.end - event.start) / 1000.0 if event.end is not None else None,
-                )
-            )
-        return supervisions
 
     def __repr__(self) -> str:
         """String representation of Caption."""

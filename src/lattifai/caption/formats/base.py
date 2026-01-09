@@ -51,6 +51,18 @@ class FormatReader(ABC):
         pass
 
     @classmethod
+    def extract_metadata(cls, source: Union[Pathlike, str]) -> Dict[str, str]:
+        """Extract metadata from caption file or content.
+
+        Args:
+            source: File path or string content
+
+        Returns:
+            Dictionary of metadata key-value pairs
+        """
+        return {}
+
+    @classmethod
     def can_read(cls, path: Union[Pathlike, str]) -> bool:
         """Check if this reader can handle the given file.
 

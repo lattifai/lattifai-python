@@ -126,19 +126,40 @@ def detect_format(path: str) -> Optional[str]:
     Returns:
         Format ID or None if no match found
     """
-    path_lower = str(path).lower()
+    path_str = str(path)
+
+    # Check if it's content instead of a path
+    is_content = "\n" in path_str or len(path_str) > 500
+
+    # Prioritize specific formats that can detect by content (e.g., youtube_vtt)
+    # These often use shared extensions like .vtt or .txt
+    priority_formats = ["youtube_vtt", "gemini"]
+    for format_id in priority_formats:
+        reader_cls = _READERS.get(format_id)
+        if reader_cls and reader_cls.can_read(path_str):
+            return format_id
+
+    if is_content:
+        return None
 
     # Check each reader's extensions
+    path_lower = path_str.lower()
     for format_id, reader_cls in _READERS.items():
+        if format_id in priority_formats:
+            continue
         if reader_cls.can_read(path_lower):
             return format_id
 
     # Fallback: try extension directly
     from pathlib import Path
 
-    ext = Path(path_lower).suffix.lstrip(".")
-    if ext in _READERS:
-        return ext
+    try:
+        ext = Path(path_lower).suffix.lstrip(".")
+        if ext in _READERS:
+            return ext
+    except (OSError, ValueError):
+        # Likely content, not a path
+        pass
 
     return None
 
@@ -151,6 +172,7 @@ from . import sbv  # SubViewer
 from . import tabular  # CSV, TSV, AUD, TXT, JSON
 from . import textgrid  # Praat TextGrid
 from . import ttml  # TTML, IMSC1, EBU-TT-D
+from . import youtube_vtt  # YouTube VTT with word-level timestamps
 
 # Professional NLE formats
 from .nle import audition  # Adobe Audition / Pro Tools markers

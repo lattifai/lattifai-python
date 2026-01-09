@@ -4,7 +4,7 @@ Handles: SRT, VTT, ASS, SSA, SUB (MicroDVD), SAMI/SMI
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import pysubs2
 
@@ -59,6 +59,47 @@ class Pysubs2Format(FormatHandler):
             )
 
         return supervisions
+
+    @classmethod
+    def extract_metadata(cls, source, **kwargs) -> Dict[str, str]:
+        """Extract metadata from VTT or SRT."""
+        import re
+        from pathlib import Path
+
+        metadata = {}
+        if cls.is_content(source):
+            content = source[:4096]
+        else:
+            path = Path(str(source))
+            if not path.exists():
+                return {}
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read(4096)
+            except Exception:
+                return {}
+
+        # WebVTT metadata extraction
+        if cls.pysubs2_format == "vtt" or (isinstance(source, str) and source.startswith("WEBVTT")):
+            lines = content.split("\n")
+            for line in lines[:10]:
+                line = line.strip()
+                if line.startswith("Kind:"):
+                    metadata["kind"] = line.split(":", 1)[1].strip()
+                elif line.startswith("Language:"):
+                    metadata["language"] = line.split(":", 1)[1].strip()
+                elif line.startswith("NOTE"):
+                    match = re.search(r"NOTE\s+(\w+):\s*(.+)", line)
+                    if match:
+                        key, value = match.groups()
+                        metadata[key.lower()] = value.strip()
+
+        # SRT doesn't have standard metadata, but check for BOM
+        elif cls.pysubs2_format == "srt":
+            if content.startswith("\ufeff"):
+                metadata["encoding"] = "utf-8-sig"
+
+        return metadata
 
     @classmethod
     def write(
