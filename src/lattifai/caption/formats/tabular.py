@@ -94,7 +94,12 @@ class CSVFormat(FormatHandler):
         if include_speaker:
             writer.writerow(["speaker", "start", "end", "text"])
             for sup in supervisions:
-                speaker = sup.speaker or ""
+                # Check if speaker should be included
+                include_this_speaker = True
+                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
+                    include_this_speaker = False
+
+                speaker = sup.speaker if include_this_speaker and sup.speaker else ""
                 start_ms = round(1000 * sup.start)
                 end_ms = round(1000 * sup.end)
                 writer.writerow([speaker, start_ms, end_ms, sup.text.strip()])
@@ -184,7 +189,12 @@ class TSVFormat(FormatHandler):
         if include_speaker:
             lines.append("speaker\tstart\tend\ttext")
             for sup in supervisions:
-                speaker = sup.speaker or ""
+                # Check if speaker should be included
+                include_this_speaker = True
+                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
+                    include_this_speaker = False
+
+                speaker = sup.speaker if include_this_speaker and sup.speaker else ""
                 start_ms = round(1000 * sup.start)
                 end_ms = round(1000 * sup.end)
                 text = sup.text.strip().replace("\t", " ")
@@ -273,7 +283,7 @@ class AUDFormat(FormatHandler):
         lines = []
         for sup in supervisions:
             text = sup.text.strip().replace("\t", " ")
-            if include_speaker and sup.speaker:
+            if cls._should_include_speaker(sup, include_speaker):
                 text = f"[[{sup.speaker}]]{text}"
             lines.append(f"{sup.start}\t{sup.end}\t{text}")
 
@@ -332,7 +342,13 @@ class TXTFormat(FormatHandler):
         for sup in supervisions:
             text = sup.text or ""
             if include_speaker and sup.speaker:
-                text = f"[{sup.speaker}]: {text}"
+                # Check if speaker should be included
+                include_this_speaker = True
+                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
+                    include_this_speaker = False
+
+                if include_this_speaker:
+                    text = f"[{sup.speaker}]: {text}"
             lines.append(f"[{sup.start:.2f}-{sup.end:.2f}] {text}")
 
         return "\n".join(lines).encode("utf-8")

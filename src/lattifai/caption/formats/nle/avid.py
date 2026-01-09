@@ -195,7 +195,14 @@ class AvidDSWriter:
 
             # Prepare text
             text = sup.text.strip() if sup.text else ""
-            if config.include_speaker and sup.speaker:
+
+            # Check if speaker should be included
+            include_this_speaker = config.include_speaker and sup.speaker
+            if include_this_speaker and hasattr(sup, "custom") and sup.custom:
+                if not sup.custom.get("original_speaker", True):
+                    include_this_speaker = False
+
+            if include_this_speaker:
                 text = f"{sup.speaker}: {text}"
 
             # Wrap text to max line length
@@ -236,7 +243,14 @@ class AvidDSWriter:
             end_tc = cls.seconds_to_timecode(sup.end, config.fps, config.drop_frame)
 
             text = sup.text.strip() if sup.text else ""
-            if config.include_speaker and sup.speaker:
+
+            # Check if speaker should be included
+            include_this_speaker = config.include_speaker and sup.speaker
+            if include_this_speaker and hasattr(sup, "custom") and sup.custom:
+                if not sup.custom.get("original_speaker", True):
+                    include_this_speaker = False
+
+            if include_this_speaker:
                 text = f"{sup.speaker}: {text}"
 
             wrapped_lines = cls.wrap_text(text, config.max_line_length)

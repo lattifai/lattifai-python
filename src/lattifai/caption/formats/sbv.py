@@ -132,7 +132,13 @@ class SBVFormat(FormatHandler):
 
             text = sup.text.strip() if sup.text else ""
             if include_speaker and sup.speaker:
-                text = f"{sup.speaker}: {text}"
+                # Check if speaker should be included
+                include_this_speaker = True
+                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
+                    include_this_speaker = False
+
+                if include_this_speaker:
+                    text = f"{sup.speaker}: {text}"
             lines.append(text)
 
             if i < len(supervisions) - 1:

@@ -76,7 +76,13 @@ class TextGridFormat(FormatHandler):
         for sup in sorted(supervisions, key=lambda x: x.start):
             text = sup.text or ""
             if include_speaker and sup.speaker:
-                text = f"{sup.speaker} {text}"
+                # Check if speaker should be included
+                include_this_speaker = True
+                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
+                    include_this_speaker = False
+
+                if include_this_speaker:
+                    text = f"{sup.speaker} {text}"
 
             utterances.append(Interval(sup.start, sup.end, text))
 

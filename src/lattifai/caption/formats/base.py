@@ -136,6 +136,20 @@ class FormatWriter(ABC):
         """
         pass
 
+    @classmethod
+    def _should_include_speaker(cls, sup: Any, include_speaker: bool) -> bool:
+        """Check if speaker should be included in output text.
+
+        Considers both the global include_speaker flag and the segment-level
+        'original_speaker' flag in custom metadata.
+        """
+        if not include_speaker or not getattr(sup, "speaker", None):
+            return False
+        custom = getattr(sup, "custom", None)
+        if custom and not custom.get("original_speaker", True):
+            return False
+        return True
+
 
 class FormatHandler(FormatReader, FormatWriter):
     """Combined reader and writer for formats that support both.

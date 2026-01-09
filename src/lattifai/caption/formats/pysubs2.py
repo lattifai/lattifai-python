@@ -87,20 +87,33 @@ class Pysubs2Format(FormatHandler):
         subs = pysubs2.SSAFile()
 
         for sup in supervisions:
-            text = sup.text or ""
-            if include_speaker and sup.speaker:
-                # Check if speaker was originally in text
-                if not (hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True)):
-                    text = f"{sup.speaker}: {text}"
+            # Extract word-level alignment if present
+            alignment = getattr(sup, "alignment", None)
+            word_items = alignment.get("word") if alignment else None
 
-            subs.append(
-                pysubs2.SSAEvent(
-                    start=int(sup.start * 1000),
-                    end=int(sup.end * 1000),
-                    text=text,
-                    name=sup.speaker or "",
+            if word_items:
+                for word in word_items:
+                    subs.append(
+                        pysubs2.SSAEvent(
+                            start=int(word.start * 1000),
+                            end=int(word.end * 1000),
+                            text=word.symbol,
+                            name=sup.speaker if cls._should_include_speaker(sup, include_speaker) else "",
+                        )
+                    )
+            else:
+                text = sup.text or ""
+                if cls._should_include_speaker(sup, include_speaker):
+                    text = f"{sup.speaker} {text}"
+
+                subs.append(
+                    pysubs2.SSAEvent(
+                        start=int(sup.start * 1000),
+                        end=int(sup.end * 1000),
+                        text=text,
+                        name=sup.speaker if cls._should_include_speaker(sup, include_speaker) else "",
+                    )
                 )
-            )
 
         # MicroDVD format requires framerate
         if cls.pysubs2_format == "microdvd":

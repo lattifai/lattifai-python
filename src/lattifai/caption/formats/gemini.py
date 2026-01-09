@@ -651,7 +651,7 @@ class GeminiFormat(FormatHandler):
     @classmethod
     def read(cls, path: Pathlike, **kwargs) -> List[Supervision]:
         """Read Gemini format file."""
-        return GeminiReader.read(path, **kwargs)
+        return GeminiReader.extract_for_alignment(path, **kwargs)
 
     @classmethod
     def write(

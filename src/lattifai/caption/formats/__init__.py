@@ -146,7 +146,7 @@ def detect_format(path: str) -> Optional[str]:
 # Import all format modules to trigger registration
 # Standard formats
 from . import gemini  # YouTube/Gemini markdown
-from . import pysubs2_formats  # SRT, VTT, ASS, SSA, SUB, SAMI
+from . import pysubs2  # SRT, VTT, ASS, SSA, SUB, SAMI
 from . import sbv  # SubViewer
 from . import tabular  # CSV, TSV, AUD, TXT, JSON
 from . import textgrid  # Praat TextGrid

@@ -93,7 +93,9 @@ class TTMLFormatBase(FormatWriter):
         return region_elem
 
     @classmethod
-    def _build_ttml(cls, supervisions: List[Supervision], config: TTMLConfig) -> ET.Element:
+    def _build_ttml(
+        cls, supervisions: List[Supervision], config: TTMLConfig, include_speaker: bool = True
+    ) -> ET.Element:
         """Build TTML document structure."""
         ET.register_namespace("", TTML_NS)
         ET.register_namespace("tts", TTML_STYLE_NS)
@@ -151,7 +153,9 @@ class TTMLFormatBase(FormatWriter):
             else:
                 p.set("style", "default")
 
-            if sup.speaker and config.profile != "basic":
+            include_this_speaker = cls._should_include_speaker(sup, include_speaker)
+
+            if include_this_speaker and config.profile != "basic":
                 span = ET.SubElement(p, f"{{{TTML_NS}}}span")
                 span.set(f"{{{TTML_STYLE_NS}}}fontWeight", "bold")
                 span.text = f"{sup.speaker}: "
@@ -195,7 +199,7 @@ class TTMLFormat(TTMLFormatBase):
         if output_path.suffix.lower() not in [".ttml", ".xml"]:
             output_path = output_path.with_suffix(".ttml")
 
-        root = cls._build_ttml(supervisions, config)
+        root = cls._build_ttml(supervisions, config, include_speaker=include_speaker)
         xml_content = cls._prettify_xml(root)
 
         output_path.write_text(xml_content, encoding="utf-8")
@@ -213,7 +217,7 @@ class TTMLFormat(TTMLFormatBase):
         if config is None:
             config = TTMLConfig()
 
-        root = cls._build_ttml(supervisions, config)
+        root = cls._build_ttml(supervisions, config, include_speaker=include_speaker)
         xml_content = cls._prettify_xml(root)
         return xml_content.encode("utf-8")
 
