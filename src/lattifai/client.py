@@ -117,6 +117,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
 
+            # Ensure word_level is synchronized with config
+            caption.word_level = self.caption_config.word_level
+
             output_caption_path = output_caption_path or self.caption_config.output_path
 
             # Step 2: Check if segmented alignment is needed

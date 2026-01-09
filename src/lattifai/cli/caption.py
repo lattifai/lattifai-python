@@ -16,6 +16,7 @@ def convert(
     output_path: Pathlike,
     include_speaker_in_text: bool = False,
     normalize_text: bool = False,
+    word_level: bool = False,
 ):
     """
     Convert caption file to another format.
@@ -33,6 +34,7 @@ def convert(
         normalize_text: Whether to normalize caption text during conversion.
             This applies text cleaning such as removing HTML tags, decoding entities,
             collapsing whitespace, and standardizing punctuation.
+        word_level: Use word-level output format if supported (e.g., YouTube VTT for .vtt output).
 
     Examples:
         # Basic format conversion (positional arguments)
@@ -40,6 +42,9 @@ def convert(
 
         # Convert with text normalization
         lai caption convert input.srt output.json normalize_text=true
+
+        # Convert to YouTube VTT with word-level timestamps (if input has alignment)
+        lai caption convert input.json output.vtt word_level=true
 
         # Mixing positional and keyword arguments
         lai caption convert input.srt output.vtt \\
@@ -54,6 +59,7 @@ def convert(
     from lattifai.caption import Caption
 
     caption = Caption.read(input_path, normalize_text=normalize_text)
+    caption.word_level = word_level
     caption.write(output_path, include_speaker_in_text=include_speaker_in_text)
 
     safe_print(f"✅ Converted {input_path} -> {output_path}")
