@@ -13,9 +13,9 @@ from lhotse.utils import Pathlike
 from tgt import TextGrid
 
 from ..config.caption import InputCaptionFormat, OutputCaptionFormat  # noqa: F401
+from .parsers.text_parser import normalize_text as normalize_text_fn
+from .parsers.text_parser import parse_speaker_text, parse_timestamp_text
 from .supervision import Supervision
-from .text_parser import normalize_text as normalize_text_fn
-from .text_parser import parse_speaker_text, parse_timestamp_text
 
 DiarizationOutput = TypeVar("DiarizationOutput")
 
@@ -494,7 +494,7 @@ class Caption:
             return content
 
         # Handle file path (existing logic)
-        return self._write_caption(alignments, path, include_speaker_in_text)
+        return self._write_caption(alignments, path, include_speaker_in_text, output_format)
 
     def read_speaker_diarization(
         self,
@@ -658,6 +658,57 @@ class Caption:
 
             return "\n".join(lines).encode("utf-8")
 
+        # Handle Avid DS format
+        elif output_format == "avid_ds":
+            from .formats.nle.avid import AvidDSConfig, AvidDSWriter
+
+            config = AvidDSConfig(include_speaker=include_speaker_in_text)
+            return AvidDSWriter.to_bytes(alignments, config)
+
+        # Handle FCPXML format
+        elif output_format == "fcpxml":
+            from .formats.nle.fcpxml import FCPXMLConfig, FCPXMLWriter
+
+            config = FCPXMLConfig()
+            return FCPXMLWriter.to_bytes(alignments, config)
+
+        # Handle Premiere Pro XML format
+        elif output_format == "premiere_xml":
+            from .formats.nle.premiere import PremiereXMLConfig, PremiereXMLWriter
+
+            config = PremiereXMLConfig()
+            return PremiereXMLWriter.to_bytes(alignments, config)
+
+        # Handle Adobe Audition CSV format
+        elif output_format == "audition_csv":
+            from .formats.nle.audition import AuditionCSVConfig, AuditionCSVWriter
+
+            config = AuditionCSVConfig(include_speaker_in_name=include_speaker_in_text)
+            return AuditionCSVWriter.to_bytes(alignments, config)
+
+        # Handle EdiMarker CSV format (Pro Tools)
+        elif output_format == "edimarker_csv":
+            from .formats.nle.audition import EdiMarkerConfig, EdiMarkerWriter
+
+            config = EdiMarkerConfig(include_speaker=include_speaker_in_text)
+            return EdiMarkerWriter.to_bytes(alignments, config)
+
+        # Handle IMSC1 TTML format
+        elif output_format == "imsc1":
+            from .formats.ttml import TTMLConfig
+            from .formats.ttml import TTMLFormat as TTMLWriter
+
+            config = TTMLConfig(profile="imsc1")
+            return TTMLWriter.to_bytes(alignments, config)
+
+        # Handle EBU-TT-D TTML format
+        elif output_format == "ebu_tt_d":
+            from .formats.ttml import TTMLConfig
+            from .formats.ttml import TTMLFormat as TTMLWriter
+
+            config = TTMLConfig(profile="ebu-tt-d")
+            return TTMLWriter.to_bytes(alignments, config)
+
         # Handle pysubs2 formats (srt, vtt, ass, ssa, ttml, json)
         else:
             import pysubs2
@@ -724,6 +775,7 @@ class Caption:
         alignments: List[Supervision],
         output_path: Pathlike,
         include_speaker_in_text: bool = True,
+        output_format: Optional[str] = None,
     ) -> Pathlike:
         """
         Write caption to file in various formats.
@@ -732,11 +784,13 @@ class Caption:
             alignments: List of supervision segments to write
             output_path: Path to output file
             include_speaker_in_text: Whether to include speaker in text
+            output_format: Explicit output format (overrides file extension detection)
 
         Returns:
             Path to written file
         """
-        ext = cls._get_file_extension(output_path)
+        # Use explicit format if provided, otherwise detect from extension
+        ext = output_format.lower() if output_format else cls._get_file_extension(output_path)
 
         if ext == "txt":
             with open(output_path, "w", encoding="utf-8") as f:
@@ -765,6 +819,44 @@ class Caption:
             cls._write_aud(alignments, output_path, include_speaker_in_text)
         elif ext == "sbv":
             cls._write_sbv(alignments, output_path, include_speaker_in_text)
+        # Handle professional NLE formats
+        elif ext == "avid_ds" or str(output_path).endswith("_avid.txt"):
+            from .formats.nle.avid import AvidDSConfig, AvidDSWriter
+
+            config = AvidDSConfig(include_speaker=include_speaker_in_text)
+            AvidDSWriter.write(alignments, output_path, config)
+        elif ext == "fcpxml" or ext == "fcpxmld":
+            from .formats.nle.fcpxml import FCPXMLConfig, FCPXMLWriter
+
+            config = FCPXMLConfig()
+            FCPXMLWriter.write(alignments, output_path, config)
+        elif ext == "premiere_xml" or (ext == "xml" and "premiere" in str(output_path).lower()):
+            from .formats.nle.premiere import PremiereXMLConfig, PremiereXMLWriter
+
+            config = PremiereXMLConfig()
+            PremiereXMLWriter.write(alignments, output_path, config)
+        elif ext == "audition_csv" or (ext == "csv" and "audition" in str(output_path).lower()):
+            from .formats.nle.audition import AuditionCSVConfig, AuditionCSVWriter
+
+            config = AuditionCSVConfig(include_speaker_in_name=include_speaker_in_text)
+            AuditionCSVWriter.write(alignments, output_path, config)
+        elif ext == "edimarker_csv" or (ext == "csv" and "edimarker" in str(output_path).lower()):
+            from .formats.nle.audition import EdiMarkerConfig, EdiMarkerWriter
+
+            config = EdiMarkerConfig(include_speaker=include_speaker_in_text)
+            EdiMarkerWriter.write(alignments, output_path, config)
+        elif ext == "imsc1" or (ext == "ttml" and "imsc" in str(output_path).lower()):
+            from .formats.ttml import TTMLConfig
+            from .formats.ttml import TTMLFormat as TTMLWriter
+
+            config = TTMLConfig(profile="imsc1")
+            TTMLWriter.write(alignments, output_path, config)
+        elif ext == "ebu_tt_d" or (ext == "ttml" and "ebu" in str(output_path).lower()):
+            from .formats.ttml import TTMLConfig
+            from .formats.ttml import TTMLFormat as TTMLWriter
+
+            config = TTMLConfig(profile="ebu-tt-d")
+            TTMLWriter.write(alignments, output_path, config)
         else:
             import pysubs2
 
@@ -1109,7 +1201,7 @@ class Caption:
             is_gemini_format = format == "gemini"
 
         if is_gemini_format:
-            from .gemini_reader import GeminiReader
+            from .formats.gemini import GeminiReader
 
             supervisions = GeminiReader.extract_for_alignment(caption)
         elif format == "textgrid" or (not is_string_content and cls._get_file_extension(caption) == "textgrid"):
@@ -1174,7 +1266,7 @@ class Caption:
                 supervisions = cls._parse_caption(caption, format=format, normalize_text=normalize_text)
             except Exception as e:
                 print(f"Failed to parse caption with Format: {format}, Exception: {e}, trying 'gemini' parser.")
-                from .gemini_reader import GeminiReader
+                from .formats.gemini import GeminiReader
 
                 supervisions = GeminiReader.extract_for_alignment(caption)
 

@@ -13,15 +13,54 @@ CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "md", "ttml"
 INPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "auto", "gemini"]
 
 # Output caption formats (includes special formats like 'TextGrid' and 'json')
-OUTPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "TextGrid", "json"]
+OUTPUT_CAPTION_FORMATS = [
+    "srt",
+    "vtt",
+    "ass",
+    "ssa",
+    "sub",
+    "sbv",
+    "txt",
+    "ttml",
+    "sami",
+    "smi",
+    "TextGrid",
+    "json",
+    # Professional NLE formats
+    "avid_ds",  # Avid Media Composer SubCap format
+    "fcpxml",  # Final Cut Pro XML
+    "premiere_xml",  # Adobe Premiere Pro XML (graphic clips)
+    "audition_csv",  # Adobe Audition markers
+    "edimarker_csv",  # Pro Tools (via EdiMarker) markers
+    "imsc1",  # IMSC1 (Netflix/streaming) TTML profile
+    "ebu_tt_d",  # EBU-TT-D (European broadcast) TTML profile
+]
 
 # All caption formats combined (for file detection)
-ALL_CAPTION_FORMATS = list(set(CAPTION_FORMATS + ["TextGrid", "json", "gemini"]))
+ALL_CAPTION_FORMATS = list(set(CAPTION_FORMATS + ["TextGrid", "json", "gemini", "avid_ds", "fcpxml"]))
 
 # Type aliases for better type hints
 InputCaptionFormat = Literal["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "gemini"]
 OutputCaptionFormat = Literal[
-    "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "TextGrid", "json"
+    "srt",
+    "vtt",
+    "ass",
+    "ssa",
+    "sub",
+    "sbv",
+    "txt",
+    "ttml",
+    "sami",
+    "smi",
+    "TextGrid",
+    "json",
+    "avid_ds",
+    "fcpxml",
+    "premiere_xml",
+    "audition_csv",
+    "edimarker_csv",
+    "imsc1",
+    "ebu_tt_d",
 ]
 
 
