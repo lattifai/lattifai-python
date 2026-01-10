@@ -96,11 +96,17 @@ class YouTubeVTTFormat(FormatHandler):
             seconds = float(parts[2])
             return hours * 3600 + minutes * 60 + seconds
 
+        def has_word_timestamps(text: str) -> bool:
+            """Check if text contains word-level timestamps."""
+            return bool(word_timestamp_pattern.search(text) or first_word_pattern.match(text))
+
         lines = content.split("\n")
         i = 0
-        while i < len(lines):
-            line = lines[i].strip()
 
+        # First pass: collect all cues with their content
+        all_cues = []
+        while i < len(lines):
+            line = lines[i]
             ts_match = timestamp_pattern.search(line)
             if ts_match:
                 cue_start = parse_timestamp(ts_match.group(1))
@@ -108,108 +114,147 @@ class YouTubeVTTFormat(FormatHandler):
 
                 cue_lines = []
                 i += 1
-                while i < len(lines) and lines[i].strip() and not timestamp_pattern.search(lines[i]):
-                    cue_lines.append(lines[i])
+                # Collect all lines until next timestamp or empty line after stripping
+                while i < len(lines):
+                    if timestamp_pattern.search(lines[i]):
+                        break
+                    stripped = lines[i].strip()
+                    if not stripped and cue_lines and not lines[i - 1].strip():
+                        # Two consecutive empty lines mark end of cue
+                        break
+                    if stripped:  # Only add non-empty lines
+                        cue_lines.append(lines[i])
                     i += 1
 
-                for cue_line in cue_lines:
-                    cue_line = cue_line.strip()
-                    if not cue_line:
-                        continue
-
-                    # Check for word-level timestamps
-                    word_matches = word_timestamp_pattern.findall(cue_line)
-                    if word_matches:
-                        word_alignments = []
-
-                        # Get first word
-                        first_match = first_word_pattern.match(cue_line)
-                        if first_match:
-                            first_word = first_match.group(1).strip()
-                            first_word_next_ts = parse_timestamp(first_match.group(2))
-                            if first_word:
-                                word_alignments.append(
-                                    AlignmentItem(
-                                        symbol=first_word,
-                                        start=cue_start,
-                                        duration=max(0.01, first_word_next_ts - cue_start),
-                                    )
-                                )
-
-                        # Process remaining words
-                        for idx, (ts, word) in enumerate(word_matches):
-                            word_start = parse_timestamp(ts)
-                            word = word.strip()
-                            if not word:
-                                continue
-
-                            if idx + 1 < len(word_matches):
-                                next_ts = parse_timestamp(word_matches[idx + 1][0])
-                                duration = next_ts - word_start
-                            else:
-                                duration = cue_end - word_start
-
-                            word_alignments.append(
-                                AlignmentItem(
-                                    symbol=word,
-                                    start=word_start,
-                                    duration=max(0.01, duration),
-                                )
-                            )
-
-                        if word_alignments:
-                            full_text = " ".join(item.symbol for item in word_alignments)
-                            if normalize_text:
-                                full_text = normalize_text_fn(full_text)
-
-                            sup_start = word_alignments[0].start
-                            sup_end = word_alignments[-1].start + word_alignments[-1].duration
-
-                            supervisions.append(
-                                Supervision(
-                                    text=full_text,
-                                    start=sup_start,
-                                    duration=max(0.0, sup_end - sup_start),
-                                    alignment={"word": word_alignments},
-                                )
-                            )
+                all_cues.append({"start": cue_start, "end": cue_end, "lines": cue_lines})
                 continue
             i += 1
 
-        return cls._merge_supervisions(supervisions)
+        # Second pass: identify cues to skip and cues to merge
+        # Skip 0.010-duration cues without word timestamps if next cue starts at same time
+        # Merge plain text cues that follow a skipped 0.010s cue with the previous cue
+        cues_to_skip = set()
+        cues_to_merge_text = {}  # Maps cue index to text to append
 
-    @classmethod
-    def _merge_supervisions(cls, supervisions: List[Supervision]) -> List[Supervision]:
-        """Merge consecutive YouTube VTT supervisions into complete utterances."""
-        if not supervisions:
-            return supervisions
+        for idx in range(len(all_cues) - 1):
+            cue = all_cues[idx]
+            duration = cue["end"] - cue["start"]
 
-        merged = []
-        current = supervisions[0]
+            # Check if duration is 0.010 seconds and has no word timestamps
+            if abs(duration - 0.010) < 0.001:
+                cue_text = "\n".join(cue["lines"])
+                if not has_word_timestamps(cue_text):
+                    # Check if next cue starts at same time as this one ends
+                    next_cue = all_cues[idx + 1]
+                    if abs(next_cue["start"] - cue["end"]) < 0.001:
+                        cues_to_skip.add(idx)
 
-        for next_sup in supervisions[1:]:
-            gap = next_sup.start - (current.start + current.duration)
+                        # Check if next cue has plain text that should be merged
+                        next_cue_text = "\n".join(next_cue["lines"])
+                        if not has_word_timestamps(next_cue_text):
+                            # Find the last non-skipped cue before this one
+                            for prev_idx in range(idx - 1, -1, -1):
+                                if prev_idx not in cues_to_skip:
+                                    # Extract last line from next cue (skip context line)
+                                    if len(next_cue["lines"]) > 1:
+                                        append_text = next_cue["lines"][-1].strip()
+                                        if append_text:
+                                            cues_to_merge_text[prev_idx] = append_text
+                                    cues_to_skip.add(idx + 1)
+                                    break
 
-            if gap < 0.5 and current.alignment and next_sup.alignment:
-                current_words = current.alignment.get("word", [])
-                next_words = next_sup.alignment.get("word", [])
-                merged_words = list(current_words) + list(next_words)
+        # Third pass: process remaining cues
+        for idx, cue in enumerate(all_cues):
+            if idx in cues_to_skip:
+                continue
 
-                merged_text = current.text + " " + next_sup.text
-                merged_end = next_sup.start + next_sup.duration
+            cue_start = cue["start"]
+            cue_end = cue["end"]
+            cue_lines = cue["lines"]
 
-                current = Supervision(
-                    text=merged_text,
-                    start=current.start,
-                    duration=max(0.0, merged_end - current.start),
-                    alignment={"word": merged_words},
-                )
+            # Collect text with word timestamps only
+            word_alignments = []
+            text_parts = []
+
+            for cue_line in cue_lines:
+                cue_line = cue_line.strip()
+                if not cue_line:
+                    continue
+
+                # Check for word-level timestamps
+                word_matches = word_timestamp_pattern.findall(cue_line)
+                first_match = first_word_pattern.match(cue_line)
+
+                if word_matches or first_match:
+                    # Line has word-level timestamps, extract them
+
+                    # Get first word
+                    if first_match:
+                        first_word = first_match.group(1).strip()
+                        first_word_next_ts = parse_timestamp(first_match.group(2))
+                        if first_word:
+                            text_parts.append(first_word)
+                            word_alignments.append(
+                                AlignmentItem(
+                                    symbol=first_word,
+                                    start=cue_start,
+                                    duration=max(0.01, first_word_next_ts - cue_start),
+                                )
+                            )
+
+                    # Process remaining words
+                    for word_idx, (ts, word) in enumerate(word_matches):
+                        word_start = parse_timestamp(ts)
+                        word = word.strip()
+                        if not word:
+                            continue
+
+                        text_parts.append(word)
+
+                        if word_idx + 1 < len(word_matches):
+                            next_ts = parse_timestamp(word_matches[word_idx + 1][0])
+                            duration = next_ts - word_start
+                        else:
+                            duration = cue_end - word_start
+
+                        word_alignments.append(
+                            AlignmentItem(
+                                symbol=word,
+                                start=word_start,
+                                duration=max(0.01, duration),
+                            )
+                        )
+
+            # Skip if no text extracted
+            if not text_parts:
+                continue
+
+            # Add merged text if applicable
+            full_text = " ".join(text_parts)
+            if idx in cues_to_merge_text:
+                full_text += " " + cues_to_merge_text[idx]
+
+            if normalize_text:
+                full_text = normalize_text_fn(full_text)
+
+            # Use word alignment times if available, otherwise use cue times
+            if word_alignments:
+                sup_start = word_alignments[0].start
+                sup_end = word_alignments[-1].start + word_alignments[-1].duration
             else:
-                merged.append(current)
-                current = next_sup
+                sup_start = cue_start
+                sup_end = cue_end
 
-        merged.append(current)
-        return merged
+            supervisions.append(
+                Supervision(
+                    text=full_text,
+                    start=sup_start,
+                    duration=max(0.0, sup_end - sup_start),
+                    alignment={"word": word_alignments} if word_alignments else None,
+                )
+            )
+
+        return supervisions
 
     @classmethod
     def write(

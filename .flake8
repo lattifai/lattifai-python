@@ -20,3 +20,4 @@ exclude =
   .git,
   setup.py,
   app/
+  tests/data/captions/*.vtt
