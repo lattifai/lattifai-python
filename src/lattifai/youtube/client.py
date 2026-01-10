@@ -1,37 +1,234 @@
 """
-YouTube media and caption downloader using yt-dlp
+YouTube client for metadata extraction and media download using yt-dlp
 """
 
 import asyncio
+import logging
 import os
 import re
-import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+try:
+    import yt_dlp
+except ImportError:
+    yt_dlp = None
+
 from ..config.caption import CAPTION_FORMATS
+from ..errors import LattifAIError
 from ..workflow.base import setup_workflow_logger
 from ..workflow.file_manager import TRANSCRIBE_CHOICE, FileExistenceManager
+from .types import CaptionTrack, VideoMetadata
+
+logger = logging.getLogger(__name__)
+
+
+class YouTubeError(LattifAIError):
+    """Base error for YouTube operations"""
+
+    pass
+
+
+class VideoUnavailableError(YouTubeError):
+    """Video is not available (private, deleted, etc)"""
+
+    pass
+
+
+class YoutubeLoader:
+    """Lightweight YouTube metadata and caption content loader
+
+    Use this class when you need to:
+    - Fetch video metadata quickly
+    - Get caption content in memory (not save to disk)
+    - Support proxy and cookies configuration
+    """
+
+    def __init__(self, proxy: Optional[str] = None, cookies: Optional[str] = None):
+        if yt_dlp is None:
+            raise ImportError("yt-dlp is required. Install with `pip install yt-dlp`")
+
+        self.proxy = proxy
+        self.cookies = cookies
+
+        # Base configuration for metadata extraction
+        self._base_opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": False,  # Need full info for captions
+            "youtube_include_dash_manifest": False,
+            "youtube_include_hls_manifest": False,
+        }
+
+        if self.proxy:
+            self._base_opts["proxy"] = self.proxy
+
+        if self.cookies:
+            self._base_opts["cookiefile"] = self.cookies
+
+        # Strategy: Prefer Android client to avoid PO Token issues on Web
+        # But for captions, sometimes Web is needed.
+        # We start with a robust default.
+        self._base_opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
+
+    def get_video_info(self, video_id: str) -> Dict[str, Any]:
+        """
+        Fetch basic video metadata and list of available captions.
+        Returns a dict with 'metadata' (VideoMetadata) and 'captions' (List[CaptionTrack]).
+        """
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        opts = {
+            **self._base_opts,
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                # Parse metadata
+                metadata = VideoMetadata(
+                    video_id=info.get("id", video_id),
+                    title=info.get("title", "Unknown"),
+                    description=info.get("description", ""),
+                    duration=float(info.get("duration", 0)),
+                    thumbnail_url=info.get("thumbnail", ""),
+                    channel_name=info.get("uploader", "Unknown"),
+                    view_count=info.get("view_count", 0),
+                    upload_date=info.get("upload_date"),
+                )
+
+                # Parse captions
+                tracks: List[CaptionTrack] = []
+
+                # Manual captions
+                subtitles = info.get("subtitles", {})
+                for lang, formats in subtitles.items():
+                    for fmt in formats:
+                        tracks.append(
+                            CaptionTrack(
+                                language_code=lang,
+                                language_name=self._get_lang_name(formats),
+                                kind="manual",
+                                ext=fmt.get("ext", ""),
+                                url=fmt.get("url"),
+                            )
+                        )
+
+                # Auto captions
+                auto_subs = info.get("automatic_captions", {})
+                for lang, formats in auto_subs.items():
+                    for fmt in formats:
+                        tracks.append(
+                            CaptionTrack(
+                                language_code=lang,
+                                language_name=self._get_lang_name(formats),
+                                kind="asr",
+                                ext=fmt.get("ext", ""),
+                                url=fmt.get("url"),
+                            )
+                        )
+
+                return {"metadata": metadata, "captions": tracks}
+
+        except yt_dlp.utils.DownloadError as e:
+            msg = str(e)
+            if "Sign in to confirm" in msg or "Private video" in msg:
+                raise VideoUnavailableError(f"Video {video_id} is unavailable: {msg}")
+            raise YouTubeError(f"yt-dlp failed: {msg}") from e
+        except Exception as e:
+            raise YouTubeError(f"Unexpected error: {str(e)}") from e
+
+    def get_caption(self, video_id: str, lang: str = "en") -> Dict[str, str]:
+        """
+        Fetch transcript for a specific language.
+        Returns a dict with 'content' (raw string) and 'fmt' (format extension).
+        """
+        url = f"https://www.youtube.com/watch?v={video_id}"
+
+        # We need to download json3 or vtt to parse.
+        # Ideally we want json3 for precision, but yt-dlp prefers vtt/srv3
+
+        opts = {
+            **self._base_opts,
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitleslangs": [lang],
+            "skip_download": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                # Look for the requested language in subtitles or automatic_captions
+                subs = info.get("subtitles", {}).get(lang)
+                if not subs:
+                    subs = info.get("automatic_captions", {}).get(lang)
+
+                if not subs:
+                    raise YouTubeError(f"No captions found for language: {lang}")
+
+                # Sort to find best format (json3 > vtt > ttml > srv3)
+                best_fmt = self._find_best_format(subs)
+                if not best_fmt or not best_fmt.get("url"):
+                    raise YouTubeError("Could not find a download URL for captions")
+
+                caption_url = best_fmt["url"]
+                ext = best_fmt.get("ext")
+                content = self._fetch_caption(caption_url)
+
+                return {"content": content, "fmt": ext}
+
+        except Exception as e:
+            raise YouTubeError(f"Failed to fetch transcript: {str(e)}") from e
+
+    def _get_lang_name(self, formats: List[Dict]) -> str:
+        if formats and "name" in formats[0]:
+            return formats[0]["name"]
+        return "Unknown"
+
+    def _find_best_format(self, formats: List[Dict]) -> Optional[Dict]:
+        # Prefer json3, then vtt
+        priority = ["json3", "vtt", "ttml", "srv3", "srv2", "srv1"]
+
+        for fmt_ext in priority:
+            for f in formats:
+                if f.get("ext") == fmt_ext:
+                    return f
+        return formats[0] if formats else None
+
+    def _fetch_caption(self, url: str) -> str:
+        import requests
+
+        try:
+            resp = requests.get(url, proxies={"https": self.proxy} if self.proxy else None)
+            resp.raise_for_status()
+            return resp.text
+        except Exception as e:
+            logger.error(f"Error fetching caption: {e}")
+            raise YouTubeError("Failed to fetch caption content") from e
 
 
 class YouTubeDownloader:
-    """YouTube video/audio downloader using yt-dlp
+    """YouTube media and caption file downloader using yt-dlp
 
-    Configuration (in __init__):
-        - None (stateless downloader)
-
-    Runtime parameters (in __call__ or methods):
-        - url: YouTube URL to download
-        - output_dir: Where to save files
-        - media_format: Format to download (mp3, mp4, etc.)
-        - force_overwrite: Whether to overwrite existing files
+    Use this class when you need to:
+    - Download audio/video files to disk
+    - Download caption files to disk
+    - Manage file existence and overwrite options
+    - Async download support
     """
 
     def __init__(self):
+        if yt_dlp is None:
+            raise ImportError("yt-dlp is required. Install with `pip install yt-dlp`")
+
         self.logger = setup_workflow_logger("youtube")
-        # Check if yt-dlp is available
-        self._check_ytdlp()
+        self.logger.info(f"yt-dlp version: {yt_dlp.version.__version__}")
 
     @staticmethod
     def extract_video_id(url: str) -> str:
@@ -59,32 +256,25 @@ class YouTubeDownloader:
                 return match.group(1)
         return "youtube_media"
 
-    def _check_ytdlp(self):
-        """Check if yt-dlp is installed"""
-        try:
-            result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, check=True)
-            self.logger.info(f"yt-dlp version: {result.stdout.strip()}")
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            raise RuntimeError(
-                "yt-dlp is not installed or not found in PATH. Please install it with: pip install yt-dlp"
-            )
-
     async def get_video_info(self, url: str) -> Dict[str, Any]:
         """Get video metadata without downloading"""
         self.logger.info(f"🔍 Extracting video info for: {url}")
 
-        cmd = ["yt-dlp", "--dump-json", "--no-download", url]
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+        }
 
         try:
             # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
-            )
 
-            import json
+            def _extract_info():
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    return ydl.extract_info(url, download=False)
 
-            metadata = json.loads(result.stdout)
+            metadata = await loop.run_in_executor(None, _extract_info)
 
             # Extract relevant info
             info = {
@@ -101,12 +291,12 @@ class YouTubeDownloader:
             self.logger.info(f'✅ Video info extracted: {info["title"]}')
             return info
 
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to extract video info: {e.stderr}")
-            raise RuntimeError(f"Failed to extract video info: {e.stderr}")
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse video metadata: {e}")
-            raise RuntimeError(f"Failed to parse video metadata: {e}")
+        except yt_dlp.utils.DownloadError as e:
+            self.logger.error(f"Failed to extract video info: {str(e)}")
+            raise RuntimeError(f"Failed to extract video info: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Failed to parse video metadata: {str(e)}")
+            raise RuntimeError(f"Failed to parse video metadata: {str(e)}")
 
     async def download_media(
         self,
@@ -125,7 +315,7 @@ class YouTubeDownloader:
             url: YouTube URL
             output_dir: Output directory (default: temp directory)
             media_format: Media format - audio (mp3, wav, m4a, aac, opus, ogg, flac, aiff)
-                         or video (mp4, webm, mkv, avi, mov, etc.) (default: instance format)
+                         or video (mp4, webm, mkv, avi, mov, etc.) (default: mp3)
             force_overwrite: Skip user confirmation and overwrite existing files
 
         Returns:
@@ -198,7 +388,6 @@ class YouTubeDownloader:
                     pass
                 elif user_choice in existing_files["media"]:
                     # User selected a specific file
-                    # self.logger.info(f"✅ Using selected media file: {user_choice}")
                     return user_choice
                 else:
                     # Fallback: use first file
@@ -212,54 +401,43 @@ class YouTubeDownloader:
         # Generate output filename template
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
-        # Build yt-dlp command based on media type
+        # Build yt-dlp options based on media type
         if is_audio:
-            cmd = [
-                "yt-dlp",
-                "--extract-audio",
-                "--audio-format",
-                media_format,
-                "--audio-quality",
-                "0",  # Best quality
-                "--output",
-                output_template,
-                "--no-playlist",
-                url,
-            ]
+            opts = {
+                "format": "bestaudio/best",
+                "postprocessors": [
+                    {
+                        "key": "FFmpegExtractAudio",
+                        "preferredcodec": media_format,
+                        "preferredquality": "0",  # Best quality
+                    }
+                ],
+                "outtmpl": output_template,
+                "noplaylist": True,
+                "quiet": False,
+                "no_warnings": True,
+            }
         else:
-            cmd = [
-                "yt-dlp",
-                "--format",
-                "bestvideo*+bestaudio/best",
-                "--merge-output-format",
-                media_format,
-                "--output",
-                output_template,
-                "--no-playlist",
-                url,
-            ]
+            opts = {
+                "format": "bestvideo*+bestaudio/best",
+                "merge_output_format": media_format,
+                "outtmpl": output_template,
+                "noplaylist": True,
+                "quiet": False,
+                "no_warnings": True,
+            }
 
         try:
             # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
-            )
+
+            def _download():
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
+
+            await loop.run_in_executor(None, _download)
 
             self.logger.info(f"✅ {media_type.capitalize()} download completed")
-
-            # Find the downloaded file
-            # Try to parse from yt-dlp output first
-            if is_audio:
-                output_lines = result.stderr.strip().split("\n")
-                for line in reversed(output_lines):
-                    if "Destination:" in line or "has already been downloaded" in line:
-                        parts = line.split()
-                        filename = " ".join(parts[1:]) if "Destination:" in line else parts[0]
-                        file_path = target_dir / filename
-                        if file_path.exists():
-                            self.logger.info(f"{emoji} Downloaded {media_type} file: {file_path}")
-                            return str(file_path)
 
             # Check for expected file format
             expected_file = target_dir / f"{video_id}.{media_format}"
@@ -282,9 +460,12 @@ class YouTubeDownloader:
 
             raise RuntimeError(f"Downloaded {media_type} file not found")
 
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to download {media_type}: {e.stderr}")
-            raise RuntimeError(f"Failed to download {media_type}: {e.stderr}")
+        except yt_dlp.utils.DownloadError as e:
+            self.logger.error(f"Failed to download {media_type}: {str(e)}")
+            raise RuntimeError(f"Failed to download {media_type}: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Failed to download {media_type}: {str(e)}")
+            raise RuntimeError(f"Failed to download {media_type}: {str(e)}")
 
     async def download_audio(
         self,
@@ -400,39 +581,32 @@ class YouTubeDownloader:
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
         # Configure yt-dlp options for caption download
-        ytdlp_options = [
-            "yt-dlp",
-            "--skip-download",  # Don't download video/audio
-            "--output",
-            output_template,
-            "--sub-format",
-            "best",  # Prefer best available format
-            "--no-warnings",  # Suppress warnings for cleaner output
-            "--extractor-retries",
-            "3",  # Retry on errors
-            "--sleep-requests",
-            "1",  # Sleep between requests to avoid rate limiting
-        ]
+        opts = {
+            "skip_download": True,  # Don't download video/audio
+            "writesubtitles": True,
+            "writeautomaticsub": True,
+            "subtitlesformat": "best",
+            "outtmpl": output_template,
+            "quiet": False,
+            "no_warnings": True,
+        }
 
         # Add caption language selection if specified
         if source_lang:
-            ytdlp_options.extend(["--write-sub", "--write-auto-sub", "--sub-langs", f"{source_lang}*"])
-        else:
-            # Download only manual captions (not auto-generated) in English to avoid rate limiting
-            ytdlp_options.extend(["--write-sub", "--write-auto-sub"])
-
-        ytdlp_options.append(url)
+            opts["subtitleslangs"] = [f"{source_lang}*"]
 
         try:
             # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: subprocess.run(ytdlp_options, capture_output=True, text=True, check=True)
-            )
-            # Only log success message, not full yt-dlp output
-            self.logger.debug(f"yt-dlp output: {result.stdout.strip()}")
-        except subprocess.CalledProcessError as e:
-            error_msg = e.stderr.strip() if e.stderr else str(e)
+
+            def _download_subs():
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
+
+            await loop.run_in_executor(None, _download_subs)
+
+        except yt_dlp.utils.DownloadError as e:
+            error_msg = str(e)
 
             # Check for specific error conditions
             if "No automatic or manual captions found" in error_msg:
@@ -446,6 +620,8 @@ class YouTubeDownloader:
                 )
             else:
                 self.logger.error(f"Failed to download transcript: {error_msg}")
+        except Exception as e:
+            self.logger.error(f"Failed to download transcript: {str(e)}")
 
         # Find the downloaded transcript file
         caption_patterns = [
@@ -513,65 +689,49 @@ class YouTubeDownloader:
         """
         self.logger.info(f"📋 Listing available captions for: {url}")
 
-        cmd = ["yt-dlp", "--list-subs", "--no-download", url]
+        opts = {
+            "skip_download": True,
+            "listsubtitles": True,
+            "quiet": True,
+            "no_warnings": True,
+        }
 
         try:
             # Run in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None, lambda: subprocess.run(cmd, capture_output=True, text=True, check=True)
-            )
 
-            # Parse the caption list output
+            def _get_info():
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    return ydl.extract_info(url, download=False)
+
+            info = await loop.run_in_executor(None, _get_info)
+
             caption_info = []
-            lines = result.stdout.strip().split("\n")
 
-            # Look for the caption section (not automatic captions)
-            in_caption_section = False
-            for line in lines:
-                if "Available captions for" in line:
-                    in_caption_section = True
-                    continue
-                elif "Available automatic captions for" in line:
-                    in_caption_section = False
-                    continue
-                elif in_caption_section and line.strip():
-                    # Skip header lines
-                    if "Language" in line and "Name" in line and "Formats" in line:
-                        continue
+            # Parse manual captions
+            subtitles = info.get("subtitles", {})
+            for lang, formats in subtitles.items():
+                if formats:
+                    format_names = [f.get("ext", "") for f in formats]
+                    lang_name = formats[0].get("name", lang) if formats else lang
+                    caption_info.append(
+                        {"language": lang, "name": lang_name, "formats": format_names, "kind": "manual"}
+                    )
 
-                    # Parse caption information
-                    # Format: "Language Name Formats" where formats are comma-separated
-                    # Example: "en-uYU-mmqFLq8 English - CC1    vtt, srt, ttml, srv3, srv2, srv1, json3"
-
-                    if line.strip() and not line.startswith("["):
-                        # Split by multiple spaces to separate language, name, and formats
-                        import re
-
-                        parts = re.split(r"\s{2,}", line.strip())
-
-                        if len(parts) >= 2:
-                            # First part is language, last part is formats
-                            language_and_name = parts[0]
-                            formats_str = parts[-1]
-
-                            # Split language and name - language is first word
-                            lang_name_parts = language_and_name.split(" ", 1)
-                            language = lang_name_parts[0]
-                            name = lang_name_parts[1] if len(lang_name_parts) > 1 else ""
-
-                            # If there are more than 2 parts, middle parts are also part of name
-                            if len(parts) > 2:
-                                name = " ".join([name] + parts[1:-1]).strip()
-
-                            # Parse formats - they are comma-separated
-                            formats = [f.strip() for f in formats_str.split(",") if f.strip()]
-
-                            caption_info.append({"language": language, "name": name, "formats": formats})
+            # Parse automatic captions
+            auto_subs = info.get("automatic_captions", {})
+            for lang, formats in auto_subs.items():
+                if formats:
+                    format_names = [f.get("ext", "") for f in formats]
+                    lang_name = formats[0].get("name", lang) if formats else lang
+                    caption_info.append({"language": lang, "name": lang_name, "formats": format_names, "kind": "asr"})
 
             self.logger.info(f"✅ Found {len(caption_info)} caption tracks")
             return caption_info
 
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to list captions: {e.stderr}")
-            raise RuntimeError(f"Failed to list captions: {e.stderr}")
+        except yt_dlp.utils.DownloadError as e:
+            self.logger.error(f"Failed to list captions: {str(e)}")
+            raise RuntimeError(f"Failed to list captions: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Failed to list captions: {str(e)}")
+            raise RuntimeError(f"Failed to list captions: {str(e)}")

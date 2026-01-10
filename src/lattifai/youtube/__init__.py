@@ -2,8 +2,7 @@
 YouTube Data Acquisition Module (powered by yt-dlp)
 """
 
-from .downloader import YouTubeDownloader
-from .loader import YoutubeLoader
-from .types import CaptionSegment, CaptionTrack, VideoMetadata
+from .client import YouTubeDownloader, YoutubeLoader
+from .types import CaptionTrack, VideoMetadata
 
-__all__ = ["YoutubeLoader", "YouTubeDownloader", "VideoMetadata", "CaptionTrack", "CaptionSegment"]
+__all__ = ["YoutubeLoader", "YouTubeDownloader", "VideoMetadata", "CaptionTrack"]

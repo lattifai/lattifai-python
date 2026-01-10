@@ -21,14 +21,3 @@ class CaptionTrack:
     kind: str  # 'manual' | 'asr'
     ext: str  # 'vtt', 'srv3' etc
     url: Optional[str] = None
-
-
-@dataclass
-class CaptionSegment:
-    start: float
-    duration: float
-    text: str
-
-    @property
-    def end(self) -> float:
-        return self.start + self.duration
