@@ -220,7 +220,7 @@ class LattifAIClientMixin:
     def downloader(self):
         """Lazy load YouTube downloader."""
         if self._downloader is None:
-            from .workflow.youtube import YouTubeDownloader
+            from .youtube import YouTubeDownloader
 
             self._downloader = YouTubeDownloader()
         return self._downloader
@@ -485,7 +485,7 @@ class LattifAIClientMixin:
         """
         import asyncio
 
-        from lattifai.workflow.youtube import TRANSCRIBE_CHOICE
+        from lattifai.workflow.file_manager import TRANSCRIBE_CHOICE
 
         transcriber_name = self.transcriber.name
 

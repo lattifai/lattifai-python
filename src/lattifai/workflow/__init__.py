@@ -10,13 +10,11 @@ of multimedia content through intelligent agent-based pipelines.
 
 from .base import WorkflowAgent, WorkflowResult, WorkflowStep
 from .file_manager import TRANSCRIBE_CHOICE, FileExistenceManager
-from .youtube import YouTubeDownloader
 
 __all__ = [
     "WorkflowAgent",
     "WorkflowStep",
     "WorkflowResult",
     "FileExistenceManager",
-    "YouTubeDownloader",
     "TRANSCRIBE_CHOICE",
 ]

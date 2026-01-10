@@ -1,5 +1,5 @@
 """
-YouTube downloader module using yt-dlp and Agent
+YouTube media and caption downloader using yt-dlp
 """
 
 import asyncio
@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ..config.caption import CAPTION_FORMATS
-from .base import setup_workflow_logger
-from .file_manager import TRANSCRIBE_CHOICE, FileExistenceManager
+from ..workflow.base import setup_workflow_logger
+from ..workflow.file_manager import TRANSCRIBE_CHOICE, FileExistenceManager
 
 
 class YouTubeDownloader:
@@ -131,7 +131,7 @@ class YouTubeDownloader:
         Returns:
             Path to downloaded media file
         """
-        media_format = media_format or self.media_format
+        media_format = media_format or "mp3"
 
         # Determine if format is audio or video
         audio_formats = ["mp3", "wav", "m4a", "aac", "opus", "ogg", "flac", "aiff"]
@@ -299,14 +299,14 @@ class YouTubeDownloader:
         Args:
             url: YouTube URL
             output_dir: Output directory (default: temp directory)
-            media_format: Audio format (default: instance format)
+            media_format: Audio format (default: mp3)
             force_overwrite: Skip user confirmation and overwrite existing files
 
         Returns:
             Path to downloaded audio file
         """
         target_dir = output_dir or tempfile.gettempdir()
-        media_format = media_format or self.media_format
+        media_format = media_format or "mp3"
         return await self._download_media_internal(
             url, target_dir, media_format, is_audio=True, force_overwrite=force_overwrite
         )
