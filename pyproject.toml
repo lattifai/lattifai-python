@@ -128,6 +128,8 @@ packages = [
     "lattifai.config",
     "lattifai.caption",
     "lattifai.caption.formats",
+    "lattifai.caption.formats.nle",
+    "lattifai.caption.parsers",
     "lattifai.diarization",
     "lattifai.server",
     "lattifai.transcription",
