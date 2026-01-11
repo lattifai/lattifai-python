@@ -143,10 +143,9 @@ def test_caption_write_youtube_vtt_word_level():
         )
     ]
     caption = Caption.from_supervisions(supervisions)
-    caption.word_level = True
 
-    # Write to VTT
-    vtt_content = caption.to_bytes(output_format="vtt").decode("utf-8")
+    # Write to VTT with word_level=True
+    vtt_content = caption.to_bytes(output_format="vtt", word_level=True).decode("utf-8")
 
     assert "WEBVTT" in vtt_content
     assert "<00:00:00.000><c> Hello</c>" in vtt_content

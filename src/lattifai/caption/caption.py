@@ -47,7 +47,6 @@ class Caption:
     kind: Optional[str] = None
     source_format: Optional[str] = None
     source_path: Optional[Pathlike] = None
-    word_level: bool = False
     metadata: Dict[str, str] = field(default_factory=dict)
 
     def __len__(self) -> int:
@@ -259,25 +258,30 @@ class Caption:
         buffer = io.StringIO(content)
         return cls.read(buffer, format=format, normalize_text=normalize_text)
 
-    def to_bytes(self, output_format: Optional[str] = None, include_speaker_in_text: bool = True) -> bytes:
+    def to_bytes(
+        self, output_format: Optional[str] = None, include_speaker_in_text: bool = True, word_level: bool = False
+    ) -> bytes:
         """
         Convert caption to bytes.
 
         Args:
             output_format: Output format (e.g., 'srt', 'vtt', 'ass'). Defaults to source_format or 'srt'
             include_speaker_in_text: Whether to include speaker labels in text
+            word_level: Use word-level output format if supported (e.g., YouTube VTT for .vtt output)
 
         Returns:
             Caption content as bytes
 
         Example:
-            >>> caption = Caption.read(\"input.srt\")
+            >>> caption = Caption.read("input.srt")
             >>> # Get as bytes in original format
             >>> data = caption.to_bytes()
             >>> # Get as bytes in specific format
-            >>> vtt_data = caption.to_bytes(output_format=\"vtt\")
+            >>> vtt_data = caption.to_bytes(output_format="vtt")
         """
-        return self.write(None, output_format=output_format, include_speaker_in_text=include_speaker_in_text)
+        return self.write(
+            None, output_format=output_format, include_speaker_in_text=include_speaker_in_text, word_level=word_level
+        )
 
     @classmethod
     def from_transcription_results(
@@ -392,6 +396,7 @@ class Caption:
         path: Union[Pathlike, io.BytesIO, None] = None,
         output_format: Optional[str] = None,
         include_speaker_in_text: bool = True,
+        word_level: bool = False,
     ) -> Union[Pathlike, bytes]:
         """
         Write caption to file or return as bytes.
@@ -400,6 +405,7 @@ class Caption:
             path: Path to output caption file, BytesIO object, or None to return bytes
             output_format: Output format (e.g., 'srt', 'vtt', 'ass')
             include_speaker_in_text: Whether to include speaker labels in text
+            word_level: Use word-level output format if supported (e.g., YouTube VTT for .vtt output)
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -435,7 +441,7 @@ class Caption:
                 ext = "ebu_tt_d"
 
         # Use YouTube VTT if word-level is requested for VTT output
-        if ext == "vtt" and self.word_level:
+        if ext == "vtt" and word_level:
             ext = "youtube_vtt"
 
         writer_cls = get_writer(ext)

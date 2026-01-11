@@ -59,8 +59,7 @@ def convert(
     from lattifai.caption import Caption
 
     caption = Caption.read(input_path, normalize_text=normalize_text)
-    caption.word_level = word_level
-    caption.write(output_path, include_speaker_in_text=include_speaker_in_text)
+    caption.write(output_path, include_speaker_in_text=include_speaker_in_text, word_level=word_level)
 
     safe_print(f"✅ Converted {input_path} -> {output_path}")
     return output_path
