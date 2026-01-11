@@ -5,9 +5,10 @@ Supports reading and writing transcript files with speaker labels, events, and s
 """
 
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 from lhotse.utils import Pathlike
 
@@ -52,6 +53,8 @@ class GeminiReader:
     INLINE_TIMESTAMP_END_PATTERN = re.compile(r"^(.+?)\s*\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$")
     # Timestamp at the beginning indicates start time
     INLINE_TIMESTAMP_START_PATTERN = re.compile(r"^\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]\s*(.+)$")
+    # Standalone timestamp on its own line
+    STANDALONE_TIMESTAMP_PATTERN = re.compile(r"^\[(?:(\d{1,2}):(\d{2}):(\d{2})|(\d{1,2}):(\d{2}))\]$")
 
     # New patterns for YouTube link format: [[MM:SS](URL&t=seconds)]
     YOUTUBE_SECTION_PATTERN = re.compile(r"^##\s*\[\[(\d{1,2}):(\d{2})\]\([^)]*&t=(\d+)\)\]\s*(.+)$")
@@ -82,31 +85,40 @@ class GeminiReader:
     @classmethod
     def read(
         cls,
-        transcript_path: Pathlike,
+        transcript_path: Union[Pathlike, str],
         include_events: bool = False,
         include_sections: bool = False,
     ) -> List[GeminiSegment]:
-        """Parse YouTube transcript file and return list of transcript segments.
+        """Parse YouTube transcript file or content and return list of transcript segments.
 
         Args:
-                transcript_path: Path to the transcript file
+                transcript_path: Path to the transcript file or raw string content
                 include_events: Whether to include event descriptions like [Applause]
                 include_sections: Whether to include section headers
 
         Returns:
                 List of GeminiSegment objects with all metadata
         """
-        transcript_path = Path(transcript_path).expanduser().resolve()
-        if not transcript_path.exists():
-            raise FileNotFoundError(f"Transcript file not found: {transcript_path}")
+        content = ""
+        # Check if transcript_path is a multi-line string (content) or a short string (likely path)
+        is_content = "\n" in str(transcript_path) or len(str(transcript_path)) > 1000
+
+        if is_content:
+            content = str(transcript_path)
+        else:
+            p = Path(transcript_path).expanduser().resolve()
+            if p.exists() and p.is_file():
+                with open(p, "r", encoding="utf-8") as f:
+                    content = f.read()
+            else:
+                # Fallback: treat as content if path doesn't exist
+                content = str(transcript_path)
 
         segments: List[GeminiSegment] = []
         current_section = None
         current_speaker = None
 
-        with open(transcript_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
+        lines = content.splitlines()
         for line_num, line in enumerate(lines, start=1):
             line = line.strip()
             if not line:
@@ -136,11 +148,10 @@ class GeminiReader:
                     )
                 continue
 
-            # Parse YouTube format section headers: ## [[MM:SS](URL&t=seconds)] Title
+            # Parse YouTube format section headers
             youtube_section_match = cls.YOUTUBE_SECTION_PATTERN.match(line)
             if youtube_section_match:
                 minutes, seconds, url_seconds, section_title = youtube_section_match.groups()
-                # Use the URL seconds for more accuracy
                 timestamp = cls.parse_timestamp(url_seconds)
                 current_section = section_title.strip()
                 if include_sections:
@@ -155,21 +166,38 @@ class GeminiReader:
                     )
                 continue
 
-            # Parse event descriptions [event] [HH:MM:SS] or [MM:SS]
+            # Parse standalone timestamp [HH:MM:SS]
+            # Often used as an end timestamp for the preceding block
+            standalone_match = cls.STANDALONE_TIMESTAMP_PATTERN.match(line)
+            if standalone_match:
+                groups = standalone_match.groups()
+                if groups[0] is not None:
+                    ts = cls.parse_timestamp(groups[0], groups[1], groups[2])
+                else:
+                    ts = cls.parse_timestamp(groups[3], groups[4])
+
+                # Assign to previous dialogue segment if it doesn't have an end time
+                if segments and segments[-1].segment_type == "dialogue":
+                    if segments[-1].end_timestamp is None:
+                        segments[-1].end_timestamp = ts
+                    elif segments[-1].timestamp is None:
+                        # If it has an end but no start, this standalone might be its start?
+                        # Usually standalone is end, but let's be flexible
+                        segments[-1].timestamp = ts
+                continue
+
+            # Parse event descriptions [event] [HH:MM:SS]
             event_match = cls.EVENT_PATTERN.match(line)
             if event_match:
                 groups = event_match.groups()
                 event_text = groups[0]
-                # Parse timestamp - groups: (event_text, hours/minutes, minutes/seconds, seconds_optional)
                 hours_or_minutes = groups[1]
                 minutes_or_seconds = groups[2]
                 seconds_optional = groups[3]
 
                 if seconds_optional is not None:
-                    # HH:MM:SS format
                     timestamp = cls.parse_timestamp(hours_or_minutes, minutes_or_seconds, seconds_optional)
                 else:
-                    # MM:SS format
                     timestamp = cls.parse_timestamp(hours_or_minutes, minutes_or_seconds)
 
                 if include_events and timestamp is not None:
@@ -184,15 +212,13 @@ class GeminiReader:
                     )
                 continue
 
-            # Parse speaker dialogue: **Speaker:** Text [HH:MM:SS] or [MM:SS]
+            # Parse speaker dialogue: **Speaker:** Text [HH:MM:SS]
             speaker_match = cls.SPEAKER_PATTERN.match(line)
             if speaker_match:
                 speaker, text_with_timestamp = speaker_match.groups()
                 current_speaker = speaker.strip()
 
-                # Check for timestamp at the beginning (start time)
                 start_match = cls.INLINE_TIMESTAMP_START_PATTERN.match(text_with_timestamp.strip())
-                # Check for timestamp at the end (end time)
                 end_match = cls.INLINE_TIMESTAMP_END_PATTERN.match(text_with_timestamp.strip())
                 youtube_match = cls.YOUTUBE_INLINE_PATTERN.match(text_with_timestamp.strip())
 
@@ -202,24 +228,21 @@ class GeminiReader:
 
                 if start_match:
                     groups = start_match.groups()
-                    # Parse timestamp - can be HH:MM:SS (groups 0,1,2) or MM:SS (groups 3,4)
-                    if groups[0] is not None:  # HH:MM:SS format
+                    if groups[0] is not None:
                         start_timestamp = cls.parse_timestamp(groups[0], groups[1], groups[2])
-                    elif groups[3] is not None:  # MM:SS format
+                    elif groups[3] is not None:
                         start_timestamp = cls.parse_timestamp(groups[3], groups[4])
-                    text = groups[5]  # Text is after timestamp
+                    text = groups[5]
                 elif end_match:
                     groups = end_match.groups()
-                    text = groups[0]  # Text is before timestamp
-                    # Parse timestamp - can be HH:MM:SS (groups 1,2,3) or MM:SS (groups 4,5)
-                    if groups[1] is not None:  # HH:MM:SS format
+                    text = groups[0]
+                    if groups[1] is not None:
                         end_timestamp = cls.parse_timestamp(groups[1], groups[2], groups[3])
-                    elif groups[4] is not None:  # MM:SS format
+                    elif groups[4] is not None:
                         end_timestamp = cls.parse_timestamp(groups[4], groups[5])
                 elif youtube_match:
                     groups = youtube_match.groups()
                     text = groups[0]
-                    # Extract seconds from URL parameter (treat as end time)
                     url_seconds = groups[3]
                     end_timestamp = cls.parse_timestamp(url_seconds)
 
@@ -234,52 +257,41 @@ class GeminiReader:
                         line_number=line_num,
                     )
                 )
-                current_speaker = None  # Reset speaker after use
+                current_speaker = None
                 continue
 
-            # Parse plain text with timestamp (check both positions)
+            # Parse plain text (might contain inline timestamp or be a continuation)
             start_match = cls.INLINE_TIMESTAMP_START_PATTERN.match(line)
             end_match = cls.INLINE_TIMESTAMP_END_PATTERN.match(line)
             youtube_inline_match = cls.YOUTUBE_INLINE_PATTERN.match(line)
 
-            start_timestamp = None
-            end_timestamp = None
-            text = None
-
             if start_match:
                 groups = start_match.groups()
-                # Parse timestamp - can be HH:MM:SS (groups 0,1,2) or MM:SS (groups 3,4)
-                if groups[0] is not None:  # HH:MM:SS format
+                if groups[0] is not None:
                     start_timestamp = cls.parse_timestamp(groups[0], groups[1], groups[2])
-                elif groups[3] is not None:  # MM:SS format
+                else:
                     start_timestamp = cls.parse_timestamp(groups[3], groups[4])
-                text = groups[5]  # Text is after timestamp
-
+                text = groups[5]
                 segments.append(
                     GeminiSegment(
                         text=text.strip(),
                         timestamp=start_timestamp,
-                        end_timestamp=None,
                         speaker=current_speaker,
                         section=current_section,
                         segment_type="dialogue",
                         line_number=line_num,
                     )
                 )
-                continue
             elif end_match:
                 groups = end_match.groups()
-                text = groups[0]  # Text is before timestamp
-                # Parse timestamp - can be HH:MM:SS (groups 1,2,3) or MM:SS (groups 4,5)
-                if groups[1] is not None:  # HH:MM:SS format
+                text = groups[0]
+                if groups[1] is not None:
                     end_timestamp = cls.parse_timestamp(groups[1], groups[2], groups[3])
-                elif groups[4] is not None:  # MM:SS format
+                else:
                     end_timestamp = cls.parse_timestamp(groups[4], groups[5])
-
                 segments.append(
                     GeminiSegment(
                         text=text.strip(),
-                        timestamp=None,
                         end_timestamp=end_timestamp,
                         speaker=current_speaker,
                         section=current_section,
@@ -287,30 +299,40 @@ class GeminiReader:
                         line_number=line_num,
                     )
                 )
-                continue
             elif youtube_inline_match:
                 groups = youtube_inline_match.groups()
                 text = groups[0]
-                # Extract seconds from URL parameter (treat as end time)
                 url_seconds = groups[3]
-                end_timestamp = cls.parse_timestamp(url_seconds)
-
                 segments.append(
                     GeminiSegment(
                         text=text.strip(),
-                        timestamp=None,
-                        end_timestamp=end_timestamp,
+                        end_timestamp=cls.parse_timestamp(url_seconds),
                         speaker=current_speaker,
                         section=current_section,
                         segment_type="dialogue",
                         line_number=line_num,
                     )
                 )
-                continue
+            else:
+                # Plain text without any recognized markers
+                # If it follows a speaker line or another dialogue line without end timestamp,
+                # merge it into the last segment to support multi-line text blocks.
+                if segments and segments[-1].segment_type == "dialogue" and segments[-1].end_timestamp is None:
+                    segments[-1].text += " " + line.strip()
+                else:
+                    # Skip markdown headers and other formatting
+                    if line.startswith("#"):
+                        continue
 
-            # Skip markdown headers and other formatting
-            if line.startswith("#"):
-                continue
+                    segments.append(
+                        GeminiSegment(
+                            text=line.strip(),
+                            speaker=current_speaker,
+                            section=current_section,
+                            segment_type="dialogue",
+                            line_number=line_num,
+                        )
+                    )
 
         return segments
 
@@ -321,6 +343,8 @@ class GeminiReader:
         merge_consecutive: bool = False,
         min_duration: float = 0.1,
         merge_max_gap: float = 2.0,
+        normalize_text: bool = True,
+        **kwargs,
     ) -> List[Supervision]:
         """Extract text segments for forced alignment.
 
@@ -401,7 +425,7 @@ class GeminiReader:
                 if segment.segment_type == "dialogue":
                     supervisions.append(
                         Supervision(
-                            text=segment.text,
+                            text=segment.text.strip(),
                             start=seg_start,
                             duration=duration,
                             id=f"segment_{i:05d}",
@@ -626,6 +650,31 @@ class GeminiWriter:
                 f.write("\n")
 
         return output_path
+
+    @classmethod
+    def write(
+        cls,
+        supervisions: List[Supervision],
+        output_path: Pathlike,
+        **kwargs,
+    ) -> Path:
+        """Alias for write_aligned_transcript for Caption API compatibility."""
+        return Path(cls.write_aligned_transcript(supervisions, output_path, **kwargs))
+
+    @classmethod
+    def to_bytes(
+        cls,
+        supervisions: List[Supervision],
+        **kwargs,
+    ) -> bytes:
+        """Convert aligned supervisions to Gemini format bytes."""
+        with tempfile.NamedTemporaryFile(suffix=".md", delete=False) as tmp:
+            tmp_path = Path(tmp.name)
+        try:
+            cls.write_aligned_transcript(supervisions, tmp_path, **kwargs)
+            return tmp_path.read_bytes()
+        finally:
+            tmp_path.unlink(missing_ok=True)
 
 
 __all__ = ["GeminiWriter"]
