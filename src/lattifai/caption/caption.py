@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, TypeVar, Union
 
+from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
 from tgt import TextGrid
 
@@ -144,19 +145,72 @@ class Caption:
         Returns:
             New Caption instance with shifted timestamps
         """
-        shifted_sups = [
-            Supervision(
-                text=sup.text,
-                start=sup.start + seconds,
-                duration=sup.duration,
-                speaker=sup.speaker,
-                id=sup.id,
-                language=sup.language,
-                alignment=getattr(sup, "alignment", None),
-                custom=sup.custom,
+        shifted_sups = []
+        for sup in self.supervisions:
+            # Calculate physical time range
+            raw_start = sup.start + seconds
+            raw_end = sup.end + seconds
+
+            # Skip segments that end before 0
+            if raw_end <= 0:
+                continue
+
+            # Clip start to 0 if negative
+            if raw_start < 0:
+                final_start = 0.0
+                final_duration = raw_end
+            else:
+                final_start = raw_start
+                final_duration = sup.duration
+
+            # Handle alignment (word-level timestamps)
+            final_alignment = None
+            original_alignment = getattr(sup, "alignment", None)
+            if original_alignment and "word" in original_alignment:
+                new_words = []
+                for word in original_alignment["word"]:
+                    w_start = word.start + seconds
+                    w_end = w_start + word.duration
+
+                    # Skip words that end before 0
+                    if w_end <= 0:
+                        continue
+
+                    # Clip start to 0 if negative
+                    if w_start < 0:
+                        w_final_start = 0.0
+                        w_final_duration = w_end
+                    else:
+                        w_final_start = w_start
+                        w_final_duration = word.duration
+
+                    new_words.append(
+                        AlignmentItem(
+                            symbol=word.symbol,
+                            start=w_final_start,
+                            duration=w_final_duration,
+                            score=word.score,
+                        )
+                    )
+
+                # Copy original alignment dict structure and update words
+                final_alignment = original_alignment.copy()
+                final_alignment["word"] = new_words
+
+            shifted_sups.append(
+                Supervision(
+                    text=sup.text,
+                    start=final_start,
+                    duration=final_duration,
+                    speaker=sup.speaker,
+                    id=sup.id,
+                    recording_id=sup.recording_id if hasattr(sup, "recording_id") else "",
+                    channel=getattr(sup, "channel", 0),
+                    language=sup.language,
+                    alignment=final_alignment,
+                    custom=sup.custom,
+                )
             )
-            for sup in self.supervisions
-        ]
 
         return Caption(
             supervisions=shifted_sups,
