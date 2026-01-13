@@ -73,8 +73,6 @@ _skbuild/
 # might want to remove this later when distributing
 MANIFEST
 
-.claude/
-
 .prompts
 .env
 .vscode/
