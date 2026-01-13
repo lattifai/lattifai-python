@@ -27,7 +27,7 @@ class TestCaptionConfigValidation:
 
     def test_valid_output_formats(self):
         """Test that all valid output formats are accepted."""
-        valid_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json"]
+        valid_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "textgrid", "json"]
         for fmt in valid_formats:
             config = CaptionConfig(output_format=fmt)
             assert config.output_format == fmt

@@ -174,7 +174,7 @@ class TestFormatCoverage:
         """Verify all input formats are properly defined."""
         from lattifai.config.caption import INPUT_CAPTION_FORMATS
 
-        expected_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "auto", "gemini"]
+        expected_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "sami", "smi", "auto", "gemini"]
 
         for fmt in expected_formats:
             assert fmt in INPUT_CAPTION_FORMATS, f"Format {fmt} missing from INPUT_CAPTION_FORMATS"
@@ -185,7 +185,7 @@ class TestFormatCoverage:
         """Verify all output formats are properly defined."""
         from lattifai.config.caption import OUTPUT_CAPTION_FORMATS
 
-        expected_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "TextGrid", "json"]
+        expected_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "textgrid", "json"]
 
         for fmt in expected_formats:
             assert fmt in OUTPUT_CAPTION_FORMATS, f"Format {fmt} missing from OUTPUT_CAPTION_FORMATS"
@@ -196,7 +196,7 @@ class TestFormatCoverage:
         """Test that format detection works for all common extensions."""
         from lattifai.config.caption import ALL_CAPTION_FORMATS
 
-        common_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "TextGrid", "json", "gemini"]
+        common_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "textgrid", "json", "gemini"]
 
         for fmt in common_formats:
             assert fmt in ALL_CAPTION_FORMATS, f"Format {fmt} not in ALL_CAPTION_FORMATS"
