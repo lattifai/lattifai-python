@@ -2,18 +2,17 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional, get_args
 
 from lhotse.utils import Pathlike
 
-# Supported caption formats for reading/writing
-CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "md", "ttml", "sami", "smi"]
+# =============================================================================
+# Format Type Definitions (Single Source of Truth)
+# =============================================================================
 
-# Input caption formats (includes special formats like 'auto' and 'gemini')
-INPUT_CAPTION_FORMATS = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "auto", "gemini"]
-
-# Output caption formats (includes special formats like 'TextGrid' and 'json')
-OUTPUT_CAPTION_FORMATS = [
+# Type alias for input caption formats (all formats with registered readers)
+InputCaptionFormat = Literal[
+    # Standard subtitle formats
     "srt",
     "vtt",
     "ass",
@@ -21,47 +20,74 @@ OUTPUT_CAPTION_FORMATS = [
     "sub",
     "sbv",
     "txt",
-    "ttml",
     "sami",
     "smi",
-    "TextGrid",
+    # Tabular formats
+    "csv",
+    "tsv",
+    "aud",
     "json",
+    # Specialized formats
+    "textgrid",  # Praat TextGrid
+    "youtube_vtt",  # YouTube VTT with word-level timestamps
+    "gemini",  # Gemini/YouTube transcript format
+    # Professional NLE formats
+    "avid_ds",
+    "fcpxml",
+    "premiere_xml",
+    "audition_csv",
+    # Special
+    "auto",  # Auto-detect format
+]
+
+# Type alias for output caption formats (all formats with registered writers)
+OutputCaptionFormat = Literal[
+    # Standard subtitle formats
+    "srt",
+    "vtt",
+    "ass",
+    "ssa",
+    "sub",
+    "sbv",
+    "txt",
+    "sami",
+    "smi",
+    # Tabular formats
+    "csv",
+    "tsv",
+    "aud",
+    "json",
+    # Specialized formats
+    "textgrid",  # Praat TextGrid
+    "youtube_vtt",  # YouTube VTT with word-level timestamps
+    "gemini",  # Gemini/YouTube transcript format
+    # TTML profiles (write-only)
+    "ttml",  # Generic TTML
+    "imsc1",  # IMSC1 (Netflix/streaming) TTML profile
+    "ebu_tt_d",  # EBU-TT-D (European broadcast) TTML profile
     # Professional NLE formats
     "avid_ds",  # Avid Media Composer SubCap format
     "fcpxml",  # Final Cut Pro XML
     "premiere_xml",  # Adobe Premiere Pro XML (graphic clips)
     "audition_csv",  # Adobe Audition markers
     "edimarker_csv",  # Pro Tools (via EdiMarker) markers
-    "imsc1",  # IMSC1 (Netflix/streaming) TTML profile
-    "ebu_tt_d",  # EBU-TT-D (European broadcast) TTML profile
 ]
 
-# All caption formats combined (for file detection)
-ALL_CAPTION_FORMATS = list(set(CAPTION_FORMATS + ["TextGrid", "json", "gemini", "avid_ds", "fcpxml"]))
+# =============================================================================
+# Runtime Format Lists (Derived from Type Definitions)
+# =============================================================================
 
-# Type aliases for better type hints
-InputCaptionFormat = Literal["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "ttml", "sami", "smi", "gemini"]
-OutputCaptionFormat = Literal[
-    "srt",
-    "vtt",
-    "ass",
-    "ssa",
-    "sub",
-    "sbv",
-    "txt",
-    "ttml",
-    "sami",
-    "smi",
-    "TextGrid",
-    "json",
-    "avid_ds",
-    "fcpxml",
-    "premiere_xml",
-    "audition_csv",
-    "edimarker_csv",
-    "imsc1",
-    "ebu_tt_d",
-]
+# Input caption formats list (derived from InputCaptionFormat)
+INPUT_CAPTION_FORMATS: list[str] = list(get_args(InputCaptionFormat))
+
+# Output caption formats list (derived from OutputCaptionFormat)
+OUTPUT_CAPTION_FORMATS: list[str] = list(get_args(OutputCaptionFormat))
+
+# Standard caption formats (formats with both reader and writer)
+CAPTION_FORMATS: list[str] = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "sami", "smi"]
+
+# All caption formats combined (for file detection, excludes "auto")
+ALL_CAPTION_FORMATS: list[str] = list(set(INPUT_CAPTION_FORMATS + OUTPUT_CAPTION_FORMATS) - {"auto"})
 
 
 @dataclass
@@ -73,13 +99,19 @@ class CaptionConfig:
     """
 
     input_format: InputCaptionFormat = "auto"
-    """Input caption format: 'auto', 'srt', 'vtt', 'ass', 'txt', or 'json'."""
+    """Input caption format. Supports: 'auto' (detect),
+        standard formats (srt, vtt, ass, ssa, sub, sbv, txt, sami, smi),
+        tabular (csv, tsv, aud, json),
+        specialized (textgrid, youtube_vtt, gemini),
+        NLE (avid_ds, fcpxml, premiere_xml, audition_csv).
+    """
 
     input_path: Optional[str] = None
     """Path to input caption file."""
 
     output_format: OutputCaptionFormat = "srt"
-    """Output caption format: 'srt', 'vtt', 'ass', 'txt', or 'json'."""
+    """Output caption format. Supports: standard formats, tabular, specialized, TTML profiles (ttml, imsc1, ebu_tt_d),
+    NLE (avid_ds, fcpxml, premiere_xml, audition_csv, edimarker_csv)."""
 
     output_path: Optional[str] = None
     """Path to output caption file."""

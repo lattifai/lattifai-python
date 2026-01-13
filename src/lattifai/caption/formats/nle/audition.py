@@ -484,3 +484,58 @@ class AuditionCSVReaderHandler(FormatReader):
             content = str(source)
 
         return AuditionCSVReader.read(content, normalize_text=normalize_text, **kwargs)
+
+
+@register_writer("edimarker_csv")
+class EdiMarkerCSVFormat(FormatWriter):
+    """Format handler for EdiMarker (Pro Tools) CSV markers."""
+
+    format_id = "edimarker_csv"
+    extensions = [".csv"]
+    description = "EdiMarker (Pro Tools) CSV Marker Format"
+
+    @classmethod
+    def write(
+        cls,
+        supervisions: List[Supervision],
+        output_path: Pathlike,
+        include_speaker: bool = True,
+        fps: float = 24.0,
+        **kwargs,
+    ):
+        """Write supervisions to EdiMarker CSV format.
+
+        Args:
+            supervisions: List of supervision segments
+            output_path: Path to output file
+            include_speaker: Whether to include speaker labels
+            fps: Frame rate for timecode conversion
+            **kwargs: Additional config options
+
+        Returns:
+            Path to written file
+        """
+        config = EdiMarkerConfig(include_speaker=include_speaker, **kwargs)
+        return EdiMarkerWriter.write(supervisions, output_path, config, fps=fps)
+
+    @classmethod
+    def to_bytes(
+        cls,
+        supervisions: List[Supervision],
+        include_speaker: bool = True,
+        fps: float = 24.0,
+        **kwargs,
+    ) -> bytes:
+        """Convert supervisions to EdiMarker CSV bytes.
+
+        Args:
+            supervisions: List of supervision segments
+            include_speaker: Whether to include speaker labels
+            fps: Frame rate for timecode conversion
+            **kwargs: Additional config options
+
+        Returns:
+            EdiMarker CSV content as bytes
+        """
+        config = EdiMarkerConfig(include_speaker=include_speaker, **kwargs)
+        return EdiMarkerWriter.to_bytes(supervisions, config, fps=fps)
