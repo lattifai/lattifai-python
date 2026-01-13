@@ -14,14 +14,14 @@ import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from xml.dom import minidom
 
 from lhotse.utils import Pathlike
 
 from ...supervision import Supervision
 from .. import register_writer
-from ..base import FormatWriter
+from ..base import FormatReader, FormatWriter
 
 
 @dataclass
@@ -439,3 +439,101 @@ class FCPXMLFormat(FormatWriter):
         """
         config = FCPXMLConfig(**kwargs)
         return FCPXMLWriter.to_bytes(supervisions, config)
+
+
+class FCPXMLReader:
+    """Reader for FCPXML format."""
+
+    @classmethod
+    def _parse_rational_time(cls, time_str: str) -> float:
+        """Parse rational time string (e.g., "100/25s") to seconds."""
+        if not time_str or not time_str.endswith("s"):
+            return 0.0
+
+        val_str = time_str[:-1]  # Remove 's'
+        if "/" in val_str:
+            num, den = val_str.split("/")
+            return float(num) / float(den)
+        else:
+            return float(val_str)
+
+    @classmethod
+    def read(cls, source: str, normalize_text: bool = True) -> List[Supervision]:
+        """Read FCPXML content and return supervisions."""
+        try:
+            root = ET.fromstring(source)
+        except ET.ParseError:
+            return []
+
+        supervisions = []
+
+        # Traverse recursively to find caption elements
+        # FCPXML structure is flexible, captions can be nested in spines, gaps, clips, etc.
+        for caption in root.iter("caption"):
+            # Get timing
+            offset_str = caption.get("offset", "0s")
+            # start_str = caption.get("start", "0s")
+            duration_str = caption.get("duration", "0s")
+
+            # In FCPXML, logic for absolute time is complex depending on parent containers.
+            # Simplified approach: If direct child of a gap/spine in a simple project,
+            # offset + start might be enough.
+            # However, standard caption export usually puts them relative to the start of the project
+            # or the 'offset' attribute is the absolute time on the timeline.
+            # Let's assume 'offset' is the timeline start time for the caption clip.
+
+            start_sec = cls._parse_rational_time(offset_str)
+            duration_sec = cls._parse_rational_time(duration_str)
+
+            # Get text
+            text_elem = caption.find("text")
+            text_content = ""
+            if text_elem is not None:
+                text_content = text_elem.text
+
+            # Fallback if text element is empty or missing (some versions might differ)
+            if not text_content:
+                # Sometimes text is in 'name' attribute if it's a title?
+                # But for 'caption' element, <text> child is standard.
+                continue
+
+            if duration_sec > 0:
+                supervisions.append(
+                    Supervision(
+                        id=caption.get("name", str(uuid.uuid4())),
+                        recording_id="fcpxml_import",
+                        start=start_sec,
+                        duration=duration_sec,
+                        text=text_content.strip() if normalize_text else text_content,
+                    )
+                )
+
+        return sorted(supervisions, key=lambda s: s.start)
+
+
+from .. import register_reader
+
+
+@register_reader("fcpxml")
+class FCPXMLReaderHandler(FormatReader):
+    """Reader handler for FCPXML."""
+
+    format_id = "fcpxml"
+    extensions = [".fcpxml", ".fcpxmld"]
+
+    @classmethod
+    def read(cls, source: Union[Pathlike, str], normalize_text: bool = True, **kwargs) -> List[Supervision]:
+        if isinstance(source, (str, Path)) and not cls.is_content(source):
+            # Check if it's a bundle directory
+            p = Path(source)
+            if p.is_dir() and p.suffix == ".fcpxmld":
+                info_path = p / "Info.fcpxml"
+                if info_path.exists():
+                    p = info_path
+
+            with open(p, "r", encoding="utf-8") as f:
+                content = f.read()
+        else:
+            content = str(source)
+
+        return FCPXMLReader.read(content, normalize_text=normalize_text)

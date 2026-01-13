@@ -12,13 +12,13 @@ Format specification:
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from lhotse.utils import Pathlike
 
 from ...supervision import Supervision
 from .. import register_writer
-from ..base import FormatWriter
+from ..base import FormatReader, FormatWriter
 
 
 class FrameRate(Enum):
@@ -310,3 +310,104 @@ class AvidDSFormat(FormatWriter):
         """
         config = AvidDSConfig(include_speaker=include_speaker, **kwargs)
         return AvidDSWriter.to_bytes(supervisions, config)
+
+
+class AvidDSReader:
+    """Reader for Avid DS subtitle format."""
+
+    @classmethod
+    def _timecode_to_seconds(cls, tc: str, fps: float = 25.0) -> float:
+        """Convert SMPTE timecode (HH:MM:SS:FF) to seconds."""
+        parts = tc.replace(";", ":").split(":")
+        if len(parts) != 4:
+            return 0.0
+
+        h, m, s, f = map(int, parts)
+        total_seconds = h * 3600 + m * 60 + s
+        return total_seconds + (f / fps)
+
+    @classmethod
+    def read(cls, source: str, normalize_text: bool = True) -> List[Supervision]:
+        """Read Avid DS content and return supervisions."""
+        supervisions = []
+        lines = source.splitlines()
+
+        # Check header roughly
+        if not any(line.startswith("@") for line in lines[:5]):
+            # Not a strict Avid DS file maybe, but try anyway if columns match
+            pass
+
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith("@") or line.startswith("#"):
+                continue
+
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                start_tc = parts[0]
+                end_tc = parts[1]
+                text = "\t".join(parts[2:])  # Text might contain tabs? unlikely for captions but safe join
+
+                # Heuristic: verify TC format roughly
+                if ":" not in start_tc:
+                    continue
+
+                # Default FPS 25.0 if unknown, usually Avid DS is context dependent.
+                # Ideally config or header hints FPS, but standard TXT often lacks it.
+                # We assume 25 or try to guess?
+                # Let's verify separators: ';' implies drop frame (29.97).
+                fps = 25.0
+                if ";" in start_tc or ";" in end_tc:
+                    fps = 29.97
+
+                start_sec = cls._timecode_to_seconds(start_tc, fps)
+                end_sec = cls._timecode_to_seconds(end_tc, fps)
+
+                # Handle text cleanup
+                # Remove speaker if present and normalize?
+                # Avid DS text is just raw text usually.
+
+                if end_sec > start_sec:
+                    supervisions.append(
+                        Supervision(
+                            id=str(uuid.uuid4()),
+                            recording_id="avid_import",
+                            start=start_sec,
+                            duration=end_sec - start_sec,
+                            text=text.strip() if normalize_text else text,
+                        )
+                    )
+
+        return sorted(supervisions, key=lambda s: s.start)
+
+
+import uuid
+
+from .. import register_reader
+
+
+@register_reader("avid_ds")
+class AvidDSReaderHandler(FormatReader):
+    """Reader handler for Avid DS."""
+
+    format_id = "avid_ds"
+    extensions = [".txt"]
+
+    @classmethod
+    def can_read(cls, path: Union[Pathlike, str]) -> bool:
+        # Txt is generic, so we must peek content
+        if isinstance(path, (str, Path)) and not cls.is_content(path):
+            # We rely on upstream detection or explicit format selection usually.
+            # but check ext
+            return str(path).lower().endswith(".txt")
+        return False
+
+    @classmethod
+    def read(cls, source: Union[Pathlike, str], normalize_text: bool = True, **kwargs) -> List[Supervision]:
+        if isinstance(source, (str, Path)) and not cls.is_content(source):
+            with open(source, "r", encoding="utf-8") as f:
+                content = f.read()
+        else:
+            content = str(source)
+
+        return AvidDSReader.read(content, normalize_text=normalize_text)

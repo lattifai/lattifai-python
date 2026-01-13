@@ -9,17 +9,18 @@ Key features:
 - Speaker separation to different video tracks
 """
 
+import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from xml.dom import minidom
 
 from lhotse.utils import Pathlike
 
 from ...supervision import Supervision
 from .. import register_writer
-from ..base import FormatWriter
+from ..base import FormatReader, FormatWriter
 
 
 @dataclass
@@ -405,3 +406,151 @@ class PremiereXMLFormat(FormatWriter):
         """
         config = PremiereXMLConfig(**kwargs)
         return PremiereXMLWriter.to_bytes(supervisions, config)
+
+
+class PremiereXMLReader:
+    """Reader for Premiere Pro XML format."""
+
+    @classmethod
+    def _frames_to_seconds(cls, frames: int, fps: float) -> float:
+        """Convert frames to seconds."""
+        if fps <= 0:
+            return 0.0
+        return frames / fps
+
+    @classmethod
+    def _get_fps_from_rate(cls, rate_elem: Optional[ET.Element]) -> float:
+        """Extract FPS from rate element."""
+        if rate_elem is None:
+            return 25.0  # Default
+
+        timebase = rate_elem.find("timebase")
+        ntsc = rate_elem.find("ntsc")
+
+        if timebase is None:
+            return 25.0
+
+        base = float(timebase.text)
+        is_ntsc = ntsc is not None and ntsc.text == "TRUE"
+
+        if is_ntsc:
+            if base == 24:
+                return 23.976
+            elif base == 30:
+                return 29.97
+            elif base == 60:
+                return 59.94
+
+        return base
+
+    @classmethod
+    def read(cls, source: str, normalize_text: bool = True) -> List[Supervision]:
+        """Read Premiere XML content and return supervisions."""
+        try:
+            root = ET.fromstring(source)
+        except ET.ParseError:
+            # Handle potential encoding issues or invalid XML
+            return []
+
+        # Find sequence
+        sequence = root.find("sequence")
+        if sequence is None:
+            # Maybe root is sequence?
+            if root.tag == "sequence":
+                sequence = root
+            else:
+                return []
+
+        # Get frame rate
+        rate = sequence.find("rate")
+        fps = cls._get_fps_from_rate(rate)
+
+        supervisions = []
+
+        # Traverse video tracks for clipitems
+        # Typically structure: sequence -> media -> video -> track -> clipitem
+        media = sequence.find("media")
+        if media is None:
+            return []
+
+        video = media.find("video")
+        if video is None:
+            return []
+
+        for track in video.findall("track"):
+            for clipitem in track.findall("clipitem"):
+                # Check for filter/effect/name = Basic Text or similar
+                # We look for text parameters
+                text_content = ""
+
+                # Check filter effects
+                filter_elem = clipitem.find("filter")
+                if filter_elem is not None:
+                    effect = filter_elem.find("effect")
+                    if effect is not None:
+                        # Look for parameter with name "Text"
+                        for param in effect.findall("parameter"):
+                            name = param.find("name")
+                            if name is not None and name.text == "Text":
+                                val = param.find("value")
+                                if val is not None:
+                                    text_content = val.text
+                                    break
+
+                if not text_content:
+                    # Alternative: check if name is the text (simplistic fallback)
+                    # But often name is truncated.
+                    pass
+
+                if text_content:
+                    start_frame = int(clipitem.find("start").text)
+                    end_frame = int(clipitem.find("end").text)
+                    # Clipitem timing is relative to sequence logic usually,
+                    # but 'start' and 'end' in clipitem are often within the clip's local time?
+                    # Wait, standard Premiere XML:
+                    # <start> is start time in the sequence timeline (in frames)
+                    # <end> is end time in the sequence timeline
+
+                    # NOTE: Sometimes <start> is source start.
+                    # We need to check if it's placed on timeline.
+                    # Actually <start> and <end> inside clipitem usually define placement on timeline
+                    # if NO <in>/<out> complexity overrides it.
+                    # Let's assume standard usage from our Writer.
+
+                    start_sec = cls._frames_to_seconds(start_frame, fps)
+                    end_sec = cls._frames_to_seconds(end_frame, fps)
+                    duration = end_sec - start_sec
+
+                    if duration > 0:
+                        supervisions.append(
+                            Supervision(
+                                id=clipitem.get("id", str(uuid.uuid4())),
+                                recording_id="xml_import",
+                                start=start_sec,
+                                duration=duration,
+                                text=text_content.strip() if normalize_text else text_content,
+                            )
+                        )
+
+        return sorted(supervisions, key=lambda s: s.start)
+
+
+from .. import register_reader
+
+
+@register_reader("premiere_xml")
+class PremiereXMLReaderHandler(FormatReader):
+    """Reader handler for Premiere Pro XML."""
+
+    format_id = "premiere_xml"
+    extensions = [".xml"]
+
+    @classmethod
+    def read(cls, source: Union[Pathlike, str], normalize_text: bool = True, **kwargs) -> List[Supervision]:
+        if isinstance(source, (str, Path)) and not cls.is_content(source):
+            with open(source, "r", encoding="utf-8") as f:
+                content = f.read()
+        else:
+            content = str(source)
+
+        return PremiereXMLReader.read(content, normalize_text=normalize_text)

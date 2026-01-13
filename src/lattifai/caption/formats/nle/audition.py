@@ -13,13 +13,13 @@ import csv
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from lhotse.utils import Pathlike
 
 from ...supervision import Supervision
 from .. import register_writer
-from ..base import FormatWriter
+from ..base import FormatReader, FormatWriter
 
 
 @dataclass
@@ -388,3 +388,99 @@ class AuditionCSVFormat(FormatWriter):
         """
         config = AuditionCSVConfig(include_speaker_in_name=include_speaker, **kwargs)
         return AuditionCSVWriter.to_bytes(supervisions, config)
+
+
+class AuditionCSVReader:
+    """Reader for Adobe Audition CSV markers."""
+
+    @classmethod
+    def read(cls, source: str, normalize_text: bool = True, **kwargs) -> List[Supervision]:
+        """Read Audition CSV content and return supervisions."""
+        supervisions = []
+
+        # Use csv module to handle quoting correctly
+        f = StringIO(source)
+        reader = csv.DictReader(f)
+
+        # Mapping for flexible header names if needed, but assuming standard Audition export
+        # Standard: Name,Start,Duration,Time Format,Type,Description
+
+        sample_rate = kwargs.get("sample_rate", 48000)
+
+        for row in reader:
+            # Check for required fields
+            if "Start" not in row or "Duration" not in row:
+                continue
+
+            time_format = row.get("Time Format", "decimal")
+            start_val = row["Start"]
+            duration_val = row["Duration"]
+
+            try:
+                if time_format == "samples":
+                    start_sec = float(start_val) / sample_rate
+                    duration_sec = float(duration_val) / sample_rate
+                else:
+                    # decimal
+                    start_sec = float(start_val)
+                    duration_sec = float(duration_val)
+            except ValueError:
+                continue
+
+            # Extract text from Description or Name
+            description = row.get("Description", "")
+            name = row.get("Name", "")
+
+            # Logic: If description has content, prefer it as the caption text?
+            # Or is Name the text? The Writer puts text in Description if configured,
+            # and Name is "Speaker - Marker X".
+            # So Description is the best candidate for caption text.
+            text = description
+            if not text and name:
+                # Fallback to Name provided it doesn't look like generic "Marker 01"
+                if not name.startswith("Marker "):
+                    text = name
+
+            if duration_sec > 0 and text:
+                supervisions.append(
+                    Supervision(
+                        id=str(uuid.uuid4()),
+                        recording_id="audition_import",
+                        start=start_sec,
+                        duration=duration_sec,
+                        text=text.strip() if normalize_text else text,
+                    )
+                )
+
+        return sorted(supervisions, key=lambda s: s.start)
+
+
+import uuid
+
+from .. import register_reader
+
+
+@register_reader("audition_csv")
+class AuditionCSVReaderHandler(FormatReader):
+    """Reader handler for Audition CSV."""
+
+    format_id = "audition_csv"
+    extensions = [".csv"]
+
+    @classmethod
+    def can_read(cls, path: Union[Pathlike, str]) -> bool:
+        # Check first line for "Time Format" or "Audition" specific headers
+        if isinstance(path, (str, Path)) and not cls.is_content(path):
+            # We rely on upstream detection because .csv is too generic
+            return str(path).lower().endswith(".csv")
+        return False
+
+    @classmethod
+    def read(cls, source: Union[Pathlike, str], normalize_text: bool = True, **kwargs) -> List[Supervision]:
+        if isinstance(source, (str, Path)) and not cls.is_content(source):
+            with open(source, "r", encoding="utf-8") as f:
+                content = f.read()
+        else:
+            content = str(source)
+
+        return AuditionCSVReader.read(content, normalize_text=normalize_text, **kwargs)
