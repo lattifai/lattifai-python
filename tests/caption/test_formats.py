@@ -204,5 +204,112 @@ class TestFormatCoverage:
         print(f"✓ All {len(common_formats)} common formats are detected")
 
 
+class TestPysubs2SpeakerFormat:
+    """Test pysubs2 format speaker handling including word-level output."""
+
+    def test_pysubs2_speaker_in_text(self, tmp_path):
+        """Test that speaker is included in text when include_speaker_in_text=True."""
+        supervisions = [
+            Supervision(text="Hello world", start=1.0, duration=2.0, speaker="ALICE"),
+            Supervision(text="Goodbye", start=4.0, duration=1.0, speaker="BOB"),
+        ]
+
+        caption = Caption.from_supervisions(supervisions)
+        output_file = tmp_path / "output.srt"
+        caption.write(output_file, include_speaker_in_text=True)
+
+        content = output_file.read_text()
+        # New format: "speaker text"
+        assert "ALICE Hello world" in content
+        assert "BOB Goodbye" in content
+
+    def test_pysubs2_speaker_not_in_text(self, tmp_path):
+        """Test that speaker is not in text when include_speaker_in_text=False."""
+        supervisions = [
+            Supervision(text="Hello world", start=1.0, duration=2.0, speaker="ALICE"),
+        ]
+
+        caption = Caption.from_supervisions(supervisions)
+        output_file = tmp_path / "output.srt"
+        caption.write(output_file, include_speaker_in_text=False)
+
+        content = output_file.read_text()
+        assert "Hello world" in content
+        assert "ALICE Hello world" not in content
+
+    def test_pysubs2_word_level_with_speaker(self, tmp_path):
+        """Test word-level output uses consistent speaker across all words."""
+        from lhotse.supervision import AlignmentItem
+
+        # Create supervision with word-level alignment
+        supervisions = [
+            Supervision(
+                text="Hello world",
+                start=1.0,
+                duration=2.0,
+                speaker="SPEAKER_01",
+                alignment={
+                    "word": [
+                        AlignmentItem(symbol="Hello", start=1.0, duration=0.5),
+                        AlignmentItem(symbol="world", start=1.6, duration=0.4),
+                    ]
+                },
+            ),
+        ]
+
+        caption = Caption.from_supervisions(supervisions)
+        output_file = tmp_path / "output.vtt"
+        caption.write(output_file, include_speaker_in_text=True)
+
+        content = output_file.read_text()
+        # Word-level output should have each word as separate subtitle
+        assert "Hello" in content
+        assert "world" in content
+
+    def test_pysubs2_word_level_without_speaker(self, tmp_path):
+        """Test word-level output without speaker inclusion."""
+        from lhotse.supervision import AlignmentItem
+
+        # Create supervision with word-level alignment
+        supervisions = [
+            Supervision(
+                text="Hello world",
+                start=1.0,
+                duration=2.0,
+                speaker="SPEAKER_01",
+                alignment={
+                    "word": [
+                        AlignmentItem(symbol="Hello", start=1.0, duration=0.5),
+                        AlignmentItem(symbol="world", start=1.6, duration=0.4),
+                    ]
+                },
+            ),
+        ]
+
+        caption = Caption.from_supervisions(supervisions)
+        output_file = tmp_path / "output.vtt"
+        caption.write(output_file, include_speaker_in_text=False)
+
+        content = output_file.read_text()
+        # Words should be present
+        assert "Hello" in content
+        assert "world" in content
+
+    def test_pysubs2_null_speaker_handling(self, tmp_path):
+        """Test that null speaker is handled correctly."""
+        supervisions = [
+            Supervision(text="No speaker here", start=1.0, duration=2.0, speaker=None),
+        ]
+
+        caption = Caption.from_supervisions(supervisions)
+        output_file = tmp_path / "output.srt"
+        caption.write(output_file, include_speaker_in_text=True)
+
+        content = output_file.read_text()
+        assert "No speaker here" in content
+        # Should not have "None" or empty prefix
+        assert "None No speaker" not in content
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

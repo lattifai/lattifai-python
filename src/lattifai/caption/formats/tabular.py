@@ -94,8 +94,11 @@ class CSVFormat(FormatHandler):
         if include_speaker:
             writer.writerow(["speaker", "start", "end", "text"])
             for sup in supervisions:
-                speaker = sup.speaker if cls._should_include_speaker(sup, include_speaker) else ""
-                writer.writerow([speaker, round(1000 * sup.start), round(1000 * sup.end), sup.text.strip()])
+                if cls._should_include_speaker(sup, include_speaker):
+                    text = f"{sup.speaker} {sup.text.strip()}"
+                else:
+                    text = sup.text.strip()
+                writer.writerow([sup.speaker or "", round(1000 * sup.start), round(1000 * sup.end), text])
         else:
             writer.writerow(["start", "end", "text"])
             for sup in supervisions:
@@ -266,7 +269,7 @@ class AUDFormat(FormatHandler):
         for sup in supervisions:
             text = sup.text.strip().replace("\t", " ")
             if cls._should_include_speaker(sup, include_speaker):
-                text = f"[[{sup.speaker}]]{text}"
+                text = f"{sup.speaker} {text}"
             lines.append(f"{sup.start}\t{sup.end}\t{text}")
 
         return "\n".join(lines).encode("utf-8")
@@ -324,7 +327,7 @@ class TXTFormat(FormatHandler):
         for sup in supervisions:
             text = sup.text or ""
             if cls._should_include_speaker(sup, include_speaker):
-                text = f"[{sup.speaker}]: {text}"
+                text = f"{sup.speaker} {text}"
             lines.append(f"[{sup.start:.2f}-{sup.end:.2f}] {text}")
 
         return "\n".join(lines).encode("utf-8")

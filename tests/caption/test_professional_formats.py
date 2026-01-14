@@ -240,6 +240,38 @@ class TestTTMLWriter:
 
         assert result.exists()
 
+    def test_speaker_format_in_ttml(self, sample_supervisions, tmp_path):
+        """Test that speaker format uses 'speaker ' instead of 'speaker: '."""
+        config = TTMLConfig(profile="imsc1")
+        content = TTMLWriter.to_bytes(sample_supervisions, config)
+
+        # New format uses "speaker " not "speaker: "
+        assert b"Speaker1 " in content
+        assert b"Speaker1: " not in content
+
+    def test_speaker_span_element(self, sample_supervisions):
+        """Test speaker is rendered in bold span element."""
+        config = TTMLConfig(profile="imsc1")
+        content = TTMLWriter.to_bytes(sample_supervisions, config)
+
+        # Should contain span elements with bold font weight
+        assert b"<" in content  # XML structure
+        assert b"fontWeight" in content
+        assert b"bold" in content
+
+    def test_ttml_no_speaker_inclusion(self, tmp_path):
+        """Test TTML output without speaker inclusion."""
+        supervisions = [
+            Supervision(text="Test text", start=0.0, duration=2.0, speaker="Alice"),
+        ]
+
+        config = TTMLConfig(profile="imsc1")
+        content = TTMLWriter.to_bytes(supervisions, include_speaker=False, config=config)
+
+        # Should not include speaker name in output
+        assert b"Alice " not in content
+        assert b"Test text" in content
+
 
 class TestTimecodeOffset:
     """Tests for timecode offset functionality."""

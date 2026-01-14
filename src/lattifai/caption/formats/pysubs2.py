@@ -133,13 +133,14 @@ class Pysubs2Format(FormatHandler):
             word_items = alignment.get("word") if alignment else None
 
             if word_items:
+                speaker = sup.speaker if cls._should_include_speaker(sup, include_speaker) else ""
                 for word in word_items:
                     subs.append(
                         pysubs2.SSAEvent(
                             start=int(word.start * 1000),
                             end=int(word.end * 1000),
                             text=word.symbol,
-                            name=sup.speaker if cls._should_include_speaker(sup, include_speaker) else "",
+                            name=speaker,
                         )
                     )
             else:
@@ -152,7 +153,7 @@ class Pysubs2Format(FormatHandler):
                         start=int(sup.start * 1000),
                         end=int(sup.end * 1000),
                         text=text,
-                        name=sup.speaker if cls._should_include_speaker(sup, include_speaker) else "",
+                        name=sup.speaker or "",
                     )
                 )
 

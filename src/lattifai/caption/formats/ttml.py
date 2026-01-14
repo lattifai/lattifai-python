@@ -158,7 +158,7 @@ class TTMLFormatBase(FormatWriter):
             if include_this_speaker and config.profile != "basic":
                 span = ET.SubElement(p, f"{{{TTML_NS}}}span")
                 span.set(f"{{{TTML_STYLE_NS}}}fontWeight", "bold")
-                span.text = f"{sup.speaker}: "
+                span.text = f"{sup.speaker} "
                 span.tail = sup.text.strip() if sup.text else ""
             else:
                 p.text = sup.text.strip() if sup.text else ""
