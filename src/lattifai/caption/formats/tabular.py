@@ -94,21 +94,12 @@ class CSVFormat(FormatHandler):
         if include_speaker:
             writer.writerow(["speaker", "start", "end", "text"])
             for sup in supervisions:
-                # Check if speaker should be included
-                include_this_speaker = True
-                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
-                    include_this_speaker = False
-
-                speaker = sup.speaker if include_this_speaker and sup.speaker else ""
-                start_ms = round(1000 * sup.start)
-                end_ms = round(1000 * sup.end)
-                writer.writerow([speaker, start_ms, end_ms, sup.text.strip()])
+                speaker = sup.speaker if cls._should_include_speaker(sup, include_speaker) else ""
+                writer.writerow([speaker, round(1000 * sup.start), round(1000 * sup.end), sup.text.strip()])
         else:
             writer.writerow(["start", "end", "text"])
             for sup in supervisions:
-                start_ms = round(1000 * sup.start)
-                end_ms = round(1000 * sup.end)
-                writer.writerow([start_ms, end_ms, sup.text.strip()])
+                writer.writerow([round(1000 * sup.start), round(1000 * sup.end), sup.text.strip()])
 
         return output.getvalue().encode("utf-8")
 
@@ -189,23 +180,14 @@ class TSVFormat(FormatHandler):
         if include_speaker:
             lines.append("speaker\tstart\tend\ttext")
             for sup in supervisions:
-                # Check if speaker should be included
-                include_this_speaker = True
-                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
-                    include_this_speaker = False
-
-                speaker = sup.speaker if include_this_speaker and sup.speaker else ""
-                start_ms = round(1000 * sup.start)
-                end_ms = round(1000 * sup.end)
+                speaker = sup.speaker if cls._should_include_speaker(sup, include_speaker) else ""
                 text = sup.text.strip().replace("\t", " ")
-                lines.append(f"{speaker}\t{start_ms}\t{end_ms}\t{text}")
+                lines.append(f"{speaker}\t{round(1000 * sup.start)}\t{round(1000 * sup.end)}\t{text}")
         else:
             lines.append("start\tend\ttext")
             for sup in supervisions:
-                start_ms = round(1000 * sup.start)
-                end_ms = round(1000 * sup.end)
                 text = sup.text.strip().replace("\t", " ")
-                lines.append(f"{start_ms}\t{end_ms}\t{text}")
+                lines.append(f"{round(1000 * sup.start)}\t{round(1000 * sup.end)}\t{text}")
 
         return "\n".join(lines).encode("utf-8")
 
@@ -341,14 +323,8 @@ class TXTFormat(FormatHandler):
         lines = []
         for sup in supervisions:
             text = sup.text or ""
-            if include_speaker and sup.speaker:
-                # Check if speaker should be included
-                include_this_speaker = True
-                if hasattr(sup, "custom") and sup.custom and not sup.custom.get("original_speaker", True):
-                    include_this_speaker = False
-
-                if include_this_speaker:
-                    text = f"[{sup.speaker}]: {text}"
+            if cls._should_include_speaker(sup, include_speaker):
+                text = f"[{sup.speaker}]: {text}"
             lines.append(f"[{sup.start:.2f}-{sup.end:.2f}] {text}")
 
         return "\n".join(lines).encode("utf-8")

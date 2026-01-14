@@ -64,7 +64,7 @@ class Caption:
 
     def __bool__(self) -> bool:
         """Return True if caption has supervisions."""
-        return self.__len__() > 0
+        return len(self) > 0
 
     @property
     def is_empty(self) -> bool:

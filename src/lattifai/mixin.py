@@ -227,12 +227,9 @@ class LattifAIClientMixin:
 
     def _prepare_youtube_output_dir(self, output_dir: Optional["Pathlike"]) -> Path:
         """Prepare and return output directory for YouTube downloads."""
-        if output_dir is None:
-            output_dir = Path(tempfile.gettempdir()) / "lattifai_youtube"
-        else:
-            output_dir = Path(output_dir).expanduser()
-        output_dir.mkdir(parents=True, exist_ok=True)
-        return output_dir
+        output_path = Path(output_dir).expanduser() if output_dir else Path(tempfile.gettempdir()) / "lattifai_youtube"
+        output_path.mkdir(parents=True, exist_ok=True)
+        return output_path
 
     def _determine_media_format(self, media_format: Optional[str]) -> str:
         """Determine media format from parameter or config."""
@@ -242,11 +239,11 @@ class LattifAIClientMixin:
         self, output_caption_path: Optional["Pathlike"], media_file: str, output_dir: Path
     ) -> Path:
         """Generate output caption path if not provided."""
-        if not output_caption_path:
-            media_name = Path(media_file).stem
-            output_format = self.caption_config.output_format or "srt"
-            output_caption_path = output_dir / f"{media_name}_LattifAI.{output_format}"
-        return Path(output_caption_path)
+        if output_caption_path:
+            return Path(output_caption_path)
+        media_name = Path(media_file).stem
+        output_format = self.caption_config.output_format or "srt"
+        return output_dir / f"{media_name}_LattifAI.{output_format}"
 
     def _validate_transcription_setup(self) -> None:
         """Validate that transcription is properly configured if requested."""

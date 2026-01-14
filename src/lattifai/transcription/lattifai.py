@@ -9,7 +9,6 @@ from lattifai.audio2 import AudioData
 from lattifai.caption import Caption, Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.transcription.base import BaseTranscriber
-from lattifai.transcription.prompts import get_prompt_loader  # noqa: F401
 
 
 class LattifAITranscriber(BaseTranscriber):
@@ -20,61 +19,42 @@ class LattifAITranscriber(BaseTranscriber):
     Note: This transcriber only supports local file transcription, not URLs.
     """
 
-    # Transcriber metadata
     file_suffix = ".ass"
     supports_url = False
 
-    def __init__(
-        self,
-        transcription_config: TranscriptionConfig,
-    ):
+    def __init__(self, transcription_config: TranscriptionConfig):
         """
-        Initialize Gemini transcriber.
+        Initialize LattifAI transcriber.
 
         Args:
-            transcription_config: Transcription configuration. If None, uses default.
+            transcription_config: Transcription configuration.
         """
-        super().__init__(
-            config=transcription_config,
-        )
-
-        self._system_prompt: Optional[str] = None
+        super().__init__(config=transcription_config)
         self._transcriber = None
 
     @property
     def name(self) -> str:
-        return f"{self.config.model_name}"
+        return self.config.model_name
 
-    async def transcribe_url(self, url: str, language: Optional[str] = None) -> str:
-        """
-        URL transcription not supported for LattifAI local models.
-
-        This method exists to satisfy the BaseTranscriber interface but
-        will never be called because supports_url = False and the base
-        class checks this flag before calling this method.
-
-        Args:
-            url: URL to transcribe (not supported)
-            language: Optional language code (not used)
-        """
-        raise NotImplementedError(
-            f"{self.__class__.__name__} does not support URL transcription. "
-            f"Please download the file first and use transcribe_file()."
-        )
-
-    async def transcribe_file(self, media_file: Union[str, Path, AudioData], language: Optional[str] = None) -> Caption:
+    def _ensure_transcriber(self):
+        """Lazily initialize the core transcriber."""
         if self._transcriber is None:
             from lattifai_core.transcription import LattifAITranscriber as CoreLattifAITranscriber
 
             self._transcriber = CoreLattifAITranscriber.from_pretrained(model_config=self.config)
+        return self._transcriber
 
-        transcription, audio_events = self._transcriber.transcribe(media_file, language=language, num_workers=2)
-        caption = Caption.from_transcription_results(
-            transcription=transcription,
-            audio_events=audio_events,
+    async def transcribe_url(self, url: str, language: Optional[str] = None) -> str:
+        """URL transcription not supported for LattifAI local models."""
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support URL transcription. "
+            "Please download the file first and use transcribe_file()."
         )
 
-        return caption
+    async def transcribe_file(self, media_file: Union[str, Path, AudioData], language: Optional[str] = None) -> Caption:
+        transcriber = self._ensure_transcriber()
+        transcription, audio_events = transcriber.transcribe(media_file, language=language, num_workers=2)
+        return Caption.from_transcription_results(transcription=transcription, audio_events=audio_events)
 
     def transcribe_numpy(
         self,
@@ -92,13 +72,8 @@ class LattifAITranscriber(BaseTranscriber):
         Returns:
             Supervision object (or list of Supervision objects) with transcription and alignment info.
         """
-        if self._transcriber is None:
-            from lattifai_core.transcription import LattifAITranscriber as CoreLattifAITranscriber
-
-            self._transcriber = CoreLattifAITranscriber.from_pretrained(model_config=self.config)
-
-        # Delegate to core transcriber which handles both single arrays and lists
-        return self._transcriber.transcribe(
+        transcriber = self._ensure_transcriber()
+        return transcriber.transcribe(
             audio, language=language, return_hypotheses=True, progress_bar=False, timestamps=True
         )[0]
 
@@ -119,13 +94,3 @@ class LattifAITranscriber(BaseTranscriber):
             write_to_file(transcript.audio_events, events_file, format="long")
 
         return output_file
-
-    def _get_transcription_prompt(self) -> str:
-        """Get (and cache) transcription system prompt from prompts module."""
-        if self._system_prompt is not None:
-            return self._system_prompt
-
-        base_prompt = ""  # TODO
-
-        self._system_prompt = base_prompt
-        return self._system_prompt
