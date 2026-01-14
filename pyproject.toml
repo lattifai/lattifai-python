@@ -36,7 +36,7 @@ dependencies = [
     "wtpsplit>=2.1.7",
     "modelscope==1.33.0",
     # analysis and alignment
-    "error-align>=0.1.0b6",
+    "error-align-fix>=0.1.2",
     # transcription
     "OmniSenseVoice>=0.4.2",
     "nemo_toolkit_asr[asr]>=2.7.0rc4",
