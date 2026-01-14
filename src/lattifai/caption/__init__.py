@@ -23,6 +23,13 @@ from .formats.nle.fcpxml import FCPXMLConfig, FCPXMLStyle, FCPXMLWriter
 from .formats.nle.premiere import PremiereXMLConfig, PremiereXMLWriter
 from .formats.ttml import TTMLConfig, TTMLFormat, TTMLRegion, TTMLStyle
 from .parsers.text_parser import normalize_text
+from .standardize import (
+    CaptionStandardizer,
+    CaptionValidator,
+    StandardizationConfig,
+    ValidationResult,
+    standardize_captions,
+)
 from .supervision import Supervision
 
 # Create TTMLWriter alias for backward compatibility
@@ -44,6 +51,12 @@ __all__ = [
     # Core classes
     "Caption",
     "Supervision",
+    # Standardization
+    "CaptionStandardizer",
+    "CaptionValidator",
+    "StandardizationConfig",
+    "ValidationResult",
+    "standardize_captions",
     # Gemini format support
     "GeminiReader",
     "GeminiWriter",
