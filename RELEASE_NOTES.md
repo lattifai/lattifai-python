@@ -1,4 +1,69 @@
 ````markdown
+# Release Notes - LattifAI Python v1.2.1
+
+**Release Date:** January 15, 2026
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.2.1 introduces intelligent model caching for both Hugging Face and ModelScope, significantly improving download performance and reducing bandwidth usage.
+
+---
+
+## ✨ New Features
+
+### Smart Model Caching
+- **Automatic cache validation**: Models are cached locally with date-based markers to avoid unnecessary re-downloads
+- **7-day cache validity**: Cached models remain valid for 7 days before automatic refresh
+- **Multi-hub support**: Caching works seamlessly with both Hugging Face and ModelScope hubs
+- **Unified cache management**: Centralized `_resolve_model_path()` function handles all model downloads
+
+### Enhanced Model Resolution
+- Improved model path resolution logic for local and remote models
+- Better handling of ModelScope cache directory structure (`~/.cache/modelscope/hub/models/`)
+- Automatic cache marker creation and cleanup
+
+---
+
+## 🔧 Improvements
+
+### Code Refactoring
+- Refactored sentence splitter to use centralized `_resolve_model_path()` function
+- Eliminated duplicate model download code across the codebase
+- Improved code maintainability and consistency
+
+---
+
+## 🐛 Bug Fixes
+
+- Fixed ModelScope cache path detection to match actual directory structure
+- Improved cache validation logic to handle edge cases
+
+---
+
+## 📦 Installation
+
+```bash
+pip install --upgrade lattifai
+```
+
+---
+
+## 🔄 Migration Guide
+
+No breaking changes in this release. Users will automatically benefit from the caching improvements.
+
+---
+
+## 📝 Notes
+
+- The caching mechanism creates `.doneYYYYMMDD` marker files in model cache directories
+- Old cache markers are automatically cleaned up when new downloads occur
+- Cache validity can be verified by checking for these marker files
+
+---
+
 # Release Notes - LattifAI Python v1.2.0
 
 **Release Date:** December 31, 2025
