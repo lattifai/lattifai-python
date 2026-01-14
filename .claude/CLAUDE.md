@@ -306,3 +306,8 @@ YouTube URL → Downloader → Media File + Auto Caption
 - Type hints: Use for public APIs, optional for internal helpers
 - Docstrings: Google style for public classes/methods
 - Error handling: Custom exceptions in `errors.py`, raise specific errors with context
+
+## Language Guidelines
+
+- **Code Modification Explanations**: All explanations regarding code modifications must be in English.
+- **Commit Messages**: Commit messages must be written in English.

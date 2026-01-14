@@ -28,6 +28,7 @@ from .standardize import (
     CaptionValidator,
     StandardizationConfig,
     ValidationResult,
+    apply_margins_to_captions,
     standardize_captions,
 )
 from .supervision import Supervision
@@ -57,6 +58,7 @@ __all__ = [
     "StandardizationConfig",
     "ValidationResult",
     "standardize_captions",
+    "apply_margins_to_captions",
     # Gemini format support
     "GeminiReader",
     "GeminiWriter",

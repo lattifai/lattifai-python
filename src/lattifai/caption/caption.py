@@ -221,6 +221,67 @@ class Caption:
             metadata=self.metadata.copy(),
         )
 
+    def with_margins(
+        self,
+        start_margin: float = 0.08,
+        end_margin: float = 0.20,
+        min_gap: float = 0.08,
+        collision_mode: str = "trim",
+    ) -> "Caption":
+        """
+        Create a new Caption with segment boundaries adjusted based on word-level alignment.
+
+        Uses supervision.alignment['word'] to recalculate segment start/end times
+        with the specified margins applied around the actual speech boundaries.
+
+        Args:
+            start_margin: Seconds to extend before the first word (default: 0.08)
+            end_margin: Seconds to extend after the last word (default: 0.20)
+            min_gap: Minimum gap between segments for collision handling (default: 0.08)
+            collision_mode: How to handle segment overlap - 'trim' or 'gap' (default: 'trim')
+
+        Returns:
+            New Caption instance with adjusted timestamps
+
+        Note:
+            Segments without alignment data will keep their original timestamps.
+
+        Example:
+            >>> caption = Caption.read("aligned.srt")
+            >>> adjusted = caption.with_margins(start_margin=0.05, end_margin=0.15)
+            >>> adjusted.write("output.srt")
+        """
+        from .standardize import apply_margins_to_captions
+
+        # Determine which supervisions to use
+        if self.alignments:
+            source_sups = self.alignments
+        elif self.supervisions:
+            source_sups = self.supervisions
+        else:
+            source_sups = self.transcription
+
+        adjusted_sups = apply_margins_to_captions(
+            source_sups,
+            start_margin=start_margin,
+            end_margin=end_margin,
+            min_gap=min_gap,
+            collision_mode=collision_mode,
+        )
+
+        return Caption(
+            supervisions=adjusted_sups,
+            transcription=self.transcription,
+            audio_events=self.audio_events,
+            speaker_diarization=self.speaker_diarization,
+            alignments=[],  # Clear alignments since we've applied them
+            language=self.language,
+            kind=self.kind,
+            source_format=self.source_format,
+            source_path=self.source_path,
+            metadata=self.metadata.copy(),
+        )
+
     def to_string(self, format: str = "srt") -> str:
         """
         Return caption content in specified format.

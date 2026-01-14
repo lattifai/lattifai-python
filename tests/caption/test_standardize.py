@@ -6,13 +6,16 @@ Tests for CaptionStandardizer and CaptionValidator classes.
 """
 
 import pytest
+from lhotse.supervision import AlignmentItem
 
 from lattifai.caption import (
+    Caption,
     CaptionStandardizer,
     CaptionValidator,
     StandardizationConfig,
     Supervision,
     ValidationResult,
+    apply_margins_to_captions,
     standardize_captions,
 )
 
@@ -498,3 +501,337 @@ class TestIntegration:
 
         # Should pass validation after standardization
         assert result.valid is True, f"Validation failed: {result.warnings}"
+
+
+class TestStandardizationConfigMargins:
+    """Test StandardizationConfig margin-related fields."""
+
+    def test_default_margin_values(self):
+        """Test default margin configuration values."""
+        config = StandardizationConfig()
+
+        assert config.start_margin == 0.08
+        assert config.end_margin == 0.20
+        assert config.margin_collision_mode == "trim"
+
+    def test_custom_margin_values(self):
+        """Test custom margin configuration values."""
+        config = StandardizationConfig(
+            start_margin=0.05,
+            end_margin=0.15,
+            margin_collision_mode="gap",
+        )
+
+        assert config.start_margin == 0.05
+        assert config.end_margin == 0.15
+        assert config.margin_collision_mode == "gap"
+
+    def test_validation_start_margin(self):
+        """Test start_margin validation."""
+        with pytest.raises(ValueError, match="start_margin cannot be negative"):
+            StandardizationConfig(start_margin=-0.1)
+
+    def test_validation_end_margin(self):
+        """Test end_margin validation."""
+        with pytest.raises(ValueError, match="end_margin cannot be negative"):
+            StandardizationConfig(end_margin=-0.1)
+
+    def test_validation_margin_collision_mode(self):
+        """Test margin_collision_mode validation."""
+        with pytest.raises(ValueError, match="margin_collision_mode must be"):
+            StandardizationConfig(margin_collision_mode="invalid")
+
+
+class TestApplyMargins:
+    """Test apply_margins functionality."""
+
+    def test_apply_margins_basic(self):
+        """Test basic margin application with word alignment."""
+        seg = Supervision(
+            id="1",
+            start=1.0,
+            duration=2.0,
+            text="hello world",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="hello", start=1.1, duration=0.4, score=0.95),
+                    AlignmentItem(symbol="world", start=1.6, duration=0.4, score=0.92),
+                ]
+            },
+        )
+
+        standardizer = CaptionStandardizer()
+        result = standardizer.apply_margins([seg], start_margin=0.08, end_margin=0.20)
+
+        # first_word_start=1.1, last_word_end=2.0
+        # new_start = 1.1 - 0.08 = 1.02
+        # new_end = 2.0 + 0.20 = 2.20
+        assert len(result) == 1
+        assert result[0].start == pytest.approx(1.02, abs=0.001)
+        assert result[0].end == pytest.approx(2.20, abs=0.001)
+
+    def test_apply_margins_no_alignment(self):
+        """Test that segments without alignment data keep original timing."""
+        seg = Supervision(id="1", start=1.0, duration=2.0, text="hello")
+
+        standardizer = CaptionStandardizer()
+        result = standardizer.apply_margins([seg], start_margin=0.08, end_margin=0.20)
+
+        assert len(result) == 1
+        assert result[0].start == 1.0
+        assert result[0].duration == 2.0
+
+    def test_apply_margins_boundary_clamp_to_zero(self):
+        """Test that start time is clamped to 0."""
+        seg = Supervision(
+            id="1",
+            start=0.0,
+            duration=2.0,
+            text="hello",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="hello", start=0.05, duration=0.5, score=0.95),
+                ]
+            },
+        )
+
+        standardizer = CaptionStandardizer()
+        result = standardizer.apply_margins([seg], start_margin=0.10, end_margin=0.20)
+
+        # first_word_start=0.05, start_margin=0.10
+        # new_start = max(0, 0.05 - 0.10) = 0
+        assert result[0].start == 0.0
+
+    def test_apply_margins_collision_trim_mode(self):
+        """Test collision handling in trim mode.
+
+        When start_margin would cause overlap with previous segment,
+        trim mode reduces the margin to fit within available space.
+        """
+        # Create segments where word boundaries are close but have some space
+        segments = [
+            Supervision(
+                id="1",
+                start=0.0,
+                duration=1.0,
+                text="first",
+                alignment={
+                    "word": [
+                        AlignmentItem(symbol="first", start=0.1, duration=0.5, score=0.95),
+                    ]
+                },
+            ),
+            Supervision(
+                id="2",
+                start=1.0,
+                duration=1.0,
+                text="second",
+                alignment={
+                    "word": [
+                        # Word starts at 1.0, so start_margin=0.10 would put start at 0.90
+                        # First segment ends at 0.6 + 0.10 = 0.70 with end_margin
+                        # This leaves room for second to start at 0.78 (with min_gap=0.08)
+                        AlignmentItem(symbol="second", start=1.0, duration=0.5, score=0.92),
+                    ]
+                },
+            ),
+        ]
+
+        standardizer = CaptionStandardizer(min_gap=0.08)
+        standardizer.config.margin_collision_mode = "trim"
+        result = standardizer.apply_margins(segments, start_margin=0.10, end_margin=0.10)
+
+        # First segment: word 0.1-0.6, with margins → 0.0-0.70
+        # Second segment: word 1.0-1.5, with margins → 0.90-1.60
+        # Gap = 0.90 - 0.70 = 0.20, which is >= 0.08
+        first_end = result[0].start + result[0].duration
+        gap = result[1].start - first_end
+        assert gap >= 0.08 - 0.001, f"Gap {gap} should be >= 0.08"
+
+    def test_apply_margins_collision_gap_mode(self):
+        """Test collision handling in gap mode."""
+        segments = [
+            Supervision(
+                id="1",
+                start=0.0,
+                duration=1.0,
+                text="first",
+                alignment={
+                    "word": [
+                        AlignmentItem(symbol="first", start=0.1, duration=0.8, score=0.95),
+                    ]
+                },
+            ),
+            Supervision(
+                id="2",
+                start=1.0,
+                duration=1.0,
+                text="second",
+                alignment={
+                    "word": [
+                        AlignmentItem(symbol="second", start=1.05, duration=0.8, score=0.92),
+                    ]
+                },
+            ),
+        ]
+
+        standardizer = CaptionStandardizer(min_gap=0.08)
+        standardizer.config.margin_collision_mode = "gap"
+        result = standardizer.apply_margins(segments, start_margin=0.20, end_margin=0.20)
+
+        # Check that min_gap is strictly enforced
+        first_end = result[0].start + result[0].duration
+        gap = result[1].start - first_end
+        assert gap >= 0.08 - 0.001, f"Gap {gap} should be >= 0.08"
+
+    def test_apply_margins_preserves_metadata(self):
+        """Test that segment metadata is preserved."""
+        seg = Supervision(
+            id="seg1",
+            recording_id="rec1",
+            start=1.0,
+            duration=2.0,
+            text="hello",
+            speaker="Speaker1",
+            language="en",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="hello", start=1.1, duration=0.5, score=0.95),
+                ]
+            },
+        )
+
+        standardizer = CaptionStandardizer()
+        result = standardizer.apply_margins([seg])
+
+        assert result[0].id == "seg1"
+        assert result[0].recording_id == "rec1"
+        assert result[0].speaker == "Speaker1"
+        assert result[0].language == "en"
+        assert result[0].alignment is not None
+
+    def test_apply_margins_empty_input(self):
+        """Test with empty input list."""
+        standardizer = CaptionStandardizer()
+        result = standardizer.apply_margins([])
+
+        assert result == []
+
+    def test_apply_margins_config_defaults(self):
+        """Test that config defaults are used when not overridden."""
+        seg = Supervision(
+            id="1",
+            start=1.0,
+            duration=2.0,
+            text="hello",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="hello", start=1.1, duration=0.5, score=0.95),
+                ]
+            },
+        )
+
+        standardizer = CaptionStandardizer()
+        standardizer.config.start_margin = 0.05
+        standardizer.config.end_margin = 0.10
+
+        result = standardizer.apply_margins([seg])  # No explicit margins
+
+        # Should use config defaults: start=1.1-0.05=1.05, end=1.6+0.10=1.70
+        assert result[0].start == pytest.approx(1.05, abs=0.001)
+        assert result[0].end == pytest.approx(1.70, abs=0.001)
+
+
+class TestApplyMarginsConvenienceFunction:
+    """Test the apply_margins_to_captions convenience function."""
+
+    def test_apply_margins_to_captions_basic(self):
+        """Test the convenience function."""
+        seg = Supervision(
+            id="1",
+            start=1.0,
+            duration=2.0,
+            text="hello",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="hello", start=1.1, duration=0.5, score=0.95),
+                ]
+            },
+        )
+
+        result = apply_margins_to_captions([seg], start_margin=0.05, end_margin=0.15)
+
+        assert len(result) == 1
+        # first_word_start=1.1, last_word_end=1.6
+        # new_start = 1.1 - 0.05 = 1.05
+        # new_end = 1.6 + 0.15 = 1.75
+        assert result[0].start == pytest.approx(1.05, abs=0.001)
+        assert result[0].end == pytest.approx(1.75, abs=0.001)
+
+
+class TestCaptionWithMargins:
+    """Test Caption.with_margins() method."""
+
+    def test_caption_with_margins_basic(self):
+        """Test Caption.with_margins() method."""
+        seg = Supervision(
+            id="1",
+            start=1.0,
+            duration=2.0,
+            text="hello",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="hello", start=1.1, duration=0.5, score=0.95),
+                ]
+            },
+        )
+
+        caption = Caption(supervisions=[seg], language="en")
+        adjusted = caption.with_margins(start_margin=0.05, end_margin=0.15)
+
+        assert len(adjusted.supervisions) == 1
+        assert adjusted.supervisions[0].start == pytest.approx(1.05, abs=0.001)
+        assert adjusted.supervisions[0].end == pytest.approx(1.75, abs=0.001)
+        assert adjusted.language == "en"
+
+    def test_caption_with_margins_returns_new_instance(self):
+        """Test that with_margins returns a new Caption instance."""
+        seg = Supervision(
+            id="1",
+            start=1.0,
+            duration=2.0,
+            text="hello",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="hello", start=1.1, duration=0.5, score=0.95),
+                ]
+            },
+        )
+
+        caption = Caption(supervisions=[seg])
+        adjusted = caption.with_margins()
+
+        assert caption is not adjusted
+        assert caption.supervisions[0].start == 1.0  # Original unchanged
+
+    def test_caption_with_margins_uses_alignments(self):
+        """Test that with_margins prefers alignments over supervisions."""
+        original_seg = Supervision(id="1", start=0.0, duration=5.0, text="original")
+        aligned_seg = Supervision(
+            id="1",
+            start=1.0,
+            duration=2.0,
+            text="aligned",
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="aligned", start=1.1, duration=0.5, score=0.95),
+                ]
+            },
+        )
+
+        caption = Caption(supervisions=[original_seg], alignments=[aligned_seg])
+        adjusted = caption.with_margins(start_margin=0.05, end_margin=0.10)
+
+        # Should use aligned_seg, not original_seg
+        assert adjusted.supervisions[0].text == "aligned"
+        assert adjusted.supervisions[0].start == pytest.approx(1.05, abs=0.001)
