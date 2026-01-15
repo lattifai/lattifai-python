@@ -366,6 +366,9 @@ class AuditionCSVFormat(FormatWriter):
         Returns:
             Path to written file
         """
+        # Filter out unsupported kwargs (word_level, karaoke_config not supported by Audition CSV)
+        kwargs.pop("word_level", None)
+        kwargs.pop("karaoke_config", None)
         config = AuditionCSVConfig(include_speaker_in_name=include_speaker, **kwargs)
         return AuditionCSVWriter.write(supervisions, output_path, config)
 
@@ -386,6 +389,9 @@ class AuditionCSVFormat(FormatWriter):
         Returns:
             Audition CSV content as bytes
         """
+        # Filter out unsupported kwargs (word_level, karaoke_config not supported by Audition CSV)
+        kwargs.pop("word_level", None)
+        kwargs.pop("karaoke_config", None)
         config = AuditionCSVConfig(include_speaker_in_name=include_speaker, **kwargs)
         return AuditionCSVWriter.to_bytes(supervisions, config)
 
@@ -515,6 +521,9 @@ class EdiMarkerCSVFormat(FormatWriter):
         Returns:
             Path to written file
         """
+        # Filter out unsupported kwargs (word_level, karaoke_config not supported by EdiMarker)
+        kwargs.pop("word_level", None)
+        kwargs.pop("karaoke_config", None)
         config = EdiMarkerConfig(include_speaker=include_speaker, **kwargs)
         return EdiMarkerWriter.write(supervisions, output_path, config, fps=fps)
 
@@ -537,5 +546,8 @@ class EdiMarkerCSVFormat(FormatWriter):
         Returns:
             EdiMarker CSV content as bytes
         """
+        # Filter out unsupported kwargs (word_level, karaoke_config not supported by EdiMarker)
+        kwargs.pop("word_level", None)
+        kwargs.pop("karaoke_config", None)
         config = EdiMarkerConfig(include_speaker=include_speaker, **kwargs)
         return EdiMarkerWriter.to_bytes(supervisions, config, fps=fps)

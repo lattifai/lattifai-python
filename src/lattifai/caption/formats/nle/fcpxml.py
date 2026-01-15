@@ -417,6 +417,9 @@ class FCPXMLFormat(FormatWriter):
         Returns:
             Path to written file
         """
+        # Filter out unsupported kwargs (word_level, karaoke_config not supported by FCPXML)
+        kwargs.pop("word_level", None)
+        kwargs.pop("karaoke_config", None)
         config = FCPXMLConfig(**kwargs)
         return FCPXMLWriter.write(supervisions, output_path, config)
 
@@ -437,6 +440,9 @@ class FCPXMLFormat(FormatWriter):
         Returns:
             FCPXML content as bytes
         """
+        # Filter out unsupported kwargs (word_level, karaoke_config not supported by FCPXML)
+        kwargs.pop("word_level", None)
+        kwargs.pop("karaoke_config", None)
         config = FCPXMLConfig(**kwargs)
         return FCPXMLWriter.to_bytes(supervisions, config)
 
