@@ -164,9 +164,11 @@ def detect_format(path: str) -> Optional[str]:
     return None
 
 
+# Karaoke formats
 # Import all format modules to trigger registration
 # Standard formats
 from . import gemini  # YouTube/Gemini markdown
+from . import lrc  # Enhanced LRC with word-level timestamps
 from . import pysubs2  # SRT, VTT, ASS, SSA, SUB, SAMI
 from . import sbv  # SubViewer
 from . import tabular  # CSV, TSV, AUD, TXT, JSON
