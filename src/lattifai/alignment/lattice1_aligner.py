@@ -113,7 +113,7 @@ class Lattice1Aligner(object):
             if verbose:
                 safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
         except Exception as e:
-            if isinstance(supervisions, Supervision):
+            if isinstance(supervisions[0], Supervision):
                 text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
             else:
                 text_content = ""
