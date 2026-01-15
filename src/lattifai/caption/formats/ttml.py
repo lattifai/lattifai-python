@@ -4,6 +4,7 @@ TTML (Timed Text Markup Language) is a W3C standard used by:
 - Netflix (IMSC1 profile)
 - European broadcasters (EBU-TT-D profile)
 - IMF workflows
+- Apple Music (iTunes timing)
 """
 
 import xml.etree.ElementTree as ET
@@ -15,12 +16,14 @@ from xml.dom import minidom
 from ..supervision import Supervision
 from . import register_writer
 from .base import FormatWriter
+from .karaoke import KaraokeConfig
 
 # XML namespaces
 TTML_NS = "http://www.w3.org/ns/ttml"
 TTML_STYLE_NS = "http://www.w3.org/ns/ttml#styling"
 TTML_PARAM_NS = "http://www.w3.org/ns/ttml#parameter"
 XML_NS = "http://www.w3.org/XML/1998/namespace"
+ITUNES_NS = "http://music.apple.com/lyric-ttml-internal"
 
 
 @dataclass
@@ -94,13 +97,30 @@ class TTMLFormatBase(FormatWriter):
 
     @classmethod
     def _build_ttml(
-        cls, supervisions: List[Supervision], config: TTMLConfig, include_speaker: bool = True
+        cls,
+        supervisions: List[Supervision],
+        config: TTMLConfig,
+        include_speaker: bool = True,
+        word_level: bool = False,
+        karaoke_config: Optional[KaraokeConfig] = None,
     ) -> ET.Element:
-        """Build TTML document structure."""
+        """Build TTML document structure.
+
+        Args:
+            supervisions: List of supervisions to convert
+            config: TTML configuration
+            include_speaker: Whether to include speaker names
+            word_level: Whether to output word-level timing (iTunes format)
+            karaoke_config: Optional karaoke configuration for styling
+        """
         ET.register_namespace("", TTML_NS)
         ET.register_namespace("tts", TTML_STYLE_NS)
         ET.register_namespace("ttp", TTML_PARAM_NS)
         ET.register_namespace("xml", XML_NS)
+
+        # Register iTunes namespace if word-level timing is enabled
+        if word_level:
+            ET.register_namespace("itunes", ITUNES_NS)
 
         root = ET.Element(
             f"{{{TTML_NS}}}tt",
@@ -114,6 +134,13 @@ class TTMLFormatBase(FormatWriter):
             root.set(f"{{{TTML_PARAM_NS}}}profile", "http://www.w3.org/ns/ttml/profile/imsc1/text")
         elif config.profile == "ebu-tt-d":
             root.set(f"{{{TTML_PARAM_NS}}}profile", "urn:ebu:tt:distribution:2014-01")
+
+        # Add iTunes timing attribute for word-level
+        if word_level:
+            timing_mode = "Word"
+            if karaoke_config:
+                timing_mode = karaoke_config.ttml_timing_mode
+            root.set(f"{{{ITUNES_NS}}}timing", timing_mode)
 
         # Head section
         head = ET.SubElement(root, f"{{{TTML_NS}}}head")
@@ -155,7 +182,23 @@ class TTMLFormatBase(FormatWriter):
 
             include_this_speaker = cls._should_include_speaker(sup, include_speaker)
 
-            if include_this_speaker and config.profile != "basic":
+            # Check if word-level timing should be used for this supervision
+            has_word_alignment = (
+                word_level and sup.alignment and "word" in sup.alignment and len(sup.alignment["word"]) > 0
+            )
+
+            if has_word_alignment:
+                # Word-level timing: create span for each word
+                word_items = sup.alignment["word"]
+                for i, item in enumerate(word_items):
+                    span = ET.SubElement(p, f"{{{TTML_NS}}}span")
+                    span.set("begin", cls._seconds_to_ttml_time(item.start))
+                    span.set("end", cls._seconds_to_ttml_time(item.start + item.duration))
+                    span.text = item.symbol
+                    # Add space between words (except after last word)
+                    if i < len(word_items) - 1:
+                        span.tail = " "
+            elif include_this_speaker and config.profile != "basic":
                 span = ET.SubElement(p, f"{{{TTML_NS}}}span")
                 span.set(f"{{{TTML_STYLE_NS}}}fontWeight", "bold")
                 span.text = f"{sup.speaker} "
@@ -189,9 +232,20 @@ class TTMLFormat(TTMLFormatBase):
         output_path,
         include_speaker: bool = True,
         config: Optional[TTMLConfig] = None,
+        word_level: bool = False,
+        karaoke_config: Optional[KaraokeConfig] = None,
         **kwargs,
     ) -> Path:
-        """Write TTML format."""
+        """Write TTML format.
+
+        Args:
+            supervisions: List of supervisions to write
+            output_path: Output file path
+            include_speaker: Whether to include speaker names
+            config: TTML configuration
+            word_level: Whether to output word-level timing (iTunes format)
+            karaoke_config: Optional karaoke configuration
+        """
         if config is None:
             config = TTMLConfig()
 
@@ -199,7 +253,13 @@ class TTMLFormat(TTMLFormatBase):
         if output_path.suffix.lower() not in [".ttml", ".xml"]:
             output_path = output_path.with_suffix(".ttml")
 
-        root = cls._build_ttml(supervisions, config, include_speaker=include_speaker)
+        root = cls._build_ttml(
+            supervisions,
+            config,
+            include_speaker=include_speaker,
+            word_level=word_level,
+            karaoke_config=karaoke_config,
+        )
         xml_content = cls._prettify_xml(root)
 
         output_path.write_text(xml_content, encoding="utf-8")
@@ -211,13 +271,29 @@ class TTMLFormat(TTMLFormatBase):
         supervisions: List[Supervision],
         include_speaker: bool = True,
         config: Optional[TTMLConfig] = None,
+        word_level: bool = False,
+        karaoke_config: Optional[KaraokeConfig] = None,
         **kwargs,
     ) -> bytes:
-        """Convert to TTML format bytes."""
+        """Convert to TTML format bytes.
+
+        Args:
+            supervisions: List of supervisions to convert
+            include_speaker: Whether to include speaker names
+            config: TTML configuration
+            word_level: Whether to output word-level timing (iTunes format)
+            karaoke_config: Optional karaoke configuration
+        """
         if config is None:
             config = TTMLConfig()
 
-        root = cls._build_ttml(supervisions, config, include_speaker=include_speaker)
+        root = cls._build_ttml(
+            supervisions,
+            config,
+            include_speaker=include_speaker,
+            word_level=word_level,
+            karaoke_config=karaoke_config,
+        )
         xml_content = cls._prettify_xml(root)
         return xml_content.encode("utf-8")
 
@@ -313,4 +389,4 @@ class EBUTD_Format(TTMLFormatBase):
 
 
 # Export config classes
-__all__ = ["TTMLFormat", "IMSC1Format", "EBUTD_Format", "TTMLConfig", "TTMLStyle", "TTMLRegion"]
+__all__ = ["TTMLFormat", "IMSC1Format", "EBUTD_Format", "TTMLConfig", "TTMLStyle", "TTMLRegion", "ITUNES_NS"]
