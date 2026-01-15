@@ -13,6 +13,7 @@ from ..parsers.text_parser import parse_speaker_text
 from ..supervision import Supervision
 from . import register_format
 from .base import FormatHandler
+from .karaoke import KaraokeConfig, KaraokeStyle
 
 
 class Pysubs2Format(FormatHandler):
@@ -201,11 +202,162 @@ class VTTFormat(Pysubs2Format):
 
 @register_format("ass")
 class ASSFormat(Pysubs2Format):
-    """Advanced SubStation Alpha format."""
+    """Advanced SubStation Alpha format with karaoke support."""
 
     extensions = [".ass"]
     pysubs2_format = "ass"
     description = "Advanced SubStation Alpha - rich styling support"
+
+    @classmethod
+    def to_bytes(
+        cls,
+        supervisions: List[Supervision],
+        include_speaker: bool = True,
+        fps: float = 25.0,
+        word_level: bool = False,
+        karaoke_config: Optional[KaraokeConfig] = None,
+        **kwargs,
+    ) -> bytes:
+        """Convert to ASS bytes with optional karaoke tags.
+
+        Args:
+            supervisions: List of supervision segments
+            include_speaker: Whether to include speaker in output
+            fps: Frames per second (not used for ASS)
+            word_level: If True and alignment data exists, generate karaoke tags
+            karaoke_config: Karaoke style configuration
+
+        Returns:
+            ASS content as bytes
+        """
+        # If word_level is False, use original behavior
+        if not word_level:
+            return super().to_bytes(supervisions, include_speaker=include_speaker, fps=fps, **kwargs)
+
+        # Check if any supervision has word-level alignment
+        has_alignment = any(getattr(sup, "alignment", None) and sup.alignment.get("word") for sup in supervisions)
+
+        # If no alignment data, fallback to original behavior
+        if not has_alignment:
+            return super().to_bytes(supervisions, include_speaker=include_speaker, fps=fps, **kwargs)
+
+        # Get karaoke config with defaults
+        if karaoke_config is None:
+            karaoke_config = KaraokeConfig()
+
+        style = karaoke_config.style
+
+        # Create ASS file with karaoke style
+        subs = pysubs2.SSAFile()
+        subs.styles["Karaoke"] = cls._create_karaoke_style(style)
+
+        for sup in supervisions:
+            alignment = getattr(sup, "alignment", None)
+            word_items = alignment.get("word") if alignment else None
+
+            if word_items:
+                # Build karaoke text for the entire line
+                karaoke_text = cls._build_karaoke_text(word_items, style.effect)
+
+                # Create single event with karaoke tags
+                subs.append(
+                    pysubs2.SSAEvent(
+                        start=int(sup.start * 1000),
+                        end=int(sup.end * 1000),
+                        text=karaoke_text,
+                        style="Karaoke",
+                    )
+                )
+            else:
+                # No alignment for this supervision, use plain text
+                text = sup.text or ""
+                if cls._should_include_speaker(sup, include_speaker):
+                    text = f"{sup.speaker} {text}"
+
+                subs.append(
+                    pysubs2.SSAEvent(
+                        start=int(sup.start * 1000),
+                        end=int(sup.end * 1000),
+                        text=text,
+                        name=sup.speaker or "",
+                    )
+                )
+
+        return subs.to_string(format_="ass").encode("utf-8")
+
+    @classmethod
+    def _create_karaoke_style(cls, style: KaraokeStyle) -> pysubs2.SSAStyle:
+        """Create pysubs2 SSAStyle from KaraokeStyle config.
+
+        Args:
+            style: KaraokeStyle configuration
+
+        Returns:
+            pysubs2.SSAStyle object
+        """
+        # Convert int alignment to pysubs2.Alignment enum
+        alignment = pysubs2.Alignment(style.alignment)
+
+        return pysubs2.SSAStyle(
+            fontname=style.font_name,
+            fontsize=style.font_size,
+            primarycolor=cls._hex_to_ass_color(style.primary_color),
+            secondarycolor=cls._hex_to_ass_color(style.secondary_color),
+            outlinecolor=cls._hex_to_ass_color(style.outline_color),
+            backcolor=cls._hex_to_ass_color(style.back_color),
+            bold=style.bold,
+            italic=style.italic,
+            outline=style.outline_width,
+            shadow=style.shadow_depth,
+            alignment=alignment,
+            marginl=style.margin_l,
+            marginr=style.margin_r,
+            marginv=style.margin_v,
+        )
+
+    @staticmethod
+    def _hex_to_ass_color(hex_color: str) -> pysubs2.Color:
+        """Convert #RRGGBB to pysubs2 Color.
+
+        ASS uses &HAABBGGRR format (reversed RGB with alpha).
+
+        Args:
+            hex_color: Color in #RRGGBB format
+
+        Returns:
+            pysubs2.Color object
+        """
+        # Remove # prefix if present
+        hex_color = hex_color.lstrip("#")
+
+        # Parse RGB
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+
+        return pysubs2.Color(r=r, g=g, b=b, a=0)
+
+    @staticmethod
+    def _build_karaoke_text(words: list, effect: str = "sweep") -> str:
+        """Build karaoke tag text.
+
+        Args:
+            words: List of AlignmentItem objects
+            effect: Karaoke effect type ("sweep", "instant", "outline")
+
+        Returns:
+            Text with karaoke tags, e.g. "{\\kf45}Hello {\\kf55}world"
+        """
+        tag_map = {"sweep": "kf", "instant": "k", "outline": "ko"}
+        tag = tag_map.get(effect, "kf")
+
+        parts = []
+        for word in words:
+            # Duration in centiseconds (multiply by 100)
+            centiseconds = int(word.duration * 100)
+            parts.append(f"{{\\{tag}{centiseconds}}}{word.symbol}")
+
+        return " ".join(parts)
 
 
 @register_format("ssa")
