@@ -1,9 +1,14 @@
 """Caption data structure for storing subtitle information with metadata."""
 
+from __future__ import annotations
+
 import io
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, TypeVar, Union
+
+if TYPE_CHECKING:
+    from .formats.karaoke import KaraokeConfig
 
 from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
@@ -282,17 +287,24 @@ class Caption:
             metadata=self.metadata.copy(),
         )
 
-    def to_string(self, format: str = "srt") -> str:
+    def to_string(
+        self,
+        format: str = "srt",
+        word_level: bool = False,
+        karaoke_config: Optional["KaraokeConfig"] = None,
+    ) -> str:
         """
         Return caption content in specified format.
 
         Args:
             format: Output format (e.g., 'srt', 'vtt', 'ass')
+            word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
+            karaoke_config: Karaoke configuration for word-level export
 
         Returns:
             String containing formatted captions
         """
-        return self.to_bytes(output_format=format).decode("utf-8")
+        return self.to_bytes(output_format=format, word_level=word_level, karaoke_config=karaoke_config).decode("utf-8")
 
     def to_dict(self) -> Dict:
         """
@@ -374,7 +386,11 @@ class Caption:
         return cls.read(buffer, format=format, normalize_text=normalize_text)
 
     def to_bytes(
-        self, output_format: Optional[str] = None, include_speaker_in_text: bool = True, word_level: bool = False
+        self,
+        output_format: Optional[str] = None,
+        include_speaker_in_text: bool = True,
+        word_level: bool = False,
+        karaoke_config: Optional["KaraokeConfig"] = None,
     ) -> bytes:
         """
         Convert caption to bytes.
@@ -382,7 +398,8 @@ class Caption:
         Args:
             output_format: Output format (e.g., 'srt', 'vtt', 'ass'). Defaults to source_format or 'srt'
             include_speaker_in_text: Whether to include speaker labels in text
-            word_level: Use word-level output format if supported (e.g., YouTube VTT for .vtt output)
+            word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
+            karaoke_config: Karaoke configuration for word-level export
 
         Returns:
             Caption content as bytes
@@ -395,7 +412,11 @@ class Caption:
             >>> vtt_data = caption.to_bytes(output_format="vtt")
         """
         return self.write(
-            None, output_format=output_format, include_speaker_in_text=include_speaker_in_text, word_level=word_level
+            None,
+            output_format=output_format,
+            include_speaker_in_text=include_speaker_in_text,
+            word_level=word_level,
+            karaoke_config=karaoke_config,
         )
 
     @classmethod
@@ -512,6 +533,7 @@ class Caption:
         output_format: Optional[str] = None,
         include_speaker_in_text: bool = True,
         word_level: bool = False,
+        karaoke_config: Optional["KaraokeConfig"] = None,
     ) -> Union[Pathlike, bytes]:
         """
         Write caption to file or return as bytes.
@@ -520,7 +542,8 @@ class Caption:
             path: Path to output caption file, BytesIO object, or None to return bytes
             output_format: Output format (e.g., 'srt', 'vtt', 'ass')
             include_speaker_in_text: Whether to include speaker labels in text
-            word_level: Use word-level output format if supported (e.g., YouTube VTT for .vtt output)
+            word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
+            karaoke_config: Karaoke configuration for word-level export
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -566,9 +589,17 @@ class Caption:
             writer_cls = Pysubs2Format
 
         if isinstance(path, (str, Path)):
-            return writer_cls.write(supervisions, path, include_speaker=include_speaker_in_text)
+            return writer_cls.write(
+                supervisions,
+                path,
+                include_speaker=include_speaker_in_text,
+                word_level=word_level,
+                karaoke_config=karaoke_config,
+            )
 
-        content = writer_cls.to_bytes(supervisions, include_speaker=include_speaker_in_text)
+        content = writer_cls.to_bytes(
+            supervisions, include_speaker=include_speaker_in_text, word_level=word_level, karaoke_config=karaoke_config
+        )
         if isinstance(path, io.BytesIO):
             path.write(content)
             path.seek(0)
