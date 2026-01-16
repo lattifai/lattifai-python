@@ -333,49 +333,6 @@ class TXTFormat(FormatHandler):
         return "\n".join(lines).encode("utf-8")
 
 
-@register_format("json")
-class JSONFormat(FormatHandler):
-    """JSON format for structured caption data."""
-
-    extensions = [".json"]
-    description = "JSON - structured caption data"
-
-    @classmethod
-    def read(cls, source, normalize_text: bool = True, **kwargs) -> List[Supervision]:
-        """Read JSON format."""
-        if cls.is_content(source):
-            data = json.loads(source)
-        else:
-            with open(source, "r", encoding="utf-8") as f:
-                data = json.load(f)
-
-        supervisions = []
-        for item in data:
-            text = item.get("text", "")
-            if normalize_text:
-                text = normalize_text_fn(text)
-
-            supervisions.append(
-                Supervision(
-                    text=text,
-                    start=item.get("start", 0),
-                    duration=item.get("duration", 0),
-                    speaker=item.get("speaker"),
-                )
-            )
-
-        return supervisions
-
-    @classmethod
-    def write(cls, supervisions: List[Supervision], output_path, include_speaker: bool = True, **kwargs) -> Path:
-        """Write JSON format."""
-        output_path = Path(output_path)
-        content = cls.to_bytes(supervisions, include_speaker=include_speaker)
-        output_path.write_bytes(content)
-        return output_path
-
-    @classmethod
-    def to_bytes(cls, supervisions: List[Supervision], include_speaker: bool = True, **kwargs) -> bytes:
-        """Convert to JSON format bytes."""
-        data = [sup.to_dict() for sup in supervisions]
-        return json.dumps(data, ensure_ascii=False, indent=4).encode("utf-8")
+# JSON format moved to json.py for better organization
+# Import here for backwards compatibility
+from .json import JSONFormat  # noqa: F401

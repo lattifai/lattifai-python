@@ -18,6 +18,7 @@ from typing import List, Optional, Union
 
 from lhotse.supervision import SupervisionSegment
 
+from ..config.caption import StandardizationConfig
 from .supervision import Supervision
 
 __all__ = [
@@ -28,57 +29,6 @@ __all__ = [
     "standardize_captions",
     "apply_margins_to_captions",
 ]
-
-
-@dataclass
-class StandardizationConfig:
-    """Standardization configuration."""
-
-    min_duration: float = 0.8
-    """Minimum duration (seconds) - Netflix recommends 5/6s, BBC recommends 0.3s"""
-
-    max_duration: float = 7.0
-    """Maximum duration (seconds) - Netflix/BBC recommends 7s"""
-
-    min_gap: float = 0.08
-    """Minimum gap (seconds) - Prevents subtitle flicker, 80ms is safe threshold"""
-
-    max_lines: int = 2
-    """Maximum lines - Broadcast standard is typically 2 lines"""
-
-    max_chars_per_line: int = 42
-    """Maximum characters per line - 42 for English, 22 for CJK"""
-
-    optimal_cps: float = 17.0
-    """Optimal reading speed (chars/sec) - Netflix recommends 17-20 CPS"""
-
-    start_margin: float = 0.08
-    """Start margin (seconds) - Extends before first word based on word alignment"""
-
-    end_margin: float = 0.20
-    """End margin (seconds) - Extends after last word based on word alignment"""
-
-    margin_collision_mode: str = "trim"
-    """Collision mode: 'trim' (reduce margin) | 'gap' (maintain min_gap)"""
-
-    def __post_init__(self):
-        """Validate configuration parameters."""
-        if self.min_duration <= 0:
-            raise ValueError("min_duration must be positive")
-        if self.max_duration <= self.min_duration:
-            raise ValueError("max_duration must be greater than min_duration")
-        if self.min_gap < 0:
-            raise ValueError("min_gap cannot be negative")
-        if self.max_lines < 1:
-            raise ValueError("max_lines must be at least 1")
-        if self.max_chars_per_line < 10:
-            raise ValueError("max_chars_per_line must be at least 10")
-        if self.start_margin < 0:
-            raise ValueError("start_margin cannot be negative")
-        if self.end_margin < 0:
-            raise ValueError("end_margin cannot be negative")
-        if self.margin_collision_mode not in ("trim", "gap"):
-            raise ValueError("margin_collision_mode must be 'trim' or 'gap'")
 
 
 @dataclass
@@ -124,7 +74,7 @@ class CaptionStandardizer:
 
     # Chinese/Japanese punctuation (for line break priority)
     # Reference: alignment/punctuation.py
-    CJK_PUNCTUATION = r"[，。、？！：；·…—～""''（）【】〔〕〖〗《》〈〉「」『』〘〙〚〛]"
+    CJK_PUNCTUATION = r"[，。、？！：；·…—～" "''（）【】〔〕〖〗《》〈〉「」『』〘〙〚〛]"
 
     # English/Western punctuation
     EN_PUNCTUATION = r"[,.!?;:\-–—«»‹›]"
@@ -418,8 +368,9 @@ class CaptionStandardizer:
         if not segments:
             return []
 
-        sm = start_margin if start_margin is not None else self.config.start_margin
-        em = end_margin if end_margin is not None else self.config.end_margin
+        # Resolve margins: parameter > config > 0.0 (no adjustment)
+        sm = start_margin if start_margin is not None else (self.config.start_margin or 0.0)
+        em = end_margin if end_margin is not None else (self.config.end_margin or 0.0)
 
         # Sort by start time
         sorted_segs = sorted(segments, key=lambda s: s.start)
@@ -438,7 +389,7 @@ class CaptionStandardizer:
             first_word_start = words[0].start
             last_word_end = words[-1].start + words[-1].duration
 
-            # Apply margin
+            # Apply margin (0.0 means no adjustment, just use word boundaries)
             new_start = max(0, first_word_start - sm)
             new_end = last_word_end + em
 

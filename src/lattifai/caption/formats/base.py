@@ -176,3 +176,36 @@ class FormatHandler(FormatReader, FormatWriter):
 # Type aliases for registration
 ReaderType = type[FormatReader]
 WriterType = type[FormatWriter]
+
+
+def expand_to_word_supervisions(supervisions: List["Supervision"]) -> List["Supervision"]:
+    """Expand supervisions with word alignment to one supervision per word.
+
+    Used for word-per-segment output when word_level=True but karaoke=False.
+
+    Args:
+        supervisions: List of Supervision objects with optional alignment data
+
+    Returns:
+        List of Supervision objects, one per word if alignment exists,
+        otherwise returns original supervisions unchanged.
+    """
+    from ..supervision import Supervision
+
+    result = []
+    for sup in supervisions:
+        if sup.alignment and "word" in sup.alignment:
+            for word in sup.alignment["word"]:
+                result.append(
+                    Supervision(
+                        text=word.symbol,
+                        start=word.start,
+                        duration=word.duration,
+                        speaker=sup.speaker,
+                        id=f"{sup.id}_word" if sup.id else "",
+                        recording_id=sup.recording_id if hasattr(sup, "recording_id") else "",
+                    )
+                )
+        else:
+            result.append(sup)
+    return result

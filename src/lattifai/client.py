@@ -198,8 +198,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         media_audio,
                         _supervisions,
                         split_sentence=split_sentence or self.caption_config.split_sentence,
-                        return_details=self.caption_config.word_level
-                        or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                        return_details=True,
                         emission=emission,
                         offset=offset,
                         verbose=False,
@@ -216,8 +215,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     media_audio,
                     caption.supervisions,
                     split_sentence=split_sentence or self.caption_config.split_sentence,
-                    return_details=self.caption_config.word_level
-                    or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                    return_details=True,
                 )
 
             # Update caption with aligned results

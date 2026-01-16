@@ -1,56 +1,55 @@
-"""Tests for karaoke configuration classes."""
+"""Tests for caption style and karaoke configuration classes."""
 
 import pytest
 
-from lattifai.caption.formats.karaoke import KaraokeConfig, KaraokeFonts, KaraokeStyle
+from lattifai.config.caption import CaptionFonts, CaptionStyle, KaraokeConfig
 
 
-class TestKaraokeFonts:
-    """Test KaraokeFonts constants."""
+class TestCaptionFonts:
+    """Test CaptionFonts constants."""
 
     def test_western_fonts_exist(self):
         """Western font constants should be defined."""
-        assert KaraokeFonts.ARIAL == "Arial"
-        assert KaraokeFonts.IMPACT == "Impact"
-        assert KaraokeFonts.VERDANA == "Verdana"
+        assert CaptionFonts.ARIAL == "Arial"
+        assert CaptionFonts.IMPACT == "Impact"
+        assert CaptionFonts.VERDANA == "Verdana"
 
     def test_chinese_fonts_exist(self):
         """Chinese font constants should be defined."""
-        assert KaraokeFonts.NOTO_SANS_SC == "Noto Sans SC"
-        assert KaraokeFonts.MICROSOFT_YAHEI == "Microsoft YaHei"
-        assert KaraokeFonts.PINGFANG_SC == "PingFang SC"
+        assert CaptionFonts.NOTO_SANS_SC == "Noto Sans SC"
+        assert CaptionFonts.MICROSOFT_YAHEI == "Microsoft YaHei"
+        assert CaptionFonts.PINGFANG_SC == "PingFang SC"
 
     def test_japanese_fonts_exist(self):
         """Japanese font constants should be defined."""
-        assert KaraokeFonts.NOTO_SANS_JP == "Noto Sans JP"
-        assert KaraokeFonts.MEIRYO == "Meiryo"
+        assert CaptionFonts.NOTO_SANS_JP == "Noto Sans JP"
+        assert CaptionFonts.MEIRYO == "Meiryo"
 
 
-class TestKaraokeStyle:
-    """Test KaraokeStyle dataclass."""
+class TestCaptionStyle:
+    """Test CaptionStyle dataclass."""
 
     def test_default_values(self):
         """Default style should have sensible defaults."""
-        style = KaraokeStyle()
-        assert style.effect == "sweep"
-        assert style.primary_color == "#00FFFF"
-        assert style.secondary_color == "#FFFFFF"
-        assert style.font_name == KaraokeFonts.ARIAL
+        style = CaptionStyle()
+        assert style.primary_color == "#FFFFFF"
+        assert style.secondary_color == "#00FFFF"
+        assert style.font_name == CaptionFonts.ARIAL
         assert style.font_size == 48
-        assert style.bold is True
+        assert style.bold is False
 
     def test_custom_values(self):
         """Custom values should override defaults."""
-        style = KaraokeStyle(
-            effect="instant",
+        style = CaptionStyle(
             primary_color="#FF00FF",
-            font_name=KaraokeFonts.NOTO_SANS_SC,
+            font_name=CaptionFonts.NOTO_SANS_SC,
             font_size=56,
+            bold=True,
         )
-        assert style.effect == "instant"
         assert style.primary_color == "#FF00FF"
         assert style.font_name == "Noto Sans SC"
         assert style.font_size == 56
+        assert style.bold is True
 
 
 class TestKaraokeConfig:
@@ -59,10 +58,22 @@ class TestKaraokeConfig:
     def test_default_config(self):
         """Default config should work."""
         config = KaraokeConfig()
-        assert config.enabled is True
-        assert isinstance(config.style, KaraokeStyle)
+        assert config.enabled is False  # Default is False, must be explicitly enabled
+        assert config.effect == "sweep"
+        assert isinstance(config.style, CaptionStyle)
         assert config.lrc_precision == "millisecond"
         assert config.ttml_timing_mode == "Word"
+
+    def test_effect_options(self):
+        """Effect should support sweep, instant, outline."""
+        config_sweep = KaraokeConfig(effect="sweep")
+        assert config_sweep.effect == "sweep"
+
+        config_instant = KaraokeConfig(effect="instant")
+        assert config_instant.effect == "instant"
+
+        config_outline = KaraokeConfig(effect="outline")
+        assert config_outline.effect == "outline"
 
     def test_lrc_metadata(self):
         """LRC metadata should be configurable."""

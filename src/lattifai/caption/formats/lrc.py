@@ -22,10 +22,10 @@ from typing import List, Optional
 
 from lhotse.supervision import AlignmentItem
 
+from ...config.caption import KaraokeConfig
 from ..supervision import Supervision
 from . import register_format
 from .base import FormatHandler
-from .karaoke import KaraokeConfig
 
 
 @register_format("lrc")
@@ -154,8 +154,9 @@ class LRCFormat(FormatHandler):
             supervisions: List of Supervision objects to write
             output_path: Path to output file
             include_speaker: Whether to include speaker labels in text
-            word_level: Enable enhanced LRC with word timestamps
-            karaoke_config: Karaoke configuration for metadata and precision
+            word_level: Enable word-level output
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                use enhanced LRC with inline timestamps
             **kwargs: Additional options
 
         Returns:
@@ -186,33 +187,44 @@ class LRCFormat(FormatHandler):
         Args:
             supervisions: List of Supervision objects
             include_speaker: Whether to include speaker labels
-            word_level: Enable enhanced LRC with word timestamps
-            karaoke_config: Karaoke configuration for metadata and precision
+            word_level: Enable word-level output
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                use enhanced LRC with inline timestamps
 
         Returns:
             Caption content as bytes
         """
-        config = karaoke_config or KaraokeConfig()
+        config = karaoke_config or KaraokeConfig(enabled=False)
+        karaoke_enabled = config.enabled
         lines = []
 
-        # Metadata header
-        for key, value in config.lrc_metadata.items():
-            lines.append(f"[{key}:{value}]")
-        if config.lrc_metadata:
-            lines.append("")
+        # Metadata header (only when karaoke mode is enabled)
+        if karaoke_enabled:
+            for key, value in config.lrc_metadata.items():
+                lines.append(f"[{key}:{value}]")
+            if config.lrc_metadata:
+                lines.append("")
 
         for sup in supervisions:
-            line_time = cls._format_time(sup.start, config.lrc_precision)
-
             if word_level and sup.alignment and "word" in sup.alignment:
-                # Enhanced LRC mode: each word has timestamp
-                word_parts = []
-                for word in sup.alignment["word"]:
-                    word_time = cls._format_time(word.start, config.lrc_precision)
-                    word_parts.append(f"<{word_time}>{word.symbol}")
-                lines.append(f"[{line_time}]{' '.join(word_parts)}")
+                word_items = sup.alignment["word"]
+                if karaoke_enabled:
+                    # Enhanced LRC mode: each word has inline timestamp
+                    # Use first word's timestamp for line timing (more accurate)
+                    line_time = cls._format_time(word_items[0].start, config.lrc_precision)
+                    word_parts = []
+                    for word in word_items:
+                        word_time = cls._format_time(word.start, config.lrc_precision)
+                        word_parts.append(f"<{word_time}>{word.symbol}")
+                    lines.append(f"[{line_time}]{' '.join(word_parts)}")
+                else:
+                    # Word-per-line mode: each word as separate line
+                    for word in sup.alignment["word"]:
+                        word_time = cls._format_time(word.start, config.lrc_precision)
+                        lines.append(f"[{word_time}]{word.symbol}")
             else:
                 # Standard LRC mode: only line timestamp
+                line_time = cls._format_time(sup.start, config.lrc_precision)
                 text = sup.text or ""
                 if cls._should_include_speaker(sup, include_speaker):
                     text = f"{sup.speaker}: {text}"

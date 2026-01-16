@@ -1,15 +1,18 @@
-"""YouTube VTT format handler with word-level timestamps.
+"""YouTube VTT format reader with word-level timestamps.
 
 YouTube auto-generated captions use a specific WebVTT variant with
 word-level tags like: Word1<00:00:10.559><c> Word2</c>
+
+This module provides READ-ONLY support for parsing YouTube VTT format.
+For WRITING YouTube VTT format, use VTTFormat with karaoke=True:
+
+    caption.to_string("vtt", word_level=True, karaoke=True)
 """
 
 import re
-from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 from lhotse.supervision import AlignmentItem
-from lhotse.utils import Pathlike
 
 from ..parsers.text_parser import normalize_text as normalize_text_fn
 from ..supervision import Supervision
@@ -40,7 +43,7 @@ class YouTubeVTTFormat(FormatHandler):
         return bool(re.search(r"<\d{2}:\d{2}:\d{2}[.,]\d{3}><c>", content))
 
     @classmethod
-    def extract_metadata(cls, source: Union[Pathlike, str], **kwargs) -> Dict[str, str]:
+    def extract_metadata(cls, source, **kwargs) -> Dict[str, str]:
         """Extract metadata from YouTube VTT."""
         if cls.is_content(source):
             content = source[:4096]
@@ -255,62 +258,3 @@ class YouTubeVTTFormat(FormatHandler):
             )
 
         return supervisions
-
-    @classmethod
-    def write(
-        cls,
-        supervisions: List[Supervision],
-        output_path: Pathlike,
-        include_speaker: bool = True,
-        **kwargs,
-    ) -> Path:
-        """Write YouTube VTT format."""
-        content = cls.to_bytes(supervisions, include_speaker=include_speaker, **kwargs)
-        output_path = Path(str(output_path))
-        output_path.write_bytes(content)
-        return output_path
-
-    @classmethod
-    def to_bytes(
-        cls,
-        supervisions: List[Supervision],
-        include_speaker: bool = True,
-        **kwargs,
-    ) -> bytes:
-        """Convert supervisions to YouTube VTT format bytes."""
-
-        def format_timestamp(seconds: float) -> str:
-            """Format seconds into HH:MM:SS.mmm."""
-            h = int(seconds // 3600)
-            m = int((seconds % 3600) // 60)
-            s = int(seconds % 60)
-            ms = int(round((seconds % 1) * 1000))
-            if ms == 1000:
-                s += 1
-                ms = 0
-            return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
-
-        lines = ["WEBVTT", ""]
-
-        for sup in sorted(supervisions, key=lambda x: x.start):
-            lines.append(f"{format_timestamp(sup.start)} --> {format_timestamp(sup.end)}")
-
-            text = sup.text or ""
-            alignment = getattr(sup, "alignment", None)
-            words = alignment.get("word") if alignment else None
-
-            if words:
-                text_parts = []
-                for i, word in enumerate(words):
-                    symbol = word.symbol
-                    if i == 0 and include_speaker and sup.speaker:
-                        symbol = f"{sup.speaker}: {symbol}"
-                    text_parts.append(f"<{format_timestamp(word.start)}><c> {symbol}</c>")
-                lines.append("".join(text_parts))
-            else:
-                if include_speaker and sup.speaker:
-                    text = f"{sup.speaker}: {text}"
-                lines.append(text)
-            lines.append("")
-
-        return "\n".join(lines).encode("utf-8")

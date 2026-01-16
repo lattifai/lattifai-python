@@ -898,13 +898,93 @@ LattifAI supports virtually all common media and subtitle formats:
 |------|---------|
 | **Audio** | WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF, and more |
 | **Video** | MP4, MKV, MOV, WEBM, AVI, and more |
-| **Caption/Subtitle Input** | SRT, VTT, ASS, SSA, SUB, SBV, TXT, Gemini, and more |
-| **Caption/Subtitle Output** | All input formats + TextGrid (Praat) |
+| **Caption/Subtitle Input** | SRT, VTT, ASS, SSA, SUB, SBV, TXT, JSON, Gemini, and more |
+| **Caption/Subtitle Output** | All input formats + TextGrid (Praat), TTML, LRC |
 
 **Tabular Formats:**
 - **TSV**: Tab-separated values with optional speaker column
 - **CSV**: Comma-separated values with optional speaker column
 - **AUD**: Audacity labels format with `[[speaker]]` notation
+
+### JSON Format
+
+JSON is the most flexible format for storing caption data with full word-level timing support:
+
+**Structure:**
+```json
+[
+    {
+        "text": "Hello beautiful world",
+        "start": 0.0,
+        "end": 2.5,
+        "speaker": "Speaker 1",
+        "words": [
+            {"word": "Hello", "start": 0.0, "end": 0.5},
+            {"word": "beautiful", "start": 0.6, "end": 1.4},
+            {"word": "world", "start": 1.5, "end": 2.5}
+        ]
+    }
+]
+```
+
+**Features:**
+- ✅ **Word-Level Timestamps**: `words` array preserves per-word timing from alignment
+- ✅ **Round-Trip Compatible**: Read/write preserves all data without loss
+- ✅ **Speaker Labels**: Optional `speaker` field for multi-speaker content
+- ✅ **Flexible Input**: Accepts `duration` or `end` fields (reads both, outputs `end` only)
+
+**Usage:**
+```bash
+# Export with word-level timestamps
+lai alignment align audio.wav subtitle.srt output.json caption.word_level=true
+
+# Convert JSON to other formats
+lai caption convert input.json output.srt word_level=true  # One word per segment
+lai caption convert input.json output.ass word_level=true karaoke=true  # Karaoke styling
+```
+
+```python
+from lattifai import LattifAI, CaptionConfig
+
+client = LattifAI(
+    caption_config=CaptionConfig(word_level=True)
+)
+
+caption = client.alignment(
+    input_media="audio.wav",
+    input_caption="subtitle.srt",
+    output_caption_path="output.json",  # JSON preserves word-level data
+)
+```
+
+### Word-Level and Karaoke Output
+
+When exporting with `word_level=True`, different formats handle output differently:
+
+| Format | word_level=True | word_level=True + karaoke=True |
+|--------|-----------------|--------------------------------|
+| **JSON** | Includes `words` array in each segment | Same as word_level=True |
+| **SRT/VTT** | One word per segment | One word per segment |
+| **ASS** | One word per segment | `{\kf}` karaoke tags (sweep effect) |
+| **LRC** | One word per line | Enhanced `<timestamp>` tags |
+| **TTML** | One word per `<p>` element | `<span>` elements with `itunes:timing="Word"` |
+
+**Karaoke Effects (ASS format):**
+```python
+from lattifai.config.caption import KaraokeConfig, CaptionStyle
+
+# Customize karaoke styling
+config = KaraokeConfig(
+    enabled=True,
+    effect="sweep",  # "sweep" (default), "instant", or "outline"
+    style=CaptionStyle(
+        font_name="Arial",
+        font_size=48,
+        primary_color="#FFFFFF",
+        secondary_color="#00FFFF",
+    )
+)
+```
 
 > **Note**: If a format is not listed above but commonly used, it's likely supported. Feel free to try it or reach out if you encounter any issues.
 

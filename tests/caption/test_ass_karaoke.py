@@ -3,9 +3,9 @@
 import pytest
 from lhotse.supervision import AlignmentItem
 
-from lattifai.caption.formats.karaoke import KaraokeConfig, KaraokeStyle
 from lattifai.caption.formats.pysubs2 import ASSFormat
 from lattifai.caption.supervision import Supervision
+from lattifai.config.caption import CaptionStyle, KaraokeConfig
 
 
 class TestASSKaraoke:
@@ -26,7 +26,8 @@ class TestASSKaraoke:
                 },
             )
         ]
-        result = ASSFormat.to_bytes(sups, word_level=True)
+        karaoke_config = KaraokeConfig(enabled=True)
+        result = ASSFormat.to_bytes(sups, word_level=True, karaoke_config=karaoke_config)
         content = result.decode("utf-8")
 
         # \kf45 means 45 centiseconds (0.45s)
@@ -48,8 +49,7 @@ class TestASSKaraoke:
                 },
             )
         ]
-        style = KaraokeStyle(effect="instant")
-        config = KaraokeConfig(style=style)
+        config = KaraokeConfig(enabled=True, effect="instant")
         result = ASSFormat.to_bytes(sups, word_level=True, karaoke_config=config)
         content = result.decode("utf-8")
 
@@ -70,8 +70,7 @@ class TestASSKaraoke:
                 },
             )
         ]
-        style = KaraokeStyle(effect="outline")
-        config = KaraokeConfig(style=style)
+        config = KaraokeConfig(enabled=True, effect="outline")
         result = ASSFormat.to_bytes(sups, word_level=True, karaoke_config=config)
         content = result.decode("utf-8")
 
@@ -91,7 +90,8 @@ class TestASSKaraoke:
                 },
             )
         ]
-        result = ASSFormat.to_bytes(sups, word_level=True)
+        karaoke_config = KaraokeConfig(enabled=True)
+        result = ASSFormat.to_bytes(sups, word_level=True, karaoke_config=karaoke_config)
         content = result.decode("utf-8")
 
         # Should have Karaoke style defined
@@ -100,7 +100,8 @@ class TestASSKaraoke:
     def test_fallback_without_alignment(self):
         """Without alignment, should output normal ASS."""
         sups = [Supervision(text="No alignment", start=10.0, duration=2.0)]
-        result = ASSFormat.to_bytes(sups, word_level=True)
+        karaoke_config = KaraokeConfig(enabled=True)
+        result = ASSFormat.to_bytes(sups, word_level=True, karaoke_config=karaoke_config)
         content = result.decode("utf-8")
 
         assert "No alignment" in content

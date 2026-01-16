@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, TypeVar, Union
 
 if TYPE_CHECKING:
-    from .formats.karaoke import KaraokeConfig
+    from ..config.caption import KaraokeConfig
 
 from lhotse.supervision import AlignmentItem
 from lhotse.utils import Pathlike
@@ -299,7 +299,8 @@ class Caption:
         Args:
             format: Output format (e.g., 'srt', 'vtt', 'ass')
             word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
-            karaoke_config: Karaoke configuration for word-level export
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                enables karaoke styling (ASS \\kf tags, enhanced LRC, etc.)
 
         Returns:
             String containing formatted captions
@@ -399,7 +400,8 @@ class Caption:
             output_format: Output format (e.g., 'srt', 'vtt', 'ass'). Defaults to source_format or 'srt'
             include_speaker_in_text: Whether to include speaker labels in text
             word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
-            karaoke_config: Karaoke configuration for word-level export
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                enables karaoke styling (ASS \\kf tags, enhanced LRC, etc.)
 
         Returns:
             Caption content as bytes
@@ -543,7 +545,8 @@ class Caption:
             output_format: Output format (e.g., 'srt', 'vtt', 'ass')
             include_speaker_in_text: Whether to include speaker labels in text
             word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
-            karaoke_config: Karaoke configuration for word-level export
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                enables karaoke styling (ASS \\kf tags, enhanced LRC, etc.)
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -578,10 +581,6 @@ class Caption:
             elif "ebu" in path_str.lower() and path_str.endswith(".ttml"):
                 ext = "ebu_tt_d"
 
-        # Use YouTube VTT if word-level is requested for VTT output
-        if ext == "vtt" and word_level:
-            ext = "youtube_vtt"
-
         writer_cls = get_writer(ext)
         if not writer_cls:
             from .formats.pysubs2 import Pysubs2Format
@@ -598,7 +597,10 @@ class Caption:
             )
 
         content = writer_cls.to_bytes(
-            supervisions, include_speaker=include_speaker_in_text, word_level=word_level, karaoke_config=karaoke_config
+            supervisions,
+            include_speaker=include_speaker_in_text,
+            word_level=word_level,
+            karaoke_config=karaoke_config,
         )
         if isinstance(path, io.BytesIO):
             path.write(content)

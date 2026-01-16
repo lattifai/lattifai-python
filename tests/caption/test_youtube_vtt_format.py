@@ -7,6 +7,7 @@ from lattifai import Caption
 from lattifai.alignment.tokenizer import LatticeTokenizer
 from lattifai.caption import Supervision
 from lattifai.caption.formats.youtube_vtt import YouTubeVTTFormat
+from lattifai.config.caption import KaraokeConfig
 
 
 def test_youtube_vtt_detection():
@@ -144,8 +145,9 @@ def test_caption_write_youtube_vtt_word_level():
     ]
     caption = Caption.from_supervisions(supervisions)
 
-    # Write to VTT with word_level=True
-    vtt_content = caption.to_bytes(output_format="vtt", word_level=True).decode("utf-8")
+    # Write to VTT with word_level=True and karaoke_config (YouTube VTT karaoke format)
+    karaoke_config = KaraokeConfig(enabled=True)
+    vtt_content = caption.to_bytes(output_format="vtt", word_level=True, karaoke_config=karaoke_config).decode("utf-8")
 
     assert "WEBVTT" in vtt_content
     assert "<00:00:00.000><c> Hello</c>" in vtt_content

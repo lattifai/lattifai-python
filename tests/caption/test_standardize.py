@@ -510,8 +510,9 @@ class TestStandardizationConfigMargins:
         """Test default margin configuration values."""
         config = StandardizationConfig()
 
-        assert config.start_margin == 0.08
-        assert config.end_margin == 0.20
+        # Default is None (no margin adjustment)
+        assert config.start_margin is None
+        assert config.end_margin is None
         assert config.margin_collision_mode == "trim"
 
     def test_custom_margin_values(self):

@@ -7,6 +7,7 @@ from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.config import CaptionConfig
+from lattifai.config.caption import KaraokeConfig
 from lattifai.utils import safe_print
 
 
@@ -17,6 +18,7 @@ def convert(
     include_speaker_in_text: bool = False,
     normalize_text: bool = False,
     word_level: bool = False,
+    karaoke: bool = False,
 ):
     """
     Convert caption file to another format.
@@ -34,7 +36,11 @@ def convert(
         normalize_text: Whether to normalize caption text during conversion.
             This applies text cleaning such as removing HTML tags, decoding entities,
             collapsing whitespace, and standardizing punctuation.
-        word_level: Use word-level output format if supported (e.g., YouTube VTT for .vtt output).
+        word_level: Use word-level output format if supported.
+            When True without karaoke: outputs word-per-segment (each word as separate segment).
+            JSON format will include a 'words' field with word-level timestamps.
+        karaoke: Enable karaoke styling (requires word_level=True).
+            When True: outputs karaoke format (ASS \\kf tags, enhanced LRC, etc.).
 
     Examples:
         # Basic format conversion (positional arguments)
@@ -43,8 +49,14 @@ def convert(
         # Convert with text normalization
         lai caption convert input.srt output.json normalize_text=true
 
-        # Convert to YouTube VTT with word-level timestamps (if input has alignment)
-        lai caption convert input.json output.vtt word_level=true
+        # Convert to word-per-segment output (if input has alignment)
+        lai caption convert input.json output.srt word_level=true
+
+        # Convert to karaoke format (ASS with \\kf tags)
+        lai caption convert input.json output.ass word_level=true karaoke=true
+
+        # Export JSON with word-level timestamps
+        lai caption convert input.srt output.json word_level=true
 
         # Mixing positional and keyword arguments
         lai caption convert input.srt output.vtt \\
@@ -58,8 +70,16 @@ def convert(
     """
     from lattifai.caption import Caption
 
+    # Create karaoke_config if karaoke flag is set
+    karaoke_config = KaraokeConfig(enabled=True) if karaoke else None
+
     caption = Caption.read(input_path, normalize_text=normalize_text)
-    caption.write(output_path, include_speaker_in_text=include_speaker_in_text, word_level=word_level)
+    caption.write(
+        output_path,
+        include_speaker_in_text=include_speaker_in_text,
+        word_level=word_level,
+        karaoke_config=karaoke_config,
+    )
 
     safe_print(f"✅ Converted {input_path} -> {output_path}")
     return output_path

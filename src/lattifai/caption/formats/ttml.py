@@ -13,10 +13,10 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from xml.dom import minidom
 
+from ...config.caption import KaraokeConfig
 from ..supervision import Supervision
 from . import register_writer
 from .base import FormatWriter
-from .karaoke import KaraokeConfig
 
 # XML namespaces
 TTML_NS = "http://www.w3.org/ns/ttml"
@@ -110,16 +110,26 @@ class TTMLFormatBase(FormatWriter):
             supervisions: List of supervisions to convert
             config: TTML configuration
             include_speaker: Whether to include speaker names
-            word_level: Whether to output word-level timing (iTunes format)
-            karaoke_config: Optional karaoke configuration for styling
+            word_level: Whether to output word-level timing
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                use span-based karaoke; otherwise use p-per-word
         """
+        from .base import expand_to_word_supervisions
+
+        # Check if karaoke is enabled
+        karaoke_enabled = karaoke_config is not None and karaoke_config.enabled
+
+        # If word_level=True and karaoke is not enabled, expand to word-per-paragraph
+        if word_level and not karaoke_enabled:
+            supervisions = expand_to_word_supervisions(supervisions)
+
         ET.register_namespace("", TTML_NS)
         ET.register_namespace("tts", TTML_STYLE_NS)
         ET.register_namespace("ttp", TTML_PARAM_NS)
         ET.register_namespace("xml", XML_NS)
 
-        # Register iTunes namespace if word-level timing is enabled
-        if word_level:
+        # Register iTunes namespace if karaoke mode is enabled
+        if word_level and karaoke_enabled:
             ET.register_namespace("itunes", ITUNES_NS)
 
         root = ET.Element(
@@ -135,11 +145,9 @@ class TTMLFormatBase(FormatWriter):
         elif config.profile == "ebu-tt-d":
             root.set(f"{{{TTML_PARAM_NS}}}profile", "urn:ebu:tt:distribution:2014-01")
 
-        # Add iTunes timing attribute for word-level
-        if word_level:
-            timing_mode = "Word"
-            if karaoke_config:
-                timing_mode = karaoke_config.ttml_timing_mode
+        # Add iTunes timing attribute for karaoke mode
+        if word_level and karaoke_enabled:
+            timing_mode = karaoke_config.ttml_timing_mode
             root.set(f"{{{ITUNES_NS}}}timing", timing_mode)
 
         # Head section
@@ -162,8 +170,23 @@ class TTMLFormatBase(FormatWriter):
         div = ET.SubElement(body, f"{{{TTML_NS}}}div")
 
         for sup in supervisions:
-            begin = cls._seconds_to_ttml_time(sup.start)
-            end = cls._seconds_to_ttml_time(sup.end)
+            # Check if karaoke mode should be used for this supervision
+            has_word_alignment = (
+                word_level
+                and karaoke_enabled
+                and sup.alignment
+                and "word" in sup.alignment
+                and len(sup.alignment["word"]) > 0
+            )
+
+            # Use word timestamps for timing when available (more accurate)
+            if has_word_alignment:
+                word_items = sup.alignment["word"]
+                begin = cls._seconds_to_ttml_time(word_items[0].start)
+                end = cls._seconds_to_ttml_time(word_items[-1].end)
+            else:
+                begin = cls._seconds_to_ttml_time(sup.start)
+                end = cls._seconds_to_ttml_time(sup.end)
 
             p = ET.SubElement(div, f"{{{TTML_NS}}}p")
             p.set("begin", begin)
@@ -182,14 +205,8 @@ class TTMLFormatBase(FormatWriter):
 
             include_this_speaker = cls._should_include_speaker(sup, include_speaker)
 
-            # Check if word-level timing should be used for this supervision
-            has_word_alignment = (
-                word_level and sup.alignment and "word" in sup.alignment and len(sup.alignment["word"]) > 0
-            )
-
             if has_word_alignment:
-                # Word-level timing: create span for each word
-                word_items = sup.alignment["word"]
+                # Karaoke mode: create span for each word with timing
                 for i, item in enumerate(word_items):
                     span = ET.SubElement(p, f"{{{TTML_NS}}}span")
                     span.set("begin", cls._seconds_to_ttml_time(item.start))
@@ -243,8 +260,9 @@ class TTMLFormat(TTMLFormatBase):
             output_path: Output file path
             include_speaker: Whether to include speaker names
             config: TTML configuration
-            word_level: Whether to output word-level timing (iTunes format)
-            karaoke_config: Optional karaoke configuration
+            word_level: Whether to output word-level timing
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                use span-based karaoke; otherwise use p-per-word
         """
         if config is None:
             config = TTMLConfig()
@@ -281,8 +299,9 @@ class TTMLFormat(TTMLFormatBase):
             supervisions: List of supervisions to convert
             include_speaker: Whether to include speaker names
             config: TTML configuration
-            word_level: Whether to output word-level timing (iTunes format)
-            karaoke_config: Optional karaoke configuration
+            word_level: Whether to output word-level timing
+            karaoke_config: Karaoke configuration. When provided with enabled=True,
+                use span-based karaoke; otherwise use p-per-word
         """
         if config is None:
             config = TTMLConfig()

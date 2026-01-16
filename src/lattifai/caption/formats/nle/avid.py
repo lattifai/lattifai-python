@@ -288,8 +288,9 @@ class AvidDSFormat(FormatWriter):
         Returns:
             Path to written file
         """
-        # Filter out unsupported kwargs (word_level, karaoke_config not supported by Avid DS)
+        # Filter out unsupported kwargs (word_level, karaoke, karaoke_config not supported by Avid DS)
         kwargs.pop("word_level", None)
+        kwargs.pop("karaoke", None)
         kwargs.pop("karaoke_config", None)
         config = AvidDSConfig(include_speaker=include_speaker, **kwargs)
         return AvidDSWriter.write(supervisions, output_path, config)
@@ -311,8 +312,9 @@ class AvidDSFormat(FormatWriter):
         Returns:
             Avid DS content as bytes
         """
-        # Filter out unsupported kwargs (word_level, karaoke_config not supported by Avid DS)
+        # Filter out unsupported kwargs (word_level, karaoke, karaoke_config not supported by Avid DS)
         kwargs.pop("word_level", None)
+        kwargs.pop("karaoke", None)
         kwargs.pop("karaoke_config", None)
         config = AvidDSConfig(include_speaker=include_speaker, **kwargs)
         return AvidDSWriter.to_bytes(supervisions, config)

@@ -1,10 +1,167 @@
 """Caption I/O configuration for LattifAI."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, get_args
+from typing import TYPE_CHECKING, Dict, Literal, Optional, get_args
 
 from lhotse.utils import Pathlike
+
+# =============================================================================
+# Caption Style Configuration Classes
+# =============================================================================
+
+
+class CaptionFonts:
+    """Common caption font constants.
+
+    These are reference constants for popular fonts. You can use any
+    system font name as the font_name parameter in CaptionStyle.
+    """
+
+    # Western fonts
+    ARIAL = "Arial"
+    IMPACT = "Impact"
+    VERDANA = "Verdana"
+    HELVETICA = "Helvetica"
+
+    # Chinese fonts
+    NOTO_SANS_SC = "Noto Sans SC"
+    MICROSOFT_YAHEI = "Microsoft YaHei"
+    PINGFANG_SC = "PingFang SC"
+    SIMHEI = "SimHei"
+
+    # Japanese fonts
+    NOTO_SANS_JP = "Noto Sans JP"
+    MEIRYO = "Meiryo"
+    HIRAGINO_SANS = "Hiragino Sans"
+
+    # Korean fonts
+    NOTO_SANS_KR = "Noto Sans KR"
+    MALGUN_GOTHIC = "Malgun Gothic"
+
+
+@dataclass
+class CaptionStyle:
+    """Caption style configuration for ASS/TTML formats.
+
+    Attributes:
+        primary_color: Main text color (#RRGGBB)
+        secondary_color: Secondary/highlight color (#RRGGBB)
+        outline_color: Text outline color (#RRGGBB)
+        back_color: Shadow color (#RRGGBB)
+        font_name: Font family name (use CaptionFonts constants or any system font)
+        font_size: Font size in points
+        bold: Enable bold text
+        italic: Enable italic text
+        outline_width: Outline thickness
+        shadow_depth: Shadow distance
+        alignment: ASS alignment (1-9, numpad style), 2=bottom-center
+        margin_l: Left margin in pixels
+        margin_r: Right margin in pixels
+        margin_v: Vertical margin in pixels
+    """
+
+    # Colors (#RRGGBB format)
+    primary_color: str = "#FFFFFF"
+    secondary_color: str = "#00FFFF"
+    outline_color: str = "#000000"
+    back_color: str = "#000000"
+
+    # Font
+    font_name: str = CaptionFonts.ARIAL
+    font_size: int = 48
+    bold: bool = False
+    italic: bool = False
+
+    # Border and shadow
+    outline_width: float = 2.0
+    shadow_depth: float = 1.0
+
+    # Position
+    alignment: int = 2
+    margin_l: int = 20
+    margin_r: int = 20
+    margin_v: int = 20
+
+
+@dataclass
+class KaraokeConfig:
+    """Karaoke export configuration.
+
+    Attributes:
+        enabled: Whether karaoke mode is enabled
+        effect: Karaoke effect type
+            - "sweep": Gradual fill from left to right (ASS \\kf tag)
+            - "instant": Instant highlight (ASS \\k tag)
+            - "outline": Outline then fill (ASS \\ko tag)
+        style: Caption style configuration (font, colors, position)
+        lrc_precision: LRC time precision ("centisecond" or "millisecond")
+        lrc_metadata: LRC metadata dict (ar, ti, al, etc.)
+        ttml_timing_mode: TTML timing attribute ("Word" or "Line")
+    """
+
+    enabled: bool = False
+    effect: Literal["sweep", "instant", "outline"] = "sweep"
+    style: CaptionStyle = field(default_factory=CaptionStyle)
+
+    # LRC specific
+    lrc_precision: Literal["centisecond", "millisecond"] = "millisecond"
+    lrc_metadata: Dict[str, str] = field(default_factory=dict)
+
+    # TTML specific
+    ttml_timing_mode: Literal["Word", "Line"] = "Word"
+
+
+@dataclass
+class StandardizationConfig:
+    """Caption standardization configuration following broadcast guidelines.
+
+    Reference Standards:
+    - Netflix Timed Text Style Guide
+    - BBC Subtitle Guidelines
+    - EBU-TT-D Standard
+
+    Attributes:
+        min_duration: Minimum segment duration (seconds). Netflix recommends 5/6s, BBC 0.3s
+        max_duration: Maximum segment duration (seconds). Netflix/BBC recommends 7s
+        min_gap: Minimum gap between segments (seconds). 80ms prevents subtitle flicker
+        max_lines: Maximum lines per segment. Broadcast standard is typically 2
+        max_chars_per_line: Maximum characters per line. CJK auto-adjusted by ÷2 (e.g., 42 → 21)
+        optimal_cps: Optimal reading speed (chars/sec). Netflix recommends 17-20 CPS
+        start_margin: Start margin (seconds) before first word. None = no adjustment (default)
+        end_margin: End margin (seconds) after last word. None = no adjustment (default)
+        margin_collision_mode: How to handle collisions: 'trim' (reduce margin) or 'gap' (maintain min_gap)
+    """
+
+    min_duration: float = 0.8
+    max_duration: float = 7.0
+    min_gap: float = 0.08
+    max_lines: int = 2
+    max_chars_per_line: int = 42
+    optimal_cps: float = 17.0
+    start_margin: Optional[float] = None
+    end_margin: Optional[float] = None
+    margin_collision_mode: Literal["trim", "gap"] = "trim"
+
+    def __post_init__(self):
+        """Validate configuration parameters."""
+        if self.min_duration <= 0:
+            raise ValueError("min_duration must be positive")
+        if self.max_duration <= self.min_duration:
+            raise ValueError("max_duration must be greater than min_duration")
+        if self.min_gap < 0:
+            raise ValueError("min_gap cannot be negative")
+        if self.max_lines < 1:
+            raise ValueError("max_lines must be at least 1")
+        if self.max_chars_per_line < 10:
+            raise ValueError("max_chars_per_line must be at least 10")
+        if self.start_margin is not None and self.start_margin < 0:
+            raise ValueError("start_margin cannot be negative")
+        if self.end_margin is not None and self.end_margin < 0:
+            raise ValueError("end_margin cannot be negative")
+        if self.margin_collision_mode not in ("trim", "gap"):
+            raise ValueError("margin_collision_mode must be 'trim' or 'gap'")
+
 
 # =============================================================================
 # Format Type Definitions (Single Source of Truth)
@@ -128,11 +285,20 @@ class CaptionConfig:
     word_level: bool = False
     """Include word-level timestamps in alignment results (useful for karaoke, dubbing)."""
 
+    karaoke: Optional[KaraokeConfig] = None
+    """Karaoke configuration when word_level=True (e.g., ASS \\kf tags, enhanced LRC).
+    When None with word_level=True, outputs word-per-segment instead of karaoke styling.
+    When provided, karaoke.enabled controls whether karaoke styling is applied."""
+
     encoding: str = "utf-8"
     """Character encoding for reading/writing caption files (default: utf-8)."""
 
     source_lang: Optional[str] = None
     """Source language code for the caption content (e.g., 'en', 'zh', 'de')."""
+
+    standardization: Optional[StandardizationConfig] = None
+    """Standardization configuration for broadcast-grade captions.
+    When provided, captions will be standardized according to Netflix/BBC guidelines."""
 
     def __post_init__(self):
         """Validate configuration after initialization."""
