@@ -89,7 +89,8 @@ class SentenceSplitter:
 
         for split_text in split_texts:
             text_start = input_text.find(split_text, search_start)
-            assert text_start != -1, f"Could not find split text '{split_text}' in input supervisions."
+            if text_start == -1:
+                raise ValueError(f"Could not find split text '{split_text}' in input supervisions.")
 
             text_end = text_start + len(split_text)
             search_start = text_end
@@ -121,9 +122,8 @@ class SentenceSplitter:
                 last_sup = sup
                 last_char_idx = min(len(sup.text) - 1, text_end - 1 - sup_start)
 
-            assert (
-                first_sup is not None and last_sup is not None
-            ), f"Could not find supervisions for split text: {split_text}"
+            if first_sup is None or last_sup is None:
+                raise ValueError(f"Could not find supervisions for split text: {split_text}")
 
             # Calculate timing
             start_time = first_sup.start + (first_char_idx / len(first_sup.text)) * first_sup.duration
@@ -235,7 +235,8 @@ class SentenceSplitter:
             elif text_len >= 2000 or is_last:
                 flush_segment(s, None)
 
-        assert len(speakers) == len(texts), f"len(speakers)={len(speakers)} != len(texts)={len(texts)}"
+        if len(speakers) != len(texts):
+            raise ValueError(f"len(speakers)={len(speakers)} != len(texts)={len(texts)}")
         sentences = self._splitter.split(texts, threshold=0.15, strip_whitespace=strip_whitespace, batch_size=8)
 
         # First pass: collect all split texts with their speakers
@@ -296,13 +297,15 @@ class SentenceSplitter:
                     remainder_speaker = _speaker
                     if k == len(speakers) - 1:
                         pass  # keep _speaker for the last supervision
+                    elif speakers[k + 1] is not None:
+                        raise ValueError(f"Expected speakers[{k + 1}] to be None, got {speakers[k + 1]}")
                     else:
-                        assert speakers[k + 1] is None
                         speakers[k + 1] = _speaker
-                else:
-                    assert len(_sentences) > 1
+                elif len(_sentences) > 1:
                     _speaker = None  # reset speaker if sentence not ended
                     remainder_speaker = None
+                else:
+                    raise ValueError(f"Unexpected state: len(_sentences)={len(_sentences)}")
 
         if remainder.strip():
             split_texts_with_speakers.append((remainder.strip(), remainder_speaker))

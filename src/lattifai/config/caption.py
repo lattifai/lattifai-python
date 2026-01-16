@@ -323,14 +323,17 @@ class CaptionConfig:
         return True
 
     def _normalize_paths(self) -> None:
-        """Normalize and expand input/output paths."""
+        """Normalize and expand input/output paths.
+
+        Uses Path.resolve() to get absolute paths and prevent path traversal issues.
+        """
         # Expand and normalize input path if provided, but don't require it to exist yet
         # (it might be set later after downloading captions)
         if self.input_path is not None:
-            self.input_path = str(Path(self.input_path).expanduser())
+            self.input_path = str(Path(self.input_path).expanduser().resolve())
 
         if self.output_path is not None:
-            self.output_path = str(Path(self.output_path).expanduser())
+            self.output_path = str(Path(self.output_path).expanduser().resolve())
             output_dir = Path(self.output_path).parent
             output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -391,7 +394,7 @@ class CaptionConfig:
         if not self.input_path:
             raise ValueError("input_path is required but not set in CaptionConfig")
 
-        input_file = Path(self.input_path).expanduser()
+        input_file = Path(self.input_path).expanduser().resolve()
         if not input_file.exists():
             raise FileNotFoundError(
                 f"Input caption file does not exist: '{input_file}'. " "Please check the path and try again."
@@ -401,15 +404,20 @@ class CaptionConfig:
                 f"Input caption path is not a file: '{input_file}'. " "Expected a valid caption file path."
             )
 
-    def check_sanity(self) -> bool:
-        """Perform sanity checks on the configuration."""
-        assert self.is_input_path_existed(), "Input caption path must be provided and exist."
+    def check_sanity(self) -> None:
+        """Perform sanity checks on the configuration.
+
+        Raises:
+            ValueError: If input path is not provided or does not exist.
+        """
+        if not self.is_input_path_existed():
+            raise ValueError("Input caption path must be provided and exist.")
 
     def is_input_path_existed(self) -> bool:
         """Check if input caption path is provided and exists."""
         if self.input_path is None:
             return False
 
-        input_file = Path(self.input_path).expanduser()
+        input_file = Path(self.input_path).expanduser().resolve()
         self.input_path = str(input_file)
         return input_file.exists() and input_file.is_file()

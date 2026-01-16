@@ -69,7 +69,8 @@ def parse_speaker_text(line) -> Tuple[Optional[str], str]:
 
     match = SPEAKER_LATTIFAI.match(line)
     if match:
-        assert len(match.groups()) == 2, match.groups()
+        if len(match.groups()) != 2:
+            raise ValueError(f"Expected 2 groups in SPEAKER_LATTIFAI match, got {match.groups()}")
         if not match.group(1):
             logging.error(f"ParseSub LINE [{line}]")
         else:
@@ -77,7 +78,8 @@ def parse_speaker_text(line) -> Tuple[Optional[str], str]:
 
     match = SPEAKER_PATTERN2.match(line)
     if match:
-        assert len(match.groups()) == 2, match.groups()
+        if len(match.groups()) != 2:
+            raise ValueError(f"Expected 2 groups in SPEAKER_PATTERN2 match, got {match.groups()}")
         return match.group(1).strip(), match.group(2).strip()
 
     return None, line

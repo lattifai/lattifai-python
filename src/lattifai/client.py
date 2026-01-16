@@ -126,9 +126,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 safe_print(colorful.cyan(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.supervisions and alignment_strategy == "transcription":
-                    assert (
-                        "gemini" not in self.transcriber.name.lower()
-                    ), f"Transcription-based alignment is not supported for {self.transcriber.name}(Gemini's timestamp is not reliable)."
+                    if "gemini" in self.transcriber.name.lower():
+                        raise ValueError(
+                            f"Transcription-based alignment is not supported for {self.transcriber.name} "
+                            "(Gemini's timestamp is not reliable)."
+                        )
                     if not caption.transcription:
                         transcript = self._transcribe(
                             media_audio,
@@ -138,7 +140,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         )
                         caption.transcription = transcript.supervisions or transcript.transcription
                         caption.audio_events = transcript.audio_events
-                    assert caption.transcription, "Transcription is empty after transcription step."
+                    if not caption.transcription:
+                        raise ValueError("Transcription is empty after transcription step.")
 
                     if split_sentence or self.caption_config.split_sentence:
                         caption.supervisions = self.aligner.tokenizer.split_sentences(caption.supervisions)
@@ -155,9 +158,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         segment[2][1] = self.aligner.tokenizer.split_sentences(segment[2][1])
                 else:
                     if caption.transcription:
-                        assert (
-                            "gemini" not in self.transcriber.name.lower()
-                        ), f"Transcription-based alignment is not supported for {self.transcriber.name}(Gemini's timestamp is not reliable)."
+                        if "gemini" in self.transcriber.name.lower():
+                            raise ValueError(
+                                f"Transcription-based alignment is not supported for {self.transcriber.name} "
+                                "(Gemini's timestamp is not reliable)."
+                            )
                         if not caption.supervisions:  # youtube + transcription case
                             segments = [(sup.start, sup.end, [sup], not sup.text) for sup in caption.transcription]
                         else:
