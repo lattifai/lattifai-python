@@ -2,6 +2,7 @@
 show-source=true
 statistics=true
 max-line-length = 120
+ignore = W503, E203
 per-file-ignores =
   src/lattifai/client.py: F841, E501, W503
   src/lattifai/*.py: E402, F401

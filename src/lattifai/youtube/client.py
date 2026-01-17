@@ -212,6 +212,185 @@ class YoutubeLoader:
             logger.error(f"Error fetching caption: {e}")
             raise YouTubeError("Failed to fetch caption content") from e
 
+    def get_audio_url(
+        self,
+        video_id: str,
+        format_preference: str = "m4a",
+        quality: str = "best",
+    ) -> Dict[str, Any]:
+        """
+        Get direct audio-only stream URL for a YouTube video.
+
+        Args:
+            video_id: YouTube video ID
+            format_preference: Preferred audio format (m4a, webm, opus)
+            quality: Audio quality - "best" (highest bitrate), "medium" (~128kbps),
+                    "low" (~50kbps), or specific bitrate like "128", "64"
+
+        Returns:
+            Dict with url, mime_type, bitrate, content_length, format_id, ext
+        """
+        url = f"https://www.youtube.com/watch?v={video_id}"
+
+        # Use default yt-dlp config to get DASH formats with separate audio streams
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": False,
+            "youtube_include_dash_manifest": True,
+        }
+        if self.proxy:
+            opts["proxy"] = self.proxy
+        if self.cookies:
+            opts["cookiefile"] = self.cookies
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                # Get all formats and filter for audio-only (no video track)
+                formats = info.get("formats", [])
+                audio_formats = [
+                    f
+                    for f in formats
+                    if f.get("acodec") not in (None, "none")
+                    and f.get("vcodec") in (None, "none")
+                    and f.get("url")  # Must have a direct URL
+                ]
+
+                if not audio_formats:
+                    raise YouTubeError(
+                        "No audio-only formats available. " "YouTube may require authentication for this video."
+                    )
+
+                # Parse quality parameter
+                # "best" = highest bitrate, "medium" ~128kbps, "low" ~50kbps
+                quality_tier = quality.lower()
+                if quality_tier == "best":
+                    max_bitrate = float("inf")
+                elif quality_tier == "medium":
+                    max_bitrate = 160  # Allow up to 160kbps for "medium"
+                elif quality_tier == "low":
+                    max_bitrate = 70  # Allow up to 70kbps for "low"
+                elif quality_tier.isdigit():
+                    max_bitrate = int(quality_tier) + 20  # Allow some tolerance
+                else:
+                    max_bitrate = float("inf")  # Default to best
+
+                # Sort by preference: format match > bitrate (within limit)
+                def score_format(f: Dict) -> tuple:
+                    ext = f.get("ext", "")
+                    ext_match = 2 if ext == format_preference else 0
+                    # Prefer m4a/webm over other formats
+                    common_format = 1 if ext in ("m4a", "webm", "opus") else 0
+                    bitrate = f.get("abr") or f.get("tbr") or 0
+
+                    # For quality tiers, filter then maximize
+                    if bitrate <= max_bitrate:
+                        quality_score = bitrate  # Higher is better within limit
+                    else:
+                        quality_score = -1000  # Exclude formats exceeding limit
+
+                    return (ext_match, common_format, quality_score)
+
+                audio_formats.sort(key=score_format, reverse=True)
+                best = audio_formats[0]
+
+                return {
+                    "url": best.get("url"),
+                    "mime_type": best.get("ext", format_preference),
+                    "bitrate": best.get("abr") or best.get("tbr"),
+                    "content_length": best.get("filesize") or best.get("filesize_approx"),
+                    "format_id": best.get("format_id"),
+                    "ext": best.get("ext"),
+                }
+
+        except yt_dlp.utils.DownloadError as e:
+            raise YouTubeError(f"Failed to get audio URL: {str(e)}") from e
+        except Exception as e:
+            raise YouTubeError(f"Unexpected error getting audio URL: {str(e)}") from e
+
+    def get_video_url(self, video_id: str, format_preference: str = "mp4", quality: str = "best") -> Dict[str, Any]:
+        """
+        Get direct video stream URL for a YouTube video.
+
+        Args:
+            video_id: YouTube video ID
+            format_preference: Preferred video format (mp4, webm)
+            quality: Video quality (best, 1080, 720, 480, 360)
+
+        Returns:
+            Dict with url, mime_type, width, height, fps, vcodec, acodec, bitrate, content_length, format_id, ext
+        """
+        url = f"https://www.youtube.com/watch?v={video_id}"
+
+        # Use default yt-dlp config to get all available formats
+        opts = {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "extract_flat": False,
+            "youtube_include_dash_manifest": True,
+        }
+        if self.proxy:
+            opts["proxy"] = self.proxy
+        if self.cookies:
+            opts["cookiefile"] = self.cookies
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+                # Get all formats
+                formats = info.get("formats", [])
+
+                # Filter for video formats with both video and audio, or video-only
+                video_formats = [f for f in formats if f.get("vcodec") not in (None, "none")]
+
+                if not video_formats:
+                    raise YouTubeError("No video formats available")
+
+                # Sort by preference: format match > resolution > bitrate
+                def score_format(f: Dict) -> tuple:
+                    ext = f.get("ext", "")
+                    ext_match = 1 if ext == format_preference else 0
+                    height = f.get("height") or 0
+                    bitrate = f.get("tbr") or f.get("vbr") or 0
+                    has_audio = 1 if f.get("acodec") not in (None, "none") else 0
+                    return (ext_match, has_audio, height, bitrate)
+
+                video_formats.sort(key=score_format, reverse=True)
+
+                # If quality is specified, filter by resolution
+                if quality != "best" and quality.isdigit():
+                    target_height = int(quality)
+                    # Find closest match
+                    filtered = [f for f in video_formats if (f.get("height") or 0) <= target_height]
+                    if filtered:
+                        video_formats = filtered
+
+                best = video_formats[0]
+
+                return {
+                    "url": best.get("url"),
+                    "mime_type": best.get("ext", format_preference),
+                    "width": best.get("width"),
+                    "height": best.get("height"),
+                    "fps": best.get("fps"),
+                    "vcodec": best.get("vcodec"),
+                    "acodec": best.get("acodec"),
+                    "bitrate": best.get("tbr") or best.get("vbr"),
+                    "content_length": best.get("filesize") or best.get("filesize_approx"),
+                    "format_id": best.get("format_id"),
+                    "ext": best.get("ext"),
+                }
+
+        except yt_dlp.utils.DownloadError as e:
+            raise YouTubeError(f"Failed to get video URL: {str(e)}") from e
+        except Exception as e:
+            raise YouTubeError(f"Unexpected error getting video URL: {str(e)}") from e
+
 
 class YouTubeDownloader:
     """YouTube media and caption file downloader using yt-dlp

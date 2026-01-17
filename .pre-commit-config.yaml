@@ -10,7 +10,7 @@ repos:
     rev: 7.3.0
     hooks:
       - id: flake8
-        args: [ '--config=.flake8', '--ignore=E203' ]
+        args: [ '--config=.flake8' ]
         exclude: ^app/
 
   - repo: https://github.com/pycqa/isort
