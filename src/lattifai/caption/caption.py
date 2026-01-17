@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar, Union
 
 if TYPE_CHECKING:
     from ..config.caption import KaraokeConfig
@@ -53,7 +53,7 @@ class Caption:
     kind: Optional[str] = None
     source_format: Optional[str] = None
     source_path: Optional[Pathlike] = None
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __len__(self) -> int:
         """Return the number of supervision segments."""
@@ -292,6 +292,7 @@ class Caption:
         format: str = "srt",
         word_level: bool = False,
         karaoke_config: Optional["KaraokeConfig"] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Return caption content in specified format.
@@ -301,11 +302,14 @@ class Caption:
             word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
             karaoke_config: Karaoke configuration. When provided with enabled=True,
                 enables karaoke styling (ASS \\kf tags, enhanced LRC, etc.)
+            metadata: Optional metadata dict to pass to writer. If None, uses self.metadata.
 
         Returns:
             String containing formatted captions
         """
-        return self.to_bytes(output_format=format, word_level=word_level, karaoke_config=karaoke_config).decode("utf-8")
+        return self.to_bytes(
+            output_format=format, word_level=word_level, karaoke_config=karaoke_config, metadata=metadata
+        ).decode("utf-8")
 
     def to_dict(self) -> Dict:
         """
@@ -392,6 +396,7 @@ class Caption:
         include_speaker_in_text: bool = True,
         word_level: bool = False,
         karaoke_config: Optional["KaraokeConfig"] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bytes:
         """
         Convert caption to bytes.
@@ -402,6 +407,7 @@ class Caption:
             word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
             karaoke_config: Karaoke configuration. When provided with enabled=True,
                 enables karaoke styling (ASS \\kf tags, enhanced LRC, etc.)
+            metadata: Optional metadata dict to pass to writer. If None, uses self.metadata.
 
         Returns:
             Caption content as bytes
@@ -419,6 +425,7 @@ class Caption:
             include_speaker_in_text=include_speaker_in_text,
             word_level=word_level,
             karaoke_config=karaoke_config,
+            metadata=metadata,
         )
 
     @classmethod
@@ -536,6 +543,7 @@ class Caption:
         include_speaker_in_text: bool = True,
         word_level: bool = False,
         karaoke_config: Optional["KaraokeConfig"] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Union[Pathlike, bytes]:
         """
         Write caption to file or return as bytes.
@@ -547,6 +555,8 @@ class Caption:
             word_level: Use word-level output format if supported (e.g., LRC, ASS, TTML)
             karaoke_config: Karaoke configuration. When provided with enabled=True,
                 enables karaoke styling (ASS \\kf tags, enhanced LRC, etc.)
+            metadata: Optional metadata dict to pass to writer. If None, uses self.metadata.
+                Can be used to override or supplement format-specific metadata.
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -557,6 +567,11 @@ class Caption:
             supervisions = self.supervisions
         else:
             supervisions = self.transcription
+
+        # Merge external metadata with self.metadata (external takes precedence)
+        effective_metadata = dict(self.metadata) if self.metadata else {}
+        if metadata:
+            effective_metadata.update(metadata)
 
         # Determine output format
         if output_format:
@@ -594,6 +609,7 @@ class Caption:
                 include_speaker=include_speaker_in_text,
                 word_level=word_level,
                 karaoke_config=karaoke_config,
+                metadata=effective_metadata,
             )
 
         content = writer_cls.to_bytes(
@@ -601,6 +617,7 @@ class Caption:
             include_speaker=include_speaker_in_text,
             word_level=word_level,
             karaoke_config=karaoke_config,
+            metadata=effective_metadata,
         )
         if isinstance(path, io.BytesIO):
             path.write(content)

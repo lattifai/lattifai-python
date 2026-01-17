@@ -118,6 +118,56 @@ class TTMLFormatBase(FormatHandler):
             return 0.0
 
     @classmethod
+    def extract_metadata(cls, source: Union[Pathlike, str], **kwargs) -> Dict:
+        """Extract TTML metadata including profile, language, and timing mode.
+
+        Returns:
+            Dict containing:
+            - ttml_profile: Profile URI (imsc1, ebu-tt-d, or basic)
+            - ttml_language: Language code from xml:lang
+            - ttml_timing: iTunes timing mode if present
+        """
+        if isinstance(source, (str, Path)) and not cls.is_content(source):
+            try:
+                with open(source, "r", encoding="utf-8") as f:
+                    content = f.read()
+            except Exception:
+                return {}
+        else:
+            content = str(source)
+
+        metadata = {}
+
+        try:
+            # Don't strip namespaces for metadata extraction
+            root = ET.fromstring(content)
+
+            # Extract language
+            lang = root.get(f"{{{XML_NS}}}lang") or root.get("lang")
+            if lang:
+                metadata["ttml_language"] = lang
+
+            # Extract profile
+            profile = root.get(f"{{{TTML_PARAM_NS}}}profile") or root.get("profile")
+            if profile:
+                if "imsc1" in profile.lower():
+                    metadata["ttml_profile"] = "imsc1"
+                elif "ebu" in profile.lower():
+                    metadata["ttml_profile"] = "ebu-tt-d"
+                else:
+                    metadata["ttml_profile"] = "basic"
+
+            # Extract iTunes timing mode if present
+            timing = root.get(f"{{{ITUNES_NS}}}timing")
+            if timing:
+                metadata["ttml_timing"] = timing
+
+        except ET.ParseError:
+            pass
+
+        return metadata
+
+    @classmethod
     def read(
         cls,
         source: Union[Pathlike, str],
@@ -473,6 +523,7 @@ class TTMLFormat(TTMLFormatBase):
         config: Optional[TTMLConfig] = None,
         word_level: bool = False,
         karaoke_config: Optional[KaraokeConfig] = None,
+        metadata: Optional[Dict] = None,
         **kwargs,
     ) -> bytes:
         """Convert to TTML format bytes.
@@ -484,9 +535,17 @@ class TTMLFormat(TTMLFormatBase):
             word_level: Whether to output word-level timing
             karaoke_config: Karaoke configuration. When provided with enabled=True,
                 use span-based karaoke; otherwise use p-per-word
+            metadata: Optional metadata dict containing ttml_* keys to restore
         """
         if config is None:
             config = TTMLConfig()
+
+        # Apply metadata to config if available
+        if metadata:
+            if metadata.get("ttml_language"):
+                config.language = metadata["ttml_language"]
+            if metadata.get("ttml_profile"):
+                config.profile = metadata["ttml_profile"]
 
         root = cls._build_ttml(
             supervisions,

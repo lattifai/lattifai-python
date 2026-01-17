@@ -18,9 +18,10 @@ Metadata tags:
 
 import re
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from lhotse.supervision import AlignmentItem
+from lhotse.utils import Pathlike
 
 from ...config.caption import KaraokeConfig
 from ..supervision import Supervision
@@ -50,6 +51,45 @@ class LRCFormat(FormatHandler):
         if source.strip().startswith("[") and re.match(r"\[\d+:\d+", source):
             return True
         return False
+
+    @classmethod
+    def extract_metadata(cls, source: Union[Pathlike, str], **kwargs) -> Dict[str, str]:
+        """Extract LRC metadata tags.
+
+        Extracts standard LRC metadata:
+        - ar: Artist name
+        - ti: Title
+        - al: Album
+        - by: Creator
+        - offset: Time offset in milliseconds
+        - length: Song length
+
+        Returns:
+            Dict with lrc_* prefixed keys for metadata preservation
+        """
+        if cls.is_content(source):
+            content = source
+        else:
+            try:
+                content = Path(str(source)).read_text(encoding="utf-8")
+            except Exception:
+                return {}
+
+        metadata = {}
+        # Pattern to match [key:value] metadata tags
+        meta_pattern = re.compile(r"^\[([a-z]+):(.+)\]$", re.IGNORECASE)
+
+        for line in content.split("\n")[:50]:  # Only check first 50 lines
+            line = line.strip()
+            match = meta_pattern.match(line)
+            if match:
+                key, value = match.groups()
+                key = key.lower()
+                # Store with lrc_ prefix to avoid conflicts
+                if key in ("ar", "ti", "al", "by", "offset", "length", "re", "ve"):
+                    metadata[f"lrc_{key}"] = value.strip()
+
+        return metadata
 
     @classmethod
     def read(
@@ -180,6 +220,7 @@ class LRCFormat(FormatHandler):
         include_speaker: bool = True,
         word_level: bool = False,
         karaoke_config: Optional[KaraokeConfig] = None,
+        metadata: Optional[Dict] = None,
         **kwargs,
     ) -> bytes:
         """Convert supervisions to LRC format bytes.
@@ -190,6 +231,7 @@ class LRCFormat(FormatHandler):
             word_level: Enable word-level output
             karaoke_config: Karaoke configuration. When provided with enabled=True,
                 use enhanced LRC with inline timestamps
+            metadata: Optional metadata dict containing lrc_* keys to restore
 
         Returns:
             Caption content as bytes
@@ -198,12 +240,24 @@ class LRCFormat(FormatHandler):
         karaoke_enabled = config.enabled
         lines = []
 
-        # Metadata header (only when karaoke mode is enabled)
+        # Restore metadata from Caption.metadata (lrc_* keys)
+        if metadata:
+            lrc_meta_keys = ["ar", "ti", "al", "by", "offset", "length", "re", "ve"]
+            for key in lrc_meta_keys:
+                value = metadata.get(f"lrc_{key}")
+                if value:
+                    lines.append(f"[{key}:{value}]")
+
+        # Also add karaoke config metadata if enabled
         if karaoke_enabled:
             for key, value in config.lrc_metadata.items():
-                lines.append(f"[{key}:{value}]")
-            if config.lrc_metadata:
-                lines.append("")
+                # Avoid duplicates
+                existing_line = f"[{key}:"
+                if not any(line.startswith(existing_line) for line in lines):
+                    lines.append(f"[{key}:{value}]")
+
+        if lines:
+            lines.append("")
 
         for sup in supervisions:
             if word_level and sup.alignment and "word" in sup.alignment:

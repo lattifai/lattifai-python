@@ -64,7 +64,8 @@ class SentenceSplitter:
             split_texts: List of split sentence texts
 
         Returns:
-            List of Supervision objects with distributed time information
+            List of Supervision objects with distributed time information.
+            Custom attributes are inherited from first_sup with conflict markers.
         """
         if not input_supervisions:
             return [Supervision(text=text, id="", recording_id="", start=0, duration=0) for text in split_texts]
@@ -100,6 +101,7 @@ class SentenceSplitter:
             last_sup = None
             first_char_idx = None
             last_char_idx = None
+            overlapping_customs = []  # Track all custom dicts for conflict detection
 
             # Start from sup_idx, which is the first supervision that might overlap
             for i in range(sup_idx, len(sup_ranges)):
@@ -122,12 +124,35 @@ class SentenceSplitter:
                 last_sup = sup
                 last_char_idx = min(len(sup.text) - 1, text_end - 1 - sup_start)
 
+                # Collect custom dict for conflict detection
+                if getattr(sup, "custom", None):
+                    overlapping_customs.append(sup.custom)
+
             if first_sup is None or last_sup is None:
                 raise ValueError(f"Could not find supervisions for split text: {split_text}")
 
             # Calculate timing
             start_time = first_sup.start + (first_char_idx / len(first_sup.text)) * first_sup.duration
             end_time = last_sup.start + ((last_char_idx + 1) / len(last_sup.text)) * last_sup.duration
+
+            # Inherit custom from first_sup, mark conflicts if multiple sources
+            merged_custom = None
+            if overlapping_customs:
+                # Start with first_sup's custom (inherit strategy)
+                merged_custom = overlapping_customs[0].copy() if overlapping_customs[0] else {}
+
+                # Detect conflicts if multiple overlapping supervisions have different custom values
+                if len(overlapping_customs) > 1:
+                    has_conflict = False
+                    for other_custom in overlapping_customs[1:]:
+                        if other_custom and other_custom != overlapping_customs[0]:
+                            has_conflict = True
+                            break
+
+                    if has_conflict:
+                        # Mark that this supervision spans multiple sources with different customs
+                        merged_custom["_split_from_multiple"] = True
+                        merged_custom["_source_count"] = len(overlapping_customs)
 
             result.append(
                 Supervision(
@@ -136,6 +161,7 @@ class SentenceSplitter:
                     start=start_time,
                     duration=end_time - start_time,
                     recording_id=first_sup.recording_id,
+                    custom=merged_custom,
                 )
             )
 

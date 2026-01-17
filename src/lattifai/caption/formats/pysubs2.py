@@ -186,13 +186,25 @@ class SRTFormat(Pysubs2Format):
         supervisions: List[Supervision],
         include_speaker: bool = True,
         use_bom: bool = False,
+        metadata: Optional[Dict] = None,
         **kwargs,
     ) -> bytes:
-        """Generate SRT with proper formatting (comma for milliseconds)."""
+        """Generate SRT with proper formatting (comma for milliseconds).
+
+        Args:
+            supervisions: List of supervision segments
+            include_speaker: Whether to include speaker in output
+            use_bom: Whether to add BOM for Windows compatibility
+            metadata: Optional metadata dict. If encoding is 'utf-8-sig', adds BOM.
+        """
         content = super().to_bytes(supervisions, include_speaker=include_speaker, **kwargs)
 
-        # Add BOM if requested (for Windows compatibility)
-        if use_bom:
+        # Add BOM if requested or if original had BOM
+        add_bom = use_bom
+        if metadata and metadata.get("encoding") == "utf-8-sig":
+            add_bom = True
+
+        if add_bom:
             content = b"\xef\xbb\xbf" + content
 
         return content
@@ -214,9 +226,10 @@ class VTTFormat(Pysubs2Format):
         fps: float = 25.0,
         word_level: bool = False,
         karaoke_config: Optional[KaraokeConfig] = None,
+        metadata: Optional[Dict] = None,
         **kwargs,
     ) -> bytes:
-        """Convert to VTT bytes with optional karaoke (YouTube VTT style).
+        """Convert to VTT bytes with optional karaoke and metadata preservation.
 
         Args:
             supervisions: List of supervision segments
@@ -225,6 +238,7 @@ class VTTFormat(Pysubs2Format):
             word_level: If True and alignment exists, output word-per-segment or karaoke
             karaoke_config: Karaoke configuration. When enabled, output YouTube VTT
                 style with word-level timestamps: <00:00:10.559><c> word</c>
+            metadata: Optional metadata dict containing vtt_kind and vtt_language
 
         Returns:
             VTT content as bytes
@@ -235,20 +249,68 @@ class VTTFormat(Pysubs2Format):
 
         # If karaoke enabled, output YouTube VTT style
         if word_level and karaoke_enabled:
-            return cls._to_youtube_vtt_bytes(supervisions, include_speaker)
+            return cls._to_youtube_vtt_bytes(supervisions, include_speaker, metadata)
 
         # If word_level only (no karaoke), expand to word-per-segment
         if word_level:
             supervisions = expand_to_word_supervisions(supervisions)
 
-        # Use pysubs2 for standard VTT output
-        return super().to_bytes(supervisions, include_speaker=include_speaker, fps=fps, **kwargs)
+        # Build VTT with metadata header
+        return cls._to_vtt_bytes_with_metadata(supervisions, include_speaker, metadata)
+
+    @classmethod
+    def _to_vtt_bytes_with_metadata(
+        cls,
+        supervisions: List[Supervision],
+        include_speaker: bool = True,
+        metadata: Optional[Dict] = None,
+    ) -> bytes:
+        """Generate VTT with metadata header."""
+        lines = ["WEBVTT"]
+
+        # Add metadata header if present
+        if metadata:
+            if metadata.get("kind"):
+                lines.append(f"Kind: {metadata['kind']}")
+            if metadata.get("language"):
+                lines.append(f"Language: {metadata['language']}")
+
+        lines.append("")
+
+        # Use pysubs2 for cue generation
+        subs = pysubs2.SSAFile()
+        for sup in supervisions:
+            text = sup.text or ""
+            if cls._should_include_speaker(sup, include_speaker):
+                text = f"{sup.speaker} {text}"
+            subs.append(
+                pysubs2.SSAEvent(
+                    start=int(sup.start * 1000),
+                    end=int(sup.end * 1000),
+                    text=text,
+                    name=sup.speaker or "",
+                )
+            )
+
+        # Get cues from pysubs2 and append (skip WEBVTT header)
+        vtt_content = subs.to_string(format_="vtt")
+        vtt_lines = vtt_content.split("\n")
+        # Skip the first line (WEBVTT) and any empty lines before first cue
+        started = False
+        for line in vtt_lines[1:]:
+            if not started and not line.strip():
+                continue
+            started = True
+            lines.append(line)
+
+        return "\n".join(lines).encode("utf-8")
 
     @classmethod
     def _to_youtube_vtt_bytes(
         cls,
         supervisions: List[Supervision],
         include_speaker: bool = True,
+        metadata: Optional[Dict] = None,
     ) -> bytes:
         """Generate YouTube VTT format with word-level timestamps.
 
@@ -266,7 +328,16 @@ class VTTFormat(Pysubs2Format):
                 ms = 0
             return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
 
-        lines = ["WEBVTT", ""]
+        lines = ["WEBVTT"]
+
+        # Add metadata header if present
+        if metadata:
+            if metadata.get("kind"):
+                lines.append(f"Kind: {metadata['kind']}")
+            if metadata.get("language"):
+                lines.append(f"Language: {metadata['language']}")
+
+        lines.append("")
 
         for sup in sorted(supervisions, key=lambda x: x.start):
             text = sup.text or ""
@@ -306,6 +377,137 @@ class ASSFormat(Pysubs2Format):
     description = "Advanced SubStation Alpha - rich styling support"
 
     @classmethod
+    def read(
+        cls,
+        source,
+        normalize_text: bool = True,
+        **kwargs,
+    ) -> List[Supervision]:
+        """Read ASS format with style and event metadata preservation.
+
+        Preserves ASS-specific event attributes in Supervision.custom:
+        - ass_style: Style name reference
+        - ass_layer: Layer number
+        - ass_margin_l/r/v: Margin overrides
+        - ass_effect: Effect string
+        """
+        try:
+            if cls.is_content(source):
+                subs = pysubs2.SSAFile.from_string(source, format_=cls.pysubs2_format)
+            else:
+                subs = pysubs2.load(str(source), encoding="utf-8", format_=cls.pysubs2_format)
+        except Exception:
+            if cls.is_content(source):
+                subs = pysubs2.SSAFile.from_string(source)
+            else:
+                subs = pysubs2.load(str(source), encoding="utf-8")
+
+        supervisions = []
+        for event in subs.events:
+            text = event.text
+            if normalize_text:
+                text = normalize_text_fn(text)
+
+            speaker, text = parse_speaker_text(text)
+
+            # Preserve ASS-specific event attributes
+            custom = {
+                "ass_style": event.style,
+                "ass_layer": event.layer,
+                "ass_margin_l": event.marginl,
+                "ass_margin_r": event.marginr,
+                "ass_margin_v": event.marginv,
+                "ass_effect": event.effect,
+            }
+
+            supervisions.append(
+                Supervision(
+                    text=text,
+                    speaker=speaker or event.name or None,
+                    start=event.start / 1000.0 if event.start is not None else 0,
+                    duration=(event.end - event.start) / 1000.0 if event.end is not None else 0,
+                    custom=custom,
+                )
+            )
+
+        return supervisions
+
+    @classmethod
+    def extract_metadata(cls, source, **kwargs) -> Dict:
+        """Extract ASS global metadata including Script Info and Styles.
+
+        Returns:
+            Dict containing:
+            - ass_info: Script Info section as dict
+            - ass_styles: Style definitions as dict of dicts
+        """
+        try:
+            if cls.is_content(source):
+                subs = pysubs2.SSAFile.from_string(source, format_=cls.pysubs2_format)
+            else:
+                subs = pysubs2.load(str(source), encoding="utf-8", format_=cls.pysubs2_format)
+        except Exception:
+            return {}
+
+        # Convert styles to serializable dict
+        styles_dict = {}
+        for name, style in subs.styles.items():
+            styles_dict[name] = {
+                "fontname": style.fontname,
+                "fontsize": style.fontsize,
+                "primarycolor": cls._color_to_str(style.primarycolor),
+                "secondarycolor": cls._color_to_str(style.secondarycolor),
+                "tertiarycolor": cls._color_to_str(style.tertiarycolor),
+                "outlinecolor": cls._color_to_str(style.outlinecolor),
+                "backcolor": cls._color_to_str(style.backcolor),
+                "bold": style.bold,
+                "italic": style.italic,
+                "underline": style.underline,
+                "strikeout": style.strikeout,
+                "scalex": style.scalex,
+                "scaley": style.scaley,
+                "spacing": style.spacing,
+                "angle": style.angle,
+                "borderstyle": style.borderstyle,
+                "outline": style.outline,
+                "shadow": style.shadow,
+                "alignment": style.alignment,
+                "marginl": style.marginl,
+                "marginr": style.marginr,
+                "marginv": style.marginv,
+                "alphalevel": style.alphalevel,
+                "encoding": style.encoding,
+            }
+
+        return {
+            "ass_info": dict(subs.info),
+            "ass_styles": styles_dict,
+        }
+
+    @staticmethod
+    def _color_to_str(color: pysubs2.Color) -> str:
+        """Convert pysubs2.Color to ASS color string &HAABBGGRR."""
+        return f"&H{color.a:02X}{color.b:02X}{color.g:02X}{color.r:02X}"
+
+    @staticmethod
+    def _str_to_color(color_str: str) -> pysubs2.Color:
+        """Convert ASS color string &HAABBGGRR to pysubs2.Color."""
+        color_str = color_str.lstrip("&H").lstrip("&h")
+        if len(color_str) == 8:
+            a = int(color_str[0:2], 16)
+            b = int(color_str[2:4], 16)
+            g = int(color_str[4:6], 16)
+            r = int(color_str[6:8], 16)
+        elif len(color_str) == 6:
+            a = 0
+            b = int(color_str[0:2], 16)
+            g = int(color_str[2:4], 16)
+            r = int(color_str[4:6], 16)
+        else:
+            return pysubs2.Color(r=255, g=255, b=255, a=0)
+        return pysubs2.Color(r=r, g=g, b=b, a=a)
+
+    @classmethod
     def to_bytes(
         cls,
         supervisions: List[Supervision],
@@ -313,9 +515,10 @@ class ASSFormat(Pysubs2Format):
         fps: float = 25.0,
         word_level: bool = False,
         karaoke_config: Optional[KaraokeConfig] = None,
+        metadata: Optional[Dict] = None,
         **kwargs,
     ) -> bytes:
-        """Convert to ASS bytes with optional karaoke tags.
+        """Convert to ASS bytes with style preservation and optional karaoke tags.
 
         Args:
             supervisions: List of supervision segments
@@ -324,57 +527,37 @@ class ASSFormat(Pysubs2Format):
             word_level: If True and alignment exists, output word-per-segment or karaoke
             karaoke_config: Karaoke configuration. When provided with enabled=True,
                 generate karaoke tags
+            metadata: Optional metadata dict containing ass_info and ass_styles
+                to restore original ASS formatting
 
         Returns:
             ASS content as bytes
         """
-        # Check if karaoke is enabled
+        from .base import expand_to_word_supervisions
+
         karaoke_enabled = karaoke_config is not None and karaoke_config.enabled
 
-        # If word_level is False or karaoke is not enabled, use base class behavior (word-per-segment)
-        if not word_level or not karaoke_enabled:
-            return super().to_bytes(
-                supervisions,
-                include_speaker=include_speaker,
-                fps=fps,
-                word_level=word_level,
-                karaoke_config=karaoke_config,
-                **kwargs,
-            )
+        # Expand to word-per-segment if word_level=True and karaoke is not enabled
+        if word_level and not karaoke_enabled:
+            supervisions = expand_to_word_supervisions(supervisions)
 
-        # Check if any supervision has word-level alignment
-        has_alignment = any(getattr(sup, "alignment", None) and sup.alignment.get("word") for sup in supervisions)
+        # Create ASS file and restore global styles from metadata
+        subs = cls._create_ass_file_with_metadata(metadata)
 
-        # If no alignment data, fallback to base class behavior
-        if not has_alignment:
-            return super().to_bytes(
-                supervisions,
-                include_speaker=include_speaker,
-                fps=fps,
-                word_level=word_level,
-                karaoke_config=karaoke_config,
-                **kwargs,
-            )
-
-        style = karaoke_config.style
-
-        # Create ASS file with karaoke style
-        subs = pysubs2.SSAFile()
-        subs.styles["Karaoke"] = cls._create_karaoke_style(style)
+        # Add karaoke style if needed
+        if karaoke_enabled:
+            subs.styles["Karaoke"] = cls._create_karaoke_style(karaoke_config.style)
 
         for sup in supervisions:
             alignment = getattr(sup, "alignment", None)
             word_items = alignment.get("word") if alignment else None
 
-            if word_items:
-                # Build karaoke text for the entire line
+            # Karaoke mode with word alignment
+            if word_level and karaoke_enabled and word_items:
                 karaoke_text = cls._build_karaoke_text(word_items, karaoke_config.effect)
-
-                # Use word timestamps for event timing (more accurate)
                 event_start = int(word_items[0].start * 1000)
                 event_end = int(word_items[-1].end * 1000)
 
-                # Create single event with karaoke tags
                 subs.append(
                     pysubs2.SSAEvent(
                         start=event_start,
@@ -384,21 +567,97 @@ class ASSFormat(Pysubs2Format):
                     )
                 )
             else:
-                # No alignment for this supervision, use plain text
+                # Standard mode: restore custom attributes from supervision
                 text = sup.text or ""
                 if cls._should_include_speaker(sup, include_speaker):
                     text = f"{sup.speaker} {text}"
 
-                subs.append(
-                    pysubs2.SSAEvent(
-                        start=int(sup.start * 1000),
-                        end=int(sup.end * 1000),
-                        text=text,
-                        name=sup.speaker or "",
-                    )
-                )
+                event = cls._create_event_from_supervision(sup, text)
+                subs.append(event)
 
         return subs.to_string(format_="ass").encode("utf-8")
+
+    @classmethod
+    def _create_ass_file_with_metadata(cls, metadata: Optional[Dict]) -> pysubs2.SSAFile:
+        """Create SSAFile and restore global styles from metadata.
+
+        Args:
+            metadata: Dict containing ass_info and ass_styles
+
+        Returns:
+            pysubs2.SSAFile with restored styles
+        """
+        subs = pysubs2.SSAFile()
+
+        if not metadata:
+            return subs
+
+        # Restore Script Info
+        if "ass_info" in metadata:
+            subs.info.update(metadata["ass_info"])
+
+        # Restore Styles
+        if "ass_styles" in metadata:
+            for name, style_dict in metadata["ass_styles"].items():
+                subs.styles[name] = cls._dict_to_style(style_dict)
+
+        return subs
+
+    @classmethod
+    def _dict_to_style(cls, style_dict: Dict) -> pysubs2.SSAStyle:
+        """Convert style dict back to pysubs2.SSAStyle."""
+        return pysubs2.SSAStyle(
+            fontname=style_dict.get("fontname", "Arial"),
+            fontsize=style_dict.get("fontsize", 20.0),
+            primarycolor=cls._str_to_color(style_dict.get("primarycolor", "&H00FFFFFF")),
+            secondarycolor=cls._str_to_color(style_dict.get("secondarycolor", "&H000000FF")),
+            tertiarycolor=cls._str_to_color(style_dict.get("tertiarycolor", "&H00000000")),
+            outlinecolor=cls._str_to_color(style_dict.get("outlinecolor", "&H00000000")),
+            backcolor=cls._str_to_color(style_dict.get("backcolor", "&H00000000")),
+            bold=style_dict.get("bold", False),
+            italic=style_dict.get("italic", False),
+            underline=style_dict.get("underline", False),
+            strikeout=style_dict.get("strikeout", False),
+            scalex=style_dict.get("scalex", 100.0),
+            scaley=style_dict.get("scaley", 100.0),
+            spacing=style_dict.get("spacing", 0.0),
+            angle=style_dict.get("angle", 0.0),
+            borderstyle=style_dict.get("borderstyle", 1),
+            outline=style_dict.get("outline", 2.0),
+            shadow=style_dict.get("shadow", 2.0),
+            alignment=pysubs2.Alignment(style_dict.get("alignment", 2)),
+            marginl=style_dict.get("marginl", 10),
+            marginr=style_dict.get("marginr", 10),
+            marginv=style_dict.get("marginv", 10),
+            alphalevel=style_dict.get("alphalevel", 0),
+            encoding=style_dict.get("encoding", 1),
+        )
+
+    @classmethod
+    def _create_event_from_supervision(cls, sup: Supervision, text: str) -> pysubs2.SSAEvent:
+        """Create SSAEvent from Supervision, restoring custom attributes.
+
+        Args:
+            sup: Supervision with optional custom dict containing ass_* attributes
+            text: Processed text content
+
+        Returns:
+            pysubs2.SSAEvent with restored attributes
+        """
+        custom = getattr(sup, "custom", None) or {}
+
+        return pysubs2.SSAEvent(
+            start=int(sup.start * 1000),
+            end=int(sup.end * 1000),
+            text=text,
+            name=sup.speaker or "",
+            style=custom.get("ass_style", "Default"),
+            layer=custom.get("ass_layer", 0),
+            marginl=custom.get("ass_margin_l", 0),
+            marginr=custom.get("ass_margin_r", 0),
+            marginv=custom.get("ass_margin_v", 0),
+            effect=custom.get("ass_effect", ""),
+        )
 
     @classmethod
     def _create_karaoke_style(cls, style: CaptionStyle) -> pysubs2.SSAStyle:
@@ -476,12 +735,43 @@ class ASSFormat(Pysubs2Format):
 
 
 @register_format("ssa")
-class SSAFormat(Pysubs2Format):
-    """SubStation Alpha format (predecessor to ASS)."""
+class SSAFormat(ASSFormat):
+    """SubStation Alpha format (predecessor to ASS).
+
+    Inherits ASS metadata preservation - SSA and ASS share the same structure.
+    """
 
     extensions = [".ssa"]
     pysubs2_format = "ssa"
     description = "SubStation Alpha - legacy format"
+
+    @classmethod
+    def to_bytes(
+        cls,
+        supervisions: List[Supervision],
+        include_speaker: bool = True,
+        fps: float = 25.0,
+        word_level: bool = False,
+        karaoke_config: Optional[KaraokeConfig] = None,
+        metadata: Optional[Dict] = None,
+        **kwargs,
+    ) -> bytes:
+        """Convert to SSA bytes with style preservation."""
+        from .base import expand_to_word_supervisions
+
+        if word_level and not (karaoke_config and karaoke_config.enabled):
+            supervisions = expand_to_word_supervisions(supervisions)
+
+        subs = cls._create_ass_file_with_metadata(metadata)
+
+        for sup in supervisions:
+            text = sup.text or ""
+            if cls._should_include_speaker(sup, include_speaker):
+                text = f"{sup.speaker} {text}"
+            event = cls._create_event_from_supervision(sup, text)
+            subs.append(event)
+
+        return subs.to_string(format_="ssa").encode("utf-8")
 
 
 @register_format("sub")

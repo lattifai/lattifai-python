@@ -384,10 +384,11 @@ class PremiereXMLFormat(FormatWriter):
         Returns:
             Path to written file
         """
-        # Filter out unsupported kwargs (word_level, karaoke, karaoke_config not supported by Premiere XML)
+        # Filter out unsupported kwargs (word_level, karaoke, karaoke_config, metadata not supported by Premiere XML)
         kwargs.pop("word_level", None)
         kwargs.pop("karaoke", None)
         kwargs.pop("karaoke_config", None)
+        kwargs.pop("metadata", None)
         config = PremiereXMLConfig(**kwargs)
         return PremiereXMLWriter.write(supervisions, output_path, config)
 
@@ -408,10 +409,11 @@ class PremiereXMLFormat(FormatWriter):
         Returns:
             Premiere Pro XML content as bytes
         """
-        # Filter out unsupported kwargs (word_level, karaoke, karaoke_config not supported by Premiere XML)
+        # Filter out unsupported kwargs (word_level, karaoke, karaoke_config, metadata not supported by Premiere XML)
         kwargs.pop("word_level", None)
         kwargs.pop("karaoke", None)
         kwargs.pop("karaoke_config", None)
+        kwargs.pop("metadata", None)
         config = PremiereXMLConfig(**kwargs)
         return PremiereXMLWriter.to_bytes(supervisions, config)
 
