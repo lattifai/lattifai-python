@@ -10,13 +10,16 @@ TTML (Timed Text Markup Language) is a W3C standard used by:
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from xml.dom import minidom
+
+from lhotse.supervision import AlignmentItem
+from lhotse.utils import Pathlike
 
 from ...config.caption import KaraokeConfig
 from ..supervision import Supervision
-from . import register_writer
-from .base import FormatWriter
+from . import register_format
+from .base import FormatHandler
 
 # XML namespaces
 TTML_NS = "http://www.w3.org/ns/ttml"
@@ -59,8 +62,187 @@ class TTMLConfig:
     language: str = "en"
 
 
-class TTMLFormatBase(FormatWriter):
-    """Base TTML format writer."""
+class TTMLFormatBase(FormatHandler):
+    """Base TTML format handler (reader/writer)."""
+
+    @classmethod
+    def _parse_ttml_time(cls, time_str: str) -> float:
+        """Parse TTML time string to seconds.
+
+        Supports:
+        - Clock time: HH:MM:SS.mmm or HH:MM:SS:frames
+        - Offset time: 10s, 10.5s, 500ms, 100f
+        """
+        if not time_str:
+            return 0.0
+
+        time_str = time_str.strip()
+
+        # Handle offset time
+        if time_str.endswith("ms"):
+            return float(time_str[:-2]) / 1000.0
+        if time_str.endswith("s"):
+            return float(time_str[:-1])
+        if time_str.endswith("f"):
+            # Assuming default 30fps if frame count provided without explicit frame rate
+            # This is imprecise but a fallback
+            return float(time_str[:-1]) / 30.0
+
+        # Handle clock time: HH:MM:SS.mmm or HH:MM:SS:fff
+        parts = time_str.split(":")
+        if len(parts) >= 3:
+            hours = float(parts[0])
+            minutes = float(parts[1])
+
+            # Check for seconds and frames/milliseconds
+            last_part = parts[2]
+            seconds = 0.0
+
+            if "." in last_part:
+                seconds = float(last_part)
+            elif len(parts) == 4:
+                # HH:MM:SS:FF
+                seconds = float(parts[2])
+                frames = float(parts[3])
+                # Assume 30fps for HH:MM:SS:FF standard if not specified
+                seconds += frames / 30.0
+            else:
+                seconds = float(last_part)
+
+            return hours * 3600 + minutes * 60 + seconds
+
+        # Fallback: try parsing as simple float seconds
+        try:
+            return float(time_str)
+        except ValueError:
+            return 0.0
+
+    @classmethod
+    def read(
+        cls,
+        source: Union[Pathlike, str],
+        normalize_text: bool = True,
+        **kwargs,
+    ) -> List[Supervision]:
+        """Read TTML content and return supervisions."""
+        if isinstance(source, (str, Path)) and not cls.is_content(source):
+            with open(source, "r", encoding="utf-8") as f:
+                content = f.read()
+        else:
+            content = str(source)
+
+        # Parse XML
+        try:
+            # Strip namespaces for easier parsing
+            # This is a bit hacky but robust against different namespace prefixes
+            import re
+
+            content = re.sub(r' xmlns="[^"]+"', "", content, count=1)
+            content = re.sub(r' xmlns:t?ts="[^"]+"', "", content)
+            content = re.sub(r' xmlns:t?tp="[^"]+"', "", content)
+            # Also strip the namespace prefixes from attributes since we removed definitions
+            content = re.sub(r" (t?ts|t?tp):", " ", content)
+
+            root = ET.fromstring(content)
+        except ET.ParseError:
+            return []
+
+        supervisions = []
+
+        # Find body/div/p structure
+        body = root.find("body") or root.find(f"{{{TTML_NS}}}body")
+        if body is None:
+            return []
+
+        # Traverse all divs and p tags
+        # Note: TTML structure can be nested div->div->p
+        for p in body.iter("p"):
+            # Or with explicit namespace if stripping failed
+            # for p in body.iter(f"{{{TTML_NS}}}p"):
+
+            begin_str = p.get("begin")
+            end_str = p.get("end")
+            dur_str = p.get("dur")
+
+            if not begin_str:
+                continue
+
+            start = cls._parse_ttml_time(begin_str)
+
+            if end_str:
+                end = cls._parse_ttml_time(end_str)
+                duration = end - start
+            elif dur_str:
+                duration = cls._parse_ttml_time(dur_str)
+            else:
+                duration = 0.0
+
+            # Extract text and potential word-level spans
+            alignment = None
+            text_parts = []
+            word_items = []
+
+            # Text directly in p
+            if p.text and p.text.strip():
+                text_parts.append(p.text.strip())
+
+            # Child spans
+            for child in p:
+                if child.tag.endswith("span"):
+                    span_text = child.text.strip() if child.text else ""
+                    if not span_text:
+                        pass
+
+                    # Check for timing on span (word-level or phrase-level)
+                    span_begin = child.get("begin")
+                    span_end = child.get("end")
+
+                    if span_begin and (span_end or child.get("dur")):
+                        # It's a timed span
+                        s_start = cls._parse_ttml_time(span_begin)
+                        if span_end:
+                            s_end = cls._parse_ttml_time(span_end)
+                            s_dur = s_end - s_start
+                        else:
+                            s_dur = cls._parse_ttml_time(child.get("dur"))
+
+                        # If start is relative to p? TTML spec says absolute usually unless offset
+                        # We assume absolute for now as per simple profile
+
+                        word_items.append(AlignmentItem(symbol=span_text, start=s_start, duration=s_dur))
+                        text_parts.append(span_text)
+                    else:
+                        # Just styled text
+                        text_parts.append(span_text)
+
+                # Tail text after span
+                if child.tail and child.tail.strip():
+                    text_parts.append(child.tail.strip())
+
+            full_text = " ".join(text_parts).strip()
+
+            if word_items:
+                alignment = {"word": word_items}
+                # Update line timing based on words if p timing was missing/zero
+                if duration <= 0:
+                    start = word_items[0].start
+                    end = word_items[-1].start + word_items[-1].duration
+                    duration = end - start
+
+            if full_text:
+                supervisions.append(
+                    Supervision(
+                        id=p.get("id", ""),
+                        recording_id="ttml_import",
+                        start=start,
+                        duration=duration,
+                        text=full_text,
+                        alignment=alignment,
+                        speaker=p.get("agent") or p.get(f"{{{TTML_PARAM_NS}}}agent"),  # Metadata agent
+                    )
+                )
+
+        return sorted(supervisions, key=lambda s: s.start)
 
     @classmethod
     def _seconds_to_ttml_time(cls, seconds: float) -> str:
@@ -235,7 +417,7 @@ class TTMLFormatBase(FormatWriter):
         return "\n".join(lines)
 
 
-@register_writer("ttml")
+@register_format("ttml")
 class TTMLFormat(TTMLFormatBase):
     """Standard TTML format."""
 
@@ -341,7 +523,7 @@ class TTMLFormat(TTMLFormatBase):
         return cls.write(supervisions, output_path, config=config, **kwargs)
 
 
-@register_writer("imsc1")
+@register_format("imsc1")
 class IMSC1Format(TTMLFormatBase):
     """IMSC1 format - Netflix/streaming profile."""
 
@@ -374,7 +556,7 @@ class IMSC1Format(TTMLFormatBase):
         return TTMLFormat.to_bytes(supervisions, include_speaker, config, **kwargs)
 
 
-@register_writer("ebu_tt_d")
+@register_format("ebu_tt_d")
 class EBUTD_Format(TTMLFormatBase):
     """EBU-TT-D format - European broadcast profile."""
 
