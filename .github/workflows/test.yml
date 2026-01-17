@@ -118,15 +118,8 @@ jobs:
           # iic/SenseVoiceSmall
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=iic/SenseVoiceSmall
 
-      - name: Test Web App Installation
+      - name: Test Server Command
         run: |
-          # Test lai-app-install command
-          lai-app-install --help
-          # Install the web app
-          lai-app-install
-          # Verify lai-app is installed
-          lai-app --help
-          # Test lai-server command
           lai-server --help
 
       - name: Run All Tests

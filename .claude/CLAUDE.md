@@ -9,7 +9,7 @@ LattifAI is a Python SDK for precision audio-text forced alignment powered by th
 - **Multi-model transcription**: Gemini (100+ languages), Parakeet (24 languages), SenseVoice (5 languages)
 - **Speaker diarization**: Multi-speaker identification with label preservation
 - **Universal format support**: 30+ caption/subtitle formats
-- **Multiple interfaces**: CLI, Python SDK, and Web UI
+- **Multiple interfaces**: CLI and Python SDK
 
 ## Essential Commands
 
@@ -79,8 +79,6 @@ lai caption shift <input> <output> <offset_seconds>
 
 # Server
 lai-server --port 8001
-lai-app-install  # Install web UI
-lai-app          # Run web UI
 ```
 
 ## Architecture
