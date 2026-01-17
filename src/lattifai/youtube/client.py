@@ -217,6 +217,7 @@ class YoutubeLoader:
         video_id: str,
         format_preference: str = "m4a",
         quality: str = "best",
+        audio_track_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Get direct audio-only stream URL for a YouTube video.
@@ -226,6 +227,7 @@ class YoutubeLoader:
             format_preference: Preferred audio format (m4a, webm, opus)
             quality: Audio quality - "best" (highest bitrate), "medium" (~128kbps),
                     "low" (~50kbps), or specific bitrate like "128", "64"
+            audio_track_id: Specific audio track ID for multi-language videos (e.g., "en.2")
 
         Returns:
             Dict with url, mime_type, bitrate, content_length, format_id, ext
@@ -263,6 +265,21 @@ class YoutubeLoader:
                     raise YouTubeError(
                         "No audio-only formats available. " "YouTube may require authentication for this video."
                     )
+
+                # Filter by audio_track_id if specified (for multi-language audio)
+                if audio_track_id:
+                    # yt-dlp uses format_id patterns like "251-0" or "audio_track" field
+                    # Try matching by format_id suffix or audio_track field
+                    track_filtered = [
+                        f
+                        for f in audio_formats
+                        if f.get("audio_track", {}).get("id") == audio_track_id
+                        or (f.get("format_id") and audio_track_id in f.get("format_id", ""))
+                        or f.get("language") == audio_track_id.split(".")[0]  # e.g., "en" from "en.2"
+                    ]
+                    if track_filtered:
+                        audio_formats = track_filtered
+                        logger.info(f"Filtered to {len(audio_formats)} formats for audio_track_id={audio_track_id}")
 
                 # Parse quality parameter
                 # "best" = highest bitrate, "medium" ~128kbps, "low" ~50kbps
