@@ -339,6 +339,10 @@ class YoutubeLoader:
 
         Returns:
             Dict with url, mime_type, width, height, fps, vcodec, acodec, bitrate, content_length, format_id, ext
+
+        Note:
+            Prioritizes formats that include both video AND audio to avoid silent videos.
+            YouTube separates high-quality video and audio streams; we prefer pre-muxed formats.
         """
         url = f"https://www.youtube.com/watch?v={video_id}"
 
@@ -362,32 +366,59 @@ class YoutubeLoader:
                 # Get all formats
                 formats = info.get("formats", [])
 
-                # Filter for video formats with both video and audio, or video-only
-                video_formats = [f for f in formats if f.get("vcodec") not in (None, "none")]
+                # Filter for video formats:
+                # - Must have video codec
+                # - Must have direct URL (not manifest/playlist)
+                # - Exclude HLS/DASH manifests (protocol contains m3u8 or dash)
+                def is_direct_video(f: Dict) -> bool:
+                    if f.get("vcodec") in (None, "none"):
+                        return False
+                    url = f.get("url", "")
+                    protocol = f.get("protocol", "")
+                    # Exclude HLS manifests
+                    if "m3u8" in protocol or ".m3u8" in url or "manifest.googlevideo.com" in url:
+                        return False
+                    # Exclude DASH manifests
+                    if "dash" in protocol:
+                        return False
+                    return True
+
+                video_formats = [f for f in formats if is_direct_video(f)]
 
                 if not video_formats:
-                    raise YouTubeError("No video formats available")
+                    raise YouTubeError("No direct video formats available (only HLS/DASH manifests found)")
 
-                # Sort by preference: format match > resolution > bitrate
+                # Parse target height from quality parameter
+                target_height = None
+                if quality != "best" and quality.isdigit():
+                    target_height = int(quality)
+
+                # Sort by preference: has_audio (MOST IMPORTANT) > format match > resolution > bitrate
+                # YouTube high-quality streams are often video-only; we MUST prefer formats with audio
                 def score_format(f: Dict) -> tuple:
                     ext = f.get("ext", "")
                     ext_match = 1 if ext == format_preference else 0
                     height = f.get("height") or 0
                     bitrate = f.get("tbr") or f.get("vbr") or 0
-                    has_audio = 1 if f.get("acodec") not in (None, "none") else 0
-                    return (ext_match, has_audio, height, bitrate)
+                    # has_audio is now the HIGHEST priority - video without audio is useless for most users
+                    has_audio = 10 if f.get("acodec") not in (None, "none") else 0
+
+                    # For quality filtering, penalize formats exceeding target
+                    height_score = height
+                    if target_height and height > target_height:
+                        height_score = -1000  # Heavily penalize exceeding target
+
+                    return (has_audio, ext_match, height_score, bitrate)
 
                 video_formats.sort(key=score_format, reverse=True)
-
-                # If quality is specified, filter by resolution
-                if quality != "best" and quality.isdigit():
-                    target_height = int(quality)
-                    # Find closest match
-                    filtered = [f for f in video_formats if (f.get("height") or 0) <= target_height]
-                    if filtered:
-                        video_formats = filtered
-
                 best = video_formats[0]
+
+                # Log selection for debugging
+                logger.info(
+                    f"Selected video format: {best.get('format_id')} "
+                    f"({best.get('width')}x{best.get('height')}, "
+                    f"vcodec={best.get('vcodec')}, acodec={best.get('acodec')})"
+                )
 
                 return {
                     "url": best.get("url"),
@@ -426,38 +457,152 @@ class YouTubeDownloader:
         self.logger = setup_workflow_logger("youtube")
         self.logger.info(f"yt-dlp version: {yt_dlp.version.__version__}")
 
-    def _build_audio_format_selector(self, audio_track_id: Optional[str]) -> str:
+    def _normalize_audio_quality(self, quality: str) -> str:
         """
-        Build yt-dlp format selector string for audio track selection.
+        Normalize quality parameter for audio downloads.
+
+        Handles cross-type quality values (e.g., video resolution used for audio).
+
+        Args:
+            quality: Raw quality string
+
+        Returns:
+            Normalized audio quality string
+        """
+        quality_lower = quality.lower()
+
+        # Direct audio quality values
+        if quality_lower in ("best", "medium", "low"):
+            return quality_lower
+
+        # Numeric values need interpretation
+        if quality_lower.isdigit():
+            value = int(quality_lower)
+            # Values > 320 are likely video resolutions, not audio bitrates
+            if value > 320:
+                self.logger.warning(f"⚠️ Quality '{quality}' looks like video resolution, using 'best' for audio")
+                return "best"
+            # Values <= 320 are reasonable audio bitrates
+            return quality_lower
+
+        # Unknown value, default to best
+        return "best"
+
+    def _normalize_video_quality(self, quality: str) -> str:
+        """
+        Normalize quality parameter for video downloads.
+
+        Handles cross-type quality values (e.g., audio bitrate/quality used for video).
+
+        Args:
+            quality: Raw quality string
+
+        Returns:
+            Normalized video quality string
+        """
+        quality_lower = quality.lower()
+
+        # Map audio quality terms to video equivalents
+        if quality_lower == "low":
+            self.logger.info("🎬 Mapping audio quality 'low' to video 360p")
+            return "360"
+        elif quality_lower == "medium":
+            self.logger.info("🎬 Mapping audio quality 'medium' to video 720p")
+            return "720"
+        elif quality_lower == "best":
+            return "best"
+
+        # Numeric values
+        if quality_lower.isdigit():
+            value = int(quality_lower)
+            # Values <= 320 are likely audio bitrates, not video resolutions
+            if value <= 320:
+                self.logger.warning(f"⚠️ Quality '{quality}' looks like audio bitrate, using 'best' for video")
+                return "best"
+            # Values > 320 are reasonable video resolutions
+            return quality_lower
+
+        # Unknown value, default to best
+        return "best"
+
+    def _build_audio_format_selector(self, audio_track_id: Optional[str], quality: str = "best") -> str:
+        """
+        Build yt-dlp format selector string for audio track and quality selection.
 
         Args:
             audio_track_id: Audio track selection:
-                - "original": Select the original audio track (format_id contains "drc" or no numeric suffix)
+                - "original": Select the original audio track (format_id contains "drc")
                 - Language code (e.g., "en", "ja"): Select by language
                 - Format ID (e.g., "251-drc"): Select specific format
-                - None: No filtering, use default "bestaudio/best"
+                - None: No filtering
+            quality: Audio quality:
+                - "best": Highest bitrate (default)
+                - "medium": ~128 kbps
+                - "low": ~50 kbps
+                - Numeric string (e.g., "128"): Target bitrate in kbps
 
         Returns:
             yt-dlp format selector string
         """
+        # Normalize quality for audio context
+        quality_lower = self._normalize_audio_quality(quality)
+
+        # Build quality filter
+        quality_filter = ""
+        if quality_lower == "medium":
+            quality_filter = "[abr<=160]"
+            self.logger.info("🎵 Audio quality: medium (~128 kbps)")
+        elif quality_lower == "low":
+            quality_filter = "[abr<=70]"
+            self.logger.info("🎵 Audio quality: low (~50 kbps)")
+        elif quality_lower.isdigit():
+            max_bitrate = int(quality_lower) + 20  # Allow some tolerance
+            quality_filter = f"[abr<={max_bitrate}]"
+            self.logger.info(f"🎵 Audio quality: ~{quality_lower} kbps")
+        # "best" = no filter, use bestaudio
+
+        # Build track filter
         if audio_track_id is None:
-            return "bestaudio/best"
+            return f"bestaudio{quality_filter}/bestaudio/best"
 
         if audio_track_id.lower() == "original":
-            # Original track: format_id contains "drc" (dynamic range compression = original)
-            # This matches formats like "251-drc", "140-drc"
             self.logger.info("🎵 Selecting original audio track (format_id contains 'drc')")
-            return "bestaudio[format_id*=drc]/bestaudio/best"
+            return f"bestaudio[format_id*=drc]{quality_filter}/bestaudio{quality_filter}/bestaudio/best"
 
         # Check if it looks like a format_id (contains hyphen or is numeric)
         if "-" in audio_track_id or audio_track_id.isdigit():
             self.logger.info(f"🎵 Selecting audio by format_id: {audio_track_id}")
-            return f"bestaudio[format_id={audio_track_id}]/bestaudio/best"
+            return f"bestaudio[format_id={audio_track_id}]{quality_filter}/bestaudio{quality_filter}/bestaudio/best"
 
         # Assume it's a language code
         self.logger.info(f"🎵 Selecting audio by language: {audio_track_id}")
-        # Match exact language or language with region (e.g., "en" matches "en" and "en-US")
-        return f"bestaudio[language^={audio_track_id}]/bestaudio/best"
+        return f"bestaudio[language^={audio_track_id}]{quality_filter}/bestaudio{quality_filter}/bestaudio/best"
+
+    def _build_video_format_selector(self, audio_format_selector: str, quality: str = "best") -> str:
+        """
+        Build yt-dlp format selector string for video with quality selection.
+
+        Args:
+            audio_format_selector: Audio format selector from _build_audio_format_selector
+            quality: Video quality:
+                - "best": Highest resolution (default)
+                - "low": 360p
+                - "medium": 720p
+                - "1080", "720", "480", "360": Target resolution
+
+        Returns:
+            yt-dlp format selector string
+        """
+        # Normalize quality for video context
+        quality_lower = self._normalize_video_quality(quality)
+
+        if quality_lower.isdigit():
+            height = int(quality_lower)
+            self.logger.info(f"🎬 Video quality: {height}p")
+            return f"bestvideo[height<={height}]+{audio_format_selector}/best[height<={height}]/best"
+
+        # "best" or fallback
+        return f"bestvideo*+{audio_format_selector}/best"
 
     @staticmethod
     def extract_video_id(url: str) -> str:
@@ -534,6 +679,7 @@ class YouTubeDownloader:
         media_format: Optional[str] = None,
         force_overwrite: bool = False,
         audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """
         Download media (audio or video) from YouTube URL based on format
@@ -552,6 +698,9 @@ class YouTubeDownloader:
                 - Language code (e.g., "en", "ja"): Select by language
                 - Format ID (e.g., "251-drc"): Select specific format
                 - None: No filtering, use yt-dlp default
+            quality: Media quality selection:
+                For audio: "best", "medium", "low", or bitrate like "128"
+                For video: "best", "1080", "720", "480", "360"
 
         Returns:
             Path to downloaded media file
@@ -570,6 +719,7 @@ class YouTubeDownloader:
                 media_format=media_format,
                 force_overwrite=force_overwrite,
                 audio_track_id=audio_track_id,
+                quality=quality,
             )
         else:
             self.logger.info(f"🎬 Detected video format: {media_format}")
@@ -579,6 +729,7 @@ class YouTubeDownloader:
                 video_format=media_format,
                 force_overwrite=force_overwrite,
                 audio_track_id=audio_track_id,
+                quality=quality,
             )
 
     async def _download_media_internal(
@@ -589,6 +740,7 @@ class YouTubeDownloader:
         is_audio: bool,
         force_overwrite: bool = False,
         audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """
         Internal unified method for downloading audio or video from YouTube
@@ -604,6 +756,9 @@ class YouTubeDownloader:
                 - Language code (e.g., "en", "ja"): Select by language
                 - Format ID (e.g., "251-drc"): Select specific format
                 - None: No filtering, use yt-dlp default
+            quality: Media quality selection:
+                For audio: "best", "medium", "low", or bitrate like "128"
+                For video: "best", "1080", "720", "480", "360"
 
         Returns:
             Path to downloaded media file
@@ -650,8 +805,8 @@ class YouTubeDownloader:
         # Generate output filename template
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
-        # Build format selector with audio track filtering
-        audio_format_selector = self._build_audio_format_selector(audio_track_id)
+        # Build format selector with audio track and quality filtering
+        audio_format_selector = self._build_audio_format_selector(audio_track_id, quality)
 
         # Build yt-dlp options based on media type
         if is_audio:
@@ -661,7 +816,7 @@ class YouTubeDownloader:
                     {
                         "key": "FFmpegExtractAudio",
                         "preferredcodec": media_format,
-                        "preferredquality": "0",  # Best quality
+                        "preferredquality": "0",  # Best quality for conversion
                     }
                 ],
                 "outtmpl": output_template,
@@ -671,7 +826,7 @@ class YouTubeDownloader:
             }
         else:
             # For video, combine video with selected audio track
-            video_format_selector = f"bestvideo*+{audio_format_selector}/best"
+            video_format_selector = self._build_video_format_selector(audio_format_selector, quality)
             opts = {
                 "format": video_format_selector,
                 "merge_output_format": media_format,
@@ -728,6 +883,7 @@ class YouTubeDownloader:
         media_format: Optional[str] = None,
         force_overwrite: bool = False,
         audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """
         Download audio from YouTube URL
@@ -738,6 +894,7 @@ class YouTubeDownloader:
             media_format: Audio format (default: mp3)
             force_overwrite: Skip user confirmation and overwrite existing files
             audio_track_id: Audio track selection for multi-language videos
+            quality: Audio quality ("best", "medium", "low", or bitrate like "128")
 
         Returns:
             Path to downloaded audio file
@@ -745,7 +902,13 @@ class YouTubeDownloader:
         target_dir = output_dir or tempfile.gettempdir()
         media_format = media_format or "mp3"
         return await self._download_media_internal(
-            url, target_dir, media_format, is_audio=True, force_overwrite=force_overwrite, audio_track_id=audio_track_id
+            url,
+            target_dir,
+            media_format,
+            is_audio=True,
+            force_overwrite=force_overwrite,
+            audio_track_id=audio_track_id,
+            quality=quality,
         )
 
     async def download_video(
@@ -755,6 +918,7 @@ class YouTubeDownloader:
         video_format: str = "mp4",
         force_overwrite: bool = False,
         audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """
         Download video from YouTube URL
@@ -765,6 +929,7 @@ class YouTubeDownloader:
             video_format: Video format
             force_overwrite: Skip user confirmation and overwrite existing files
             audio_track_id: Audio track selection for multi-language videos
+            quality: Video quality ("best", "1080", "720", "480", "360")
 
         Returns:
             Path to downloaded video file
@@ -777,6 +942,7 @@ class YouTubeDownloader:
             is_audio=False,
             force_overwrite=force_overwrite,
             audio_track_id=audio_track_id,
+            quality=quality,
         )
 
     async def download_captions(

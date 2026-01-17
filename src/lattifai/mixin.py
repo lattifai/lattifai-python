@@ -353,17 +353,21 @@ class LattifAIClientMixin:
         media_format: str,
         force_overwrite: bool,
         audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """Download media from YouTube (async implementation)."""
         safe_print(colorful.cyan("📥 Downloading media from YouTube..."))
         if audio_track_id:
             safe_print(colorful.cyan(f"    Audio track: {audio_track_id}"))
+        if quality != "best":
+            safe_print(colorful.cyan(f"    Quality: {quality}"))
         media_file = await self.downloader.download_media(
             url=url,
             output_dir=str(output_dir),
             media_format=media_format,
             force_overwrite=force_overwrite,
             audio_track_id=audio_track_id,
+            quality=quality,
         )
         safe_print(colorful.green(f"    ✓ Media downloaded: {media_file}"))
         return media_file
@@ -375,11 +379,14 @@ class LattifAIClientMixin:
         media_format: str,
         force_overwrite: bool,
         audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """Download media from YouTube (sync wrapper)."""
         import asyncio
 
-        return asyncio.run(self._download_media(url, output_dir, media_format, force_overwrite, audio_track_id))
+        return asyncio.run(
+            self._download_media(url, output_dir, media_format, force_overwrite, audio_track_id, quality)
+        )
 
     def _transcribe(
         self,
