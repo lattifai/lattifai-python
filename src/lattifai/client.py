@@ -318,6 +318,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         use_transcription: bool = False,
         channel_selector: Optional[str | int] = "average",
         streaming_chunk_secs: Optional[float] = None,
+        audio_track_id: Optional[str] = "original",
     ) -> Caption:
         # Prepare output directory and media format
         output_dir = self._prepare_youtube_output_dir(output_dir)
@@ -326,7 +327,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         safe_print(colorful.cyan(f"🎬 Starting YouTube workflow for: {url}"))
 
         # Step 1: Download media
-        media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite)
+        media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite, audio_track_id)
 
         media_audio = self.audio_loader(
             media_file, channel_selector=channel_selector, streaming_chunk_secs=streaming_chunk_secs

@@ -44,7 +44,8 @@ def youtube(
     Args:
         yt_url: YouTube video URL (can be provided as positional argument)
         media: Media configuration for controlling formats and output directories.
-            Fields: input_path (YouTube URL), output_dir, output_format, force_overwrite
+            Fields: input_path (YouTube URL), output_dir, output_format, force_overwrite,
+                    audio_track_id (default: "original" for original audio track)
         client: API client configuration.
             Fields: api_key, timeout, max_retries
         alignment: Alignment configuration (model selection and inference settings).
@@ -129,6 +130,7 @@ def youtube(
         channel_selector=media_config.channel_selector,
         streaming_chunk_secs=media_config.streaming_chunk_secs,
         use_transcription=use_transcription,
+        audio_track_id=media_config.audio_track_id,
     )
 
 

@@ -426,6 +426,39 @@ class YouTubeDownloader:
         self.logger = setup_workflow_logger("youtube")
         self.logger.info(f"yt-dlp version: {yt_dlp.version.__version__}")
 
+    def _build_audio_format_selector(self, audio_track_id: Optional[str]) -> str:
+        """
+        Build yt-dlp format selector string for audio track selection.
+
+        Args:
+            audio_track_id: Audio track selection:
+                - "original": Select the original audio track (format_id contains "drc" or no numeric suffix)
+                - Language code (e.g., "en", "ja"): Select by language
+                - Format ID (e.g., "251-drc"): Select specific format
+                - None: No filtering, use default "bestaudio/best"
+
+        Returns:
+            yt-dlp format selector string
+        """
+        if audio_track_id is None:
+            return "bestaudio/best"
+
+        if audio_track_id.lower() == "original":
+            # Original track: format_id contains "drc" (dynamic range compression = original)
+            # This matches formats like "251-drc", "140-drc"
+            self.logger.info("🎵 Selecting original audio track (format_id contains 'drc')")
+            return "bestaudio[format_id*=drc]/bestaudio/best"
+
+        # Check if it looks like a format_id (contains hyphen or is numeric)
+        if "-" in audio_track_id or audio_track_id.isdigit():
+            self.logger.info(f"🎵 Selecting audio by format_id: {audio_track_id}")
+            return f"bestaudio[format_id={audio_track_id}]/bestaudio/best"
+
+        # Assume it's a language code
+        self.logger.info(f"🎵 Selecting audio by language: {audio_track_id}")
+        # Match exact language or language with region (e.g., "en" matches "en" and "en-US")
+        return f"bestaudio[language^={audio_track_id}]/bestaudio/best"
+
     @staticmethod
     def extract_video_id(url: str) -> str:
         """
@@ -500,6 +533,7 @@ class YouTubeDownloader:
         output_dir: Optional[str] = None,
         media_format: Optional[str] = None,
         force_overwrite: bool = False,
+        audio_track_id: Optional[str] = "original",
     ) -> str:
         """
         Download media (audio or video) from YouTube URL based on format
@@ -513,6 +547,11 @@ class YouTubeDownloader:
             media_format: Media format - audio (mp3, wav, m4a, aac, opus, ogg, flac, aiff)
                          or video (mp4, webm, mkv, avi, mov, etc.) (default: mp3)
             force_overwrite: Skip user confirmation and overwrite existing files
+            audio_track_id: Audio track selection for multi-language videos:
+                - "original": Select the original audio track (default)
+                - Language code (e.g., "en", "ja"): Select by language
+                - Format ID (e.g., "251-drc"): Select specific format
+                - None: No filtering, use yt-dlp default
 
         Returns:
             Path to downloaded media file
@@ -526,12 +565,20 @@ class YouTubeDownloader:
         if is_audio:
             self.logger.info(f"🎵 Detected audio format: {media_format}")
             return await self.download_audio(
-                url=url, output_dir=output_dir, media_format=media_format, force_overwrite=force_overwrite
+                url=url,
+                output_dir=output_dir,
+                media_format=media_format,
+                force_overwrite=force_overwrite,
+                audio_track_id=audio_track_id,
             )
         else:
             self.logger.info(f"🎬 Detected video format: {media_format}")
             return await self.download_video(
-                url=url, output_dir=output_dir, video_format=media_format, force_overwrite=force_overwrite
+                url=url,
+                output_dir=output_dir,
+                video_format=media_format,
+                force_overwrite=force_overwrite,
+                audio_track_id=audio_track_id,
             )
 
     async def _download_media_internal(
@@ -541,6 +588,7 @@ class YouTubeDownloader:
         media_format: str,
         is_audio: bool,
         force_overwrite: bool = False,
+        audio_track_id: Optional[str] = "original",
     ) -> str:
         """
         Internal unified method for downloading audio or video from YouTube
@@ -551,6 +599,11 @@ class YouTubeDownloader:
             media_format: Media format (audio or video extension)
             is_audio: True for audio download, False for video download
             force_overwrite: Skip user confirmation and overwrite existing files
+            audio_track_id: Audio track selection for multi-language videos:
+                - "original": Select the original audio track (default)
+                - Language code (e.g., "en", "ja"): Select by language
+                - Format ID (e.g., "251-drc"): Select specific format
+                - None: No filtering, use yt-dlp default
 
         Returns:
             Path to downloaded media file
@@ -597,10 +650,13 @@ class YouTubeDownloader:
         # Generate output filename template
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
+        # Build format selector with audio track filtering
+        audio_format_selector = self._build_audio_format_selector(audio_track_id)
+
         # Build yt-dlp options based on media type
         if is_audio:
             opts = {
-                "format": "bestaudio/best",
+                "format": audio_format_selector,
                 "postprocessors": [
                     {
                         "key": "FFmpegExtractAudio",
@@ -614,8 +670,10 @@ class YouTubeDownloader:
                 "no_warnings": True,
             }
         else:
+            # For video, combine video with selected audio track
+            video_format_selector = f"bestvideo*+{audio_format_selector}/best"
             opts = {
-                "format": "bestvideo*+bestaudio/best",
+                "format": video_format_selector,
                 "merge_output_format": media_format,
                 "outtmpl": output_template,
                 "noplaylist": True,
@@ -669,6 +727,7 @@ class YouTubeDownloader:
         output_dir: Optional[str] = None,
         media_format: Optional[str] = None,
         force_overwrite: bool = False,
+        audio_track_id: Optional[str] = "original",
     ) -> str:
         """
         Download audio from YouTube URL
@@ -678,6 +737,7 @@ class YouTubeDownloader:
             output_dir: Output directory (default: temp directory)
             media_format: Audio format (default: mp3)
             force_overwrite: Skip user confirmation and overwrite existing files
+            audio_track_id: Audio track selection for multi-language videos
 
         Returns:
             Path to downloaded audio file
@@ -685,11 +745,16 @@ class YouTubeDownloader:
         target_dir = output_dir or tempfile.gettempdir()
         media_format = media_format or "mp3"
         return await self._download_media_internal(
-            url, target_dir, media_format, is_audio=True, force_overwrite=force_overwrite
+            url, target_dir, media_format, is_audio=True, force_overwrite=force_overwrite, audio_track_id=audio_track_id
         )
 
     async def download_video(
-        self, url: str, output_dir: Optional[str] = None, video_format: str = "mp4", force_overwrite: bool = False
+        self,
+        url: str,
+        output_dir: Optional[str] = None,
+        video_format: str = "mp4",
+        force_overwrite: bool = False,
+        audio_track_id: Optional[str] = "original",
     ) -> str:
         """
         Download video from YouTube URL
@@ -699,13 +764,19 @@ class YouTubeDownloader:
             output_dir: Output directory (default: temp directory)
             video_format: Video format
             force_overwrite: Skip user confirmation and overwrite existing files
+            audio_track_id: Audio track selection for multi-language videos
 
         Returns:
             Path to downloaded video file
         """
         target_dir = output_dir or tempfile.gettempdir()
         return await self._download_media_internal(
-            url, target_dir, video_format, is_audio=False, force_overwrite=force_overwrite
+            url,
+            target_dir,
+            video_format,
+            is_audio=False,
+            force_overwrite=force_overwrite,
+            audio_track_id=audio_track_id,
         )
 
     async def download_captions(

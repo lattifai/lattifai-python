@@ -352,14 +352,18 @@ class LattifAIClientMixin:
         output_dir: Path,
         media_format: str,
         force_overwrite: bool,
+        audio_track_id: Optional[str] = "original",
     ) -> str:
         """Download media from YouTube (async implementation)."""
         safe_print(colorful.cyan("📥 Downloading media from YouTube..."))
+        if audio_track_id:
+            safe_print(colorful.cyan(f"    Audio track: {audio_track_id}"))
         media_file = await self.downloader.download_media(
             url=url,
             output_dir=str(output_dir),
             media_format=media_format,
             force_overwrite=force_overwrite,
+            audio_track_id=audio_track_id,
         )
         safe_print(colorful.green(f"    ✓ Media downloaded: {media_file}"))
         return media_file
@@ -370,11 +374,12 @@ class LattifAIClientMixin:
         output_dir: Path,
         media_format: str,
         force_overwrite: bool,
+        audio_track_id: Optional[str] = "original",
     ) -> str:
         """Download media from YouTube (sync wrapper)."""
         import asyncio
 
-        return asyncio.run(self._download_media(url, output_dir, media_format, force_overwrite))
+        return asyncio.run(self._download_media(url, output_dir, media_format, force_overwrite, audio_track_id))
 
     def _transcribe(
         self,
@@ -489,6 +494,7 @@ class LattifAIClientMixin:
         transcriber_name = self.transcriber.name
 
         async def _async_impl():
+            nonlocal use_transcription  # Allow modification of outer variable
             # First check if caption input_path is already provided
             if self.caption_config.input_path:
                 caption_path = Path(self.caption_config.input_path)
