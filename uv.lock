@@ -14,6 +14,9 @@ resolution-markers = [
     "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 
+[options]
+prerelease-mode = "allow"
+
 [[package]]
 name = "absl-py"
 version = "2.3.1"
@@ -1606,6 +1609,52 @@ wheels = [
 ]
 
 [[package]]
+name = "error-align-fix"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "regex" },
+    { name = "tqdm" },
+    { name = "unidecode" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/87/b6/53dbce5e3becd56d8b5a167ab23ea668400dc1794e116710c6f0986b3f96/error_align_fix-0.1.2.tar.gz", hash = "sha256:c7d8030b27e092c5539d90958a0a0af21bb8d0f1ee6503a5e92c747104105ad3", size = 1455421, upload-time = "2026-01-14T04:35:29.856Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/a8/b8815ee3c85a8606a8da6f6ba989c7838d7a0b49170e1da21c949b591272/error_align_fix-0.1.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:efd0f6a800fd5d06619f0b8d349fee71b8c7b13eebf786739cfdfd9e11377589", size = 296012, upload-time = "2026-01-14T04:34:50.26Z" },
+    { url = "https://files.pythonhosted.org/packages/e0/32/f32dc0bf70cd0f35c198465509cdb1a925dccb9ec5632a7fc023838f7e37/error_align_fix-0.1.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:5365fc0770214c38cc92f480c475f5f0cc302d7e182bfb8ce8c3cee14d0ad11b", size = 155998, upload-time = "2026-01-14T04:34:51.847Z" },
+    { url = "https://files.pythonhosted.org/packages/fb/bf/00d5727209416c4288fc783e2d0e695963f65a31bc027739ce849a0f420a/error_align_fix-0.1.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3318308a58841f8ad95abab1cb95b3a1dbc80484ea72d389fdcc102f60e17626", size = 143726, upload-time = "2026-01-14T04:34:53.116Z" },
+    { url = "https://files.pythonhosted.org/packages/16/6b/2cf645dcf2ee53581b11f1f3e9af5536b25f5afad551c146b278786a1d0e/error_align_fix-0.1.2-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:b3975e2aef2f259daa527260d61bfabc8f7351edb576e664d2dd61f5fcaae848", size = 215403, upload-time = "2026-01-14T04:35:08.621Z" },
+    { url = "https://files.pythonhosted.org/packages/db/1e/932d84d51db284d77c72d53110dc78a8e4e83b1026a28beb3399d9092768/error_align_fix-0.1.2-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:1de5203d066e677a6dc78a599eb57a1c4e58242e1bd7e59830a05d664cb8dbda", size = 1208044, upload-time = "2026-01-14T04:35:09.944Z" },
+    { url = "https://files.pythonhosted.org/packages/19/1e/e9bfda9be7ab4746ffdad665f7b506d305efc62d627ff42e6269662a055b/error_align_fix-0.1.2-cp310-cp310-win32.whl", hash = "sha256:ddc91b515bd720a258cb0592f9826c3450dd6104f8b560c4b300ae0e4c5c1349", size = 149069, upload-time = "2026-01-14T04:35:21.832Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/4d/dfee6f562da45010d8c2158544b92f5b5079eb77cb1215e14fc92ed30a4b/error_align_fix-0.1.2-cp310-cp310-win_amd64.whl", hash = "sha256:4c43a771c2e479588b53a0a29001438babe4c6a47cc424481211fb4e4d64a810", size = 166887, upload-time = "2026-01-14T04:35:23.15Z" },
+    { url = "https://files.pythonhosted.org/packages/21/d0/3ab6952e939c0b83420c112abd07e9de10680a2ebff031574672f930c29e/error_align_fix-0.1.2-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:c673076f96e1aa109cb024ac7071782d695ce0313cdf126e91de83012bceb1cd", size = 301382, upload-time = "2026-01-14T04:34:54.372Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/92/ee67db95a0a4798ed9555e02378319f0c555f09d3fcd1bf93534393bb41f/error_align_fix-0.1.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:894b764cda60b71d525714894577d0058d4a420c0a6c18d91c1acf2d0d4c12e8", size = 158905, upload-time = "2026-01-14T04:34:55.473Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/93/478f695a4eb1b186c8212a9ac3bc18b707eb80dbaa3433fed9c8607f331d/error_align_fix-0.1.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:3507be15d02dcb1648cf4f59845d9b5fc8fe6a493baff2fd8211814636cbaa50", size = 146349, upload-time = "2026-01-14T04:34:56.727Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/fd/42cdd627f23b60472b188f28fde86c028422ebbfdb68aff0def9c6e97802/error_align_fix-0.1.2-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c087d04168011c32a0c346f8b3923acb6a347d93c31f4b98e72fbb7284d61f47", size = 218982, upload-time = "2026-01-14T04:35:10.995Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/2b/9e2c38908b7b01bcdfe40fe26ff17011a6bd0813ea52405b12fa0211b96a/error_align_fix-0.1.2-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:972c353a11029f3b4e988dc99e8240e833d715e84f2242bbcf5758fcee5ad4ea", size = 1210648, upload-time = "2026-01-14T04:35:12.051Z" },
+    { url = "https://files.pythonhosted.org/packages/aa/a5/b615a1b93e812c9d939f6144d941800f15652d3e1899ac57570a1da0564f/error_align_fix-0.1.2-cp311-cp311-win32.whl", hash = "sha256:93cde596cc059085b5cab9e5827278deb9b695ee5bc717ff267917d4640e01e6", size = 151402, upload-time = "2026-01-14T04:35:24.061Z" },
+    { url = "https://files.pythonhosted.org/packages/27/56/971f39d601597dfa070b7211a89a468998191edcfa951413dc6efce8f568/error_align_fix-0.1.2-cp311-cp311-win_amd64.whl", hash = "sha256:4bdd14c075276a6347e334da90e255361afe55de8b50c8a6bf13f5a9cdbb0669", size = 168389, upload-time = "2026-01-14T04:35:25.01Z" },
+    { url = "https://files.pythonhosted.org/packages/db/be/0bbbe92ff464caa557269eda89570cddb65b56c2445e86688f1a03f91e8f/error_align_fix-0.1.2-cp312-cp312-macosx_10_13_universal2.whl", hash = "sha256:699ee19696b84fc4ffd73ecb3960c2ffb8ca3f3bab87d82588ae42735665e363", size = 303607, upload-time = "2026-01-14T04:34:57.752Z" },
+    { url = "https://files.pythonhosted.org/packages/77/cf/3c89cd6960901aa666d461200c78333353712d0788fef3f7f3b1bc3b7802/error_align_fix-0.1.2-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:bb8aefa9f93b57ace0811c97e7766d9788d41f455a2e506d014456cb82ba4138", size = 160487, upload-time = "2026-01-14T04:34:59.101Z" },
+    { url = "https://files.pythonhosted.org/packages/22/9c/6d20e19a09b05c095c60dca5197c0974c5ad0115f5324aa60d007e9a0256/error_align_fix-0.1.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:f9049b90b1aad0f0e5bd905771c8d60750a464bd61d700ce96503fa9d2cce67a", size = 146868, upload-time = "2026-01-14T04:35:00.043Z" },
+    { url = "https://files.pythonhosted.org/packages/67/84/d84889e4fbf57f390943c9fa1b04e6761b1bfa3f4f3eca8fbad9dc424afd/error_align_fix-0.1.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c40550e572a10a8d92cf37dba0ff0787501b7c84475c4c02d8285f1a1ce4bfbb", size = 219521, upload-time = "2026-01-14T04:35:13.924Z" },
+    { url = "https://files.pythonhosted.org/packages/df/47/23dde7ccd56004f09dd5a733a8cf02bec904af3a2174828215078476af5e/error_align_fix-0.1.2-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:05c917ff44d53608bfa3a3f3a05f5f232dbb0dd6acefc061ffc5f922e829ba95", size = 1217277, upload-time = "2026-01-14T04:35:15.573Z" },
+    { url = "https://files.pythonhosted.org/packages/26/ad/178f721456ccf333335969e457af6a76d4d806c974bbd3a922f251c99d5b/error_align_fix-0.1.2-cp312-cp312-win32.whl", hash = "sha256:c7d7eab0b8cab780f0157a8d8165ed399209ff299f522b0ee9223288df52a731", size = 152911, upload-time = "2026-01-14T04:35:25.959Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/ad/7e2729fb9bc8acb45cf682b0e81cb2a57607f9700e05e8c789dd2a99f16f/error_align_fix-0.1.2-cp312-cp312-win_amd64.whl", hash = "sha256:2a667d65b436060e418ba2f5d1d049fa529e3bc22b61a8421519754c07ac1c34", size = 171153, upload-time = "2026-01-14T04:35:26.914Z" },
+    { url = "https://files.pythonhosted.org/packages/8e/86/8b6357a142037453b18829d99f5c176b9825af191079884679159b02fb2e/error_align_fix-0.1.2-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:7823b13e87146d957f1aaafb914984ef03cfaa1ad6479a9ed2ff9e0607f86b3d", size = 303888, upload-time = "2026-01-14T04:35:01.434Z" },
+    { url = "https://files.pythonhosted.org/packages/98/35/082c80fc8823895535d54db032839fd4a8cf349ab4a13fbe2d5b02a26a7d/error_align_fix-0.1.2-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:cfc1f4109efb2689b262ea44e573ac073e34fa6f3ac73ffaabbc222f5755b985", size = 160620, upload-time = "2026-01-14T04:35:02.987Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/ad/f960e42eacb6c3a5ae20754c877a71571b3ad9524ed4eef9eccad041420a/error_align_fix-0.1.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:e8fd561f119cd10151ea7bed3b68daab3bc7bcd329cc64fd0a99bfb3734b159f", size = 147001, upload-time = "2026-01-14T04:35:03.821Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/ff/62ca727afce8ec4e0af1bbb18ba4add59e4a2521ad9a173a58d8beaae19c/error_align_fix-0.1.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:a905f6bda6c14e6e74bf7bcd6f477d5e8eee72dc0e901c8d721f2fae36fefcb1", size = 219257, upload-time = "2026-01-14T04:35:16.704Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/3e/bd777056a023ca49fa88f189fb6ed2ddb58816807161c5755c5724b8ef7b/error_align_fix-0.1.2-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:791ba075f9150e9340293463d702036aa33e9a2f9ab23f99edd9ff4773bb367f", size = 1217147, upload-time = "2026-01-14T04:35:17.751Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/6b/ce93be694e76edfb5eeb9ffb4be7e0b72e8eaf83d7854b542637649d7a73/error_align_fix-0.1.2-cp313-cp313-win32.whl", hash = "sha256:b8a50fe1fedd808ba1b87eaef921beb44e0631e5189e671d5a271b9d8717c574", size = 153011, upload-time = "2026-01-14T04:35:27.82Z" },
+    { url = "https://files.pythonhosted.org/packages/62/ab/f77beb253577f67622ef0472bf0d5fd9e2cb052ee27f6f414e3d74650c7e/error_align_fix-0.1.2-cp313-cp313-win_amd64.whl", hash = "sha256:62d60ce6545e42a333fc33eb63ac0fcea6f95e3666f5cd76526c7a269f83925d", size = 171206, upload-time = "2026-01-14T04:35:28.782Z" },
+    { url = "https://files.pythonhosted.org/packages/11/18/363a88b13885dc0e67165ae73d913f1693fccd488759af5984ddcdcef361/error_align_fix-0.1.2-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:e1be07c132e15ff881815b3900de4bda12aeea97e1b9e982d7697c31829485ee", size = 304519, upload-time = "2026-01-14T04:35:04.719Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/27/4e08fc171dd02c76cc78a34e8359a765e991312e082e9bee4988a1290fc3/error_align_fix-0.1.2-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:73d134684cb6e6332fcaf32bf259b0e1bae856e3f6115a38ca4f130b5f8708b1", size = 160833, upload-time = "2026-01-14T04:35:06.813Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/dc/5794814e11cd5c5cfdf14c8c0c233c2b7d31e4d604c8f1880180456ede75/error_align_fix-0.1.2-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:621c624029535df0da99b72650069f3ef3788273e5f9f9d85d2dd4dc4f7f09f8", size = 147396, upload-time = "2026-01-14T04:35:07.744Z" },
+    { url = "https://files.pythonhosted.org/packages/55/9c/63b8451ecda0a81cf9a1bab385b439467f99340583218c478686fbacd84a/error_align_fix-0.1.2-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2998114f9218115cc6ae91ae4b12e1b7093e2d7a7d6e5a96e7a7ac2c4a36224b", size = 219331, upload-time = "2026-01-14T04:35:19.561Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/a2/652cae425dad7b6f3b7db80e90e56b22ea8404fd43e6e52fecf0d5a62237/error_align_fix-0.1.2-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:ab642aa453d12dddd4e6c64971acd2e4c55a0c78960f90f958086021da6a010d", size = 1217709, upload-time = "2026-01-14T04:35:20.662Z" },
+]
+
+[[package]]
 name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2792,11 +2841,12 @@ wheels = [
 
 [[package]]
 name = "lattifai"
-version = "1.1.0"
+version = "1.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "av" },
     { name = "colorful" },
+    { name = "error-align-fix" },
     { name = "fastapi" },
     { name = "g2p-phonemizer" },
     { name = "google-genai" },
@@ -2826,94 +2876,92 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-all = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pyannote-audio" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
+alignment = [
+    { name = "colorful" },
+    { name = "error-align-fix" },
+    { name = "g2p-phonemizer" },
+    { name = "lhotse" },
+    { name = "modelscope" },
+    { name = "onnx" },
+    { name = "onnxruntime" },
+    { name = "praatio" },
+    { name = "pysubs2" },
+    { name = "tgt" },
+    { name = "wtpsplit" },
 ]
-diarization = [
-    { name = "pyannote-audio" },
-    { name = "torch-audiomentations" },
+core = [
+    { name = "av" },
+    { name = "k2py" },
+    { name = "lattifai-core" },
+    { name = "lattifai-run" },
+    { name = "msgpack" },
+    { name = "python-dotenv" },
+    { name = "scipy" },
 ]
-numpy = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-test = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-]
-transcription = [
-    { name = "nemo-toolkit-asr", extra = ["asr"] },
-    { name = "omnisensevoice" },
-]
-
-[package.dev-dependencies]
 dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+]
+server = [
+    { name = "fastapi" },
+    { name = "jinja2" },
+    { name = "python-multipart" },
+    { name = "uvicorn" },
+]
+transcription = [
+    { name = "google-genai" },
+    { name = "nemo-toolkit-asr", extra = ["asr"] },
+    { name = "omnisensevoice" },
+    { name = "pyannote-audio-notorchdeps" },
+]
+workflow = [
+    { name = "pycryptodome" },
+    { name = "questionary" },
+    { name = "yt-dlp" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "av" },
-    { name = "colorful", specifier = ">=0.5.6" },
-    { name = "fastapi", specifier = ">=0.111.0" },
-    { name = "g2p-phonemizer", specifier = ">=0.4.0" },
-    { name = "google-genai", specifier = ">=1.22.0" },
-    { name = "jinja2", specifier = ">=3.1.4" },
-    { name = "k2py", specifier = ">=0.2.1" },
-    { name = "lattifai-core", specifier = ">=0.6.0" },
-    { name = "lattifai-run", specifier = ">=1.0.1" },
-    { name = "lhotse", specifier = ">=1.26.0" },
-    { name = "modelscope", specifier = "==1.33.0" },
-    { name = "msgpack" },
-    { name = "nemo-toolkit-asr", extras = ["asr"], specifier = ">=2.7.0rc4" },
-    { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'transcription'", specifier = ">=2.7.0rc3" },
-    { name = "numpy", marker = "extra == 'all'" },
-    { name = "numpy", marker = "extra == 'numpy'" },
-    { name = "numpy", marker = "extra == 'test'" },
-    { name = "omnisensevoice", specifier = ">=0.4.2" },
-    { name = "omnisensevoice", marker = "extra == 'transcription'", specifier = ">=0.4.0" },
-    { name = "onnx", specifier = ">=1.16.0" },
-    { name = "onnxruntime" },
-    { name = "praatio" },
-    { name = "pyannote-audio", marker = "extra == 'all'", specifier = ">=4.0.2" },
-    { name = "pyannote-audio", marker = "extra == 'diarization'", specifier = ">=4.0.2" },
-    { name = "pyannote-audio-notorchdeps", specifier = ">=4.0.2" },
-    { name = "pycryptodome" },
-    { name = "pysubs2" },
-    { name = "pytest", marker = "extra == 'all'" },
-    { name = "pytest", marker = "extra == 'test'" },
-    { name = "pytest-asyncio", marker = "extra == 'all'" },
-    { name = "pytest-asyncio", marker = "extra == 'test'" },
-    { name = "pytest-cov", marker = "extra == 'all'" },
-    { name = "pytest-cov", marker = "extra == 'test'" },
-    { name = "python-dotenv" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "questionary", specifier = ">=2.0" },
-    { name = "scipy", specifier = "!=1.16.3" },
-    { name = "tgt" },
-    { name = "torch-audiomentations", marker = "extra == 'diarization'", specifier = "==0.12.0" },
-    { name = "uvicorn", specifier = ">=0.30.0" },
-    { name = "wtpsplit", specifier = ">=2.1.7" },
-    { name = "yt-dlp" },
+    { name = "av", marker = "extra == 'core'" },
+    { name = "colorful", marker = "extra == 'alignment'", specifier = ">=0.5.6" },
+    { name = "error-align-fix", marker = "extra == 'alignment'", specifier = ">=0.1.2" },
+    { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.111.0" },
+    { name = "g2p-phonemizer", marker = "extra == 'alignment'", specifier = ">=0.4.0" },
+    { name = "google-genai", marker = "extra == 'transcription'", specifier = ">=1.22.0" },
+    { name = "jinja2", marker = "extra == 'server'", specifier = ">=3.1.4" },
+    { name = "k2py", marker = "extra == 'core'", specifier = ">=0.2.1" },
+    { name = "lattifai", extras = ["alignment"] },
+    { name = "lattifai", extras = ["core"] },
+    { name = "lattifai", extras = ["server"] },
+    { name = "lattifai", extras = ["transcription"] },
+    { name = "lattifai", extras = ["workflow"] },
+    { name = "lattifai-core", marker = "extra == 'core'", specifier = ">=0.6.0" },
+    { name = "lattifai-run", marker = "extra == 'core'", specifier = ">=1.0.1" },
+    { name = "lhotse", marker = "extra == 'alignment'", specifier = ">=1.26.0" },
+    { name = "modelscope", marker = "extra == 'alignment'", specifier = ">=1.33.0" },
+    { name = "msgpack", marker = "extra == 'core'" },
+    { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'transcription'", specifier = ">=2.7.0rc4" },
+    { name = "omnisensevoice", marker = "extra == 'transcription'", specifier = ">=0.4.2" },
+    { name = "onnx", marker = "extra == 'alignment'", specifier = ">=1.16.0" },
+    { name = "onnxruntime", marker = "extra == 'alignment'" },
+    { name = "praatio", marker = "extra == 'alignment'" },
+    { name = "pyannote-audio-notorchdeps", marker = "extra == 'transcription'", specifier = ">=4.0.2" },
+    { name = "pycryptodome", marker = "extra == 'workflow'" },
+    { name = "pysubs2", marker = "extra == 'alignment'" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "python-dotenv", marker = "extra == 'core'" },
+    { name = "python-multipart", marker = "extra == 'server'", specifier = ">=0.0.9" },
+    { name = "questionary", marker = "extra == 'workflow'", specifier = ">=2.0" },
+    { name = "scipy", marker = "extra == 'core'", specifier = "!=1.16.3" },
+    { name = "tgt", marker = "extra == 'alignment'" },
+    { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.30.0" },
+    { name = "wtpsplit", marker = "extra == 'alignment'", specifier = ">=2.1.7" },
+    { name = "yt-dlp", marker = "extra == 'workflow'" },
 ]
-provides-extras = ["numpy", "diarization", "transcription", "test", "all"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-]
+provides-extras = ["core", "alignment", "transcription", "workflow", "server", "dev"]
 
 [[package]]
 name = "lattifai-core"
@@ -5090,39 +5138,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pyannote-audio"
-version = "4.0.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "asteroid-filterbanks" },
-    { name = "einops" },
-    { name = "huggingface-hub" },
-    { name = "lightning" },
-    { name = "matplotlib" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp" },
-    { name = "opentelemetry-sdk" },
-    { name = "pyannote-core" },
-    { name = "pyannote-database" },
-    { name = "pyannote-metrics" },
-    { name = "pyannote-pipeline" },
-    { name = "pyannoteai-sdk" },
-    { name = "pytorch-metric-learning" },
-    { name = "rich" },
-    { name = "safetensors" },
-    { name = "soundfile" },
-    { name = "torch" },
-    { name = "torch-audiomentations" },
-    { name = "torchaudio" },
-    { name = "torchcodec" },
-    { name = "torchmetrics" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e8/a8/1f5e5b2226bb21d8e47ee8c700a5c59d4ed45d3df5347f1945628da6a936/pyannote_audio-4.0.2.tar.gz", hash = "sha256:7a45aff2368b35476a6bd8482f8592c2defd0c3297f79765ed9becb1a2beb382", size = 13867589, upload-time = "2025-11-19T20:45:23.325Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2a/a0/0736374720d339b3920f0593479b57559c97fae2d59f5aab66e85dd60a82/pyannote_audio-4.0.2-py3-none-any.whl", hash = "sha256:896123f3d1186f1253eeaf2ac8ea7d2a4d51110f9eb105f03e426d6c83434362", size = 892550, upload-time = "2025-11-19T20:45:21.325Z" },
-]
-
-[[package]]
 name = "pyannote-audio-notorchdeps"
 version = "4.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -7060,25 +7075,6 @@ wheels = [
 ]
 
 [[package]]
-name = "torchcodec"
-version = "0.7.0"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/d8/23/ca6bd1bc5e22786596e25d1dd62a6a4e733802940b54726a54fcf5a8795b/torchcodec-0.7.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:6ae0b7acbc0c1a755ae817a8843715131f24be7807ddc46092d8b49a0fc970eb", size = 2891797, upload-time = "2025-09-08T14:17:48.602Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/81/cff42793544b7d3e2ff9a4912542c6d1c7a617aabe8404f8fd3d52453f20/torchcodec-0.7.0-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:a0071096724e8ded6a171457ce4680f646499b4a4d285cdb46e130983f965ce4", size = 1411823, upload-time = "2025-09-08T14:17:39.405Z" },
-    { url = "https://files.pythonhosted.org/packages/ad/b9/7f03bf7d42e0f7ab5598d400cb1133d3f227b52aad15d88b2ab9c97fe1ff/torchcodec-0.7.0-cp310-cp310-win_amd64.whl", hash = "sha256:737da9212594bf2f205582512a7a4f56d39591b357bf5a30e72e858cfcedc2ac", size = 1553965, upload-time = "2025-09-08T14:17:57.187Z" },
-    { url = "https://files.pythonhosted.org/packages/6a/f1/bb2b5ab929ef3f092cb6508673510ffc2aafd8324493c94a2d41f1c8a683/torchcodec-0.7.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:967a14b31e04721901ddbf965f9e9f733f328c5e98a51e22f414e25ac32e20ba", size = 3388626, upload-time = "2025-09-08T14:17:50.433Z" },
-    { url = "https://files.pythonhosted.org/packages/06/14/8ff28247988365fc47e8471e28cdfd8d037232fcf73abb67ee815ac80f1d/torchcodec-0.7.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:afb1c48b52bd4ee8f485f5a427bb4e82380590255a26b8e9e3fe099e0779287f", size = 1419444, upload-time = "2025-09-08T14:17:41.479Z" },
-    { url = "https://files.pythonhosted.org/packages/1f/80/04f23dff2c7ac406d2d6b24a52be7654a946d2fdfe158b19341a524dae20/torchcodec-0.7.0-cp311-cp311-win_amd64.whl", hash = "sha256:a68765cd29159da3cf36eb5716481c617ad9d168fe06418bcde2a9360cc7eb5e", size = 1563430, upload-time = "2025-09-08T14:17:58.571Z" },
-    { url = "https://files.pythonhosted.org/packages/c7/b2/6d3e190fcd18c65b35f6da734d4415c72b42c8a72ffc2494d998bad8caf3/torchcodec-0.7.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:d9d082bbb599f4f7715bfc3b1afa5bc16d8fb9d852e68084c63f1973cc78a1cb", size = 3574506, upload-time = "2025-09-08T14:17:52.071Z" },
-    { url = "https://files.pythonhosted.org/packages/41/10/4a1a8407d0fad37cb43d1f749e7b422e5a0f6def17f3b90ab9ab9a105e32/torchcodec-0.7.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:3cd23c3296c9b071d56bb2c534a6a98275d65c1a6a7213cdb72a26ec9f9d2fd8", size = 1421871, upload-time = "2025-09-08T14:17:43.419Z" },
-    { url = "https://files.pythonhosted.org/packages/9b/e7/a2fa7ed9c81d7d683d37ca7204007b421c0537132364a9cfd8d577f19a96/torchcodec-0.7.0-cp312-cp312-win_amd64.whl", hash = "sha256:ac942831bff02e6041d8718b71c6f63e4e37c05dd95e72863725c9dbef0d4a7b", size = 1565029, upload-time = "2025-09-08T14:18:02.83Z" },
-    { url = "https://files.pythonhosted.org/packages/3c/82/7c7691d538f67704b2b2444deb0e234ae564f9329bc9becf66d69998bc9b/torchcodec-0.7.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:32a0115035a7f0a77fa451f67c101e0273a3a37d33b69e1bcd777f00aceb7340", size = 3537881, upload-time = "2025-09-08T14:17:54.254Z" },
-    { url = "https://files.pythonhosted.org/packages/01/25/177ea01d138598ab68d5e3b000789e8617bf97874bd8f761d89093f419ba/torchcodec-0.7.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:9c70f910f9f48e6625aacaed534f766e13d447b895dc7299e96d4db9a93f1514", size = 1422493, upload-time = "2025-09-08T14:17:45.41Z" },
-    { url = "https://files.pythonhosted.org/packages/5c/a9/e2b6301fbf4590d352e183bef64927f74ef4d4f660cca3ed7a32dda60484/torchcodec-0.7.0-cp313-cp313-win_amd64.whl", hash = "sha256:31b402c9ae3c6e9f33c41fddf7058f9492c443ad55d02f022395f8fa196b58f6", size = 1565405, upload-time = "2025-09-08T14:18:04.217Z" },
-]
-
-[[package]]
 name = "torchmetrics"
 version = "1.8.2"
 source = { registry = "https://pypi.org/simple" }
@@ -7264,6 +7260,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5f/ee/6bc65bd375c812026a7af63fe9d09d409382120aff25f2152f1ba12af5ec/umap_learn-0.5.9.post2.tar.gz", hash = "sha256:bdf60462d779bd074ce177a0714ced17e6d161285590fa487f3f9548dd3c31c9", size = 95441, upload-time = "2025-07-03T00:18:02.479Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/6b/b1/c24deeda9baf1fd491aaad941ed89e0fed6c583a117fd7b79e0a33a1e6c0/umap_learn-0.5.9.post2-py3-none-any.whl", hash = "sha256:fbe51166561e0e7fab00ef3d516ac2621243b8d15cf4bef9f656d701736b16a0", size = 90146, upload-time = "2025-07-03T00:18:01.042Z" },
+]
+
+[[package]]
+name = "unidecode"
+version = "1.4.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/7d/a8a765761bbc0c836e397a2e48d498305a865b70a8600fd7a942e85dcf63/Unidecode-1.4.0.tar.gz", hash = "sha256:ce35985008338b676573023acc382d62c264f307c8f7963733405add37ea2b23", size = 200149, upload-time = "2025-04-24T08:45:03.798Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/b7/559f59d57d18b44c6d1250d2eeaa676e028b9c527431f5d0736478a73ba1/Unidecode-1.4.0-py3-none-any.whl", hash = "sha256:c3c7606c27503ad8d501270406e345ddb480a7b5f38827eafe4fa82a137f0021", size = 235837, upload-time = "2025-04-24T08:45:01.609Z" },
 ]
 
 [[package]]
