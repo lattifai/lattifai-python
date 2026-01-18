@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## [1.2.1] - 2026-01-15
+
+### Added
+- Smart model caching mechanism with 7-day validity period
+- Cache validation for Hugging Face and ModelScope model downloads
+- Date-based cache markers (.doneYYYYMMDD) for tracking model freshness
+- Centralized `_resolve_model_path()` function for unified model resolution
+
+### Changed
+- Improved ModelScope cache directory detection to match actual structure
+
+### Fixed
+- ModelScope cache path detection now correctly uses `~/.cache/modelscope/hub/models/` structure
+- Automatic cleanup of old cache markers when downloading new models
+
 ## [1.2.0] - 2025-12-31
 
 ### Added

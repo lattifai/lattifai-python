@@ -3,6 +3,7 @@ from typing import List, Optional
 
 from lattifai.alignment.punctuation import END_PUNCTUATION
 from lattifai.caption import Supervision
+from lattifai.utils import _resolve_model_path
 
 
 class SentenceSplitter:
@@ -37,17 +38,18 @@ class SentenceSplitter:
             providers.append("MPSExecutionProvider")
 
         if self.model_hub == "modelscope":
-            from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot
-
-            downloaded_path = ms_snapshot("LattifAI/OmniTokenizer")
+            downloaded_path = _resolve_model_path("LattifAI/OmniTokenizer", model_hub="modelscope")
             sat = SaT(
                 f"{downloaded_path}/sat-3l-sm",
                 tokenizer_name_or_path=f"{downloaded_path}/xlm-roberta-base",
                 ort_providers=providers + ["CPUExecutionProvider"],
             )
         else:
+            sat_path = _resolve_model_path("segment-any-text/sat-3l-sm", model_hub="huggingface")
             sat = SaT(
-                "sat-3l-sm",
+                sat_path,
+                tokenizer_name_or_path="facebookAI/xlm-roberta-base",
+                hub_prefix="segment-any-text",
                 ort_providers=providers + ["CPUExecutionProvider"],
             )
         self._splitter = sat
