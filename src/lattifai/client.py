@@ -126,9 +126,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 safe_print(colorful.cyan(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.supervisions and alignment_strategy == "transcription":
-                    assert (
-                        "gemini" not in self.transcriber.name.lower()
-                    ), f"Transcription-based alignment is not supported for {self.transcriber.name}(Gemini's timestamp is not reliable)."
+                    if "gemini" in self.transcriber.name.lower():
+                        raise ValueError(
+                            f"Transcription-based alignment is not supported for {self.transcriber.name} "
+                            "(Gemini's timestamp is not reliable)."
+                        )
                     if not caption.transcription:
                         transcript = self._transcribe(
                             media_audio,
@@ -138,7 +140,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         )
                         caption.transcription = transcript.supervisions or transcript.transcription
                         caption.audio_events = transcript.audio_events
-                    assert caption.transcription, "Transcription is empty after transcription step."
+                    if not caption.transcription:
+                        raise ValueError("Transcription is empty after transcription step.")
 
                     if split_sentence or self.caption_config.split_sentence:
                         caption.supervisions = self.aligner.tokenizer.split_sentences(caption.supervisions)
@@ -155,9 +158,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         segment[2][1] = self.aligner.tokenizer.split_sentences(segment[2][1])
                 else:
                     if caption.transcription:
-                        assert (
-                            "gemini" not in self.transcriber.name.lower()
-                        ), f"Transcription-based alignment is not supported for {self.transcriber.name}(Gemini's timestamp is not reliable)."
+                        if "gemini" in self.transcriber.name.lower():
+                            raise ValueError(
+                                f"Transcription-based alignment is not supported for {self.transcriber.name} "
+                                "(Gemini's timestamp is not reliable)."
+                            )
                         if not caption.supervisions:  # youtube + transcription case
                             segments = [(sup.start, sup.end, [sup], not sup.text) for sup in caption.transcription]
                         else:
@@ -198,8 +203,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         media_audio,
                         _supervisions,
                         split_sentence=split_sentence or self.caption_config.split_sentence,
-                        return_details=self.caption_config.word_level
-                        or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                        return_details=True,
                         emission=emission,
                         offset=offset,
                         verbose=False,
@@ -216,8 +220,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     media_audio,
                     caption.supervisions,
                     split_sentence=split_sentence or self.caption_config.split_sentence,
-                    return_details=self.caption_config.word_level
-                    or (output_caption_path and str(output_caption_path).endswith(".TextGrid")),
+                    return_details=True,
                 )
 
             # Update caption with aligned results
@@ -315,6 +318,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         use_transcription: bool = False,
         channel_selector: Optional[str | int] = "average",
         streaming_chunk_secs: Optional[float] = None,
+        audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> Caption:
         # Prepare output directory and media format
         output_dir = self._prepare_youtube_output_dir(output_dir)
@@ -323,7 +328,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         safe_print(colorful.cyan(f"🎬 Starting YouTube workflow for: {url}"))
 
         # Step 1: Download media
-        media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite)
+        media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite, audio_track_id, quality)
 
         media_audio = self.audio_loader(
             media_file, channel_selector=channel_selector, streaming_chunk_secs=streaming_chunk_secs

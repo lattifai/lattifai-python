@@ -1,6 +1,4 @@
-""".
-File existence management utilities for video processing workflows
-"""
+"""File existence management utilities for video processing workflows."""
 
 import asyncio
 import os
@@ -187,8 +185,7 @@ class FileExistenceManager:
         if not files:
             return "proceed"
 
-        emoji, label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ("📄", file_type.capitalize()))
-        del emoji  # Unused variable
+        _, label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ("📄", file_type.capitalize()))
 
         # Header with warning color
         safe_print(f'\n{colorful.bold_yellow(f"⚠️  Existing {label} files found:")}')

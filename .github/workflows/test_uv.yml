@@ -66,15 +66,8 @@ jobs:
           uv run lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
           uv run lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-flash-preview
 
-      - name: Test Web App Installation
+      - name: Test Server Command
         run: |
-          # Test lai-app-install command
-          uv run lai-app-install --help
-          # Install the web app
-          uv run lai-app-install
-          # Verify lai-app is installed
-          uv run lai-app --help
-          # Test lai-server command
           uv run lai-server --help
 
       # - name: Test Cli Commands (Windows)

@@ -1,7 +1,13 @@
 """Configuration system for LattifAI using nemo_run."""
 
 from .alignment import AlignmentConfig
-from .caption import CaptionConfig
+from .caption import (
+    CaptionConfig,
+    CaptionFonts,
+    CaptionStyle,
+    KaraokeConfig,
+    StandardizationConfig,
+)
 from .client import ClientConfig
 from .diarization import DiarizationConfig
 from .media import AUDIO_FORMATS, MEDIA_FORMATS, VIDEO_FORMATS, MediaConfig
@@ -11,6 +17,10 @@ __all__ = [
     "ClientConfig",
     "AlignmentConfig",
     "CaptionConfig",
+    "CaptionFonts",
+    "CaptionStyle",
+    "KaraokeConfig",
+    "StandardizationConfig",
     "TranscriptionConfig",
     "DiarizationConfig",
     "MediaConfig",

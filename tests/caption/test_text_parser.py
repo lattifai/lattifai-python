@@ -1,6 +1,6 @@
 import pytest
 
-from lattifai.caption.text_parser import normalize_text, parse_speaker_text, parse_timestamp_text
+from lattifai.caption.parsers.text_parser import normalize_text, parse_speaker_text, parse_timestamp_text
 
 # Test cases for parse_speaker_text
 # Each tuple contains: (input_line, expected_speaker, expected_text)

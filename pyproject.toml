@@ -64,7 +64,7 @@ alignment = [
     "g2p-phonemizer>=0.4.0",
     "wtpsplit>=2.1.7",
     "modelscope>=1.33.0",
-    "error-align>=0.1.0b6",
+    "error-align-fix>=0.1.2",
 ]
 # transcription & diarization
 transcription = [
@@ -113,7 +113,6 @@ Changelog = 'https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md'
 "laicap-shift" = "lattifai.cli.caption:main_shift"
 "laicap-diff" = "lattifai.cli.caption:main_diff"
 "lai-server" = "lattifai.cli.server:main"
-"lai-app-install" = "lattifai.cli.app_installer:main"
 
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"
@@ -127,11 +126,15 @@ packages = [
     "lattifai.alignment",
     "lattifai.config",
     "lattifai.caption",
+    "lattifai.caption.formats",
+    "lattifai.caption.formats.nle",
+    "lattifai.caption.parsers",
     "lattifai.diarization",
     "lattifai.server",
     "lattifai.transcription",
     "lattifai.transcription.prompts",
     "lattifai.workflow",
+    "lattifai.youtube",
     "lattifai.cli",
 ]
 include-package-data = true
@@ -141,7 +144,6 @@ lattifai = "src/lattifai"
 
 [tool.setuptools.package-data]
 "lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]
-"lattifai" = ["app/**/*"]
 
 [tool.pytest.ini_options]
 addopts = "--durations=10"

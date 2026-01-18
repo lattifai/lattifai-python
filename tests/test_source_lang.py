@@ -10,7 +10,7 @@ from lattifai.caption import Caption
 from lattifai.config import CaptionConfig, TranscriptionConfig
 from lattifai.mixin import LattifAIClientMixin
 from lattifai.transcription import GeminiTranscriber
-from lattifai.workflow.youtube import YouTubeDownloader
+from lattifai.youtube import YouTubeDownloader
 
 
 class TestSourceLangInCaptionConfig:
