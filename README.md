@@ -71,10 +71,13 @@ client = LattifAI(alignment_config=AlignmentConfig(model_hub="modelscope"))
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Create project and install LattifAI
-uv init my-project && cd my-project
-uv add lattifai
-source .venv/bin/activate
+# Quick start (run without installing)
+uvx --from lattifai lai --help
+
+# Or create a project
+mkdir my-project && cd my-project
+uv init --bare && uv add lattifai
+uv run lai alignment align audio.wav caption.srt output.srt
 ```
 
 ### Using pip
