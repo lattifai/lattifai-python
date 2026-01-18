@@ -1,4 +1,44 @@
 ````markdown
+# Release Notes - LattifAI Python v1.2.2
+
+**Release Date:** January 18, 2026
+
+---
+
+## 🎉 Overview
+
+LattifAI Python v1.2.2 focuses on code hygiene and dependency updates, removing legacy backend server components and improving error text alignment.
+
+---
+
+## ✨ New Features
+
+### Benchmark Improvements
+- Added social sharing metadata and dedicated card to benchmark page
+- Enhanced benchmark visualization and reporting
+
+---
+
+### Code Cleanup
+- **Removed legacy server components**: Cleaned up deprecated backend server code from the SDK
+
+---
+
+## 📦 Installation
+
+```bash
+pip install --upgrade lattifai
+```
+
+---
+
+## 🔄 Migration Guide
+
+No breaking changes in this release.
+
+---
+
+````markdown
 # Release Notes - LattifAI Python v1.2.1
 
 **Release Date:** January 15, 2026

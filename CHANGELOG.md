@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## [1.2.2] - 2026-01-18
+
+### Added
+- Benchmark page enhancements with social sharing metadata and dedicated card
+
+### Changed
+- Refactored project structure to remove legacy backend server components
+
+### Fixed
+- Improved alignment error text extraction logic
+
 ## [1.2.1] - 2026-01-15
 
 ### Added
