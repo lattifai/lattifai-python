@@ -129,7 +129,7 @@ def transcribe(
         if is_url:
             # Download media first, then transcribe
             safe_print(colorful.cyan("    Downloading media from URL..."))
-            from lattifai.workflow.youtube import YouTubeDownloader
+            from lattifai.youtube import YouTubeDownloader
 
             downloader = YouTubeDownloader()
             input_path = asyncio.run(

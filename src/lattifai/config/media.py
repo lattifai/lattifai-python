@@ -91,6 +91,26 @@ class MediaConfig:
     force_overwrite: bool = False
     """Overwrite existing output files without prompting."""
 
+    audio_track_id: Optional[str] = "original"
+    """Audio track ID for multi-language YouTube videos.
+    - "original": Select the original audio track (default)
+    - Language code (e.g., "en", "ja", "fr"): Select by language
+    - Format ID (e.g., "251-drc", "140-0"): Select specific format
+    - None: No filtering, use yt-dlp default selection
+    """
+
+    quality: str = "best"
+    """Media quality for YouTube downloads.
+    For audio:
+    - "best": Highest bitrate (default)
+    - "medium": ~128 kbps
+    - "low": ~50 kbps
+    - Numeric string (e.g., "128"): Target bitrate in kbps
+    For video:
+    - "best": Highest resolution (default)
+    - "1080", "720", "480", "360": Target resolution
+    """
+
     def __post_init__(self) -> None:
         """Validate configuration and normalize paths/formats."""
         self._setup_output_directory()

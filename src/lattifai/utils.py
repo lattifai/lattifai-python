@@ -94,18 +94,13 @@ def _resolve_model_path(model_name_or_path: str, model_hub: str = "huggingface")
         model_name_or_path: Local path or remote model identifier.
         model_hub: Which hub to use for downloads. Supported: "huggingface", "modelscope".
     """
-    if Path(model_name_or_path).expanduser().exists():
-        return str(Path(model_name_or_path).expanduser())
+    local_path = Path(model_name_or_path).expanduser()
+    if local_path.exists():
+        return str(local_path)
 
-    # Normalize hub name
     hub = (model_hub or "huggingface").lower()
-
     if hub not in ("huggingface", "modelscope"):
         raise ValueError(f"Unsupported model_hub: {model_hub}. Supported: 'huggingface', 'modelscope'.")
-
-    # If local path exists, return it regardless of hub
-    if Path(model_name_or_path).expanduser().exists():
-        return str(Path(model_name_or_path).expanduser())
 
     if hub == "huggingface":
         from huggingface_hub import HfApi, snapshot_download
@@ -201,9 +196,8 @@ def _select_device(device: Optional[str]) -> str:
 
     import torch
 
-    detected = "cpu"
     if torch.backends.mps.is_available():
-        detected = "mps"
-    elif torch.cuda.is_available():
-        detected = "cuda"
-    return detected
+        return "mps"
+    if torch.cuda.is_available():
+        return "cuda"
+    return "cpu"

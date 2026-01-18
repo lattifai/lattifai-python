@@ -1,0 +1,1 @@
+LattifAI is a high-performance engine designed for the structuring of audio and video content assets. It runs entirely on local compute, ensuring your data security. Through a local-first architecture, LattifAI achieves zero-latency media processing, and your raw data never leaves your device.

@@ -68,10 +68,13 @@ class TestSpeakerRoundtrip:
         print("✓ VTT speaker roundtrip successful")
 
     def test_txt_speaker_roundtrip(self, tmp_path):
-        """Test speaker roundtrip in TXT format."""
+        """Test speaker roundtrip in TXT format.
+
+        Note: New format uses "speaker text" instead of "[speaker]: text".
+        """
         supervisions = [
-            Supervision(text="Line one", start=1.0, duration=2.0, speaker="NARRATOR"),
-            Supervision(text="Line two", start=4.0, duration=2.0, speaker="ALICE"),
+            Supervision(text="Line one", start=1.0, duration=2.0, speaker="[NARRATOR]:"),
+            Supervision(text="Line two", start=4.0, duration=2.0, speaker="[ALICE]:"),
         ]
 
         # Write to TXT file
@@ -79,10 +82,10 @@ class TestSpeakerRoundtrip:
         caption = Caption.from_supervisions(supervisions)
         caption.write(txt_file, include_speaker_in_text=True)
 
-        # Read and check content format
+        # Read and check content format - new format: "speaker text"
         content = txt_file.read_text()
-        assert "[NARRATOR]:" in content
-        assert "[ALICE]:" in content
+        assert "[NARRATOR]: Line one" in content
+        assert "[ALICE]: Line two" in content
 
         print("✓ TXT speaker format correct")
 
@@ -126,8 +129,8 @@ BOB: Third speaker format
     def test_write_without_speaker(self, tmp_path):
         """Test writing without speaker labels."""
         supervisions = [
-            Supervision(text="Hello", start=1.0, duration=2.0, speaker="ALICE"),
-            Supervision(text="World", start=4.0, duration=2.0, speaker="BOB"),
+            Supervision(text="Hello", start=1.0, duration=2.0, speaker="[ALICE]:"),
+            Supervision(text="World", start=4.0, duration=2.0, speaker="[BOB]:"),
         ]
 
         # Write without speaker

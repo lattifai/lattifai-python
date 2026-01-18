@@ -220,19 +220,16 @@ class LattifAIClientMixin:
     def downloader(self):
         """Lazy load YouTube downloader."""
         if self._downloader is None:
-            from .workflow.youtube import YouTubeDownloader
+            from .youtube import YouTubeDownloader
 
             self._downloader = YouTubeDownloader()
         return self._downloader
 
     def _prepare_youtube_output_dir(self, output_dir: Optional["Pathlike"]) -> Path:
         """Prepare and return output directory for YouTube downloads."""
-        if output_dir is None:
-            output_dir = Path(tempfile.gettempdir()) / "lattifai_youtube"
-        else:
-            output_dir = Path(output_dir).expanduser()
-        output_dir.mkdir(parents=True, exist_ok=True)
-        return output_dir
+        output_path = Path(output_dir).expanduser() if output_dir else Path(tempfile.gettempdir()) / "lattifai_youtube"
+        output_path.mkdir(parents=True, exist_ok=True)
+        return output_path
 
     def _determine_media_format(self, media_format: Optional[str]) -> str:
         """Determine media format from parameter or config."""
@@ -242,11 +239,11 @@ class LattifAIClientMixin:
         self, output_caption_path: Optional["Pathlike"], media_file: str, output_dir: Path
     ) -> Path:
         """Generate output caption path if not provided."""
-        if not output_caption_path:
-            media_name = Path(media_file).stem
-            output_format = self.caption_config.output_format or "srt"
-            output_caption_path = output_dir / f"{media_name}_LattifAI.{output_format}"
-        return Path(output_caption_path)
+        if output_caption_path:
+            return Path(output_caption_path)
+        media_name = Path(media_file).stem
+        output_format = self.caption_config.output_format or "srt"
+        return output_dir / f"{media_name}_LattifAI.{output_format}"
 
     def _validate_transcription_setup(self) -> None:
         """Validate that transcription is properly configured if requested."""
@@ -332,6 +329,8 @@ class LattifAIClientMixin:
             result = caption.write(
                 output_caption_path,
                 include_speaker_in_text=self.caption_config.include_speaker_in_text,
+                word_level=self.caption_config.word_level,
+                karaoke_config=self.caption_config.karaoke,
             )
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if not diarization_file.exists() and caption.speaker_diarization:
@@ -353,14 +352,22 @@ class LattifAIClientMixin:
         output_dir: Path,
         media_format: str,
         force_overwrite: bool,
+        audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """Download media from YouTube (async implementation)."""
         safe_print(colorful.cyan("📥 Downloading media from YouTube..."))
+        if audio_track_id:
+            safe_print(colorful.cyan(f"    Audio track: {audio_track_id}"))
+        if quality != "best":
+            safe_print(colorful.cyan(f"    Quality: {quality}"))
         media_file = await self.downloader.download_media(
             url=url,
             output_dir=str(output_dir),
             media_format=media_format,
             force_overwrite=force_overwrite,
+            audio_track_id=audio_track_id,
+            quality=quality,
         )
         safe_print(colorful.green(f"    ✓ Media downloaded: {media_file}"))
         return media_file
@@ -371,11 +378,15 @@ class LattifAIClientMixin:
         output_dir: Path,
         media_format: str,
         force_overwrite: bool,
+        audio_track_id: Optional[str] = "original",
+        quality: str = "best",
     ) -> str:
         """Download media from YouTube (sync wrapper)."""
         import asyncio
 
-        return asyncio.run(self._download_media(url, output_dir, media_format, force_overwrite))
+        return asyncio.run(
+            self._download_media(url, output_dir, media_format, force_overwrite, audio_track_id, quality)
+        )
 
     def _transcribe(
         self,
@@ -408,7 +419,7 @@ class LattifAIClientMixin:
                 # Generate transcript file path
                 transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
                 if transcript_file.exists():
-                    safe_print(colorful.cyan(f"    Using existing transcript file: {transcript_file}"))
+                    safe_print(colorful.cyan(f"     Using existing transcript file: {transcript_file}"))
                     transcription = self._read_caption(transcript_file, normalize_text=False)
                     return transcription
 
@@ -485,11 +496,12 @@ class LattifAIClientMixin:
         """
         import asyncio
 
-        from lattifai.workflow.youtube import TRANSCRIBE_CHOICE
+        from lattifai.workflow.file_manager import TRANSCRIBE_CHOICE
 
         transcriber_name = self.transcriber.name
 
         async def _async_impl():
+            nonlocal use_transcription  # Allow modification of outer variable
             # First check if caption input_path is already provided
             if self.caption_config.input_path:
                 caption_path = Path(self.caption_config.input_path)

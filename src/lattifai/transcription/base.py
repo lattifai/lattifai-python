@@ -41,8 +41,13 @@ class BaseTranscriber(ABC):
         self.logger = get_logger("transcription")
 
     @property
+    @abstractmethod
     def name(self) -> str:
-        """Human-readable name of the transcriber."""
+        """Human-readable name of the transcriber.
+
+        Returns:
+            str: Identifier for the transcriber (e.g., 'gemini', 'parakeet').
+        """
 
     @property
     def file_name(self) -> str:

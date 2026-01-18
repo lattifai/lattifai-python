@@ -2,6 +2,7 @@
 show-source=true
 statistics=true
 max-line-length = 120
+ignore = W503, E203
 per-file-ignores =
   src/lattifai/client.py: F841, E501, W503
   src/lattifai/*.py: E402, F401
@@ -11,10 +12,14 @@ per-file-ignores =
   src/lattifai/workflow/*.py: W503
   src/lattifai/server/app.py: E501
   src/lattifai/caption/caption.py: W503
-  tests/*/*.py: E501, F541, F401, F841, W605, E226
+  src/lattifai/caption/formats/ttml.py: W503
+  src/lattifai/caption/formats/gemini.py: W503
+  src/lattifai/alignment/text_align.py: W503, E501
+  tests/*/*.py: E501, F541, F401, F841, W605, E226, E741
   tests/*.py: F541
 
 exclude =
   .git,
   setup.py,
   app/
+  tests/data/captions/*.vtt
