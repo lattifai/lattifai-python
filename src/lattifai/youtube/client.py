@@ -49,6 +49,12 @@ class YoutubeLoader:
         if yt_dlp is None:
             raise ImportError("yt-dlp is required. Install with `pip install yt-dlp`")
 
+        # Auto-load from environment if not specified
+        if proxy is None:
+            proxy = os.getenv("YOUTUBE_PROXY")
+        if cookies is None:
+            cookies = os.getenv("YOUTUBE_COOKIE_FILE") or os.getenv("YOUTUBE_COOKIE_BROWSER")
+
         self.proxy = proxy
         self.cookies = cookies
 
@@ -64,14 +70,29 @@ class YoutubeLoader:
 
         if self.proxy:
             self._base_opts["proxy"] = self.proxy
+            logger.info(f"🌐 Using proxy: {self.proxy}")
 
+        # Cookie configuration
         if self.cookies:
-            self._base_opts["cookiefile"] = self.cookies
+            # Check if it's a browser name (chrome, firefox, safari, etc.)
+            browser_names = ["chrome", "firefox", "safari", "edge", "opera", "brave"]
+            if self.cookies.lower() in browser_names:
+                # Use cookies from browser directly
+                self._base_opts["cookiesfrombrowser"] = (self.cookies.lower(),)
+                logger.info(f"🍪 Using cookies from browser: {self.cookies}")
+            else:
+                # Use cookie file
+                cookie_path = Path(self.cookies).expanduser()
+                if cookie_path.exists():
+                    self._base_opts["cookiefile"] = str(cookie_path)
+                    logger.info(f"🍪 Using cookie file: {cookie_path}")
+                else:
+                    logger.warning(f"⚠️ Cookie file not found: {cookie_path}")
+                    logger.warning("💡 Tip: Run 'yt-dlp --cookies-from-browser chrome' to extract cookies")
 
-        # Strategy: Prefer Android client to avoid PO Token issues on Web
-        # But for captions, sometimes Web is needed.
-        # We start with a robust default.
-        self._base_opts["extractor_args"] = {"youtube": {"player_client": ["android", "web"]}}
+        # Note: player_client configuration is removed to avoid format availability issues
+        # with certain videos. Let yt-dlp automatically select the best client.
+        # Previous config caused "Requested format is not available" errors for some videos.
 
     def get_video_info(self, video_id: str) -> Dict[str, Any]:
         """
@@ -136,8 +157,23 @@ class YoutubeLoader:
 
         except yt_dlp.utils.DownloadError as e:
             msg = str(e)
-            if "Sign in to confirm" in msg or "Private video" in msg:
-                raise VideoUnavailableError(f"Video {video_id} is unavailable: {msg}")
+            if "Sign in to confirm" in msg or "not a bot" in msg:
+                # Bot detection error - provide helpful guidance
+                error_msg = (
+                    f"🤖 YouTube Bot Detection: Video {video_id} requires authentication.\n\n"
+                    "Solutions:\n"
+                    "1. Use browser cookies (recommended):\n"
+                    "   loader = YoutubeLoader(cookies='chrome')  # or 'firefox', 'safari'\n\n"
+                    "2. Export cookie file:\n"
+                    "   yt-dlp --cookies-from-browser chrome --cookies cookies.txt <video_url>\n"
+                    "   loader = YoutubeLoader(cookies='cookies.txt')\n\n"
+                    "3. Environment variable:\n"
+                    "   export YOUTUBE_COOKIE_BROWSER=chrome\n\n"
+                    f"Original error: {msg}"
+                )
+                raise VideoUnavailableError(error_msg) from e
+            elif "Private video" in msg:
+                raise VideoUnavailableError(f"Video {video_id} is private") from e
             raise YouTubeError(f"yt-dlp failed: {msg}") from e
         except Exception as e:
             raise YouTubeError(f"Unexpected error: {str(e)}") from e
@@ -234,18 +270,11 @@ class YoutubeLoader:
         """
         url = f"https://www.youtube.com/watch?v={video_id}"
 
-        # Use default yt-dlp config to get DASH formats with separate audio streams
+        # Use base opts (includes proxy and cookie config) + DASH manifest
         opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-            "extract_flat": False,
+            **self._base_opts,
             "youtube_include_dash_manifest": True,
         }
-        if self.proxy:
-            opts["proxy"] = self.proxy
-        if self.cookies:
-            opts["cookiefile"] = self.cookies
 
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -262,8 +291,22 @@ class YoutubeLoader:
                 ]
 
                 if not audio_formats:
+                    # Fallback: If no audio-only formats, use lowest resolution video with audio
+                    # This happens with HLS-only videos (e.g., protected content)
+                    logger.warning("No audio-only formats found. Falling back to lowest resolution video with audio.")
+                    audio_formats = [
+                        f
+                        for f in formats
+                        if f.get("acodec") not in (None, "none")
+                        and f.get("vcodec") not in (None, "none")
+                        and f.get("url")
+                    ]
+                    # Sort by resolution (lowest first) for minimal bandwidth
+                    audio_formats.sort(key=lambda f: f.get("height") or f.get("width") or 9999)
+
+                if not audio_formats:
                     raise YouTubeError(
-                        "No audio-only formats available. " "YouTube may require authentication for this video."
+                        "No formats with audio available. " "YouTube may require authentication for this video."
                     )
 
                 # Filter by audio_track_id if specified (for multi-language audio)
@@ -324,7 +367,14 @@ class YoutubeLoader:
                 }
 
         except yt_dlp.utils.DownloadError as e:
-            raise YouTubeError(f"Failed to get audio URL: {str(e)}") from e
+            msg = str(e)
+            if "Sign in to confirm" in msg or "not a bot" in msg:
+                raise YouTubeError(
+                    f"🤖 YouTube Bot Detection: Cookie configuration required to access this video. "
+                    f"Reference: YoutubeLoader(cookies='chrome') or set environment variable YOUTUBE_COOKIE_BROWSER=chrome. "
+                    f"Original error: {msg}"
+                ) from e
+            raise YouTubeError(f"Failed to get audio URL: {msg}") from e
         except Exception as e:
             raise YouTubeError(f"Unexpected error getting audio URL: {str(e)}") from e
 
@@ -346,18 +396,12 @@ class YoutubeLoader:
         """
         url = f"https://www.youtube.com/watch?v={video_id}"
 
-        # Use default yt-dlp config to get all available formats
+        # Use base opts (includes proxy and cookie config) + DASH and HLS manifests
         opts = {
-            "quiet": True,
-            "no_warnings": True,
-            "skip_download": True,
-            "extract_flat": False,
+            **self._base_opts,
             "youtube_include_dash_manifest": True,
+            "youtube_include_hls_manifest": True,
         }
-        if self.proxy:
-            opts["proxy"] = self.proxy
-        if self.cookies:
-            opts["cookiefile"] = self.cookies
 
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
@@ -368,25 +412,19 @@ class YoutubeLoader:
 
                 # Filter for video formats:
                 # - Must have video codec
-                # - Must have direct URL (not manifest/playlist)
-                # - Exclude HLS/DASH manifests (protocol contains m3u8 or dash)
-                def is_direct_video(f: Dict) -> bool:
+                # - Must have a URL
+                # - Prefer direct URLs over manifests, but allow manifests if needed
+                def is_usable_video(f: Dict) -> bool:
                     if f.get("vcodec") in (None, "none"):
                         return False
-                    url = f.get("url", "")
-                    protocol = f.get("protocol", "")
-                    # Exclude HLS manifests
-                    if "m3u8" in protocol or ".m3u8" in url or "manifest.googlevideo.com" in url:
-                        return False
-                    # Exclude DASH manifests
-                    if "dash" in protocol:
+                    if not f.get("url"):
                         return False
                     return True
 
-                video_formats = [f for f in formats if is_direct_video(f)]
+                video_formats = [f for f in formats if is_usable_video(f)]
 
                 if not video_formats:
-                    raise YouTubeError("No direct video formats available (only HLS/DASH manifests found)")
+                    raise YouTubeError("No video formats available")
 
                 # Parse target height from quality parameter
                 target_height = None
@@ -435,7 +473,14 @@ class YoutubeLoader:
                 }
 
         except yt_dlp.utils.DownloadError as e:
-            raise YouTubeError(f"Failed to get video URL: {str(e)}") from e
+            msg = str(e)
+            if "Sign in to confirm" in msg or "not a bot" in msg:
+                raise YouTubeError(
+                    f"🤖 YouTube Bot Detection: Cookie configuration required to access this video. "
+                    f"Reference: YoutubeLoader(cookies='chrome') or set environment variable YOUTUBE_COOKIE_BROWSER=chrome. "
+                    f"Original error: {msg}"
+                ) from e
+            raise YouTubeError(f"Failed to get video URL: {msg}") from e
         except Exception as e:
             raise YouTubeError(f"Unexpected error getting video URL: {str(e)}") from e
 
