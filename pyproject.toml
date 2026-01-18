@@ -65,7 +65,7 @@ alignment = [
     "g2p-phonemizer>=0.4.0",
     "wtpsplit>=2.1.7",
     "modelscope>=1.33.0",
-    "error-align-fix>=0.1.2",
+    "error-align-fix>=0.1.4",
 ]
 # transcription & diarization
 transcription = [
