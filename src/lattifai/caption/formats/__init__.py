@@ -131,9 +131,9 @@ def detect_format(path: str) -> Optional[str]:
     # Check if it's content instead of a path
     is_content = "\n" in path_str or len(path_str) > 500
 
-    # Prioritize specific formats that can detect by content (e.g., youtube_vtt)
-    # These often use shared extensions like .vtt or .txt
-    priority_formats = ["youtube_vtt", "gemini"]
+    # Prioritize specific formats that can detect by content
+    # These often use shared extensions like .vtt, .txt, or .xml
+    priority_formats = ["vtt", "gemini", "premiere_xml"]
     for format_id in priority_formats:
         reader_cls = _READERS.get(format_id)
         if reader_cls and reader_cls.can_read(path_str):
@@ -164,17 +164,16 @@ def detect_format(path: str) -> Optional[str]:
     return None
 
 
-# Karaoke formats
 # Import all format modules to trigger registration
 # Standard formats
 from . import gemini  # YouTube/Gemini markdown
 from . import lrc  # Enhanced LRC with word-level timestamps
-from . import pysubs2  # SRT, VTT, ASS, SSA, SUB, SAMI
+from . import pysubs2  # SRT, ASS, SSA, SUB, SAMI
 from . import sbv  # SubViewer
 from . import tabular  # CSV, TSV, AUD, TXT, JSON
 from . import textgrid  # Praat TextGrid
 from . import ttml  # TTML, IMSC1, EBU-TT-D
-from . import youtube_vtt  # YouTube VTT with word-level timestamps
+from . import vtt  # WebVTT with YouTube VTT word-level timestamp support
 
 # Professional NLE formats
 from .nle import audition  # Adobe Audition / Pro Tools markers

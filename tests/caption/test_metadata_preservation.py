@@ -4,9 +4,10 @@ import pytest
 
 from lattifai.caption import Caption, Supervision
 from lattifai.caption.formats.lrc import LRCFormat
-from lattifai.caption.formats.pysubs2 import ASSFormat, SRTFormat, SSAFormat, VTTFormat
+from lattifai.caption.formats.pysubs2 import ASSFormat, SRTFormat, SSAFormat
 from lattifai.caption.formats.textgrid import TextGridFormat
 from lattifai.caption.formats.ttml import TTMLFormat
+from lattifai.caption.formats.vtt import VTTFormat
 
 
 class TestASSMetadataPreservation:

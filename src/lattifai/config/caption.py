@@ -171,7 +171,7 @@ class StandardizationConfig:
 InputCaptionFormat = Literal[
     # Standard subtitle formats
     "srt",
-    "vtt",
+    "vtt",  # WebVTT (auto-detects YouTube VTT with word-level timestamps)
     "ass",
     "ssa",
     "sub",
@@ -186,7 +186,6 @@ InputCaptionFormat = Literal[
     "json",
     # Specialized formats
     "textgrid",  # Praat TextGrid
-    "youtube_vtt",  # YouTube VTT with word-level timestamps
     "gemini",  # Gemini/YouTube transcript format
     # Professional NLE formats
     "avid_ds",
@@ -201,7 +200,7 @@ InputCaptionFormat = Literal[
 OutputCaptionFormat = Literal[
     # Standard subtitle formats
     "srt",
-    "vtt",
+    "vtt",  # WebVTT (use karaoke_config.enabled=True for YouTube VTT style output)
     "ass",
     "ssa",
     "sub",
@@ -216,7 +215,6 @@ OutputCaptionFormat = Literal[
     "json",
     # Specialized formats
     "textgrid",  # Praat TextGrid
-    "youtube_vtt",  # YouTube VTT with word-level timestamps
     "gemini",  # Gemini/YouTube transcript format
     # TTML profiles (write-only)
     "ttml",  # Generic TTML
@@ -259,8 +257,9 @@ class CaptionConfig:
     """Input caption format. Supports: 'auto' (detect),
         standard formats (srt, vtt, ass, ssa, sub, sbv, txt, sami, smi),
         tabular (csv, tsv, aud, json),
-        specialized (textgrid, youtube_vtt, gemini),
+        specialized (textgrid, gemini),
         NLE (avid_ds, fcpxml, premiere_xml, audition_csv).
+        Note: VTT format auto-detects YouTube VTT with word-level timestamps.
     """
 
     input_path: Optional[str] = None

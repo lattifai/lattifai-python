@@ -556,6 +556,29 @@ class PremiereXMLReaderHandler(FormatReader):
     extensions = [".xml"]
 
     @classmethod
+    def can_read(cls, source) -> bool:
+        """Check if source is Premiere Pro XML format.
+
+        Premiere XML files contain <xmeml> root element.
+        """
+        # Check extension first
+        if cls.is_content(source):
+            content = source[:1024] if len(source) > 1024 else source
+        else:
+            path_str = str(source).lower()
+            if not path_str.endswith(".xml"):
+                return False
+            # Read file content for detection
+            try:
+                with open(source, "r", encoding="utf-8") as f:
+                    content = f.read(1024)
+            except Exception:
+                return False
+
+        # Check for xmeml root element
+        return "<xmeml" in content.lower()
+
+    @classmethod
     def read(cls, source: Union[Pathlike, str], normalize_text: bool = True, **kwargs) -> List[Supervision]:
         if isinstance(source, (str, Path)) and not cls.is_content(source):
             with open(source, "r", encoding="utf-8") as f:
