@@ -113,7 +113,6 @@ Changelog = 'https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md'
 "laicap-normalize" = "lattifai.cli.caption:main_normalize"
 "laicap-shift" = "lattifai.cli.caption:main_shift"
 "laicap-diff" = "lattifai.cli.caption:main_diff"
-"lai-server" = "lattifai.cli.server:main"
 
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"
@@ -131,7 +130,6 @@ packages = [
     "lattifai.caption.formats.nle",
     "lattifai.caption.parsers",
     "lattifai.diarization",
-    "lattifai.server",
     "lattifai.transcription",
     "lattifai.transcription.prompts",
     "lattifai.workflow",
