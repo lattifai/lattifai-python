@@ -5,7 +5,9 @@ permissions:
 on:
   push:
     branches: [ main ]
-    paths-ignore: '**.md'
+    paths:
+      - 'src/**'
+      - 'pyproject.toml'
     tags:
       - 'v*.*.*'  # Trigger on release tags like v0.2.5, v1.0.0, etc.
   pull_request:
