@@ -282,12 +282,22 @@ class YoutubeLoader:
 
                 # Get all formats and filter for audio-only (no video track)
                 formats = info.get("formats", [])
+
+                def is_direct_url(url: str) -> bool:
+                    """Check if URL is a direct stream URL (not HLS manifest)"""
+                    if not url:
+                        return False
+                    # HLS manifests contain these patterns
+                    hls_patterns = ["manifest.googlevideo.com", "/hls_playlist/", ".m3u8"]
+                    return not any(p in url for p in hls_patterns)
+
                 audio_formats = [
                     f
                     for f in formats
                     if f.get("acodec") not in (None, "none")
                     and f.get("vcodec") in (None, "none")
                     and f.get("url")  # Must have a direct URL
+                    and is_direct_url(f.get("url"))  # Exclude HLS manifests
                 ]
 
                 if not audio_formats:
@@ -300,14 +310,29 @@ class YoutubeLoader:
                         if f.get("acodec") not in (None, "none")
                         and f.get("vcodec") not in (None, "none")
                         and f.get("url")
+                        and is_direct_url(f.get("url"))  # Exclude HLS manifests
                     ]
                     # Sort by resolution (lowest first) for minimal bandwidth
                     audio_formats.sort(key=lambda f: f.get("height") or f.get("width") or 9999)
 
                 if not audio_formats:
-                    raise YouTubeError(
-                        "No formats with audio available. " "YouTube may require authentication for this video."
-                    )
+                    # Check if there are HLS-only formats (common for Shorts)
+                    # HLS can still work with server-side streaming (same IP)
+                    hls_with_audio = [f for f in formats if f.get("acodec") not in (None, "none") and f.get("url")]
+                    if hls_with_audio:
+                        logger.warning("Only HLS streams available. Returning HLS URL for server-side streaming.")
+                        # Sort: prefer audio-only, then by resolution (lowest first)
+                        hls_with_audio.sort(
+                            key=lambda f: (
+                                0 if f.get("vcodec") in (None, "none") else 1,
+                                f.get("height") or f.get("width") or 9999,
+                            )
+                        )
+                        audio_formats = hls_with_audio
+                    else:
+                        raise YouTubeError(
+                            "No formats with audio available. YouTube may require authentication for this video."
+                        )
 
                 # Filter by audio_track_id if specified (for multi-language audio)
                 if audio_track_id:
@@ -357,13 +382,19 @@ class YoutubeLoader:
                 audio_formats.sort(key=score_format, reverse=True)
                 best = audio_formats[0]
 
+                # Check if selected format is HLS (requires server-side streaming)
+                best_url = best.get("url", "")
+                is_hls = not is_direct_url(best_url)
+
                 return {
-                    "url": best.get("url"),
+                    "url": best_url,
                     "mime_type": best.get("ext", format_preference),
                     "bitrate": best.get("abr") or best.get("tbr"),
+                    "sample_rate": best.get("asr"),  # Audio sample rate
                     "content_length": best.get("filesize") or best.get("filesize_approx"),
                     "format_id": best.get("format_id"),
                     "ext": best.get("ext"),
+                    "is_hls": is_hls,  # True = use server streaming, False = use proxy
                 }
 
         except yt_dlp.utils.DownloadError as e:
@@ -410,10 +441,17 @@ class YoutubeLoader:
                 # Get all formats
                 formats = info.get("formats", [])
 
+                def is_direct_url(url: str) -> bool:
+                    """Check if URL is a direct stream URL (not HLS manifest)"""
+                    if not url:
+                        return False
+                    hls_patterns = ["manifest.googlevideo.com", "/hls_playlist/", ".m3u8"]
+                    return not any(p in url for p in hls_patterns)
+
                 # Filter for video formats:
                 # - Must have video codec
                 # - Must have a URL
-                # - Prefer direct URLs over manifests, but allow manifests if needed
+                # - Prefer direct URLs (DASH) over HLS manifests
                 def is_usable_video(f: Dict) -> bool:
                     if f.get("vcodec") in (None, "none"):
                         return False
@@ -421,7 +459,13 @@ class YoutubeLoader:
                         return False
                     return True
 
-                video_formats = [f for f in formats if is_usable_video(f)]
+                # First try: direct URLs only (exclude HLS)
+                video_formats = [f for f in formats if is_usable_video(f) and is_direct_url(f.get("url", ""))]
+
+                # Fallback: include HLS if no direct formats
+                if not video_formats:
+                    logger.warning("No direct video URLs found. Falling back to HLS formats.")
+                    video_formats = [f for f in formats if is_usable_video(f)]
 
                 if not video_formats:
                     raise YouTubeError("No video formats available")
@@ -451,15 +495,19 @@ class YoutubeLoader:
                 video_formats.sort(key=score_format, reverse=True)
                 best = video_formats[0]
 
+                # Check if selected format is HLS
+                best_url = best.get("url", "")
+                is_hls = not is_direct_url(best_url)
+
                 # Log selection for debugging
                 logger.info(
                     f"Selected video format: {best.get('format_id')} "
                     f"({best.get('width')}x{best.get('height')}, "
-                    f"vcodec={best.get('vcodec')}, acodec={best.get('acodec')})"
+                    f"vcodec={best.get('vcodec')}, acodec={best.get('acodec')}, is_hls={is_hls})"
                 )
 
                 return {
-                    "url": best.get("url"),
+                    "url": best_url,
                     "mime_type": best.get("ext", format_preference),
                     "width": best.get("width"),
                     "height": best.get("height"),
@@ -470,6 +518,7 @@ class YoutubeLoader:
                     "content_length": best.get("filesize") or best.get("filesize_approx"),
                     "format_id": best.get("format_id"),
                     "ext": best.get("ext"),
+                    "is_hls": is_hls,
                 }
 
         except yt_dlp.utils.DownloadError as e:
