@@ -4,7 +4,7 @@ Evaluate subtitle alignment quality using DER, JER, WER, SCA, and SCER metrics.
 
 ## 📊 Interactive Visualization
 
-**[View Interactive Benchmark Results](./index.html)**
+**[View Interactive Benchmark Results](https://lattifai.github.io/lattifai-python/benchmark/)**
 
 Open `index.html` in your browser for an interactive visualization with:
 - Click-to-highlight metric comparison
@@ -18,11 +18,11 @@ open benchmark/index.html
 
 # Or start a local HTTP server (recommended)
 cd benchmark
-python -m http.server 8000
-# Then open: http://localhost:8000/index.html
+python -m http.server 8002
+# Then open: http://localhost:8002/index.html
 
 # Alternative with Python 2
-python -m SimpleHTTPServer 8000
+python -m SimpleHTTPServer 8002
 ```
 
 ## Metrics
