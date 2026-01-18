@@ -393,10 +393,45 @@ JSON is the most flexible format for storing caption data with full word-level t
 | Format | `word_level=True` | `word_level=True` + `karaoke=True` |
 |--------|-------------------|-----------------------------------|
 | **JSON** | Includes `words` array | Same as word_level=True |
-| **SRT/VTT** | One word per segment | One word per segment |
+| **SRT** | One word per segment | One word per segment |
+| **VTT** | One word per segment | YouTube VTT style: `<00:00:00.000><c> word</c>` |
 | **ASS** | One word per segment | `{\kf}` karaoke tags (sweep effect) |
 | **LRC** | One word per line | Enhanced `<timestamp>` tags |
 | **TTML** | One word per `<p>` element | `<span>` with `itunes:timing="Word"` |
+
+### VTT Format (YouTube VTT Support)
+
+The VTT format handler supports both standard WebVTT and YouTube VTT with word-level timestamps.
+
+**Reading**: VTT automatically detects YouTube VTT format (with `<timestamp><c>` tags) and extracts word-level alignment data:
+
+```
+WEBVTT
+
+00:00:00.000 --> 00:00:02.000
+<00:00:00.000><c> Hello</c><00:00:00.500><c> world</c>
+```
+
+**Writing**: Use `word_level=True` with `karaoke_config` to output YouTube VTT style:
+
+```python
+from lattifai import Caption
+from lattifai.config.caption import KaraokeConfig
+
+caption = Caption.read("input.vtt")
+caption.write(
+    "output.vtt",
+    word_level=True,
+    karaoke_config=KaraokeConfig(enabled=True)
+)
+```
+
+```bash
+# CLI: Convert to YouTube VTT with word-level timestamps
+lai caption convert input.json output.vtt \
+    caption.word_level=true \
+    caption.karaoke.enabled=true
+```
 
 ### Transcription Language Support
 
