@@ -22,6 +22,16 @@ from .tokenizer import _load_tokenizer
 ClientType = Any
 
 
+def _extract_text_for_error(supervisions: Union[list, tuple]) -> str:
+    """Extract text from supervisions for error messages."""
+    if not supervisions:
+        return ""
+    # TextAlignResult is a tuple: (caption_sups, transcript_sups, ...)
+    if isinstance(supervisions, tuple):
+        supervisions = supervisions[0] or supervisions[1] or []
+    return " ".join(s.text for s in supervisions if s and s.text)
+
+
 class Lattice1Aligner(object):
     """Synchronous LattifAI client with config-driven architecture."""
 
@@ -113,14 +123,7 @@ class Lattice1Aligner(object):
             if verbose:
                 safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
         except Exception as e:
-            if isinstance(supervisions[0], Supervision):
-                text_content = " ".join([sup.text for sup in supervisions]) if supervisions else ""
-            else:
-                text_content = ""
-                if supervisions[0]:
-                    text_content = " ".join([sup.text for sup in supervisions[0]])
-                if supervisions[1]:
-                    text_content += " | " + " ".join([sup.text for sup in supervisions[1]])
+            text_content = _extract_text_for_error(supervisions)
             raise LatticeEncodingError(text_content, original_error=e)
 
         # Step 3: Search lattice graph

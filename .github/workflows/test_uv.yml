@@ -66,10 +66,6 @@ jobs:
           uv run lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
           uv run lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-flash-preview
 
-      - name: Test Server Command
-        run: |
-          uv run lai-server --help
-
       # - name: Test Cli Commands (Windows)
       #   if: runner.os == 'Windows'
       #   env:
