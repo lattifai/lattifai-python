@@ -6,7 +6,7 @@ from collections import defaultdict, namedtuple
 from typing import Callable, Dict, List, Optional, Tuple, TypeVar
 
 import regex
-from error_align import error_align
+from error_align.error_align import error_align
 from error_align.utils import DELIMITERS, NUMERIC_TOKEN, STANDARD_TOKEN, Alignment, OpType
 
 from lattifai.caption import Caption, Supervision

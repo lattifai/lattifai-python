@@ -56,20 +56,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install Chromium for yt-dlp cookies
-        run: |
-          # Install Chromium using playwright (more reliable than snap in CI)
-          pip install playwright
-          playwright install chromium
-          # Create a minimal Chrome profile directory for yt-dlp
-          mkdir -p ~/.config/chromium/Default
-          echo '{}' > ~/.config/chromium/Default/Preferences
-
       - name: Build and Test
         env:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
