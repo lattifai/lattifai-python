@@ -7,13 +7,13 @@
 </div>
 
 <p align="center">
-   🌐 <a href="https://lattifai.com"><b>Official Website</b></a> &nbsp&nbsp | &nbsp&nbsp 🖥️ <a href="https://github.com/lattifai/lattifai-python">GitHub</a> &nbsp&nbsp | &nbsp&nbsp 🤗 <a href="https://huggingface.co/Lattifai/Lattice-1">Model</a> &nbsp&nbsp | &nbsp&nbsp 📑 <a href="https://lattifai.com/blogs">Blog</a> &nbsp&nbsp | &nbsp&nbsp <a href="https://discord.gg/kvF4WsBRK8"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" style="vertical-align: middle;"></a>
+   🌐 <a href="https://lattifai.com"><b>Official Website</b></a> &nbsp;&nbsp; | &nbsp;&nbsp; 🖥️ <a href="https://github.com/lattifai/lattifai-python">GitHub</a> &nbsp;&nbsp; | &nbsp;&nbsp; 🤗 <a href="https://huggingface.co/LattifAI/Lattice-1">Model</a> &nbsp;&nbsp; | &nbsp;&nbsp; 📑 <a href="https://lattifai.com/blogs">Blog</a> &nbsp;&nbsp; | &nbsp;&nbsp; <a href="https://discord.gg/kvF4WsBRK8"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" style="vertical-align: middle;"></a>
 </p>
 
 
 # LattifAI: Precision Alignment, Infinite Possibilities
 
-Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](https://huggingface.co/Lattifai/Lattice-1) model.
+Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](https://huggingface.co/LattifAI/Lattice-1) model.
 
 ## Table of Contents
 
@@ -33,7 +33,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 
 | Feature | Description |
 |---------|-------------|
-| **Forced Alignment** | Word-level and segment-level audio-text synchronization powered by [Lattice-1](https://huggingface.co/Lattifai/Lattice-1) |
+| **Forced Alignment** | Word-level and segment-level audio-text synchronization powered by [Lattice-1](https://huggingface.co/LattifAI/Lattice-1) |
 | **Multi-Model Transcription** | Gemini (100+ languages), Parakeet (24 languages), SenseVoice (5 languages) |
 | **Speaker Diarization** | Multi-speaker identification with label preservation |
 | **Streaming Mode** | Process audio up to 20 hours with minimal memory |
@@ -41,10 +41,10 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 
 ### Alignment Models
 
-| Model | Languages | Description |
-|-------|-----------|-------------|
-| **Lattice-1** | English, Chinese, German | Production model with mixed-language alignment support |
-| **Lattice-1-Alpha** | English | Initial release with English forced alignment |
+| Model | Links | Languages | Description |
+|-------|-------|-----------|-------------|
+| **Lattice-1** | [🤗 HF](https://huggingface.co/LattifAI/Lattice-1) • [🤖 MS](https://modelscope.cn/models/LattifAI/Lattice-1) | English, Chinese, German | Production model with mixed-language alignment support |
+| **Lattice-1-Alpha** | [🤗 HF](https://huggingface.co/LattifAI/Lattice-1-Alpha) • [🤖 MS](https://modelscope.cn/models/LattifAI/Lattice-1-Alpha) | English | Initial release with English forced alignment |
 
 **Model Hub**: Models can be downloaded from `huggingface` (default) or `modelscope` (recommended for users in China):
 

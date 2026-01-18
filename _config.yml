@@ -1,0 +1,5 @@
+theme: jekyll-theme-minimal
+title: LattifAI Python SDK
+description: Advanced forced alignment and subtitle generation
+show_downloads: false
+google_analytics: false
