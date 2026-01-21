@@ -47,6 +47,7 @@ dependencies = [
 core = [
     "k2py>=0.2.1",
     "lattifai-core>=0.6.0",
+    "lattifai-captions[splitting]>=0.1.0",  # Caption format handling + sentence splitting
     "lattifai-run>=1.0.1",
     "python-dotenv",
     "msgpack",
@@ -57,13 +58,9 @@ core = [
 alignment = [
     "lhotse>=1.26.0",
     "colorful>=0.5.6",
-    "pysubs2",
-    "praatio",
-    "tgt",
     "onnx>=1.16.0",
     "onnxruntime",
     "g2p-phonemizer>=0.4.0",
-    "wtpsplit>=2.1.7",
     "modelscope>=1.33.0",
     "error-align-fix>=0.1.4",
 ]
@@ -120,26 +117,16 @@ caption = "lattifai.cli"
 transcribe = "lattifai.cli"
 diarization = "lattifai.cli"
 
-[tool.setuptools]
-packages = [
-    "lattifai",
-    "lattifai.alignment",
-    "lattifai.config",
-    "lattifai.caption",
-    "lattifai.caption.formats",
-    "lattifai.caption.formats.nle",
-    "lattifai.caption.parsers",
-    "lattifai.diarization",
-    "lattifai.transcription",
-    "lattifai.transcription.prompts",
-    "lattifai.workflow",
-    "lattifai.youtube",
-    "lattifai.cli",
-]
-include-package-data = true
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
+exclude = ["lattifai.caption", "lattifai.caption.*"]
 
 [tool.setuptools.package-dir]
-lattifai = "src/lattifai"
+"" = "src"
+
+[tool.setuptools]
+include-package-data = true
 
 [tool.setuptools.package-data]
 "lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]

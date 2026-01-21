@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 import torch
 
-from lattifai import LattifAI
 from lattifai.audio2 import AudioData
+from lattifai.client import LattifAI
 from lattifai.config import AlignmentConfig, MediaConfig
 
 

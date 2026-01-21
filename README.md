@@ -54,7 +54,8 @@ lai alignment align audio.wav caption.srt output.srt alignment.model_hub=modelsc
 ```
 
 ```python
-from lattifai import LattifAI, AlignmentConfig
+from lattifai.client import LattifAI
+from lattifai.config import AlignmentConfig
 
 client = LattifAI(alignment_config=AlignmentConfig(model_hub="modelscope"))
 ```
@@ -123,7 +124,7 @@ lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
 ### Python SDK
 
 ```python
-from lattifai import LattifAI
+from lattifai.client import LattifAI
 
 client = LattifAI()
 caption = client.alignment(
@@ -222,8 +223,8 @@ lai transcribe align audio.wav output.srt \
 ### Configuration Objects
 
 ```python
-from lattifai import (
-    LattifAI,
+from lattifai.client import LattifAI
+from lattifai.config import (
     ClientConfig,
     AlignmentConfig,
     CaptionConfig,
@@ -268,7 +269,8 @@ caption = client.youtube(
 | `include_speaker_in_text` | `True` | Include speaker labels in text output |
 
 ```python
-from lattifai import LattifAI, CaptionConfig
+from lattifai.client import LattifAI
+from lattifai.config import CaptionConfig
 
 client = LattifAI(
     caption_config=CaptionConfig(
@@ -299,6 +301,9 @@ caption = client.alignment(
 ### Word-Level Alignment
 
 ```python
+from lattifai.client import LattifAI
+from lattifai.config import CaptionConfig
+
 client = LattifAI(caption_config=CaptionConfig(word_level=True))
 caption = client.alignment(
     input_media="audio.wav",
@@ -323,7 +328,8 @@ Automatically identify and label different speakers in audio.
 - Gemini transcription → Names extracted from context (e.g., "Hi, I'm Alice" → `Alice`)
 
 ```python
-from lattifai import LattifAI, DiarizationConfig
+from lattifai.client import LattifAI
+from lattifai.config import DiarizationConfig
 
 client = LattifAI(
     diarization_config=DiarizationConfig(
@@ -364,7 +370,9 @@ Input Caption → Reader → Tokenizer
 |------|---------|
 | **Audio** | WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AIFF, and more |
 | **Video** | MP4, MKV, MOV, WEBM, AVI, and more |
-| **Caption** | SRT, VTT, ASS, SSA, JSON, TextGrid, TSV, CSV, LRC, TTML, and more |
+| **Caption** | SRT, VTT, ASS, SSA, SRV3, JSON, TextGrid, TSV, CSV, LRC, TTML, and more |
+
+> **Note**: Caption format handling is provided by [lattifai-captions](https://github.com/lattifai/lattifai-captions), which is automatically installed as a dependency. For standalone caption processing without alignment features, install `pip install lattifai-captions`.
 
 ### JSON Format
 
@@ -418,8 +426,8 @@ WEBVTT
 **Writing**: Use `word_level=True` with `karaoke_config` to output YouTube VTT style:
 
 ```python
-from lattifai import Caption
-from lattifai.config.caption import KaraokeConfig
+from lattifai.caption import Caption
+from lattifai.caption.config import KaraokeConfig
 
 caption = Caption.read("input.vtt")
 caption.write(

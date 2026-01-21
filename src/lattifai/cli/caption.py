@@ -6,8 +6,8 @@ import nemo_run as run
 from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
+from lattifai.caption.config import KaraokeConfig
 from lattifai.config import CaptionConfig
-from lattifai.config.caption import KaraokeConfig
 from lattifai.utils import safe_print
 
 
@@ -235,9 +235,8 @@ def diff(
     """
     from pathlib import Path
 
-    from lattifai.alignment.sentence_splitter import SentenceSplitter
     from lattifai.alignment.text_align import align_supervisions_and_transcription
-    from lattifai.caption import Caption
+    from lattifai.caption import Caption, SentenceSplitter
 
     ref_path = Path(ref_path).expanduser()
     hyp_path = Path(hyp_path).expanduser()

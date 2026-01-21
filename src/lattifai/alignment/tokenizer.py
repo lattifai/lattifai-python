@@ -9,6 +9,7 @@ import numpy as np
 # from lattifai.caption import Supervision
 from lhotse.supervision import SupervisionSegment as Supervision  # NOTE: Transcriber SupervisionSegment
 
+from lattifai.caption import SentenceSplitter
 from lattifai.caption import normalize_text as normalize_html_text
 from lattifai.errors import (
     LATTICE_DECODING_FAILURE_HELP,
@@ -19,7 +20,6 @@ from lattifai.errors import (
 
 from .phonemizer import G2Phonemizer
 from .punctuation import PUNCTUATION, PUNCTUATION_SPACE
-from .sentence_splitter import SentenceSplitter
 from .text_align import TextAlignResult
 
 MAXIMUM_WORD_LENGTH = 40

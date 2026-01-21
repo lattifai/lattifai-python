@@ -5,7 +5,7 @@ from typing import List, TypeAlias, Union
 
 from lhotse.utils import Pathlike
 
-from .caption import Supervision
+from lattifai.caption import Supervision
 
 # Path-like types
 PathLike: TypeAlias = Pathlike  # Re-export for convenience (str | Path)

@@ -23,13 +23,13 @@ def test_import():
 def test_package_structure():
     """Test basic package structure"""
     try:
-        import lattifai
+        from importlib.metadata import version
 
-        # Check if package has expected attributes
-        assert hasattr(lattifai, "__version__"), "Package should have a __version__ attribute"
-        print(f"✓ Package structure test passed (version: {lattifai.__version__})")
+        pkg_version = version("lattifai")
+        assert pkg_version is not None, "Package should have a version"
+        print(f"✓ Package structure test passed (version: {pkg_version})")
         return True
-    except (ImportError, AssertionError) as e:
+    except Exception as e:
         print(f"✗ Package structure test failed: {e}")
         return False
 
@@ -37,7 +37,7 @@ def test_package_structure():
 def test_LattifAI_import():
     """Test that base modules can be imported without complex dependencies"""
     try:
-        from lattifai import LattifAIError
+        from lattifai.errors import LattifAIError
 
         assert LattifAIError is not None
         print("✓ Successfully imported LattifAIError")
@@ -50,8 +50,7 @@ def test_LattifAI_import():
 def test_io_imports():
     """Test that I/O modules can be imported"""
     try:
-        from lattifai import Caption
-        from lattifai.caption import Supervision
+        from lattifai.caption import Caption, Supervision
 
         assert Supervision is not None
         assert Caption is not None
@@ -65,7 +64,7 @@ def test_io_imports():
 def test_client_class_exists():
     """Test that LattifAI client class can be imported"""
     try:
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         assert LattifAI is not None
         print("✓ Successfully imported LattifAI client class")
@@ -78,7 +77,7 @@ def test_client_class_exists():
 def test_alignment_method_exists():
     """Test that alignment method exists on LattifAI class"""
     try:
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         assert hasattr(LattifAI, "alignment"), "LattifAI should have alignment method"
         print("✓ LattifAI.alignment method exists")

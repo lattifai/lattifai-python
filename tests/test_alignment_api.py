@@ -17,7 +17,7 @@ class TestAlignmentAPISignature:
         # Check the method signature
         import inspect
 
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         sig = inspect.signature(LattifAI.alignment)
 
@@ -32,7 +32,7 @@ class TestAlignmentAPISignature:
         """Test that alignment() method has correct parameters."""
         import inspect
 
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         sig = inspect.signature(LattifAI.alignment)
         params = sig.parameters
@@ -56,12 +56,12 @@ class TestAlignmentAPISignature:
     def test_import_structure(self):
         """Test that all necessary types can be imported."""
         # Test main client import
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         assert LattifAI is not None, "LattifAI should be importable"
 
         # Test error import
-        from lattifai import LattifAIError
+        from lattifai.errors import LattifAIError
 
         assert LattifAIError is not None, "LattifAIError should be importable"
 
@@ -88,7 +88,7 @@ class TestAlignmentReturnValue:
     @pytest.mark.skipif(True, reason="Requires actual audio file and API key")
     def test_alignment_returns_tuple(self, tmp_path):
         """Test that alignment() returns a tuple with correct structure."""
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         # This test would require actual audio and caption files
         # and a valid API key, so we skip it in CI
@@ -111,7 +111,7 @@ class TestAlignmentReturnValue:
 
     def test_alignment_docstring(self):
         """Test that alignment() has proper documentation."""
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         docstring = LattifAI.alignment.__doc__
         assert docstring is not None, "alignment() should have a docstring"
@@ -134,7 +134,7 @@ class TestAPIConsistency:
         """Test that LattifAI client can be initialized with correct parameters."""
         import inspect
 
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
 
         sig = inspect.signature(LattifAI.__init__)
         params = sig.parameters
@@ -148,7 +148,7 @@ class TestAPIConsistency:
 
     def test_error_inheritance(self):
         """Test that LattifAIError is the base exception."""
-        from lattifai import LattifAIError
+        from lattifai.errors import LattifAIError
 
         # Test that it's a proper exception
         assert issubclass(LattifAIError, Exception)

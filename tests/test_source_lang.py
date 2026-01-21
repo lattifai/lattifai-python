@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from lattifai import LattifAI
 from lattifai.caption import Caption
+from lattifai.client import LattifAI
 from lattifai.config import CaptionConfig, TranscriptionConfig
 from lattifai.mixin import LattifAIClientMixin
 from lattifai.transcription import GeminiTranscriber
@@ -68,9 +68,10 @@ class TestSourceLangInTranscription:
 
         assert config.language == "en"
 
-    @pytest.mark.asyncio
-    async def test_transcribe_with_source_lang(self):
+    def test_transcribe_with_source_lang(self):
         """Test transcription with source_lang parameter."""
+        import asyncio
+
         config = TranscriptionConfig(
             model_name="gemini-2.5-pro",
             gemini_api_key="test_key",
@@ -82,7 +83,7 @@ class TestSourceLangInTranscription:
         with patch.object(transcriber, "transcribe", new_callable=AsyncMock) as mock_transcribe:
             mock_transcribe.return_value = "Test transcription"
 
-            result = await transcriber.transcribe("https://example.com/video", language="en")
+            result = asyncio.run(transcriber.transcribe("https://example.com/video", language="en"))
             del result  # unused
 
             # Verify transcribe was called with language parameter
@@ -90,9 +91,10 @@ class TestSourceLangInTranscription:
             call_kwargs = mock_transcribe.call_args.kwargs
             assert call_kwargs.get("language") == "en"
 
-    @pytest.mark.asyncio
-    async def test_transcribe_file_with_source_lang(self):
+    def test_transcribe_file_with_source_lang(self):
         """Test file transcription with source_lang parameter."""
+        import asyncio
+
         config = TranscriptionConfig(
             model_name="gemini-2.5-pro",
             gemini_api_key="test_key",
@@ -104,7 +106,7 @@ class TestSourceLangInTranscription:
         with patch.object(transcriber, "transcribe_file", new_callable=AsyncMock) as mock_transcribe_file:
             mock_transcribe_file.return_value = "Test transcription"
 
-            result = await transcriber.transcribe_file("/path/to/audio.mp3", language="zh")
+            result = asyncio.run(transcriber.transcribe_file("/path/to/audio.mp3", language="zh"))
             del result  # unused
 
             # Verify transcribe_file was called with language parameter

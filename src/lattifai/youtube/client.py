@@ -15,7 +15,8 @@ try:
 except ImportError:
     yt_dlp = None
 
-from ..config.caption import CAPTION_FORMATS
+from lattifai.caption.config import CAPTION_FORMATS
+
 from ..errors import LattifAIError
 from ..workflow.base import setup_workflow_logger
 from ..workflow.file_manager import TRANSCRIBE_CHOICE, FileExistenceManager
@@ -228,8 +229,8 @@ class YoutubeLoader:
         return "Unknown"
 
     def _find_best_format(self, formats: List[Dict]) -> Optional[Dict]:
-        # Prefer json3, then vtt
-        priority = ["json3", "vtt", "ttml", "srv3", "srv2", "srv1"]
+        # Prefer json3 (best precision), srv3 (word-level timing), then vtt
+        priority = ["json3", "srv3", "vtt", "ttml", "srv2", "srv1"]
 
         for fmt_ext in priority:
             for f in formats:
