@@ -34,65 +34,69 @@ classifiers = [
     'Topic :: Multimedia :: Video',
     'Topic :: Scientific/Engineering :: Artificial Intelligence',
 ]
+# Minimal base dependencies (no PyTorch, no heavy libs)
 dependencies = [
-    "lattifai[core]",
-    "lattifai[alignment]",
-    "lattifai[transcription]",
-    "lattifai[workflow]",
-    "lattifai[server]"
+    "lattifai-core>=0.6.0",
+    "lattifai-captions>=0.1.0",
+    "python-dotenv",
+    "colorful>=0.5.6",
 ]
 
 [project.optional-dependencies]
-# Core dependencies, previously in the main dependencies section
+# Core: k2, lattice operations, audio processing
 core = [
     "k2py>=0.2.1",
-    "lattifai-core>=0.6.0",
-    "lattifai-captions[splitting]>=0.1.0",  # Caption format handling + sentence splitting
+    "lattifai-captions[splitting]>=0.1.0",
     "lattifai-run>=1.0.1",
-    "python-dotenv",
     "msgpack",
     "scipy!=1.16.3",
     "av",
 ]
-# Minimal installation for alignment only (no PyTorch required)
+# Alignment: forced alignment with Lattice-1 (requires lhotse → torch)
 alignment = [
+    "lattifai[core]",
     "lhotse>=1.26.0",
-    "colorful>=0.5.6",
     "onnxruntime",
     "error-align-fix>=0.1.4",
 ]
-# G2P support for OOV words (requires PyTorch)
+# G2P: OOV word support (requires PyTorch models)
 alignment-g2p = [
     "lattifai[alignment]",
     "g2p-phonemizer>=0.4.0",
 ]
-# transcription & diarization
+# Transcription: ASR models + diarization
 transcription = [
-    # transcription
     "OmniSenseVoice>=0.4.2",
     "nemo_toolkit_asr[asr]>=2.7.0rc4",
     "google-genai>=1.22.0",
-    # diarization
-    "pyannote-audio-notorchdeps>=4.0.2"
+    "pyannote-audio-notorchdeps>=4.0.2",
 ]
-# workflow
+# Workflow: YouTube download, interactive prompts
 workflow = [
     "questionary>=2.0",
     "yt-dlp",
-    "pycryptodome"
+    "pycryptodome",
 ]
-# server
+# Server: FastAPI web service
 server = [
     "fastapi>=0.111.0",
     "uvicorn>=0.30.0",
     "python-multipart>=0.0.9",
-    "jinja2>=3.1.4"
+    "jinja2>=3.1.4",
 ]
-# development dependencies
+# Development
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
     "pytest-asyncio>=0.23.0",
+]
+# All: install everything
+all = [
+    "lattifai[core]",
+    "lattifai[alignment-g2p]",
+    "lattifai[transcription]",
+    "lattifai[workflow]",
+    "lattifai[server]",
 ]
 
 
