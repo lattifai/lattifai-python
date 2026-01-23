@@ -63,7 +63,7 @@ jobs:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          pip install -e ".[dev]"  # Install with test dependencies including pytest-asyncio
+          pip install -e ".[all,dev]"  # Install all features + test dependencies
           python tests/test_basic.py  # Run basic tests
           pytest tests/caption/test_text_parser.py -v
           pytest ./tests/streaming
