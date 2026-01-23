@@ -18,7 +18,6 @@ from lattifai.errors import (
     QuotaExceededError,
 )
 
-from .phonemizer import G2Phonemizer
 from .punctuation import PUNCTUATION, PUNCTUATION_SPACE
 from .text_align import TextAlignResult
 
@@ -174,13 +173,16 @@ class LatticeTokenizer:
         tokenizer.dictionaries = defaultdict(list, data["dictionaries"])
         tokenizer.oov_word = data["oov_word"]
 
+        # Lazy load G2P model only if it exists (avoids PyTorch dependency)
         g2pp_model_path = f"{model_path}/g2pp.bin" if Path(f"{model_path}/g2pp.bin").exists() else None
-        if g2pp_model_path:
-            tokenizer.g2p_model = G2Phonemizer(g2pp_model_path, device=device)
+        g2p_model_path = f"{model_path}/g2p.bin" if Path(f"{model_path}/g2p.bin").exists() else None
+        g2p_path = g2pp_model_path or g2p_model_path
+        if g2p_path:
+            from .phonemizer import G2Phonemizer
+
+            tokenizer.g2p_model = G2Phonemizer(g2p_path, device=device)
         else:
-            g2p_model_path = f"{model_path}/g2p.bin" if Path(f"{model_path}/g2p.bin").exists() else None
-            if g2p_model_path:
-                tokenizer.g2p_model = G2Phonemizer(g2p_model_path, device=device)
+            tokenizer.g2p_model = None
 
         tokenizer.device = device
         tokenizer.add_special_tokens()
