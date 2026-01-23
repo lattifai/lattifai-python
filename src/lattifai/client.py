@@ -7,7 +7,7 @@ import colorful
 from lattifai_core.client import SyncAPIClient
 from lhotse.utils import Pathlike
 
-from lattifai.alignment import Lattice1Aligner, Segmenter, align_supervisions_and_transcription
+from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.caption import Caption, InputCaptionFormat
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
@@ -126,6 +126,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 safe_print(colorful.cyan(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.supervisions and alignment_strategy == "transcription":
+                    from lattifai.alignment.text_align import align_supervisions_and_transcription
+
                     if "gemini" in self.transcriber.name.lower():
                         raise ValueError(
                             f"Transcription-based alignment is not supported for {self.transcriber.name} "

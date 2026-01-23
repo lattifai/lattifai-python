@@ -36,8 +36,6 @@ classifiers = [
 ]
 # Minimal base dependencies (no PyTorch, no heavy libs)
 dependencies = [
-    "lattifai-core>=0.6.0",
-    "lattifai-captions>=0.1.0",
     "python-dotenv",
     "colorful>=0.5.6",
 ]
@@ -45,24 +43,24 @@ dependencies = [
 [project.optional-dependencies]
 # Core: k2, lattice operations, audio processing
 core = [
-    "k2py>=0.2.1",
-    "lattifai-captions[splitting]>=0.1.0",
-    "lattifai-run>=1.0.1",
-    "msgpack",
+    "lattifai-core>=0.6.0",
     "scipy!=1.16.3",
-    "av",
 ]
 # Alignment: forced alignment with Lattice-1 (requires lhotse → torch)
-alignment = [
+alignment-flash = [
     "lattifai[core]",
+    "lattifai-captions[splitting]>=0.1.0",
     "lhotse>=1.26.0",
+    "k2py>=0.2.1",
     "onnxruntime",
-    "error-align-fix>=0.1.4",
+    "av",
+    "msgpack",
 ]
-# G2P: OOV word support (requires PyTorch models)
-alignment-g2p = [
-    "lattifai[alignment]",
+# +G2P: OOV word support
+alignment = [
+    "lattifai[alignment-flash]",
     "g2p-phonemizer>=0.4.0",
+    "error-align-fix>=0.1.4",
 ]
 # Transcription: ASR models + diarization
 transcription = [
@@ -72,17 +70,10 @@ transcription = [
     "pyannote-audio-notorchdeps>=4.0.2",
 ]
 # Workflow: YouTube download, interactive prompts
-workflow = [
+youtube = [
     "questionary>=2.0",
     "yt-dlp",
     "pycryptodome",
-]
-# Server: FastAPI web service
-server = [
-    "fastapi>=0.111.0",
-    "uvicorn>=0.30.0",
-    "python-multipart>=0.0.9",
-    "jinja2>=3.1.4",
 ]
 # Development
 dev = [
@@ -92,11 +83,10 @@ dev = [
 ]
 # All: install everything
 all = [
-    "lattifai[core]",
-    "lattifai[alignment-g2p]",
+    "lattifai-run>=1.0.1",
+    "lattifai[alignment]",
     "lattifai[transcription]",
-    "lattifai[workflow]",
-    "lattifai[server]",
+    "lattifai[youtube]",
 ]
 
 

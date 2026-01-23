@@ -84,17 +84,14 @@ uv run lai alignment align audio.wav caption.srt output.srt
 ### Using pip
 
 ```bash
-# Minimal install (no PyTorch)
-pip install lattifai
+# Install everything
+pip install lattifai[all]
 
 # Install with alignment support
 pip install lattifai[alignment]
 
 # Install with transcription support
 pip install lattifai[transcription]
-
-# Install everything
-pip install lattifai[all]
 ```
 
 ### API Keys
