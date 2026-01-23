@@ -162,168 +162,132 @@ class AudioLoader:
         sampling_rate: int,
         channel_selector: Optional[ChannelSelectorType],
     ) -> np.ndarray:
-        """Load audio from file or binary stream and resample to target rate.
+        """Load audio from file or binary stream and resample to target rate."""
+        audio_source: Union[str, BinaryIO] = audio
+        audio_path: Optional[Path] = None
 
-        Args:
-            audio: Path to audio file or binary stream.
-            sampling_rate: Target sampling rate.
-            channel_selector: How to select channels.
-
-        Returns:
-            Resampled audio as a NumPy array of shape (channels, samples).
-
-        Raises:
-            ImportError: If PyAV is needed but not installed.
-            ValueError: If no audio stream found.
-            RuntimeError: If audio loading fails.
-        """
         if isinstance(audio, Pathlike):
-            audio = str(Path(str(audio)).expanduser())
+            audio_path = Path(str(audio)).expanduser()
+            audio_source = str(audio_path)
 
-        # load audio in chunks to reduce memory footprint for long files
+        if audio_path and audio_path.suffix.lower() == ".mp4":
+            return self._load_audio_with_av(audio_source, sampling_rate, channel_selector)
+
         try:
-            # First check file duration to decide loading strategy
-            info = sf.info(audio)
-            duration = info.duration
-
-            # For very long audio (>60 minutes), use chunk-based loading
-            if duration > 3600:  # 60 minutes
-                with sf.SoundFile(audio, "r") as f:
-                    sample_rate = f.samplerate
-                    total_frames = f.frames
-
-                    # Pre-calculate output size to avoid list accumulation
-                    num_channels = 1 if channel_selector else f.channels
-                    expected_output_samples = int(total_frames * sampling_rate / sample_rate)
-
-                    # Pre-allocate output array
-                    waveform = np.zeros((num_channels, expected_output_samples), dtype=np.float32)
-
-                    # Use source sample rate for reading, not target
-                    chunk_frames = int(sample_rate * 1800)  # 30-minute chunks at source rate
-                    output_offset = 0
-
-                    while True:
-                        chunk = f.read(frames=chunk_frames, dtype="float32", always_2d=True)
-                        if chunk.size == 0:
-                            break
-
-                        # Resample chunk -> (channels, samples)
-                        resampled_chunk = self._resample_audio(
-                            (chunk, sample_rate),
-                            sampling_rate,
-                            device=self.device,
-                            channel_selector=channel_selector,
-                        )
-
-                        # Write directly to pre-allocated array
-                        chunk_length = resampled_chunk.shape[-1]
-                        waveform[..., output_offset : output_offset + chunk_length] = resampled_chunk
-                        output_offset += chunk_length
-
-                        # Clean up immediately
-                        del chunk, resampled_chunk
-
-                    # Trim to actual size if needed (due to rounding in resampling)
-                    if output_offset < expected_output_samples:
-                        waveform = waveform[..., :output_offset]
-
-                return waveform
-            else:
-                # For shorter audio, use standard loading
-                waveform, sample_rate = sf.read(audio, always_2d=True, dtype="float32")
-                # Resample and return directly to avoid double processing
-                result = self._resample_audio(
-                    (waveform, sample_rate),
-                    sampling_rate,
-                    device=self.device,
-                    channel_selector=channel_selector,
-                )
-                del waveform
-                return result
+            return self._load_audio_with_soundfile(audio_source, sampling_rate, channel_selector)
         except Exception as primary_error:
             print(f"Primary error with soundfile: {primary_error}")
-            # Fallback to PyAV for formats not supported by soundfile
-            try:
-                import av
-            except ImportError:
-                raise AudioLoadError(
-                    "PyAV (av) is required for loading certain audio formats. "
-                    f"Install it with: pip install av\n"
-                    f"Primary error was: {primary_error}"
-                )
+            return self._load_audio_with_av(audio_source, sampling_rate, channel_selector, primary_error)
 
-            try:
-                container = av.open(audio)
-                audio_stream = next((s for s in container.streams if s.type == "audio"), None)
+    def _load_audio_with_soundfile(
+        self,
+        audio: Union[str, BinaryIO],
+        sampling_rate: int,
+        channel_selector: Optional[ChannelSelectorType],
+    ) -> np.ndarray:
+        """Load audio via soundfile with chunking support for long inputs."""
+        info = sf.info(audio)
+        duration = info.duration
 
-                if audio_stream is None:
-                    raise ValueError(f"No audio stream found in file: {audio}")
+        if duration > 3600:
+            with sf.SoundFile(audio, "r") as f:
+                sample_rate = f.samplerate
+                total_frames = f.frames
 
-                audio_stream.codec_context.format = av.AudioFormat("flt")  # 32-bit float
-                sample_rate = audio_stream.codec_context.sample_rate
+                num_channels = 1 if channel_selector else f.channels
+                expected_output_samples = int(total_frames * sampling_rate / sample_rate)
+                waveform = np.zeros((num_channels, expected_output_samples), dtype=np.float32)
 
-                # Estimate duration to decide processing strategy
-                duration_estimate = None
-                if audio_stream.duration and audio_stream.time_base:
-                    duration_estimate = float(audio_stream.duration * audio_stream.time_base)
-                else:
-                    print(f"WARNING: Failed to estimate duration for audio: {audio}")
+                chunk_frames = int(sample_rate * 1800)
+                output_offset = 0
 
-                # For very long audio (>30 minutes), process and resample in chunks
-                if duration_estimate and duration_estimate > 1800:
-                    # Estimate output size and pre-allocate with buffer
-                    num_channels = 1 if channel_selector else audio_stream.codec_context.channels
-                    estimated_samples = int(duration_estimate * sampling_rate * 1.1)  # 10% buffer
-                    waveform = np.zeros((num_channels, estimated_samples), dtype=np.float32)
+                while True:
+                    chunk = f.read(frames=chunk_frames, dtype="float32", always_2d=True)
+                    if chunk.size == 0:
+                        break
 
-                    frames = []
-                    accumulated_samples = 0
-                    output_offset = 0
-                    chunk_sample_target = int(sample_rate * 600)  # 10 minutes at original rate
+                    resampled_chunk = self._resample_audio(
+                        (chunk, sample_rate),
+                        sampling_rate,
+                        device=self.device,
+                        channel_selector=channel_selector,
+                    )
 
-                    for frame in container.decode(audio_stream):
-                        array = frame.to_ndarray()
+                    chunk_length = resampled_chunk.shape[-1]
+                    waveform[..., output_offset : output_offset + chunk_length] = resampled_chunk
+                    output_offset += chunk_length
 
-                        # Ensure shape is (samples, channels)
-                        if array.ndim == 1:
-                            array = array.reshape(-1, 1)
-                        elif array.ndim == 2 and array.shape[0] < array.shape[1]:
-                            array = array.T
+                    del chunk, resampled_chunk
 
-                        frames.append(array)
-                        accumulated_samples += array.shape[0]
+                if output_offset < expected_output_samples:
+                    waveform = waveform[..., :output_offset]
 
-                        # Process chunk when accumulated enough samples
-                        if accumulated_samples >= chunk_sample_target:
-                            chunk = np.concatenate(frames, axis=0).astype(np.float32)
-                            del frames  # Free frames list before resampling
-                            # Resample chunk -> (channels, samples)
-                            resampled_chunk = self._resample_audio(
-                                (chunk, sample_rate),
-                                sampling_rate,
-                                device=self.device,
-                                channel_selector=channel_selector,
-                            )
+            return waveform
 
-                            chunk_length = resampled_chunk.shape[-1]
-                            if output_offset + chunk_length > waveform.shape[-1]:
-                                print(
-                                    f"WARNING: Trimming resampled chunk from {chunk_length} to {waveform.shape[-1] - output_offset} samples to fit waveform buffer for audio: {audio}"  # noqa: E501
-                                )
-                                resampled_chunk = resampled_chunk[:, : waveform.shape[-1] - output_offset]
+        waveform, sample_rate = sf.read(audio, always_2d=True, dtype="float32")
+        result = self._resample_audio(
+            (waveform, sample_rate),
+            sampling_rate,
+            device=self.device,
+            channel_selector=channel_selector,
+        )
+        del waveform
+        return result
 
-                            # Write directly to array
-                            waveform[..., output_offset : output_offset + chunk_length] = resampled_chunk
-                            output_offset += chunk_length
+    def _load_audio_with_av(
+        self,
+        audio: Union[str, BinaryIO],
+        sampling_rate: int,
+        channel_selector: Optional[ChannelSelectorType],
+        primary_error: Optional[Exception] = None,
+    ) -> np.ndarray:
+        """Load audio via PyAV when soundfile is unavailable or unsuitable."""
+        try:
+            import av
+        except ImportError as exc:  # pragma: no cover
+            message = "PyAV (av) is required for loading certain audio formats. Install it with: pip install av"
+            if primary_error:
+                message = f"{message}\nPrimary error was: {primary_error}"
+            raise AudioLoadError(message) from exc
 
-                            # Clean up immediately
-                            del chunk, resampled_chunk
-                            frames = []  # Create new list
-                            accumulated_samples = 0
+        try:
+            container = av.open(audio)
+            audio_stream = next((s for s in container.streams if s.type == "audio"), None)
 
-                    # Process remaining frames
-                    if frames:
+            if audio_stream is None:
+                raise ValueError(f"No audio stream found in file: {audio}")
+
+            audio_stream.codec_context.format = av.AudioFormat("flt")
+            sample_rate = audio_stream.codec_context.sample_rate
+
+            duration_estimate = None
+            if audio_stream.duration and audio_stream.time_base:
+                duration_estimate = float(audio_stream.duration * audio_stream.time_base)
+            else:
+                print(f"WARNING: Failed to estimate duration for audio: {audio}")
+
+            if duration_estimate and duration_estimate > 1800:
+                num_channels = 1 if channel_selector else audio_stream.codec_context.channels
+                estimated_samples = int(duration_estimate * sampling_rate * 1.1)
+                waveform = np.zeros((num_channels, estimated_samples), dtype=np.float32)
+
+                frames = []
+                accumulated_samples = 0
+                output_offset = 0
+                chunk_sample_target = int(sample_rate * 600)
+
+                for frame in container.decode(audio_stream):
+                    array = frame.to_ndarray()
+
+                    if array.ndim == 1:
+                        array = array.reshape(-1, 1)
+                    elif array.ndim == 2 and array.shape[0] < array.shape[1]:
+                        array = array.T
+
+                    frames.append(array)
+                    accumulated_samples += array.shape[0]
+
+                    if accumulated_samples >= chunk_sample_target:
                         chunk = np.concatenate(frames, axis=0).astype(np.float32)
                         del frames
                         resampled_chunk = self._resample_audio(
@@ -335,53 +299,68 @@ class AudioLoader:
 
                         chunk_length = resampled_chunk.shape[-1]
                         if output_offset + chunk_length > waveform.shape[-1]:
-                            print(
-                                f"WARNING: Trimming resampled chunk from {chunk_length} to {waveform.shape[-1] - output_offset} samples to fit waveform buffer for audio: {audio}"  # noqa: E501
-                            )
+                            print("WARNING: Trimming resampled chunk to fit waveform buffer for audio: " f"{audio}")
                             resampled_chunk = resampled_chunk[:, : waveform.shape[-1] - output_offset]
 
                         waveform[..., output_offset : output_offset + chunk_length] = resampled_chunk
                         output_offset += chunk_length
+
                         del chunk, resampled_chunk
+                        frames = []
+                        accumulated_samples = 0
 
-                    container.close()
-
-                    if output_offset == 0:
-                        raise ValueError(f"No audio data found in file: {audio}")
-
-                    # Trim to actual size
-                    waveform = waveform[..., :output_offset]
-                    return waveform
-                else:
-                    # For shorter audio, process in batches to reduce memory
-                    frames = []
-                    for frame in container.decode(audio_stream):
-                        array = frame.to_ndarray()
-                        # Ensure shape is (channels, samples)
-                        if array.ndim == 1:
-                            array = array.reshape(-1, 1)
-                        elif array.ndim == 2 and array.shape[0] < array.shape[1]:
-                            array = array.T
-                        frames.append(array)
-                    container.close()
-
-                    if not frames:
-                        raise ValueError(f"No audio data found in file: {audio}")
-
-                    # Concatenate remaining frames
-                    waveform = np.concatenate(frames, axis=0).astype(np.float32)
+                if frames:
+                    chunk = np.concatenate(frames, axis=0).astype(np.float32)
                     del frames
-                    # Resample and return directly
-                    result = self._resample_audio(
-                        (waveform, sample_rate),
+                    resampled_chunk = self._resample_audio(
+                        (chunk, sample_rate),
                         sampling_rate,
                         device=self.device,
                         channel_selector=channel_selector,
                     )
-                    del waveform
-                    return result
-            except Exception as e:
-                raise RuntimeError(f"Failed to load audio file {audio}: {e}")
+
+                    chunk_length = resampled_chunk.shape[-1]
+                    if output_offset + chunk_length > waveform.shape[-1]:
+                        print("WARNING: Trimming resampled chunk to fit waveform buffer for audio: " f"{audio}")
+                        resampled_chunk = resampled_chunk[:, : waveform.shape[-1] - output_offset]
+
+                    waveform[..., output_offset : output_offset + chunk_length] = resampled_chunk
+                    output_offset += chunk_length
+                    del chunk, resampled_chunk
+
+                container.close()
+
+                if output_offset == 0:
+                    raise ValueError(f"No audio data found in file: {audio}")
+
+                waveform = waveform[..., :output_offset]
+                return waveform
+
+            frames = []
+            for frame in container.decode(audio_stream):
+                array = frame.to_ndarray()
+                if array.ndim == 1:
+                    array = array.reshape(-1, 1)
+                elif array.ndim == 2 and array.shape[0] < array.shape[1]:
+                    array = array.T
+                frames.append(array)
+            container.close()
+
+            if not frames:
+                raise ValueError(f"No audio data found in file: {audio}")
+
+            waveform = np.concatenate(frames, axis=0).astype(np.float32)
+            del frames
+            result = self._resample_audio(
+                (waveform, sample_rate),
+                sampling_rate,
+                device=self.device,
+                channel_selector=channel_selector,
+            )
+            del waveform
+            return result
+        except Exception as exc:
+            raise RuntimeError(f"Failed to load audio file {audio}: {exc}")
 
     def __call__(
         self,
