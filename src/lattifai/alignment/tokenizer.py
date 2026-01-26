@@ -248,9 +248,21 @@ class LatticeTokenizer:
         self.init_sentence_splitter()
         return self.sentence_splitter.split_sentences(supervisions, strip_whitespace=strip_whitespace)
 
+    def _get_client_info(self) -> Dict[str, Optional[str]]:
+        """Get client identification info for usage tracking."""
+        client_name = None
+        client_version = None
+        if hasattr(self.client_wrapper, "get_client_name"):
+            client_name = self.client_wrapper.get_client_name()
+        if hasattr(self.client_wrapper, "get_client_version"):
+            client_version = self.client_wrapper.get_client_version()
+        return {"client_name": client_name, "client_version": client_version}
+
     def tokenize(
         self, supervisions: Union[List[Supervision], TextAlignResult], split_sentence: bool = False, boost: float = 0.0
     ) -> Tuple[str, Dict[str, Any]]:
+        client_info = self._get_client_info()
+
         if isinstance(supervisions[0], Supervision):
             if split_sentence:
                 supervisions = self.split_sentences(supervisions)
@@ -262,6 +274,7 @@ class LatticeTokenizer:
                     "model_name": self.model_name,
                     "supervisions": [s.to_dict() for s in supervisions],
                     "pronunciation_dictionaries": pronunciation_dictionaries,
+                    **client_info,
                 },
             )
         else:
@@ -276,6 +289,7 @@ class LatticeTokenizer:
                     "transcription": [s.to_dict() for s in supervisions[1]],
                     "pronunciation_dictionaries": pronunciation_dictionaries,
                     "boost": boost,
+                    **client_info,
                 },
             )
 
