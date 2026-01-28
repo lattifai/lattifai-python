@@ -170,7 +170,7 @@ class AudioLoader:
             audio_path = Path(str(audio)).expanduser()
             audio_source = str(audio_path)
 
-        if audio_path and audio_path.suffix.lower() == ".mp4":
+        if audio_path and audio_path.suffix.lower() in [".mp4", ".m4a", ".aac", ".mov", ".webm", ".avi", ".mkv"]:
             return self._load_audio_with_av(audio_source, sampling_rate, channel_selector)
 
         try:
