@@ -310,9 +310,8 @@ class GeminiTranscriber(BaseTranscriber):
                 system_instruction=self._get_transcription_prompt(),
                 response_modalities=["TEXT"],
                 thinking_config=ThinkingConfig(
-                    include_thoughts=False,
+                    include_thoughts=self.config.include_thoughts,
                     thinking_budget=-1,
-                    # thinking_level="high",  # "low", "medium"
                 ),
             )
         return self._generation_config

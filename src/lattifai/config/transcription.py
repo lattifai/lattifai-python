@@ -53,6 +53,9 @@ class TranscriptionConfig:
     If the value is an existing file path, the file contents will be used.
     Otherwise, the value is used directly as the prompt text."""
 
+    include_thoughts: bool = False
+    """Include Gemini's thinking process in the output (Gemini models only)."""
+
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
 
