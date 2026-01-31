@@ -429,6 +429,20 @@ class GeminiTranscriber(BaseTranscriber):
             if hasattr(candidate, "avg_logprobs") and candidate.avg_logprobs is not None:
                 lines.append(f"avg_logprobs: {candidate.avg_logprobs:.4f}")
 
+            # Citation metadata
+            if hasattr(candidate, "citation_metadata") and candidate.citation_metadata:
+                citations = getattr(candidate.citation_metadata, "citations", [])
+                if citations:
+                    lines.append("citations:")
+                    for cite in citations:
+                        uri = getattr(cite, "uri", "")
+                        start = getattr(cite, "start_index", "")
+                        end = getattr(cite, "end_index", "")
+                        if uri:
+                            lines.append(f"  - uri: {uri}")
+                            if start or end:
+                                lines.append(f"    range: [{start}, {end}]")
+
         return lines
 
     def write(
