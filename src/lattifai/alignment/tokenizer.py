@@ -6,10 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 
-# from lattifai.caption import Supervision
-from lhotse.supervision import SupervisionSegment as Supervision  # NOTE: Transcriber SupervisionSegment
-
-from lattifai.caption import SentenceSplitter
+from lattifai.caption import SentenceSplitter, Supervision
 from lattifai.caption import normalize_text as normalize_html_text
 from lattifai.errors import (
     LATTICE_DECODING_FAILURE_HELP,
