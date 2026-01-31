@@ -341,15 +341,49 @@ class GeminiTranscriber(BaseTranscriber):
             ),
         )
 
-        if not response.text:
-            raise RuntimeError("Empty response from Gemini API")
-
-        transcript = response.text.strip()
+        # Extract content based on include_thoughts setting
+        if self.config.include_thoughts:
+            transcript = self._extract_with_thoughts(response)
+        else:
+            if not response.text:
+                raise RuntimeError("Empty response from Gemini API")
+            transcript = response.text.strip()
 
         if self.config.verbose:
             self.logger.info(f"✅ Transcription completed ({source}): {len(transcript)} characters")
 
         return transcript
+
+    def _extract_with_thoughts(self, response) -> str:
+        """Extract response content including thinking process."""
+        parts = []
+        thoughts = []
+        text_parts = []
+
+        # Iterate through all parts in the response
+        for candidate in response.candidates:
+            for part in candidate.content.parts:
+                if hasattr(part, "thought") and part.thought:
+                    # This is a thinking part
+                    if hasattr(part, "text") and part.text:
+                        thoughts.append(part.text)
+                elif hasattr(part, "text") and part.text:
+                    # This is a regular text part
+                    text_parts.append(part.text)
+
+        # Format output with thoughts section if present
+        if thoughts:
+            parts.append("<thinking>")
+            parts.extend(thoughts)
+            parts.append("</thinking>\n")
+
+        parts.extend(text_parts)
+
+        result = "\n".join(parts).strip()
+        if not result:
+            raise RuntimeError("Empty response from Gemini API")
+
+        return result
 
     def write(
         self, transcript: str, output_file: Path, encoding: str = "utf-8", cache_audio_events: bool = True
