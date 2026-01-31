@@ -115,16 +115,11 @@ def align(
     if output_caption:
         caption_config.set_output_path(output_caption)
 
-    # Pass media description to transcription config if available
-    transcription_config = transcription or TranscriptionConfig()
-    if media_config.description and not transcription_config.description:
-        transcription_config.description = media_config.description
-
     client = LattifAI(
         client_config=client,
         alignment_config=alignment,
         caption_config=caption_config,
-        transcription_config=transcription_config,
+        transcription_config=transcription,
         diarization_config=diarization,
     )
 
