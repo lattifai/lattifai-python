@@ -245,13 +245,32 @@ class GeminiTranscriber(BaseTranscriber):
         return transcript
 
     def _get_transcription_prompt(self) -> str:
-        """Get (and cache) transcription system prompt from prompts module."""
+        """Get (and cache) transcription system prompt.
+
+        Priority:
+        1. Custom prompt from config.prompt (file path or text)
+        2. Default prompt from prompts/gemini/transcription_gem.txt
+        """
         if self._system_prompt is not None:
             return self._system_prompt
 
-        # Load prompt from prompts/gemini/transcription_gem.txt
-        prompt_loader = get_prompt_loader()
-        base_prompt = prompt_loader.get_gemini_transcription_prompt()
+        # Check for custom prompt
+        if self.config.prompt:
+            prompt_path = Path(self.config.prompt)
+            if prompt_path.exists() and prompt_path.is_file():
+                # Load from file
+                base_prompt = prompt_path.read_text(encoding="utf-8").strip()
+                if self.config.verbose:
+                    self.logger.info(f"📝 Using custom prompt from file: {prompt_path}")
+            else:
+                # Use as direct text
+                base_prompt = self.config.prompt
+                if self.config.verbose:
+                    self.logger.info("📝 Using custom prompt text")
+        else:
+            # Load default prompt from prompts/gemini/transcription_gem.txt
+            prompt_loader = get_prompt_loader()
+            base_prompt = prompt_loader.get_gemini_transcription_prompt()
 
         # Add language-specific instruction if configured
         if self.config.language:

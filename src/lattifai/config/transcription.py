@@ -48,6 +48,11 @@ class TranscriptionConfig:
     language: Optional[str] = None
     """Target language code for transcription (e.g., 'en', 'zh', 'ja')."""
 
+    prompt: Optional[str] = None
+    """Custom prompt text or path to prompt file for transcription.
+    If the value is an existing file path, the file contents will be used.
+    Otherwise, the value is used directly as the prompt text."""
+
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
 
