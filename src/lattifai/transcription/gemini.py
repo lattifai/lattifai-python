@@ -276,6 +276,10 @@ class GeminiTranscriber(BaseTranscriber):
         if self.config.language:
             base_prompt += f"\n\n* Use {self.config.language} language for transcription."
 
+        # Add media description context if available
+        if self.config.description:
+            base_prompt += f"\n\n## Media Context\n\n{self.config.description}"
+
         self._system_prompt = base_prompt
         return self._system_prompt
 

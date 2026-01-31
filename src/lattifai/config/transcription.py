@@ -53,6 +53,10 @@ class TranscriptionConfig:
     If the value is an existing file path, the file contents will be used.
     Otherwise, the value is used directly as the prompt text."""
 
+    description: Optional[str] = None
+    """Media description from platforms like YouTube, Xiaoyuzhou (小宇宙), etc.
+    Used to provide context for transcription."""
+
     include_thoughts: bool = False
     """Include Gemini's thinking process in the output (Gemini models only)."""
 

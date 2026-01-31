@@ -92,9 +92,9 @@ def transcribe(
     client_wrapper = SyncAPIClient(config=client_config)
     transcription_config.client_wrapper = client_wrapper
 
-    # Initialize client wrapper to properly set client_wrapper
-    client_wrapper = SyncAPIClient(config=client_config)
-    transcription_config.client_wrapper = client_wrapper
+    # Pass media description to transcription config if available
+    if media_config.description and not transcription_config.description:
+        transcription_config.description = media_config.description
 
     # Validate input is required
     if not input and not media_config.input_path:

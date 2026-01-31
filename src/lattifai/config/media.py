@@ -46,6 +46,10 @@ class MediaConfig:
     input_path: Optional[str] = None
     """Local file path or URL to audio/video content."""
 
+    description: Optional[str] = None
+    """Media description from platforms like YouTube, Xiaoyuzhou (小宇宙), etc.
+    This metadata can be used by transcription and alignment modules for context."""
+
     media_format: str = "auto"
     """Media format (mp3, wav, mp4, etc.) or 'auto' for automatic detection."""
 
