@@ -359,8 +359,8 @@ class GeminiTranscriber(BaseTranscriber):
         return transcript
 
     def _extract_with_thoughts(self, response) -> str:
-        """Extract response content including thinking process."""
-        parts = []
+        """Extract response content including thinking process and metadata."""
+        output_parts = []
         thoughts = []
         text_parts = []
 
@@ -375,19 +375,61 @@ class GeminiTranscriber(BaseTranscriber):
                     # This is a regular text part
                     text_parts.append(part.text)
 
+        # Extract metadata
+        metadata_lines = self._extract_response_metadata(response)
+        if metadata_lines:
+            output_parts.append("---")
+            output_parts.extend(metadata_lines)
+            output_parts.append("---\n")
+
         # Format output with thoughts section if present
         if thoughts:
-            parts.append("<thinking>")
-            parts.extend(thoughts)
-            parts.append("</thinking>\n")
+            output_parts.append("<thinking>")
+            output_parts.extend(thoughts)
+            output_parts.append("</thinking>\n")
 
-        parts.extend(text_parts)
+        output_parts.extend(text_parts)
 
-        result = "\n".join(parts).strip()
+        result = "\n".join(output_parts).strip()
         if not result:
             raise RuntimeError("Empty response from Gemini API")
 
         return result
+
+    def _extract_response_metadata(self, response) -> list:
+        """Extract useful metadata from Gemini response as YAML frontmatter."""
+        lines = []
+
+        # Model version
+        if hasattr(response, "model_version") and response.model_version:
+            lines.append(f"model_version: {response.model_version}")
+
+        # Usage metadata (token counts)
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            usage = response.usage_metadata
+            if hasattr(usage, "prompt_token_count"):
+                lines.append(f"prompt_tokens: {usage.prompt_token_count}")
+            if hasattr(usage, "candidates_token_count"):
+                lines.append(f"output_tokens: {usage.candidates_token_count}")
+            if hasattr(usage, "total_token_count"):
+                lines.append(f"total_tokens: {usage.total_token_count}")
+            # Thinking tokens if available
+            if hasattr(usage, "thoughts_token_count") and usage.thoughts_token_count:
+                lines.append(f"thinking_tokens: {usage.thoughts_token_count}")
+
+        # Candidate-level metadata
+        if response.candidates:
+            candidate = response.candidates[0]
+
+            # Finish reason
+            if hasattr(candidate, "finish_reason") and candidate.finish_reason:
+                lines.append(f"finish_reason: {candidate.finish_reason}")
+
+            # Average log probability (confidence indicator)
+            if hasattr(candidate, "avg_logprobs") and candidate.avg_logprobs is not None:
+                lines.append(f"avg_logprobs: {candidate.avg_logprobs:.4f}")
+
+        return lines
 
     def write(
         self, transcript: str, output_file: Path, encoding: str = "utf-8", cache_audio_events: bool = True
