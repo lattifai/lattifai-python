@@ -60,6 +60,15 @@ class TranscriptionConfig:
     include_thoughts: bool = False
     """Include Gemini's thinking process in the output (Gemini models only)."""
 
+    temperature: Optional[float] = None
+    """Sampling temperature for generation. Higher values increase randomness."""
+
+    top_k: Optional[float] = None
+    """Top-k sampling parameter. Limits token selection to top k candidates."""
+
+    top_p: Optional[float] = None
+    """Nucleus sampling parameter. Limits token selection by cumulative probability."""
+
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
 

@@ -317,6 +317,9 @@ class GeminiTranscriber(BaseTranscriber):
                     include_thoughts=self.config.include_thoughts,
                     thinking_budget=-1,
                 ),
+                temperature=self.config.temperature,
+                top_k=self.config.top_k,
+                top_p=self.config.top_p,
             )
         return self._generation_config
 
