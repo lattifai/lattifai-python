@@ -310,13 +310,18 @@ class GeminiTranscriber(BaseTranscriber):
     def _get_generation_config(self) -> GenerateContentConfig:
         """Lazily build the generation config since it rarely changes."""
         if self._generation_config is None:
+            # Only include thinking_config if thinking mode is enabled
+            thinking_config = None
+            if self.config.thinking:
+                thinking_config = ThinkingConfig(
+                    include_thoughts=self.config.include_thoughts,
+                    thinking_budget=-1,
+                )
+
             self._generation_config = GenerateContentConfig(
                 system_instruction=self._get_transcription_prompt(),
                 response_modalities=["TEXT"],
-                thinking_config=ThinkingConfig(
-                    include_thoughts=self.config.include_thoughts,
-                    thinking_budget=-1,
-                ),
+                thinking_config=thinking_config,
                 temperature=self.config.temperature,
                 top_k=self.config.top_k,
                 top_p=self.config.top_p,

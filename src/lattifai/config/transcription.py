@@ -57,8 +57,11 @@ class TranscriptionConfig:
     """Media description from platforms like YouTube, Xiaoyuzhou (小宇宙), etc.
     Used to provide context for transcription."""
 
+    thinking: bool = True
+    """Enable Gemini's thinking mode (Gemini models only). Set to False to disable thinking."""
+
     include_thoughts: bool = False
-    """Include Gemini's thinking process in the output (Gemini models only)."""
+    """Include Gemini's thinking process in the output (Gemini models only). Requires thinking=True."""
 
     temperature: Optional[float] = None
     """Sampling temperature for generation. Higher values increase randomness."""
