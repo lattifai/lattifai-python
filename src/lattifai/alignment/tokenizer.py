@@ -246,7 +246,11 @@ class LatticeTokenizer:
         return self.sentence_splitter.split_sentences(supervisions, strip_whitespace=strip_whitespace)
 
     def tokenize(
-        self, supervisions: Union[List[Supervision], TextAlignResult], split_sentence: bool = False, boost: float = 0.0
+        self,
+        supervisions: Union[List[Supervision], TextAlignResult],
+        split_sentence: bool = False,
+        boost: float = 0.0,
+        transition_penalty: float = 0.0,
     ) -> Tuple[str, Dict[str, Any]]:
         if isinstance(supervisions[0], Supervision):
             if split_sentence:
@@ -259,6 +263,7 @@ class LatticeTokenizer:
                     "model_name": self.model_name,
                     "supervisions": [s.to_dict() for s in supervisions],
                     "pronunciation_dictionaries": pronunciation_dictionaries,
+                    "transition_penalty": transition_penalty,
                 },
             )
         else:
@@ -273,6 +278,7 @@ class LatticeTokenizer:
                     "transcription": [s.to_dict() for s in supervisions[1]],
                     "pronunciation_dictionaries": pronunciation_dictionaries,
                     "boost": boost,
+                    "transition_penalty": transition_penalty,
                 },
             )
 

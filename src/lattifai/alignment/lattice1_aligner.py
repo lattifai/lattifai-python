@@ -118,7 +118,10 @@ class Lattice1Aligner(object):
             safe_print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
         try:
             supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
-                supervisions, split_sentence=split_sentence, boost=self.config.boost
+                supervisions,
+                split_sentence=split_sentence,
+                boost=self.config.boost,
+                transition_penalty=self.config.transition_penalty,
             )
             if verbose:
                 safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
