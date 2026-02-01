@@ -9,8 +9,9 @@ from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
-from lattifai.caption import Caption, InputCaptionFormat
+from lattifai.caption import InputCaptionFormat
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
+from lattifai.data import Caption
 from lattifai.errors import (
     AlignmentError,
     CaptionProcessingError,

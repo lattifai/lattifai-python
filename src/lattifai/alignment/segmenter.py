@@ -5,8 +5,9 @@ from typing import List, Optional, Tuple
 import colorful
 
 from lattifai.audio2 import AudioData
-from lattifai.caption import Caption, Supervision
+from lattifai.caption import Supervision
 from lattifai.config import AlignmentConfig
+from lattifai.data import Caption
 from lattifai.utils import safe_print
 
 from .punctuation import END_PUNCTUATION

@@ -8,7 +8,7 @@ import colorful
 from lhotse.utils import Pathlike
 
 from lattifai.audio2 import AudioData
-from lattifai.caption import Caption
+from lattifai.data import Caption
 from lattifai.errors import CaptionProcessingError
 from lattifai.utils import safe_print
 

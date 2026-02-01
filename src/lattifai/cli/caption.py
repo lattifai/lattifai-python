@@ -68,7 +68,7 @@ def convert(
             input_path=input.srt \\
             output_path=output.TextGrid
     """
-    from lattifai.caption import Caption
+    from lattifai.data import Caption
 
     # Create karaoke_config if karaoke flag is set
     karaoke_config = KaraokeConfig(enabled=True) if karaoke else None
@@ -121,7 +121,7 @@ def normalize(
     """
     from pathlib import Path
 
-    from lattifai.caption import Caption
+    from lattifai.data import Caption
 
     input_path = Path(input_path).expanduser()
     output_path = Path(output_path).expanduser()
@@ -176,7 +176,7 @@ def shift(
     """
     from pathlib import Path
 
-    from lattifai.caption import Caption
+    from lattifai.data import Caption
 
     input_path = Path(input_path).expanduser()
     output_path = Path(output_path).expanduser()
@@ -236,7 +236,8 @@ def diff(
     from pathlib import Path
 
     from lattifai.alignment.text_align import align_supervisions_and_transcription
-    from lattifai.caption import Caption, SentenceSplitter
+    from lattifai.caption import SentenceSplitter
+    from lattifai.data import Caption
 
     ref_path = Path(ref_path).expanduser()
     hyp_path = Path(hyp_path).expanduser()

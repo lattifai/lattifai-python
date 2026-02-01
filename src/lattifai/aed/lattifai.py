@@ -10,7 +10,7 @@ from lattifai.logging import get_logger
 if TYPE_CHECKING:
     from lattifai_core.event import LEDOutput
 
-    from lattifai.caption import Caption
+    from lattifai.data import Caption
 
 
 formatter = "%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s"

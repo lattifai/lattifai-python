@@ -1,8 +1,11 @@
 import json
+import os
 import time
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import colorful
 import numpy as np
@@ -191,6 +194,7 @@ class Lattice1Worker:
                 float(output_beam),
                 int(min_active_states),
                 int(max_active_states),
+                allow_partial=False,
             )
 
             # Streaming mode
@@ -230,6 +234,7 @@ class Lattice1Worker:
                 float(output_beam),
                 int(min_active_states),
                 int(max_active_states),
+                allow_partial=False,
             )
             emission_result = emission
 
