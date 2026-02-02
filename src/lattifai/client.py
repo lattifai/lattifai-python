@@ -160,7 +160,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                             output_dir=Path(str(output_caption_path)).parent if output_caption_path else None,
                         )
                         caption.transcription = transcript.supervisions or transcript.transcription
-                        caption.audio_events = transcript.audio_events
+                        caption.event = transcript.event
                     if not caption.transcription:
                         raise ValueError("Transcription is empty after transcription step.")
 

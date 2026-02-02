@@ -54,8 +54,8 @@ class LattifAITranscriber(BaseTranscriber):
 
     async def transcribe_file(self, media_file: Union[str, Path, AudioData], language: Optional[str] = None) -> Caption:
         transcriber = self._ensure_transcriber()
-        transcription, audio_events = transcriber.transcribe(media_file, language=language, num_workers=2)
-        return Caption.from_transcription_results(transcription=transcription, audio_events=audio_events)
+        transcription, event = transcriber.transcribe(media_file, language=language, num_workers=2)
+        return Caption.from_transcription_results(transcription=transcription, event=event)
 
     def transcribe_numpy(
         self,
@@ -78,9 +78,7 @@ class LattifAITranscriber(BaseTranscriber):
             audio, language=language, return_hypotheses=True, progress_bar=False, timestamps=True
         )[0]
 
-    def write(
-        self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_audio_events: bool = True
-    ) -> Path:
+    def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_event: bool = True) -> Path:
         """
         Persist transcript text to disk and return the file path.
         """
@@ -88,10 +86,8 @@ class LattifAITranscriber(BaseTranscriber):
             output_file,
             include_speaker_in_text=False,
         )
-        if cache_audio_events and transcript.audio_events:
-            from tgt import write_to_file
-
-            events_file = output_file.with_suffix(".AED")
-            write_to_file(transcript.audio_events, events_file, format="long")
+        if cache_event and transcript.event:
+            events_file = output_file.with_suffix(".LED")
+            transcript.event.write(events_file)
 
         return output_file

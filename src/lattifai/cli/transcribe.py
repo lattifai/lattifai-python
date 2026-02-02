@@ -166,7 +166,7 @@ def transcribe(
     safe_print(colorful.cyan(f"   Output: {final_output}"))
 
     # Write output
-    transcriber.write(transcript, final_output, encoding="utf-8", cache_audio_events=False)
+    transcriber.write(transcript, final_output, encoding="utf-8", cache_event=False)
 
     safe_print(colorful.green(f"🎉 Transcription completed: {final_output}"))
 

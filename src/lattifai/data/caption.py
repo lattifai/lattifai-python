@@ -9,7 +9,7 @@ from lattifai.caption import Caption as BaseCaption
 from lattifai.caption import Pathlike, Supervision
 
 if TYPE_CHECKING:
-    from tgt import TextGrid
+    from lattifai_core.event import LEDOutput
 
 DiarizationOutput = TypeVar("DiarizationOutput")
 
@@ -21,21 +21,21 @@ class Caption(BaseCaption):
 
     Inherits from BaseCaption and adds fields for:
     - transcription: ASR results
-    - audio_events: Audio event detection results (TextGrid)
+    - event: LattifAI Event Detection results (LEDOutput)
     - speaker_diarization: Speaker diarization results
     - alignments: Post-alignment results
 
     These fields are used in the LattifAI pipeline for:
     - Storing intermediate transcription results
-    - Audio event detection (music, applause, etc.)
+    - LattifAI Event Detection (music, applause, speech, etc.)
     - Speaker identification and separation
     - Forced alignment results
     """
 
     # Transcription results
     transcription: List[Supervision] = field(default_factory=list)
-    # Audio Event Detection results
-    audio_events: Optional["TextGrid"] = None
+    # LattifAI Event Detection results
+    event: Optional["LEDOutput"] = None
     # Speaker Diarization results
     speaker_diarization: Optional[DiarizationOutput] = None
     # Alignment results
@@ -104,7 +104,7 @@ class Caption(BaseCaption):
         return Caption(
             supervisions=adjusted_sups,
             transcription=self.transcription,
-            audio_events=self.audio_events,
+            event=self.event,
             speaker_diarization=self.speaker_diarization,
             alignments=[],  # Clear alignments since we've applied them
             language=self.language,
@@ -166,7 +166,7 @@ class Caption(BaseCaption):
     def from_transcription_results(
         cls,
         transcription: List[Supervision],
-        audio_events: Optional["TextGrid"] = None,
+        event: Optional["LEDOutput"] = None,
         speaker_diarization: Optional[DiarizationOutput] = None,
         language: Optional[str] = None,
         source_path: Optional[Pathlike] = None,
@@ -177,7 +177,7 @@ class Caption(BaseCaption):
 
         Args:
             transcription: List of transcription supervision segments
-            audio_events: Optional TextGrid with audio event detection results
+            event: Optional LEDOutput with event detection results
             speaker_diarization: Optional DiarizationOutput with speaker diarization results
             language: Language code
             source_path: Source file path
@@ -188,7 +188,7 @@ class Caption(BaseCaption):
         """
         return cls(
             transcription=transcription,
-            audio_events=audio_events,
+            event=event,
             speaker_diarization=speaker_diarization,
             language=language,
             kind="transcription",

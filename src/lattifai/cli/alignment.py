@@ -13,6 +13,7 @@ from lattifai.config import (
     CaptionConfig,
     ClientConfig,
     DiarizationConfig,
+    EventConfig,
     MediaConfig,
     TranscriptionConfig,
 )
@@ -32,6 +33,7 @@ def align(
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
     diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
+    event: Annotated[Optional[EventConfig], run.Config[EventConfig]] = None,
 ):
     """
     Align audio/video with caption file.
@@ -123,6 +125,7 @@ def align(
         caption_config=caption_config,
         transcription_config=transcription,
         diarization_config=diarization,
+        event_config=event,
     )
 
     try:

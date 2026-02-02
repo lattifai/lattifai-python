@@ -11,6 +11,7 @@ from lattifai.config import (
     CaptionConfig,
     ClientConfig,
     DiarizationConfig,
+    EventConfig,
     MediaConfig,
     TranscriptionConfig,
 )
@@ -25,6 +26,7 @@ def youtube(
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
     diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
+    event: Annotated[Optional[EventConfig], run.Config[EventConfig]] = None,
     use_transcription: bool = False,
 ):
     """
@@ -114,6 +116,7 @@ def youtube(
         caption_config=caption_config,
         transcription_config=transcription,
         diarization_config=diarization,
+        event_config=event,
     )
 
     # Call the client's youtube method

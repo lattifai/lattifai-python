@@ -284,18 +284,18 @@ class LattifAIClientMixin:
                 format=input_caption_format,
                 normalize_text=normalize_text if normalize_text is not None else self.caption_config.normalize_text,
             )
-            diarization_file = Path(str(input_caption)).with_suffix(".SpkDiar")
+            diarization_file = Path(str(input_caption)).with_suffix(".Diarization")
             if diarization_file.exists():
                 if verbose:
                     safe_print(colorful.cyan(f"📖 Step1b: Reading speaker diarization from {diarization_file}"))
                 caption.read_speaker_diarization(diarization_file)
-            events_file = Path(str(input_caption)).with_suffix(".AED")
-            if events_file.exists():
+            event_file = Path(str(input_caption)).with_suffix(".LED")
+            if event_file.exists():
                 if verbose:
-                    safe_print(colorful.cyan(f"📖 Step1c: Reading audio events from {events_file}"))
-                from tgt import read_textgrid
+                    safe_print(colorful.cyan(f"📖 Step1c: Reading audio events from {event_file}"))
+                from lattifai_core.event import LEDOutput
 
-                caption.audio_events = read_textgrid(events_file)
+                caption.event = LEDOutput.read(event_file)
 
             if verbose:
                 safe_print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))

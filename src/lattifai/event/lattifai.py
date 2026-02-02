@@ -1,7 +1,7 @@
 """LattifAI Audio Event Detection implementation."""
 
 import logging
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional
 
 from lattifai.audio2 import AudioData
 from lattifai.config.event import EventConfig
@@ -25,7 +25,7 @@ class LattifAIEventDetector:
     wrapping the core LattifAIEventDetector from lattifai_core.
 
     Attributes:
-        config: AED configuration object.
+        config: EventConfig configuration object.
 
     Example:
         >>> from lattifai.event import LattifAIEventDetector
@@ -51,17 +51,16 @@ class LattifAIEventDetector:
         Initialize LattifAI Audio Event Detector.
 
         Args:
-            config: AED configuration. If None, uses default configuration.
+            config: EventConfig configuration.
         """
         self.config = config
-        self.logger = get_logger("aed")
-
+        self.logger = get_logger("event")
         self._detector = None
 
     @property
     def name(self) -> str:
         """Human-readable name of the detector."""
-        return "LattifAI_AED"
+        return "LattifAI_EventDetector"
 
     @property
     def detector(self):
@@ -69,13 +68,11 @@ class LattifAIEventDetector:
         if self._detector is None:
             from lattifai_core.event import LattifAIEventDetector as CoreEventDetector
 
-            # Load from pretrained model file
             self._detector = CoreEventDetector.from_pretrained(
                 model_path=self.config.model_path,
                 device=self.config.device,
                 client_wrapper=self.config.client_wrapper,
             )
-
         return self._detector
 
     def detect(
@@ -119,18 +116,36 @@ class LattifAIEventDetector:
         Run event detection and update caption with audio events.
 
         This is the main entry point for integrating event detection with alignment.
+        When event_matching is enabled, it also updates caption timestamps for [Event] markers.
 
         Args:
             audio: AudioData to analyze
             caption: Caption to update with event detection results
 
         Returns:
-            Updated Caption with audio_events field populated
+            Updated Caption with event field populated
         """
+        # Get supervisions to process
+        supervisions = caption.alignments or caption.supervisions
+
         # Run event detection
         led_output = self.detect(audio)
 
-        # Store audio_events in caption
-        caption.audio_events = led_output.audio_events
+        # Store LEDOutput in caption
+        caption.event = led_output
+
+        # Event matching: update caption timestamps based on detected events
+        if self.config.event_matching and supervisions:
+            supervisions = self.detector.match_events_with_supervisions(
+                audio_events=led_output.audio_events,
+                supervisions=supervisions,
+                custom_aliases=self.config.event_aliases or {},
+                timestamp_tolerance=self.config.event_timestamp_tolerance,
+                update_timestamps=self.config.update_event_timestamps,
+            )
+            if caption.alignments:
+                caption.alignments = supervisions
+            else:
+                caption.supervisions = supervisions
 
         return caption
