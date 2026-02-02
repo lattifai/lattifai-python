@@ -10,7 +10,14 @@ from lhotse.utils import Pathlike
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.caption import InputCaptionFormat
-from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
+from lattifai.config import (
+    AlignmentConfig,
+    CaptionConfig,
+    ClientConfig,
+    DiarizationConfig,
+    EventConfig,
+    TranscriptionConfig,
+)
 from lattifai.data import Caption
 from lattifai.errors import (
     AlignmentError,
@@ -23,6 +30,7 @@ from lattifai.utils import safe_print
 
 if TYPE_CHECKING:
     from lattifai.diarization import LattifAIDiarizer  # noqa: F401
+    from lattifai.event import LattifAIEventDetector  # noqa: F401
 
 
 class LattifAI(LattifAIClientMixin, SyncAPIClient):
@@ -42,6 +50,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         caption_config: Optional[CaptionConfig] = None,
         transcription_config: Optional[TranscriptionConfig] = None,
         diarization_config: Optional[DiarizationConfig] = None,
+        event_config: Optional[EventConfig] = None,
     ) -> None:
         __doc__ = LattifAIClientMixin._INIT_DOC.format(
             client_class="LattifAI",
@@ -82,6 +91,15 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             from lattifai.diarization import LattifAIDiarizer  # noqa: F811
 
             self.diarizer = LattifAIDiarizer(config=self.diarization_config)
+
+        # Initialize event detector if enabled
+        self.event_config = event_config or EventConfig()
+        self.event_config.client_wrapper = self
+        self.event_detector: Optional["LattifAIEventDetector"] = None
+        if self.event_config.enabled:
+            from lattifai.event import LattifAIEventDetector  # noqa: F811
+
+            self.event_detector = LattifAIEventDetector(config=self.event_config)
 
         # Initialize shared components (transcriber, downloader)
         self._init_shared_components(transcription_config)
@@ -259,6 +277,13 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 caption=caption,
                 output_caption_path=output_caption_path,
             )
+
+        # Step 6: Event detection
+        if self.event_config.enabled and self.event_detector:
+            safe_print(colorful.cyan("🎵 Performing audio event detection..."))
+            caption = self.event_detector.update(media_audio, caption)
+            if output_caption_path:
+                self._write_caption(caption, output_caption_path)
 
         return caption
 
