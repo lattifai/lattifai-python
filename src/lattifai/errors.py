@@ -1,9 +1,41 @@
 """Error handling and exception classes for LattifAI SDK."""
 
+import functools
 import traceback
 from typing import Any, Dict, Optional
 
 import colorful
+
+
+def format_exception(e: "LattifAIError") -> str:
+    """Format LattifAIError with filtered traceback (only lattifai frames)."""
+    tb_lines = traceback.format_exception(type(e), e, e.__traceback__)
+    filtered = []
+    skip_next_code_line = False
+
+    for i, line in enumerate(tb_lines):
+        if skip_next_code_line:
+            skip_next_code_line = False
+            continue
+
+        if line.startswith("Traceback") or not line.startswith("  File"):
+            filtered.append(line)
+        elif "lattifai" in line:
+            filtered.append(line)
+            if i + 1 < len(tb_lines) and tb_lines[i + 1].startswith("    "):
+                filtered.append(tb_lines[i + 1])
+                skip_next_code_line = True
+        elif i + 1 < len(tb_lines) and tb_lines[i + 1].startswith("    "):
+            skip_next_code_line = True
+
+    return "".join(filtered)
+
+
+def _merge_context(kwargs: Dict[str, Any], updates: Dict[str, Any]) -> None:
+    """Merge updates into kwargs['context'], creating it if needed."""
+    context = kwargs.setdefault("context", {})
+    context.update(updates)
+
 
 # Error help messages
 LATTICE_DECODING_FAILURE_HELP = (
@@ -76,10 +108,8 @@ class AudioProcessingError(LattifAIError):
     """Error during audio processing operations."""
 
     def __init__(self, message: str, media_path: Optional[str] = None, **kwargs):
-        context = kwargs.get("context", {})
         if media_path:
-            context["media_path"] = media_path
-        kwargs["context"] = context
+            _merge_context(kwargs, {"media_path": media_path})
         super().__init__(message, **kwargs)
 
 
@@ -90,11 +120,9 @@ class AudioLoadError(AudioProcessingError):
         message = f"Failed to load audio file: {colorful.red(media_path)}"
         if original_error:
             message += f" - {colorful.red(str(original_error))}"
-
-        context = kwargs.get("context", {})
-        context.update({"media_path": media_path, "original_error": str(original_error) if original_error else None})
-        kwargs["context"] = context
-
+        _merge_context(
+            kwargs, {"media_path": media_path, "original_error": str(original_error) if original_error else None}
+        )
         super().__init__(message, media_path=media_path, **kwargs)
 
 
@@ -103,9 +131,7 @@ class AudioFormatError(AudioProcessingError):
 
     def __init__(self, media_path: str, format_issue: str, **kwargs):
         message = f"Audio format error for {colorful.red(media_path)}: {colorful.red(format_issue)}"
-        context = kwargs.get("context", {})
-        context.update({"media_path": media_path, "format_issue": format_issue})
-        kwargs["context"] = context
+        _merge_context(kwargs, {"media_path": media_path, "format_issue": format_issue})
         super().__init__(message, media_path=media_path, **kwargs)
 
 
@@ -113,10 +139,8 @@ class CaptionProcessingError(LattifAIError):
     """Error during caption/text processing operations."""
 
     def __init__(self, message: str, caption_path: Optional[str] = None, **kwargs):
-        context = kwargs.get("context", {})
         if caption_path:
-            context["caption_path"] = caption_path
-        kwargs["context"] = context
+            _merge_context(kwargs, {"caption_path": caption_path})
         super().__init__(message, **kwargs)
 
 
@@ -125,9 +149,7 @@ class CaptionParseError(CaptionProcessingError):
 
     def __init__(self, caption_path: str, parse_issue: str, **kwargs):
         message = f"Failed to parse caption file {caption_path}: {parse_issue}"
-        context = kwargs.get("context", {})
-        context.update({"caption_path": caption_path, "parse_issue": parse_issue})
-        kwargs["context"] = context
+        _merge_context(kwargs, {"caption_path": caption_path, "parse_issue": parse_issue})
         super().__init__(message, caption_path=caption_path, **kwargs)
 
 
@@ -135,12 +157,13 @@ class AlignmentError(LattifAIError):
     """Error during audio-text alignment process."""
 
     def __init__(self, message: str, media_path: Optional[str] = None, caption_path: Optional[str] = None, **kwargs):
-        context = kwargs.get("context", {})
+        updates = {}
         if media_path:
-            context["media_path"] = media_path
+            updates["media_path"] = media_path
         if caption_path:
-            context["caption_path"] = caption_path
-        kwargs["context"] = context
+            updates["caption_path"] = caption_path
+        if updates:
+            _merge_context(kwargs, updates)
         super().__init__(message, **kwargs)
 
 
@@ -151,36 +174,44 @@ class LatticeEncodingError(AlignmentError):
         message = "Failed to generate lattice graph from text"
         if original_error:
             message += f": {colorful.red(str(original_error))}"
-
-        context = kwargs.get("context", {})
-        context.update(
+        text_preview = text_content[:100] + "..." if len(text_content) > 100 else text_content
+        _merge_context(
+            kwargs,
             {
                 "text_content_length": len(text_content),
-                "text_preview": text_content[:100] + "..." if len(text_content) > 100 else text_content,
+                "text_preview": text_preview,
                 "original_error": str(original_error) if original_error else None,
-            }
+            },
         )
-        kwargs["context"] = context
         super().__init__(message, **kwargs)
 
 
 class LatticeDecodingError(AlignmentError):
     """Error decoding lattice alignment results."""
 
-    def __init__(self, lattice_id: str, original_error: Optional[Exception] = None, **kwargs):
-        message = f"Failed to decode lattice alignment results for lattice ID: {colorful.red(lattice_id)}"
+    def __init__(
+        self,
+        lattice_id: str,
+        message: Optional[str] = None,
+        original_error: Optional[Exception] = None,
+        skip_help: bool = False,
+        **kwargs,
+    ):
+        message = message or f"Failed to decode lattice alignment results for lattice ID: {colorful.red(lattice_id)}"
 
-        # Don't duplicate the help message if it's already in original_error
-        if original_error and str(original_error) != LATTICE_DECODING_FAILURE_HELP:
-            message += f" - {colorful.red(str(original_error))}"
+        error_str = str(original_error) if original_error else None
+        is_help_message = error_str == LATTICE_DECODING_FAILURE_HELP
 
-        context = kwargs.get("context", {})
-        # Don't store the entire help message in context to avoid duplication
-        if original_error and str(original_error) != LATTICE_DECODING_FAILURE_HELP:
-            context["original_error"] = str(original_error)
-        context["lattice_id"] = lattice_id
-        kwargs["context"] = context
+        if original_error and not is_help_message:
+            message += f" - {colorful.red(error_str)}"
+
+        context_updates = {"lattice_id": lattice_id}
+        if original_error and not is_help_message:
+            context_updates["original_error"] = error_str
+        _merge_context(kwargs, context_updates)
+
         super().__init__(message, **kwargs)
+        self.skip_help = skip_help
 
     def get_message(self) -> str:
         """Return formatted error message with help text."""
@@ -188,8 +219,9 @@ class LatticeDecodingError(AlignmentError):
         if self.context and self.context.get("lattice_id"):
             # Only show essential context (lattice_id), not the duplicated help message
             base_message += f'\n{colorful.yellow("Lattice ID:")} {self.context["lattice_id"]}'
-        # Append help message once at the end
-        base_message += f"\n\n{colorful.yellow(LATTICE_DECODING_FAILURE_HELP)}"
+        # Append help message only if not skipped (e.g., when anomaly info is provided)
+        if not self.skip_help:
+            base_message += f"\n\n{colorful.yellow(LATTICE_DECODING_FAILURE_HELP)}"
         return base_message
 
 
@@ -200,10 +232,9 @@ class ModelLoadError(LattifAIError):
         message = f"Failed to load model: {colorful.red(model_name)}"
         if original_error:
             message += f" - {colorful.red(str(original_error))}"
-
-        context = kwargs.get("context", {})
-        context.update({"model_name": model_name, "original_error": str(original_error) if original_error else None})
-        kwargs["context"] = context
+        _merge_context(
+            kwargs, {"model_name": model_name, "original_error": str(original_error) if original_error else None}
+        )
         super().__init__(message, **kwargs)
 
 
@@ -214,10 +245,7 @@ class DependencyError(LattifAIError):
         message = f"Missing required dependency: {colorful.red(dependency_name)}"
         if install_command:
             message += f"\nPlease install it using: {colorful.yellow(install_command)}"
-
-        context = kwargs.get("context", {})
-        context.update({"dependency_name": dependency_name, "install_command": install_command})
-        kwargs["context"] = context
+        _merge_context(kwargs, {"dependency_name": dependency_name, "install_command": install_command})
         super().__init__(message, **kwargs)
 
 
@@ -225,9 +253,7 @@ class APIError(LattifAIError):
     """Error communicating with LattifAI API."""
 
     def __init__(self, message: str, status_code: Optional[int] = None, response_text: Optional[str] = None, **kwargs):
-        context = kwargs.get("context", {})
-        context.update({"status_code": status_code, "response_text": response_text})
-        kwargs["context"] = context
+        _merge_context(kwargs, {"status_code": status_code, "response_text": response_text})
         super().__init__(message, **kwargs)
 
 
@@ -249,14 +275,13 @@ class QuotaExceededError(APIError):
 def handle_exception(func):
     """Decorator to handle exceptions and convert them to LattifAI errors."""
 
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except LattifAIError:
-            # Re-raise LattifAI errors as-is
             raise
         except Exception as e:
-            # Convert other exceptions to LattifAI errors
             error_msg = f"Unexpected error in {func.__name__}: {str(e)}"
             context = {
                 "function": func.__name__,

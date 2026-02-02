@@ -1,6 +1,6 @@
 """Lattice-1 Aligner implementation."""
 
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import colorful
 import numpy as np
@@ -166,9 +166,30 @@ class Lattice1Aligner(object):
             )
             if verbose:
                 safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
-        except LatticeDecodingError:
+        except LatticeDecodingError as e:
             safe_print(colorful.red("         x Failed to decode lattice alignment results"))
-            raise
+            _alignments = self.tokenizer.detokenize(
+                lattice_id,
+                lattice_results,
+                supervisions=supervisions,
+                return_details=return_details,
+                start_margin=self.config.start_margin,
+                end_margin=self.config.end_margin,
+                check_sanity=False,
+            )
+            # Check for score anomalies (media-text mismatch)
+            anomaly = _detect_score_anomalies(_alignments)
+            if anomaly:
+                anomaly_str = _format_anomaly_warning(anomaly)
+                del _alignments
+                raise LatticeDecodingError(
+                    lattice_id,
+                    message=colorful.yellow("Score anomaly detected - media and text mismatch:\n" + anomaly_str),
+                    skip_help=True,  # anomaly info is more specific than default help
+                )
+            else:
+                del _alignments
+                raise e
         except Exception as e:
             safe_print(colorful.red("         x Failed to decode lattice alignment results"))
             raise LatticeDecodingError(lattice_id, original_error=e)
@@ -178,3 +199,91 @@ class Lattice1Aligner(object):
     def profile(self) -> None:
         """Print profiling statistics."""
         self.worker.profile()
+
+
+def _detect_score_anomalies(
+    alignments: List[Supervision],
+    drop_threshold: float = 0.08,
+    window_size: int = 5,
+) -> Optional[Dict[str, Any]]:
+    """Detect score anomalies indicating alignment mismatch.
+
+    Compares average of window_size segments before vs after each position.
+    When the drop is significant, it indicates the audio doesn't match
+    the text starting at that position.
+
+    Args:
+        alignments: List of aligned supervisions with scores
+        drop_threshold: Minimum drop between before/after averages to trigger
+        window_size: Number of segments to average on each side
+
+    Returns:
+        Dict with anomaly info if found, None otherwise
+    """
+    scores = [s.score for s in alignments if s.score is not None]
+    if len(scores) < window_size * 2:
+        return None
+
+    for i in range(window_size, len(scores) - window_size):
+        before_avg = np.mean(scores[i - window_size : i])
+        after_avg = np.mean(scores[i : i + window_size])
+        drop = before_avg - after_avg
+
+        # Trigger: significant drop between before and after windows
+        if drop > drop_threshold:
+            # Find the exact mutation point (largest single-step drop)
+            max_drop = 0
+            mutation_idx = i
+            for j in range(i - 1, min(i + window_size, len(scores) - 1)):
+                single_drop = scores[j] - scores[j + 1]
+                if single_drop > max_drop:
+                    max_drop = single_drop
+                    mutation_idx = j + 1
+
+            # Segments: last normal + anomaly segments
+            last_normal = alignments[mutation_idx - 1] if mutation_idx > 0 else None
+            anomaly_segments = [
+                alignments[j] for j in range(mutation_idx, min(mutation_idx + window_size, len(alignments)))
+            ]
+
+            return {
+                "mutation_index": mutation_idx,
+                "before_avg": round(before_avg, 4),
+                "after_avg": round(after_avg, 4),
+                "window_drop": round(drop, 4),
+                "mutation_drop": round(max_drop, 4),
+                "last_normal": last_normal,
+                "segments": anomaly_segments,
+            }
+
+    return None
+
+
+def _format_anomaly_warning(anomaly: Dict[str, Any]) -> str:
+    """Format anomaly detection result as warning message."""
+    lines = [
+        f"⚠️  Score anomaly detected at segment #{anomaly['mutation_index']}",
+        f"    Window avg: {anomaly['before_avg']:.4f} → {anomaly['after_avg']:.4f} (drop: {anomaly['window_drop']:.4f})",  # noqa: E501
+        f"    Mutation drop: {anomaly['mutation_drop']:.4f}",
+        "",
+    ]
+
+    # Show last normal segment
+    if anomaly.get("last_normal"):
+        seg = anomaly["last_normal"]
+        text_preview = seg.text[:50] + "..." if len(seg.text) > 50 else seg.text
+        lines.append(f'    [{seg.start:.2f}s-{seg.end:.2f}s] score={seg.score:.4f} "{text_preview}"')
+
+    # Separator - mutation point
+    lines.append("    " + "─" * 60)
+    lines.append(f"    ⬇️  MUTATION: The following {len(anomaly['segments'])}+ segments don't match audio")
+    lines.append("    " + "─" * 60)
+
+    # Show anomaly segments
+    for seg in anomaly["segments"]:
+        text_preview = seg.text[:50] + "..." if len(seg.text) > 50 else seg.text
+        lines.append(f'    [{seg.start:.2f}s-{seg.end:.2f}s] score={seg.score:.4f} "{text_preview}"')
+
+    lines.append("")
+    lines.append("    Possible causes: Transcription error, missing content, or wrong audio region")
+    return "\n".join(lines)

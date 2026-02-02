@@ -298,7 +298,8 @@ class LatticeTokenizer:
         end_margin: float = 0.20,
         check_sanity: bool = True,
     ) -> List[Supervision]:
-        emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
+        emission_stats, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
+        # emission_stats is a dict with 'max_probs' and 'aligned_probs' (unified for batch and streaming)
         if isinstance(supervisions[0], Supervision):
             response = self.client_wrapper.post(
                 "detokenize",
@@ -352,9 +353,8 @@ class LatticeTokenizer:
 
         alignments = [Supervision.from_dict(s) for s in result["supervisions"]]
 
-        if emission is not None and return_details:
-            # Add emission confidence scores for segments and word-level alignments
-            _add_confidence_scores(alignments, emission, labels[0], frame_shift, offset)
+        # Add emission confidence scores for segments and word-level alignments
+        _add_confidence_scores(alignments, emission_stats, frame_shift, offset)
 
         if isinstance(supervisions[0], Supervision):
             alignments = _update_alignments_speaker(supervisions, alignments)
@@ -367,8 +367,7 @@ class LatticeTokenizer:
 
 def _add_confidence_scores(
     supervisions: List[Supervision],
-    emission: np.ndarray,
-    labels: List[int],
+    emission_stats: Dict[str, np.ndarray],
     frame_shift: float,
     offset: float = 0.0,
 ) -> None:
@@ -381,29 +380,37 @@ def _add_confidence_scores(
 
     Args:
         supervisions: List of Supervision objects to add scores to (modified in-place)
-        emission: Emission tensor with shape [batch, time, vocab_size]
-        labels: Token labels corresponding to aligned tokens
+        emission_stats: Dict with 'max_probs' and 'aligned_probs' arrays
         frame_shift: Frame shift in seconds for converting frames to time
+        offset: Time offset in seconds
     """
-    tokens = np.array(labels, dtype=np.int64)
+    max_probs = emission_stats["max_probs"]
+    aligned_probs = emission_stats["aligned_probs"]
+    diffprobs_full = max_probs - aligned_probs
 
     for supervision in supervisions:
         start_frame = int((supervision.start - offset) / frame_shift)
         end_frame = int((supervision.end - offset) / frame_shift)
 
-        # Compute segment-level confidence
-        probabilities = np.exp(emission[0, start_frame:end_frame])
-        aligned = probabilities[range(0, end_frame - start_frame), tokens[start_frame:end_frame]]
-        diffprobs = np.max(probabilities, axis=-1) - aligned
-        supervision.score = round(1.0 - diffprobs.mean(), ndigits=4)
+        # Clamp to valid range
+        start_frame = max(0, min(start_frame, len(diffprobs_full) - 1))
+        end_frame = max(start_frame + 1, min(end_frame, len(diffprobs_full)))
 
-        # Compute word-level confidence if alignment exists
+        diffprobs = diffprobs_full[start_frame:end_frame]
+        if len(diffprobs) > 0:
+            supervision.score = round(1.0 - diffprobs.mean().item(), ndigits=4)
+
+        # Word-level confidence
         if hasattr(supervision, "alignment") and supervision.alignment:
             words = supervision.alignment.get("word", [])
             for w, item in enumerate(words):
-                start = int((item.start - offset) / frame_shift) - start_frame
-                end = int((item.end - offset) / frame_shift) - start_frame
-                words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean(), ndigits=4))
+                start = int((item.start - offset) / frame_shift)
+                end = int((item.end - offset) / frame_shift)
+                start = max(0, min(start, len(diffprobs_full) - 1))
+                end = max(start + 1, min(end, len(diffprobs_full)))
+                word_diffprobs = diffprobs_full[start:end]
+                if len(word_diffprobs) > 0:
+                    words[w] = item._replace(score=round(1.0 - word_diffprobs.mean().item(), ndigits=4))
 
 
 def _update_alignments_speaker(supervisions: List[Supervision], alignments: List[Supervision]) -> List[Supervision]:

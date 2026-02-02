@@ -56,7 +56,7 @@ class MediaConfig:
     """Audio channel selection strategy: 'average', 'left', 'right', or channel index."""
 
     # Audio Streaming Configuration
-    streaming_chunk_secs: Optional[float] = 600.0
+    streaming_chunk_secs: Optional[float] = 60.0
     """Duration in seconds of each audio chunk for streaming mode.
     When set to a value (e.g., 600.0), enables streaming mode for processing very long audio files (>1 hour).
     Audio is processed in chunks to keep memory usage low (<4GB peak), suitable for 20+ hour files.
