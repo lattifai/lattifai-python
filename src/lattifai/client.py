@@ -237,13 +237,15 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             if self.config.profile:
                 self.aligner.profile()
 
-        except (CaptionProcessingError, LatticeEncodingError, AlignmentError, LatticeDecodingError):
+        except (CaptionProcessingError, LatticeEncodingError) as e:
             # Re-raise our specific errors as-is
-            raise
+            raise e
+        except LatticeDecodingError as e:
+            raise e
         except Exception as e:
             # Catch any unexpected errors and wrap them
             raise AlignmentError(
-                "Unexpected error during alignment process",
+                message="Unexpected error during alignment process",
                 media_path=str(input_media),
                 caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
