@@ -1,12 +1,12 @@
-"""Audio Event Detection (AED) module for LattifAI.
+"""Audio Event Detection module for LattifAI.
 
 This module provides audio event detection capabilities, it can identify various
 audio events including speech, music, singing, and demographic characteristics
 (male, female, child voices).
 
 Key Components:
-    LattifAIEventDetector: Main LED class that wraps lattifai_core's
-        LattifAIEventDetector for seamless integration with LattifAI workflows.
+    LattifAIEventDetector: Main class that wraps lattifai_core's
+        EventDetector for seamless integration with LattifAI workflows.
 
 Features:
     - Multi-class audio event detection (30+ reduced classes or 400+ full classes)
@@ -23,7 +23,7 @@ Detected Event Types:
     - Synthetic: Synthetic/electronic sounds
 
 Configuration:
-    Use AEDConfig to control:
+    Use EventConfig to control:
     - enabled: Whether to run audio event detection
     - device: GPU/CPU device selection
     - dtype: Model precision (float32, float16, bfloat16)
@@ -32,11 +32,11 @@ Configuration:
     - vad_chunk_size/vad_max_gap: VAD segmentation parameters
 
 Example:
-    >>> from lattifai.aed import LattifAIEventDetector
-    >>> from lattifai.config import AEDConfig
+    >>> from lattifai.event import LattifAIEventDetector
+    >>> from lattifai.config import EventConfig
     >>> from lattifai.audio2 import AudioLoader
     >>>
-    >>> config = AEDConfig(enabled=True, device="cuda")
+    >>> config = EventConfig(enabled=True, device="cuda")
     >>> detector = LattifAIEventDetector(config)
     >>>
     >>> audio = AudioLoader.load("speech.wav")
@@ -56,8 +56,8 @@ Performance Notes:
     - Long audio files are automatically chunked to manage memory
 
 See Also:
-    - lattifai.config.AEDConfig: Configuration options
-    - lattifai_core.event: Core AED implementation
+    - lattifai.config.EventConfig: Configuration options
+    - lattifai_core.event: Core event detection implementation
 """
 
 from .lattifai import LattifAIEventDetector

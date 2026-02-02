@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal, Optional
 from ..utils import _select_device
 
 if TYPE_CHECKING:
-    from ..base_client import SyncAPIClient
+    from ..client import SyncAPIClient
 
 SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",

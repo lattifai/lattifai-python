@@ -1,13 +1,16 @@
-"""Audio Event Detection (AED) configuration for LattifAI."""
+"""Audio Event Detection configuration for LattifAI."""
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Dict, List, Literal, Optional
 
 from ..utils import _select_device
 
+if TYPE_CHECKING:
+    from ..client import SyncAPIClient
+
 
 @dataclass
-class AEDConfig:
+class EventConfig:
     """
     Audio Event Detection configuration.
 
@@ -68,6 +71,9 @@ class AEDConfig:
 
     update_event_timestamps: bool = True
     """Whether to update caption event timestamps based on AED detections."""
+
+    client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
+    """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""

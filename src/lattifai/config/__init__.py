@@ -15,15 +15,15 @@ from lattifai.caption.config import (
     StandardizationConfig,
 )
 
-from .aed import AEDConfig
 from .alignment import AlignmentConfig
 from .client import ClientConfig
 from .diarization import DiarizationConfig
+from .event import EventConfig
 from .media import AUDIO_FORMATS, MEDIA_FORMATS, VIDEO_FORMATS, MediaConfig
 from .transcription import TranscriptionConfig
 
 __all__ = [
-    "AEDConfig",
+    "EventConfig",
     "ClientConfig",
     "AlignmentConfig",
     "CaptionConfig",

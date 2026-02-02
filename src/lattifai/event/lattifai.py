@@ -4,7 +4,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Union
 
 from lattifai.audio2 import AudioData
-from lattifai.config.aed import AEDConfig
+from lattifai.config.event import EventConfig
 from lattifai.logging import get_logger
 
 if TYPE_CHECKING:
@@ -28,10 +28,10 @@ class LattifAIEventDetector:
         config: AED configuration object.
 
     Example:
-        >>> from lattifai.aed import LattifAIEventDetector
-        >>> from lattifai.config import AEDConfig
+        >>> from lattifai.event import LattifAIEventDetector
+        >>> from lattifai.config import EventConfig
         >>>
-        >>> config = AEDConfig(enabled=True, device="cuda")
+        >>> config = EventConfig(enabled=True, device="cuda")
         >>> detector = LattifAIEventDetector(config)
         >>>
         >>> # Detect events from audio data
@@ -46,16 +46,13 @@ class LattifAIEventDetector:
         ...     print(f"Event type: {tier.name}")
     """
 
-    def __init__(self, config: Optional[AEDConfig] = None):
+    def __init__(self, config: EventConfig):
         """
         Initialize LattifAI Audio Event Detector.
 
         Args:
             config: AED configuration. If None, uses default configuration.
         """
-        if config is None:
-            config = AEDConfig()
-
         self.config = config
         self.logger = get_logger("aed")
 
@@ -76,8 +73,7 @@ class LattifAIEventDetector:
             self._detector = CoreEventDetector.from_pretrained(
                 model_path=self.config.model_path,
                 device=self.config.device,
-                dtype=self.config.dtype,
-                password=True,
+                client_wrapper=self.config.client_wrapper,
             )
 
         return self._detector
@@ -103,8 +99,8 @@ class LattifAIEventDetector:
         """
         return self.detector(
             audio=input_media,
-            VAD_CHUNK_SIZE=vad_chunk_size or self.config.vad_chunk_size,
-            VAD_MAX_GAP=vad_max_gap or self.config.vad_max_gap,
+            vad_chunk_size=vad_chunk_size or self.config.vad_chunk_size,
+            vad_max_gap=vad_max_gap or self.config.vad_max_gap,
             fast_mode=fast_mode if fast_mode is not None else self.config.fast_mode,
         )
 
