@@ -162,6 +162,7 @@ class Lattice1Aligner(object):
                 return_details=return_details,
                 start_margin=self.config.start_margin,
                 end_margin=self.config.end_margin,
+                check_sanity=True,
             )
             if verbose:
                 safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))

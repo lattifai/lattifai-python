@@ -191,6 +191,7 @@ class Lattice1Worker:
                 float(output_beam),
                 int(min_active_states),
                 int(max_active_states),
+                allow_partial=True,
             )
 
             # Streaming mode
@@ -230,6 +231,7 @@ class Lattice1Worker:
                 float(output_beam),
                 int(min_active_states),
                 int(max_active_states),
+                allow_partial=True,
             )
             emission_result = emission
 

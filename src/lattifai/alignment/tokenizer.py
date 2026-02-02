@@ -6,10 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 
-# from lattifai.caption import Supervision
-from lhotse.supervision import SupervisionSegment as Supervision  # NOTE: Transcriber SupervisionSegment
-
-from lattifai.caption import SentenceSplitter
+from lattifai.caption import SentenceSplitter, Supervision
 from lattifai.caption import normalize_text as normalize_html_text
 from lattifai.errors import (
     LATTICE_DECODING_FAILURE_HELP,
@@ -299,6 +296,7 @@ class LatticeTokenizer:
         return_details: bool = False,
         start_margin: float = 0.08,
         end_margin: float = 0.20,
+        check_sanity: bool = True,
     ) -> List[Supervision]:
         emission, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
         if isinstance(supervisions[0], Supervision):
@@ -316,6 +314,7 @@ class LatticeTokenizer:
                     "destroy_lattice": True,
                     "start_margin": start_margin,
                     "end_margin": end_margin,
+                    "check_sanity": check_sanity,
                 },
             )
         else:
@@ -333,6 +332,7 @@ class LatticeTokenizer:
                     "destroy_lattice": True,
                     "start_margin": start_margin,
                     "end_margin": end_margin,
+                    "check_sanity": check_sanity,
                 },
             )
 
