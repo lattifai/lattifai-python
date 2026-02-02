@@ -245,17 +245,40 @@ class GeminiTranscriber(BaseTranscriber):
         return transcript
 
     def _get_transcription_prompt(self) -> str:
-        """Get (and cache) transcription system prompt from prompts module."""
+        """Get (and cache) transcription system prompt.
+
+        Priority:
+        1. Custom prompt from config.prompt (file path or text)
+        2. Default prompt from prompts/gemini/transcription_gem.txt
+        """
         if self._system_prompt is not None:
             return self._system_prompt
 
-        # Load prompt from prompts/gemini/transcription_gem.txt
-        prompt_loader = get_prompt_loader()
-        base_prompt = prompt_loader.get_gemini_transcription_prompt()
+        # Check for custom prompt
+        if self.config.prompt:
+            prompt_path = Path(self.config.prompt)
+            if prompt_path.exists() and prompt_path.is_file():
+                # Load from file
+                base_prompt = prompt_path.read_text(encoding="utf-8").strip()
+                if self.config.verbose:
+                    self.logger.info(f"📝 Using custom prompt from file: {prompt_path}")
+            else:
+                # Use as direct text
+                base_prompt = self.config.prompt
+                if self.config.verbose:
+                    self.logger.info("📝 Using custom prompt text")
+        else:
+            # Load default prompt from prompts/gemini/transcription_gem.txt
+            prompt_loader = get_prompt_loader()
+            base_prompt = prompt_loader.get_gemini_transcription_prompt()
 
         # Add language-specific instruction if configured
         if self.config.language:
             base_prompt += f"\n\n* Use {self.config.language} language for transcription."
+
+        # Add media description context if available
+        if self.config.description:
+            base_prompt += f"\n\n## Media Context\n\n{self.config.description}"
 
         self._system_prompt = base_prompt
         return self._system_prompt
@@ -287,14 +310,21 @@ class GeminiTranscriber(BaseTranscriber):
     def _get_generation_config(self) -> GenerateContentConfig:
         """Lazily build the generation config since it rarely changes."""
         if self._generation_config is None:
+            # Only include thinking_config if thinking mode is enabled
+            thinking_config = None
+            if self.config.thinking:
+                thinking_config = ThinkingConfig(
+                    include_thoughts=self.config.include_thoughts,
+                    thinking_budget=-1,
+                )
+
             self._generation_config = GenerateContentConfig(
                 system_instruction=self._get_transcription_prompt(),
                 response_modalities=["TEXT"],
-                thinking_config=ThinkingConfig(
-                    include_thoughts=False,
-                    thinking_budget=-1,
-                    # thinking_level="high",  # "low", "medium"
-                ),
+                thinking_config=thinking_config,
+                temperature=self.config.temperature,
+                top_k=self.config.top_k,
+                top_p=self.config.top_p,
             )
         return self._generation_config
 
@@ -323,19 +353,107 @@ class GeminiTranscriber(BaseTranscriber):
             ),
         )
 
-        if not response.text:
-            raise RuntimeError("Empty response from Gemini API")
-
-        transcript = response.text.strip()
+        # Extract content based on include_thoughts setting
+        if self.config.include_thoughts:
+            transcript = self._extract_with_thoughts(response)
+        else:
+            if not response.text:
+                raise RuntimeError("Empty response from Gemini API")
+            transcript = response.text.strip()
 
         if self.config.verbose:
             self.logger.info(f"✅ Transcription completed ({source}): {len(transcript)} characters")
 
         return transcript
 
-    def write(
-        self, transcript: str, output_file: Path, encoding: str = "utf-8", cache_audio_events: bool = True
-    ) -> Path:
+    def _extract_with_thoughts(self, response) -> str:
+        """Extract response content including thinking process and metadata."""
+        output_parts = []
+        thoughts = []
+        text_parts = []
+
+        # Iterate through all parts in the response
+        for candidate in response.candidates:
+            for part in candidate.content.parts:
+                if hasattr(part, "thought") and part.thought:
+                    # This is a thinking part
+                    if hasattr(part, "text") and part.text:
+                        thoughts.append(part.text)
+                elif hasattr(part, "text") and part.text:
+                    # This is a regular text part
+                    text_parts.append(part.text)
+
+        # Extract metadata
+        metadata_lines = self._extract_response_metadata(response)
+        if metadata_lines:
+            output_parts.append("---")
+            output_parts.extend(metadata_lines)
+            output_parts.append("---\n")
+
+        # Format output with thoughts section if present
+        if thoughts:
+            output_parts.append("<thinking>")
+            output_parts.extend(thoughts)
+            output_parts.append("</thinking>\n")
+
+        output_parts.extend(text_parts)
+
+        result = "\n".join(output_parts).strip()
+        if not result:
+            raise RuntimeError("Empty response from Gemini API")
+
+        return result
+
+    def _extract_response_metadata(self, response) -> list:
+        """Extract useful metadata from Gemini response as YAML frontmatter."""
+        lines = []
+
+        # Model version
+        if hasattr(response, "model_version") and response.model_version:
+            lines.append(f"model_version: {response.model_version}")
+
+        # Usage metadata (token counts)
+        if hasattr(response, "usage_metadata") and response.usage_metadata:
+            usage = response.usage_metadata
+            if hasattr(usage, "prompt_token_count"):
+                lines.append(f"prompt_tokens: {usage.prompt_token_count}")
+            if hasattr(usage, "candidates_token_count"):
+                lines.append(f"output_tokens: {usage.candidates_token_count}")
+            if hasattr(usage, "total_token_count"):
+                lines.append(f"total_tokens: {usage.total_token_count}")
+            # Thinking tokens if available
+            if hasattr(usage, "thoughts_token_count") and usage.thoughts_token_count:
+                lines.append(f"thinking_tokens: {usage.thoughts_token_count}")
+
+        # Candidate-level metadata
+        if response.candidates:
+            candidate = response.candidates[0]
+
+            # Finish reason
+            if hasattr(candidate, "finish_reason") and candidate.finish_reason:
+                lines.append(f"finish_reason: {candidate.finish_reason}")
+
+            # Average log probability (confidence indicator)
+            if hasattr(candidate, "avg_logprobs") and candidate.avg_logprobs is not None:
+                lines.append(f"avg_logprobs: {candidate.avg_logprobs:.4f}")
+
+            # Citation metadata
+            if hasattr(candidate, "citation_metadata") and candidate.citation_metadata:
+                citations = getattr(candidate.citation_metadata, "citations", [])
+                if citations:
+                    lines.append("citations:")
+                    for cite in citations:
+                        uri = getattr(cite, "uri", "")
+                        start = getattr(cite, "start_index", "")
+                        end = getattr(cite, "end_index", "")
+                        if uri:
+                            lines.append(f"  - uri: {uri}")
+                            if start or end:
+                                lines.append(f"    range: [{start}, {end}]")
+
+        return lines
+
+    def write(self, transcript: str, output_file: Path, encoding: str = "utf-8", cache_event: bool = True) -> Path:
         """
         Persist transcript text to disk and return the file path.
         """

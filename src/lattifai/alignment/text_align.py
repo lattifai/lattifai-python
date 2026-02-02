@@ -9,7 +9,8 @@ import regex
 from error_align import error_align
 from error_align.utils import DELIMITERS, NUMERIC_TOKEN, STANDARD_TOKEN, Alignment, OpType
 
-from lattifai.caption import Caption, Supervision
+from lattifai.caption import Supervision
+from lattifai.data import Caption
 from lattifai.utils import safe_print
 
 from .punctuation import PUNCTUATION

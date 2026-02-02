@@ -1,5 +1,6 @@
 """Alignment CLI entry point with nemo_run."""
 
+import sys
 from typing import Optional
 
 import nemo_run as run
@@ -12,9 +13,11 @@ from lattifai.config import (
     CaptionConfig,
     ClientConfig,
     DiarizationConfig,
+    EventConfig,
     MediaConfig,
     TranscriptionConfig,
 )
+from lattifai.errors import LattifAIError
 
 __all__ = ["align"]
 
@@ -30,6 +33,7 @@ def align(
     alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
     diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
+    event: Annotated[Optional[EventConfig], run.Config[EventConfig]] = None,
 ):
     """
     Align audio/video with caption file.
@@ -121,29 +125,36 @@ def align(
         caption_config=caption_config,
         transcription_config=transcription,
         diarization_config=diarization,
+        event_config=event,
     )
 
-    is_url = media_config.input_path.startswith(("http://", "https://"))
-    if is_url:
-        # Call the client's youtube method
-        return client.youtube(
-            url=media_config.input_path,
-            output_dir=media_config.output_dir,
+    try:
+        is_url = media_config.input_path.startswith(("http://", "https://"))
+        if is_url:
+            # Call the client's youtube method
+            return client.youtube(
+                url=media_config.input_path,
+                output_dir=media_config.output_dir,
+                output_caption_path=caption_config.output_path,
+                media_format=media_config.normalize_format() if media_config.output_format else None,
+                force_overwrite=media_config.force_overwrite,
+                split_sentence=caption_config.split_sentence,
+                channel_selector=media_config.channel_selector,
+            )
+
+        return client.alignment(
+            input_media=media_config.input_path,
+            input_caption=caption_config.input_path,
             output_caption_path=caption_config.output_path,
-            media_format=media_config.normalize_format() if media_config.output_format else None,
-            force_overwrite=media_config.force_overwrite,
             split_sentence=caption_config.split_sentence,
             channel_selector=media_config.channel_selector,
+            streaming_chunk_secs=media_config.streaming_chunk_secs,
         )
+    except LattifAIError as e:
+        from lattifai.errors import format_exception
 
-    return client.alignment(
-        input_media=media_config.input_path,
-        input_caption=caption_config.input_path,
-        output_caption_path=caption_config.output_path,
-        split_sentence=caption_config.split_sentence,
-        channel_selector=media_config.channel_selector,
-        streaming_chunk_secs=media_config.streaming_chunk_secs,
-    )
+        print(format_exception(e), file=sys.stderr)
+        sys.exit(1)
 
 
 def main():

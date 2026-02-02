@@ -100,6 +100,13 @@ class AlignmentConfig:
     Default: 5.0. Typical range: 0.0-10.0.
     """
 
+    transition_penalty: float = 0.0
+    """Penalty for token transitions in the decoding graph to discourage duration=1 tokens.
+    A negative value penalizes transitions (moving to next token), making the model prefer
+    self-loops (staying on current token longer). This helps prevent spurious short-duration alignments.
+    Default: 0.0 (no penalty). Typical range: -1.0 to 0.0 (e.g., -0.5).
+    """
+
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 

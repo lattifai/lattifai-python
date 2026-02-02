@@ -23,6 +23,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 - [CLI Reference](#cli-reference)
 - [Python SDK](#python-sdk)
 - [Advanced Features](#advanced-features)
+- [Text Processing](#text-processing)
 - [Supported Formats & Languages](#supported-formats--languages)
 - [Roadmap](#roadmap)
 - [Development](#development)
@@ -366,6 +367,51 @@ Input Media → AudioLoader → Aligner → (Diarizer) → Caption
                               ↑
 Input Caption → Reader → Tokenizer
 ```
+
+---
+
+## Text Processing
+
+The tokenizer handles various text patterns for forced alignment.
+
+### Bracket/Caption Handling
+
+Visual captions and annotations in brackets are treated specially - they get **two pronunciation paths** so the aligner can choose:
+1. **Silence path** - skip when content doesn't appear in audio
+2. **Inner text pronunciation** - match if someone actually says the words
+
+| Bracket Type | Symbol | Example | Alignment Behavior |
+|--------------|--------|---------|-------------------|
+| Half-width square | `[]` | `[APPLAUSE]` | Skip or match "applause" |
+| Half-width paren | `()` | `(music)` | Skip or match "music" |
+| Full-width square | `【】` | `【笑声】` | Skip or match "笑声" |
+| Full-width paren | `（）` | `（音乐）` | Skip or match "音乐" |
+| Angle brackets | `<>` | `<intro>` | Skip or match "intro" |
+| Book title marks | `《》` | `《开场白》` | Skip or match "开场白" |
+
+This allows proper handling of:
+- **Visual descriptions**: `[Barret adjusts the camera and smiles]` → skipped if not spoken
+- **Sound effects**: `[APPLAUSE]`, `(music)` → matched if audible
+- **Chinese annotations**: `【笑声】`, `（鼓掌）` → flexible alignment
+
+### Multilingual Text
+
+| Pattern | Handling | Example |
+|---------|----------|---------|
+| CJK characters | Split individually | `你好` → `["你", "好"]` |
+| Latin words | Grouped with accents | `Kühlschrank` → `["Kühlschrank"]` |
+| Contractions | Kept together | `I'm`, `don't`, `we'll` |
+| Punctuation | Attached to words | `Hello,` `world!` |
+
+### Speaker Labels
+
+Recognized speaker patterns are preserved during alignment:
+
+| Format | Example | Output |
+|--------|---------|--------|
+| Arrow prefix | `>> Alice:` or `&gt;&gt; Alice:` | `[Alice]` |
+| LattifAI format | `[SPEAKER_01]:` | `[SPEAKER_01]` |
+| Uppercase name | `SPEAKER NAME:` | `[SPEAKER NAME]` |
 
 ---
 

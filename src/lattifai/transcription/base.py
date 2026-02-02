@@ -7,8 +7,9 @@ from typing import List, Optional, Union
 import numpy as np
 
 from lattifai.audio2 import AudioData
-from lattifai.caption import Caption, Supervision
+from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
+from lattifai.data import Caption
 from lattifai.logging import get_logger
 
 

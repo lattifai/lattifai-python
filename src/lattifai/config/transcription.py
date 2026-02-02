@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal, Optional
 from ..utils import _select_device
 
 if TYPE_CHECKING:
-    from ..base_client import SyncAPIClient
+    from ..client import SyncAPIClient
 
 SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",
@@ -47,6 +47,30 @@ class TranscriptionConfig:
 
     language: Optional[str] = None
     """Target language code for transcription (e.g., 'en', 'zh', 'ja')."""
+
+    prompt: Optional[str] = None
+    """Custom prompt text or path to prompt file for transcription.
+    If the value is an existing file path, the file contents will be used.
+    Otherwise, the value is used directly as the prompt text."""
+
+    description: Optional[str] = None
+    """Media description from platforms like YouTube, Xiaoyuzhou (小宇宙), etc.
+    Used to provide context for transcription."""
+
+    thinking: bool = True
+    """Enable Gemini's thinking mode (Gemini models only). Set to False to disable thinking."""
+
+    include_thoughts: bool = False
+    """Include Gemini's thinking process in the output (Gemini models only). Requires thinking=True."""
+
+    temperature: Optional[float] = None
+    """Sampling temperature for generation. Higher values increase randomness."""
+
+    top_k: Optional[float] = None
+    """Top-k sampling parameter. Limits token selection to top k candidates."""
+
+    top_p: Optional[float] = None
+    """Nucleus sampling parameter. Limits token selection by cumulative probability."""
 
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""

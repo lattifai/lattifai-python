@@ -191,11 +191,16 @@ class Lattice1Worker:
                 float(output_beam),
                 int(min_active_states),
                 int(max_active_states),
+                allow_partial=True,
             )
 
-            # Streaming mode
+            # Streaming mode with confidence score accumulation
             total_duration = audio.duration
             total_minutes = int(total_duration / 60.0)
+
+            max_probs = []
+            aligned_probs = []
+            prev_labels_len = 0
 
             with tqdm(
                 total=total_minutes,
@@ -208,13 +213,43 @@ class Lattice1Worker:
                     chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale)
                     intersecter.decode(chunk_emission[0])
 
+                    __start = time.time()
+                    # Get partial labels and compute confidence stats for this chunk
+                    partial_labels = intersecter.get_partial_labels()
+                    chunk_len = chunk_emission.shape[1]
+
+                    # Get labels for current chunk (new labels since last chunk)
+                    chunk_labels = partial_labels[prev_labels_len : prev_labels_len + chunk_len]
+                    prev_labels_len = len(partial_labels)
+
+                    # Compute emission-based confidence stats
+                    probs = np.exp(chunk_emission[0])  # [T, V]
+                    max_probs.append(np.max(probs, axis=-1))  # [T]
+
+                    # Handle case where chunk_labels length might differ from chunk_len
+                    if len(chunk_labels) == chunk_len:
+                        aligned_probs.append(probs[np.arange(chunk_len), chunk_labels])
+                    else:
+                        # Fallback: use max probs as aligned probs (approximate)
+                        aligned_probs.append(np.max(probs, axis=-1))
+
+                    del chunk_emission, probs  # Free memory
+                    self.timings["align_>labels"] += time.time() - __start
+
                     # Update progress
                     chunk_duration = int(chunk.duration / 60.0)
                     pbar.update(chunk_duration)
 
-            emission_result = None
+            # Build emission_stats for confidence calculation
+            emission_stats = {
+                "max_probs": np.concatenate(max_probs),
+                "aligned_probs": np.concatenate(aligned_probs),
+            }
+
             # Get results from intersecter
+            __start = time.time()
             results, labels = intersecter.finish()
+            self.timings["align_>finish"] += time.time() - __start
         else:
             # Batch mode
             if emission is None:
@@ -230,13 +265,19 @@ class Lattice1Worker:
                 float(output_beam),
                 int(min_active_states),
                 int(max_active_states),
+                allow_partial=True,
             )
-            emission_result = emission
+            # Compute emission_stats from full emission (same format as streaming)
+            probs = np.exp(emission[0])  # [T, V]
+            emission_stats = {
+                "max_probs": np.max(probs, axis=-1),  # [T]
+                "aligned_probs": probs[np.arange(probs.shape[0]), labels[0]],  # [T]
+            }
 
         self.timings["align_segments"] += time.time() - _start
 
         channel = 0
-        return emission_result, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
+        return emission_stats, results, labels, self.frame_shift, offset, channel  # frame_shift=20ms
 
     def profile(self) -> None:
         """Print formatted profiling statistics."""
