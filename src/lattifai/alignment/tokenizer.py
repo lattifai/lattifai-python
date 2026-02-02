@@ -398,7 +398,7 @@ def _add_confidence_scores(
         probabilities = np.exp(emission[0, start_frame:end_frame])
         aligned = probabilities[range(0, end_frame - start_frame), tokens[start_frame:end_frame]]
         diffprobs = np.max(probabilities, axis=-1) - aligned
-        supervision.score = round(1.0 - diffprobs.mean(), ndigits=4)
+        supervision.score = round(1.0 - diffprobs.mean().item(), ndigits=4)
 
         # Compute word-level confidence if alignment exists
         if hasattr(supervision, "alignment") and supervision.alignment:
@@ -406,7 +406,7 @@ def _add_confidence_scores(
             for w, item in enumerate(words):
                 start = int((item.start - offset) / frame_shift) - start_frame
                 end = int((item.end - offset) / frame_shift) - start_frame
-                words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean(), ndigits=4))
+                words[w] = item._replace(score=round(1.0 - diffprobs[start:end].mean().item(), ndigits=4))
 
 
 def _update_alignments_speaker(supervisions: List[Supervision], alignments: List[Supervision]) -> List[Supervision]:
