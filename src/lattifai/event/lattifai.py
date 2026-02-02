@@ -110,32 +110,27 @@ class LattifAIEventDetector:
             return ""
         return self.detector.profiling(reset=reset, logger=self.logger)
 
-    def update(
+    def detect_events(
         self,
         audio: AudioData,
         caption: "Caption",
-        # led_output: Optional["LEDOutput"] = None
     ) -> "Caption":
         """
-        Run AED detection and update caption with audio events.
+        Run event detection and update caption with audio events.
 
-        This is the main entry point for integrating AED with alignment.
+        This is the main entry point for integrating event detection with alignment.
 
         Args:
             audio: AudioData to analyze
-            caption: Caption to update with AED results
+            caption: Caption to update with event detection results
 
         Returns:
             Updated Caption with audio_events field populated
         """
-        # Run AED detection
-        led_output, supervisions = self.detect.update(audio, caption.alignments or caption.supervisions)
+        # Run event detection
+        led_output = self.detect(audio)
 
         # Store audio_events in caption
         caption.audio_events = led_output.audio_events
-        if caption.alignments:
-            caption.alignments = supervisions
-        else:
-            caption.supervisions = supervisions
 
         return caption
