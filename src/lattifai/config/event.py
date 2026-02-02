@@ -32,9 +32,6 @@ class EventConfig:
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device for AED models."""
 
-    batch_size: int = 64
-    """Batch size for inference."""
-
     top_k: int = 10
     """Number of top event classes to detect."""
 
@@ -83,10 +80,6 @@ class EventConfig:
 
         if self.device == "auto":
             self.device = _select_device(self.device)
-
-        # Validate batch_size
-        if self.batch_size < 1:
-            raise ValueError("batch_size must be at least 1")
 
         # Validate top_k
         if self.top_k < 1:

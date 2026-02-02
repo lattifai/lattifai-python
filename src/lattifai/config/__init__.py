@@ -6,7 +6,6 @@ from lattifai.caption.config import (
     CAPTION_FORMATS,
     INPUT_CAPTION_FORMATS,
     OUTPUT_CAPTION_FORMATS,
-    CaptionConfig,
     CaptionFonts,
     CaptionStyle,
     InputCaptionFormat,
@@ -16,6 +15,9 @@ from lattifai.caption.config import (
 )
 
 from .alignment import AlignmentConfig
+
+# CaptionConfig is defined in lattifai-python (workflow config)
+from .caption import CaptionConfig
 from .client import ClientConfig
 from .diarization import DiarizationConfig
 from .event import EventConfig
