@@ -1,3 +1,40 @@
+# Release Notes - LattifAI Python v1.3.0
+
+**Release Date:** February 4, 2026
+
+---
+
+## Overview
+
+Major refactoring release with modular architecture improvements.
+
+---
+
+## Key Changes
+
+### Caption Module Extraction
+- Caption formats moved to separate `lattifai-captions` package
+- Reduced core dependencies and installation size
+
+### Event Detection
+- New audio event detection module (`[MUSIC]`, `[APPLAUSE]`, etc.)
+- Automatic event timestamp alignment
+
+### Transcription Enhancements
+- Gemini thinking mode and custom prompts
+- Generation params (temperature, top_k, top_p)
+- Citation metadata extraction
+
+---
+
+## Installation
+
+```bash
+pip install --upgrade lattifai
+```
+
+---
+
 ````markdown
 # Release Notes - LattifAI Python v1.2.2
 
