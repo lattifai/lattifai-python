@@ -6,36 +6,59 @@
 
 ## Overview
 
-Major refactoring release with modular architecture improvements.
+Major refactoring release with modular architecture and dependency restructure.
 
 ---
 
 ## Key Changes
 
+### Dependency Restructure
+
+**Base installation now includes forced alignment:**
+
+```bash
+pip install lattifai  # Includes alignment (k2py, ONNX, lhotse)
+```
+
+**Optional extras:**
+
+| Extra | Command | Includes |
+|-------|---------|----------|
+| `all` | `pip install "lattifai[all]"` | transcription + youtube |
+| `transcription` | `pip install "lattifai[transcription]"` | Gemini, Parakeet, SenseVoice |
+| `youtube` | `pip install "lattifai[youtube]"` | yt-dlp |
+| `diarization` | `pip install "lattifai[diarization]"` | NeMo, pyannote |
+| `event` | `pip install "lattifai[event]"` | Audio event detection |
+
 ### Caption Module Extraction
-- Caption formats moved to separate `lattifai-captions` package
-- Reduced core dependencies and installation size
+- Caption formats moved to [`lattifai-captions`](https://github.com/lattifai/captions) package
+- Reduced core dependencies
 
 ### Event Detection
-- New audio event detection module (`[MUSIC]`, `[APPLAUSE]`, etc.)
+- New audio event detection (`[MUSIC]`, `[APPLAUSE]`, etc.)
 - Automatic event timestamp alignment
 
 ### Transcription Enhancements
-- Gemini thinking mode and custom prompts
+- Gemini thinking mode (`include_thoughts`)
+- Custom prompt support
 - Generation params (temperature, top_k, top_p)
 - Citation metadata extraction
+
+### Bug Fixes
+- GeminiTranscriber now supports Caption objects in `write()` method
+- Suppressed CoreML warnings about partial graph support
+- Sanity check and partial results support in Lattice1Aligner
 
 ---
 
 ## Installation
 
 ```bash
-# Full installation (recommended)
+# Recommended: full installation
 pip install --upgrade "lattifai[all]"
 
-# Or specific features only
-pip install "lattifai[alignment]"      # Forced alignment
-pip install "lattifai[transcription]"  # ASR models
+# Base only (forced alignment)
+pip install lattifai
 ```
 
 ---

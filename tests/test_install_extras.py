@@ -139,6 +139,12 @@ class TestTranscriptionInstall:
 
         assert google.genai is not None
 
+    def test_nemo_asr(self):
+        """nemo_toolkit_asr should be available."""
+        import nemo.collections.asr
+
+        assert nemo.collections.asr is not None
+
     def test_gemini_transcriber(self):
         """GeminiTranscriber should be importable."""
         from lattifai.transcription.gemini import GeminiTranscriber
@@ -212,6 +218,12 @@ class TestDiarizationInstall:
 
         assert pyannote.audio is not None
 
+    def test_nemo_asr(self):
+        """nemo_toolkit_asr should be available."""
+        import nemo.collections.asr
+
+        assert nemo.collections.asr is not None
+
     def test_diarization_config(self):
         """DiarizationConfig should be importable."""
         from lattifai.config import DiarizationConfig
@@ -246,10 +258,11 @@ class TestInstallSummary:
     def test_report_installed_extras(self):
         """Report which extras are installed."""
         extras = {
-            "base": ["dotenv", "colorful", "lattifai.caption", "lattifai_core", "k2", "lhotse", "onnxruntime"],
-            "transcription": ["google.genai", "OmniSenseVoice"],
-            "youtube": ["yt_dlp", "questionary"],
-            "diarization": ["pyannote.audio"],
+            "base": ["dotenv", "colorful", "lattifai.caption", "lattifai_core", "k2", "lhotse", "onnxruntime", "av"],
+            "transcription": ["google.genai", "OmniSenseVoice", "nemo.collections.asr"],
+            "youtube": ["yt_dlp", "questionary", "Crypto"],
+            "diarization": ["pyannote.audio", "nemo.collections.asr"],
+            "event": ["pyannote.audio"],
         }
 
         print("\n" + "=" * 60)
