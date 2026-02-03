@@ -30,7 +30,7 @@ class EventConfig:
     """Enable audio event detection."""
 
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
-    """Computation device for AED models."""
+    """Computation device for Event Detection models."""
 
     top_k: int = 10
     """Number of top event classes to detect."""

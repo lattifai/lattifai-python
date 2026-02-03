@@ -13,7 +13,7 @@ from lattifai.errors import CaptionProcessingError
 from lattifai.utils import safe_print
 
 if TYPE_CHECKING:
-    from .config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, TranscriptionConfig
+    from .config import AlignmentConfig, DiarizationConfig, EventConfig, TranscriptionConfig
 
 
 class LattifAIClientMixin:
@@ -170,9 +170,10 @@ class LattifAIClientMixin:
         alignment_config: Optional["AlignmentConfig"],
         transcription_config: Optional["TranscriptionConfig"],
         diarization_config: Optional["DiarizationConfig"] = None,
+        event_config: Optional["EventConfig"] = None,
     ) -> tuple:
         """Initialize all configs with defaults if not provided."""
-        from .config import AlignmentConfig, DiarizationConfig, TranscriptionConfig
+        from .config import AlignmentConfig, DiarizationConfig, EventConfig, TranscriptionConfig
 
         if alignment_config is None:
             alignment_config = AlignmentConfig()
@@ -180,20 +181,24 @@ class LattifAIClientMixin:
             transcription_config = TranscriptionConfig()
         if diarization_config is None:
             diarization_config = DiarizationConfig()
+        if event_config is None:
+            event_config = EventConfig()
 
         from lattifai.utils import _resolve_model_path
 
-        if transcription_config is not None:
-            transcription_config.lattice_model_path = _resolve_model_path(
-                alignment_config.model_name, getattr(alignment_config, "model_hub", "huggingface")
-            )
+        model_path = _resolve_model_path(
+            alignment_config.model_name, getattr(alignment_config, "model_hub", "modelscope")
+        )
+        transcription_config.lattice_model_path = model_path
+        event_config.model_path = model_path
 
         # Set client_wrapper for all configs
         alignment_config.client_wrapper = self
         transcription_config.client_wrapper = self
         diarization_config.client_wrapper = self
+        event_config.client_wrapper = self
 
-        return alignment_config, transcription_config, diarization_config
+        return alignment_config, transcription_config, diarization_config, event_config
 
     def _init_shared_components(
         self,

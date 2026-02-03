@@ -69,8 +69,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         self.config = client_config
 
         # Initialize all configs with defaults
-        alignment_config, transcription_config, diarization_config = self._init_configs(
-            alignment_config, transcription_config, diarization_config
+        alignment_config, transcription_config, diarization_config, event_config = self._init_configs(
+            alignment_config, transcription_config, diarization_config, event_config
         )
 
         # Store configs
@@ -93,8 +93,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             self.diarizer = LattifAIDiarizer(config=self.diarization_config)
 
         # Initialize event detector if enabled
-        self.event_config = event_config or EventConfig()
-        self.event_config.client_wrapper = self
+        self.event_config = event_config
         self.event_detector: Optional["LattifAIEventDetector"] = None
         if self.event_config.enabled:
             from lattifai.event import LattifAIEventDetector  # noqa: F811
