@@ -25,7 +25,7 @@ class TestTranscribeGeminiSave:
         output_dir parameter, the raw transcription string should be saved
         before it's converted to Caption object.
         """
-        from lattifai import LattifAI
+        from lattifai.client import LattifAI
         from lattifai.config import TranscriptionConfig
 
         with tempfile.TemporaryDirectory() as tmpdir:

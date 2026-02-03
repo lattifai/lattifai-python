@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.2.2'
+version = '1.3.0'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -43,9 +43,8 @@ dependencies = [
 [project.optional-dependencies]
 # Core: k2, lattice operations, audio processing
 core = [
-    "lattifai-captions[splitting]>=0.1.5",
-    "lattifai-core>=0.6.0",
-    "scipy!=1.16.3",
+    "lattifai-captions[splitting]>=0.1.6",
+    "lattifai-core-hq>=0.6.4",
 ]
 # Alignment: forced alignment with Lattice-1 (requires lhotse → torch)
 alignment-flash = [

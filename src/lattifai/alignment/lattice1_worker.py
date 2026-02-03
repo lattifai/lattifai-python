@@ -35,6 +35,8 @@ class Lattice1Worker:
         sess_options.intra_op_num_threads = num_threads  # CPU cores
         sess_options.execution_mode = ort.ExecutionMode.ORT_PARALLEL
         sess_options.add_session_config_entry("session.intra_op.allow_spinning", "0")
+        # Suppress CoreMLExecutionProvider warnings about partial graph support
+        sess_options.log_severity_level = 3  # ERROR level only
 
         acoustic_model_path = f"{model_path}/acoustic_opt.onnx"
 

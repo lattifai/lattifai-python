@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## [1.3.0] - 2026-02-04
+
+### Added
+- **Event Detection**: Automatic detection and timestamp alignment of non-speech audio events (`[MUSIC]`, `[APPLAUSE]`, etc.)
+- **Streaming Confidence Scores**: Real-time confidence scoring with anomaly detection during alignment
+- **Extended Caption Class**: New pipeline fields for transcription, events, diarization in Caption dataclass
+- **Transcription Enhancements**:
+  - Thinking mode with `include_thoughts` config for Gemini
+  - Custom prompt support for transcription models
+  - Temperature, top_k, top_p generation parameters
+  - Citation metadata extraction from Gemini responses
+- **Transition Penalty**: New `transition_penalty` parameter in AlignmentConfig for tuning alignment behavior
+
+### Changed
+- **Caption Module Migration**: Moved caption formats to `lattifai-captions` package (reduced core dependencies)
+- **Config Centralization**: Migrated CaptionConfig from lattifai-captions to lattifai-python
+- **Dependency Restructure**: Minimal base install with optional extras (`alignment-flash`, `alignment`, `transcription`, etc.)
+
+### Fixed
+- GeminiTranscriber now properly supports Caption objects in `write()` method
+- Use `importlib.metadata` for SDK version detection (more reliable)
+- Suppressed CoreMLExecutionProvider warnings about partial graph support
+- Sanity check and partial results support in Lattice1Aligner
+
 ## [1.2.2] - 2026-01-18
 
 ### Added
