@@ -99,6 +99,7 @@ class LattifAIEventDetector:
             vad_chunk_size=vad_chunk_size or self.config.vad_chunk_size,
             vad_max_gap=vad_max_gap or self.config.vad_max_gap,
             fast_mode=fast_mode if fast_mode is not None else self.config.fast_mode,
+            custom_aliases=self.config.event_aliases or {},
         )
 
     def profiling(self, reset: bool = False) -> str:
@@ -107,10 +108,13 @@ class LattifAIEventDetector:
             return ""
         return self.detector.profiling(reset=reset, logger=self.logger)
 
-    def detect_events(
+    def detect_and_update_caption(
         self,
-        audio: AudioData,
         caption: "Caption",
+        input_media: AudioData,
+        vad_chunk_size: Optional[float] = None,
+        vad_max_gap: Optional[float] = None,
+        fast_mode: Optional[bool] = None,
     ) -> "Caption":
         """
         Run event detection and update caption with audio events.
@@ -125,27 +129,37 @@ class LattifAIEventDetector:
         Returns:
             Updated Caption with event field populated
         """
-        # Get supervisions to process
-        supervisions = caption.alignments or caption.supervisions
-
-        # Run event detection
-        led_output = self.detect(audio)
-
-        # Store LEDOutput in caption
-        caption.event = led_output
-
         # Event matching: update caption timestamps based on detected events
-        if self.config.event_matching and supervisions:
-            supervisions = self.detector.match_events_with_supervisions(
-                audio_events=led_output.audio_events,
+        if self.config.event_matching:
+            # Get supervisions to process
+            supervisions = caption.alignments or caption.supervisions
+
+            led_output, supervisions = self.detector.detect_and_update_supervisions(
                 supervisions=supervisions,
+                audio=input_media,
+                vad_chunk_size=vad_chunk_size or self.config.vad_chunk_size,
+                vad_max_gap=vad_max_gap or self.config.vad_max_gap,
+                fast_mode=fast_mode if fast_mode is not None else self.config.fast_mode,
                 custom_aliases=self.config.event_aliases or {},
+                extra_events=self.config.extra_events or None,
                 timestamp_tolerance=self.config.event_timestamp_tolerance,
                 update_timestamps=self.config.update_event_timestamps,
             )
+            # Store LEDOutput in caption
+            caption.event = led_output
+
             if caption.alignments:
                 caption.alignments = supervisions
             else:
                 caption.supervisions = supervisions
+        else:
+            # Simple detection without event matching
+            led_output = self.detect(
+                input_media=input_media,
+                vad_chunk_size=vad_chunk_size,
+                vad_max_gap=vad_max_gap,
+                fast_mode=fast_mode,
+            )
+            caption.event = led_output
 
         return caption

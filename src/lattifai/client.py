@@ -279,8 +279,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Step 6: Event detection
         if self.event_config.enabled and self.event_detector:
-            safe_print(colorful.cyan("🎵 Performing audio event detection..."))
-            caption = self.event_detector.detect_events(media_audio, caption)
+            safe_print(colorful.cyan("🔊 Performing audio event detection..."))
+            caption = self.event_detector.detect_and_update_caption(caption, media_audio)
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
 

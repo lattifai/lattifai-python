@@ -32,9 +32,6 @@ class EventConfig:
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device for Event Detection models."""
 
-    top_k: int = 10
-    """Number of top event classes to detect."""
-
     vad_chunk_size: float = 30.0
     """VAD chunk size in seconds for speech segmentation."""
 
@@ -53,8 +50,8 @@ class EventConfig:
     event_matching: bool = True
     """Whether update events in the alignment"""
 
-    extra_labels: List[str] = field(default_factory=list)
-    """Additional AED labels to always detect, even if not in top_k.
+    extra_events: List[str] = field(default_factory=list)
+    """Additional event types to always detect, even if not in top_k.
     Example: ["Applause", "Laughter", "Music"]
     """
 
@@ -80,10 +77,6 @@ class EventConfig:
 
         if self.device == "auto":
             self.device = _select_device(self.device)
-
-        # Validate top_k
-        if self.top_k < 1:
-            raise ValueError("top_k must be at least 1")
 
         # Validate vad_chunk_size
         if self.vad_chunk_size < 0:
