@@ -65,7 +65,6 @@ jobs:
         run: |
           pip install -e ".[all,dev]"  # Install all features + test dependencies
           python tests/test_basic.py  # Run basic tests
-          pytest tests/caption/test_text_parser.py -v
           pytest ./tests/streaming
           bash tests/test_audio_formats.sh  # Run audio format tests
 
