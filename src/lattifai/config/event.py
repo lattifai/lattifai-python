@@ -44,9 +44,6 @@ class EventConfig:
     model_path: str = ""
     """Path to pretrained model. If empty, uses default bundled model."""
 
-    verbose: bool = False
-    """Enable verbose logging for AED operations."""
-
     event_matching: bool = True
     """Whether update events in the alignment"""
 
@@ -57,7 +54,7 @@ class EventConfig:
 
     event_aliases: Dict[str, List[str]] = field(default_factory=dict)
     """Custom aliases for event matching.
-    Example: {"Laughs": ["Laughter"], "Heavy breathing": ["Breathing", "Pant"]}
+    Example: {"Laughs": ["Laughter"], "Heavy breathing": ["Breathing"]}
     """
 
     event_timestamp_tolerance: float = 2.0
@@ -65,6 +62,13 @@ class EventConfig:
 
     update_event_timestamps: bool = True
     """Whether to update caption event timestamps based on AED detections."""
+
+    duplicate_event_strategy: Literal["keep_all", "merge_first", "split"] = "merge_first"
+    """Strategy for handling multiple [Event] markers mapped to same AED interval.
+    - keep_all: Update all events to same time range (may cause overlapping)
+    - merge_first: Keep only first event per interval, mark others for removal
+    - split: Split interval at speech boundaries between events
+    """
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
