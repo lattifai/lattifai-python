@@ -315,12 +315,12 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if diarization_file.exists():
                 safe_print(colorful.cyan(f"Reading existing speaker diarization from {diarization_file}"))
-                caption.read_speaker_diarization(diarization_file)
+                caption.read_diarization(diarization_file)
 
         diarization, alignments = self.diarizer.diarize_with_alignments(
             input_media,
             caption.alignments,
-            diarization=caption.speaker_diarization,
+            diarization=caption.diarization,
             alignment_fn=self.aligner.alignment,
             transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
             separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
@@ -328,7 +328,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             output_path=output_caption_path,
         )
         caption.alignments = alignments
-        caption.speaker_diarization = diarization
+        caption.diarization = diarization
 
         # Write output if requested
         if output_caption_path:

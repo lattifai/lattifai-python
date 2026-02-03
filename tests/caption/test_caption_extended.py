@@ -14,8 +14,8 @@ class TestExtendedCaption:
         c = Caption()
         assert hasattr(c, "transcription")
         assert hasattr(c, "alignments")
-        assert hasattr(c, "audio_events")
-        assert hasattr(c, "speaker_diarization")
+        assert hasattr(c, "event")
+        assert hasattr(c, "diarization")
 
     def test_caption_with_transcription(self):
         """Test creating Caption with transcription data."""

@@ -152,7 +152,7 @@ src/lattifai/
 
 **Caption** (`caption/caption.py`):
 - Central dataclass containing all results
-- Fields: `supervisions`, `transcription`, `audio_events`, `speaker_diarization`, `alignments`
+- Fields: `supervisions`, `transcription`, `event`, `diarization`, `alignments`
 - Handles reading/writing 30+ caption formats via format handlers
 - Supports metadata (language, kind, source_format, source_path)
 

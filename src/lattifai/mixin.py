@@ -288,7 +288,7 @@ class LattifAIClientMixin:
             if diarization_file.exists():
                 if verbose:
                     safe_print(colorful.cyan(f"📖 Step1b: Reading speaker diarization from {diarization_file}"))
-                caption.read_speaker_diarization(diarization_file)
+                caption.read_diarization(diarization_file)
             event_file = Path(str(input_caption)).with_suffix(".LED")
             if event_file.exists():
                 if verbose:
@@ -333,9 +333,9 @@ class LattifAIClientMixin:
                 karaoke_config=self.caption_config.karaoke,
             )
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
-            if not diarization_file.exists() and caption.speaker_diarization:
+            if not diarization_file.exists() and caption.diarization:
                 safe_print(colorful.green(f"    Writing speaker diarization to: {diarization_file}"))
-                caption.write_speaker_diarization(diarization_file)
+                caption.write_diarization(diarization_file)
 
             safe_print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
             return result

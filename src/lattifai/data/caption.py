@@ -20,26 +20,31 @@ class Caption(BaseCaption):
     Extended Caption with transcription, alignment, and diarization support.
 
     Inherits from BaseCaption and adds fields for:
+    - alignments: Post-alignment results
     - transcription: ASR results
     - event: LattifAI Event Detection results (LEDOutput)
-    - speaker_diarization: Speaker diarization results
-    - alignments: Post-alignment results
+    - diarization: Speaker diarization results
+
 
     These fields are used in the LattifAI pipeline for:
+    - Forced alignment results
     - Storing intermediate transcription results
     - LattifAI Event Detection (music, applause, speech, etc.)
     - Speaker identification and separation
-    - Forced alignment results
+
     """
+
+    # Alignment results
+    alignments: List[Supervision] = field(default_factory=list)
 
     # Transcription results
     transcription: List[Supervision] = field(default_factory=list)
+
     # LattifAI Event Detection results
     event: Optional["LEDOutput"] = None
+
     # Speaker Diarization results
-    speaker_diarization: Optional[DiarizationOutput] = None
-    # Alignment results
-    alignments: List[Supervision] = field(default_factory=list)
+    diarization: Optional[DiarizationOutput] = None
 
     def __len__(self) -> int:
         """Return the number of supervision segments."""
@@ -105,7 +110,7 @@ class Caption(BaseCaption):
             supervisions=adjusted_sups,
             transcription=self.transcription,
             event=self.event,
-            speaker_diarization=self.speaker_diarization,
+            diarization=self.diarization,
             alignments=[],  # Clear alignments since we've applied them
             language=self.language,
             kind=self.kind,
@@ -167,7 +172,7 @@ class Caption(BaseCaption):
         cls,
         transcription: List[Supervision],
         event: Optional["LEDOutput"] = None,
-        speaker_diarization: Optional[DiarizationOutput] = None,
+        diarization: Optional[DiarizationOutput] = None,
         language: Optional[str] = None,
         source_path: Optional[Pathlike] = None,
         metadata: Optional[Dict[str, str]] = None,
@@ -178,7 +183,7 @@ class Caption(BaseCaption):
         Args:
             transcription: List of transcription supervision segments
             event: Optional LEDOutput with event detection results
-            speaker_diarization: Optional DiarizationOutput with speaker diarization results
+            diarization: Optional DiarizationOutput with speaker diarization results
             language: Language code
             source_path: Source file path
             metadata: Additional metadata
@@ -189,7 +194,7 @@ class Caption(BaseCaption):
         return cls(
             transcription=transcription,
             event=event,
-            speaker_diarization=speaker_diarization,
+            diarization=diarization,
             language=language,
             kind="transcription",
             source_format="asr",
@@ -197,7 +202,7 @@ class Caption(BaseCaption):
             metadata=metadata or {},
         )
 
-    def read_speaker_diarization(
+    def read_diarization(
         self,
         path: Pathlike,
     ) -> "DiarizationOutput":
@@ -206,18 +211,18 @@ class Caption(BaseCaption):
         """
         from lattifai_core.diarization import DiarizationOutput
 
-        self.speaker_diarization = DiarizationOutput.read(path)
-        return self.speaker_diarization
+        self.diarization = DiarizationOutput.read(path)
+        return self.diarization
 
-    def write_speaker_diarization(
+    def write_diarization(
         self,
         path: Pathlike,
     ) -> Pathlike:
         """
         Write speaker diarization TextGrid to file.
         """
-        if not self.speaker_diarization:
+        if not self.diarization:
             raise ValueError("No speaker diarization data to write.")
 
-        self.speaker_diarization.write(path)
+        self.diarization.write(path)
         return path
