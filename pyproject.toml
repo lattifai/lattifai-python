@@ -43,15 +43,15 @@ dependencies = [
 [project.optional-dependencies]
 # Core: k2, lattice operations, audio processing
 core = [
+    "lattifai-captions[splitting]>=0.1.5",
     "lattifai-core>=0.6.0",
     "scipy!=1.16.3",
 ]
 # Alignment: forced alignment with Lattice-1 (requires lhotse → torch)
 alignment-flash = [
     "lattifai[core]",
-    "lattifai-captions[splitting]>=0.1.0",
     "lhotse>=1.26.0",
-    "k2py>=0.2.1",
+    "k2py==0.2.4",
     "onnxruntime",
     "av",
     "msgpack",

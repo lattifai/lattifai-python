@@ -53,21 +53,28 @@ class EventConfig:
     """
 
     event_aliases: Dict[str, List[str]] = field(default_factory=dict)
-    """Custom aliases for event matching.
-    Example: {"Laughs": ["Laughter"], "Heavy breathing": ["Breathing"]}
+    """Custom aliases mapping [Event] markers to AED labels.
+
+    Core AED labels (14 types):
+        [Applause], [Baby cry], [Battle cry], [Bellow], [Children shouting],
+        [Laughter], [Music], [Shout], [Singing], [Sound effect],
+        [Speech], [Whoop], [Yell]
+
+    Custom aliases extend built-ins (not replace):
+        {"[Audience reaction]": ["[Applause]", "[Cheering]"]}
     """
 
-    event_timestamp_tolerance: float = 2.0
-    """Maximum time difference (seconds) for matching caption events to AED detections."""
+    time_tolerance: float = 20.0
+    """Max time (seconds) non-Speech events can extend beyond supervision boundaries."""
 
-    update_event_timestamps: bool = True
+    update_timestamps: bool = True
     """Whether to update caption event timestamps based on AED detections."""
 
-    duplicate_event_strategy: Literal["keep_all", "merge_first", "split"] = "merge_first"
+    duplicate_strategy: Literal["keep_all", "merge_first", "split"] = "merge_first"
     """Strategy for handling multiple [Event] markers mapped to same AED interval.
     - keep_all: Update all events to same time range (may cause overlapping)
-    - merge_first: Keep only first event per interval, mark others for removal
-    - split: Split interval at speech boundaries between events
+    - merge_first: Keep only first event per interval, skip duplicates
+    - split: Split interval at speech boundaries (not yet implemented)
     """
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
@@ -90,6 +97,6 @@ class EventConfig:
         if self.vad_max_gap < 0:
             raise ValueError("vad_max_gap must be non-negative")
 
-        # Validate event_timestamp_tolerance
-        if self.event_timestamp_tolerance < 0:
-            raise ValueError("event_timestamp_tolerance must be non-negative")
+        # Validate time_tolerance
+        if self.time_tolerance < 0:
+            raise ValueError("time_tolerance must be non-negative")

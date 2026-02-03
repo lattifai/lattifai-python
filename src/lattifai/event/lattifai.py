@@ -142,8 +142,9 @@ class LattifAIEventDetector:
                 fast_mode=fast_mode if fast_mode is not None else self.config.fast_mode,
                 custom_aliases=self.config.event_aliases or {},
                 extra_events=self.config.extra_events or None,
-                timestamp_tolerance=self.config.event_timestamp_tolerance,
-                update_timestamps=self.config.update_event_timestamps,
+                time_tolerance=self.config.time_tolerance,
+                update_timestamps=self.config.update_timestamps,
+                duplicate_strategy=self.config.duplicate_strategy,
             )
             # Store LEDOutput in caption
             caption.event = led_output
