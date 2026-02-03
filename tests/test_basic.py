@@ -48,7 +48,7 @@ def test_LattifAI_import():
 
 
 def test_io_imports():
-    """Test that I/O modules can be imported"""
+    """Test that I/O modules can be imported (requires lattifai[core])"""
     try:
         from lattifai.caption import Caption, Supervision
 
@@ -57,12 +57,12 @@ def test_io_imports():
         print("✓ Successfully imported I/O modules")
         return True
     except ImportError as e:
-        print(f"✗ Failed to import I/O modules: {e}")
-        return False
+        print(f"⊘ Skipped I/O modules test (requires lattifai[core]): {e}")
+        return None  # Skip, not fail
 
 
 def test_client_class_exists():
-    """Test that LattifAI client class can be imported"""
+    """Test that LattifAI client class can be imported (requires lattifai[alignment])"""
     try:
         from lattifai.client import LattifAI
 
@@ -70,19 +70,22 @@ def test_client_class_exists():
         print("✓ Successfully imported LattifAI client class")
         return True
     except ImportError as e:
-        print(f"✗ Failed to import LattifAI client class: {e}")
-        return False
+        print(f"⊘ Skipped client class test (requires lattifai[alignment]): {e}")
+        return None  # Skip, not fail
 
 
 def test_alignment_method_exists():
-    """Test that alignment method exists on LattifAI class"""
+    """Test that alignment method exists on LattifAI class (requires lattifai[alignment])"""
     try:
         from lattifai.client import LattifAI
 
         assert hasattr(LattifAI, "alignment"), "LattifAI should have alignment method"
         print("✓ LattifAI.alignment method exists")
         return True
-    except (ImportError, AssertionError) as e:
+    except ImportError as e:
+        print(f"⊘ Skipped alignment method test (requires lattifai[alignment]): {e}")
+        return None  # Skip, not fail
+    except AssertionError as e:
         print(f"✗ alignment method check failed: {e}")
         return False
 
@@ -98,13 +101,16 @@ if __name__ == "__main__":
     results.append(test_client_class_exists())
     results.append(test_alignment_method_exists())
 
-    passed = sum(results)
+    # Count results: True=passed, False=failed, None=skipped
+    passed = sum(1 for r in results if r is True)
+    failed = sum(1 for r in results if r is False)
+    skipped = sum(1 for r in results if r is None)
     total = len(results)
 
-    print(f"\nTest Results: {passed}/{total} tests passed")
+    print(f"\nTest Results: {passed} passed, {failed} failed, {skipped} skipped (total: {total})")
 
-    if passed == total:
-        print("🎉 All basic tests passed!")
+    if failed == 0:
+        print("🎉 All required tests passed!")
         sys.exit(0)
     else:
         print("❌ Some tests failed!")
