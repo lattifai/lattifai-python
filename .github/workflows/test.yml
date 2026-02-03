@@ -100,10 +100,10 @@ jobs:
           fi
           # Test lai-transcribe command
           # Gemini Model
-          lai-transcribe -Y tests/data/SA1.wav tests/data/SA1_gemini.md transcription.model_name=gemini-2.5-pro -v
+          lai-transcribe -Y tests/data/SA1.wav tests/data/SA1_gemini.md transcription.model_name=gemini-3-flash-preview -v
           # Test Gemini transcribe align with output file (PR #32 regression test)
           lai transcribe align -Y tests/data/SA1.wav tests/data/SA1_gemini_aligned.srt \
-              transcription.model_name=gemini-2.5-pro -v
+              transcription.model_name=gemini-3-flash-preview -v
           # iic/SenseVoiceSmall
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=iic/SenseVoiceSmall
 

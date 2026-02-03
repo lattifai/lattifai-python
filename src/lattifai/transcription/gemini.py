@@ -11,6 +11,7 @@ from google.genai.types import GenerateContentConfig, Part, ThinkingConfig
 from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
+from lattifai.data import Caption
 from lattifai.transcription.base import BaseTranscriber
 from lattifai.transcription.prompts import get_prompt_loader
 
@@ -453,11 +454,23 @@ class GeminiTranscriber(BaseTranscriber):
 
         return lines
 
-    def write(self, transcript: str, output_file: Path, encoding: str = "utf-8", cache_event: bool = True) -> Path:
+    def write(
+        self, transcript: Union[str, Caption], output_file: Path, encoding: str = "utf-8", cache_event: bool = True
+    ) -> Path:
         """
-        Persist transcript text to disk and return the file path.
+        Persist transcript to disk and return the file path.
+
+        Supports both raw string (from transcribe_file) and Caption object
+        (after conversion in mixin._transcribe).
         """
         if isinstance(output_file, str):
             output_file = Path(output_file)
-        output_file.write_text(transcript, encoding=encoding)
+
+        if isinstance(transcript, Caption):
+            # Caption object - use its write method with gemini format
+            transcript.write(output_file, output_format="gemini")
+        else:
+            # Raw string from transcription
+            output_file.write_text(transcript, encoding=encoding)
+
         return output_file
