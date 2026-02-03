@@ -34,32 +34,31 @@ classifiers = [
     'Topic :: Multimedia :: Video',
     'Topic :: Scientific/Engineering :: Artificial Intelligence',
 ]
-# Minimal base dependencies (no PyTorch, no heavy libs)
+
 dependencies = [
     "python-dotenv",
     "colorful>=0.5.6",
-]
-
-[project.optional-dependencies]
-# Core: k2, lattice operations, audio processing
-core = [
+    "lattifai-run>=1.0.1",
     "lattifai-captions[splitting]>=0.1.6",
     "lattifai-core-hq>=0.6.4",
-]
-# Alignment: forced alignment with Lattice-1 (requires lhotse → torch)
-alignment-flash = [
-    "lattifai[core]",
+    "g2p-phonemizer>=0.4.0",
+    "error-align-fix>=0.1.4",
     "lhotse>=1.26.0",
     "k2py==0.2.4",
     "onnxruntime",
     "av",
     "msgpack",
 ]
-# +G2P: OOV word support
-alignment = [
-    "lattifai[alignment-flash]",
-    "g2p-phonemizer>=0.4.0",
-    "error-align-fix>=0.1.4",
+
+[project.optional-dependencies]
+# Event
+event = [
+    "pyannote-audio-notorchdeps>=4.0.2",
+]
+# Diarization
+diarization = [
+    "nemo_toolkit_asr[asr]>=2.7.0rc4",
+    "pyannote-audio-notorchdeps>=4.0.2",
 ]
 # Transcription: ASR models + diarization
 transcription = [
@@ -83,8 +82,6 @@ dev = [
 ]
 # All: install everything
 all = [
-    "lattifai-run>=1.0.1",
-    "lattifai[alignment]",
     "lattifai[transcription]",
     "lattifai[youtube]",
 ]

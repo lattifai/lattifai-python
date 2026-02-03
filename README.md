@@ -93,14 +93,14 @@ pip install "lattifai[all]"
 
 | Extra | Command | Includes |
 |-------|---------|----------|
-| `all` | `pip install "lattifai[all]"` | Everything below |
-| `alignment` | `pip install "lattifai[alignment]"` | Forced alignment (Lattice-1, k2py, ONNX) |
+| (base) | `pip install lattifai` | Forced alignment (Lattice-1, k2py, ONNX, captions) |
+| `all` | `pip install "lattifai[all]"` | Base + transcription + youtube |
 | `transcription` | `pip install "lattifai[transcription]"` | ASR models (Gemini, Parakeet, SenseVoice) |
 | `youtube` | `pip install "lattifai[youtube]"` | YouTube download (yt-dlp) |
-| `core` | `pip install "lattifai[core]"` | Caption formats only |
-| (base) | `pip install lattifai` | Minimal (dotenv, colorful) |
+| `diarization` | `pip install "lattifai[diarization]"` | Speaker diarization (NeMo, pyannote) |
+| `event` | `pip install "lattifai[event]"` | Audio event detection |
 
-**Note:** Base installation only includes minimal dependencies. For most users, `lattifai[all]` is recommended.
+**Note:** Base installation includes full alignment functionality. Use `[all]` for transcription and YouTube features.
 
 ### Caption Format Support
 

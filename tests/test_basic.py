@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Basic tests for lattifai package
+Basic tests for lattifai package (base installation includes alignment)
 """
 
 import sys
@@ -35,7 +35,7 @@ def test_package_structure():
 
 
 def test_LattifAI_import():
-    """Test that base modules can be imported without complex dependencies"""
+    """Test that base modules can be imported"""
     try:
         from lattifai.errors import LattifAIError
 
@@ -48,7 +48,7 @@ def test_LattifAI_import():
 
 
 def test_io_imports():
-    """Test that I/O modules can be imported (requires lattifai[core])"""
+    """Test that I/O modules can be imported"""
     try:
         from lattifai.caption import Caption, Supervision
 
@@ -57,12 +57,12 @@ def test_io_imports():
         print("✓ Successfully imported I/O modules")
         return True
     except ImportError as e:
-        print(f"⊘ Skipped I/O modules test (requires lattifai[core]): {e}")
-        return None  # Skip, not fail
+        print(f"✗ Failed to import I/O modules: {e}")
+        return False
 
 
 def test_client_class_exists():
-    """Test that LattifAI client class can be imported (requires lattifai[alignment])"""
+    """Test that LattifAI client class can be imported"""
     try:
         from lattifai.client import LattifAI
 
@@ -70,12 +70,12 @@ def test_client_class_exists():
         print("✓ Successfully imported LattifAI client class")
         return True
     except ImportError as e:
-        print(f"⊘ Skipped client class test (requires lattifai[alignment]): {e}")
-        return None  # Skip, not fail
+        print(f"✗ Failed to import LattifAI client class: {e}")
+        return False
 
 
 def test_alignment_method_exists():
-    """Test that alignment method exists on LattifAI class (requires lattifai[alignment])"""
+    """Test that alignment method exists on LattifAI class"""
     try:
         from lattifai.client import LattifAI
 
@@ -83,8 +83,8 @@ def test_alignment_method_exists():
         print("✓ LattifAI.alignment method exists")
         return True
     except ImportError as e:
-        print(f"⊘ Skipped alignment method test (requires lattifai[alignment]): {e}")
-        return None  # Skip, not fail
+        print(f"✗ Failed to import LattifAI: {e}")
+        return False
     except AssertionError as e:
         print(f"✗ alignment method check failed: {e}")
         return False
@@ -101,16 +101,13 @@ if __name__ == "__main__":
     results.append(test_client_class_exists())
     results.append(test_alignment_method_exists())
 
-    # Count results: True=passed, False=failed, None=skipped
-    passed = sum(1 for r in results if r is True)
-    failed = sum(1 for r in results if r is False)
-    skipped = sum(1 for r in results if r is None)
+    passed = sum(results)
     total = len(results)
 
-    print(f"\nTest Results: {passed} passed, {failed} failed, {skipped} skipped (total: {total})")
+    print(f"\nTest Results: {passed}/{total} tests passed")
 
-    if failed == 0:
-        print("🎉 All required tests passed!")
+    if passed == total:
+        print("🎉 All basic tests passed!")
         sys.exit(0)
     else:
         print("❌ Some tests failed!")

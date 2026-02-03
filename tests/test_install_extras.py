@@ -1,12 +1,12 @@
 """Test optional dependency imports for each installation extra.
 
 These tests verify that each installation option works correctly:
-- pip install lattifai              # base only
-- pip install lattifai[core]        # + captions, core-hq
-- pip install lattifai[alignment]   # + lhotse, k2py, onnxruntime
+- pip install lattifai              # base (includes alignment)
 - pip install lattifai[transcription] # + ASR models
 - pip install lattifai[youtube]     # + yt-dlp
-- pip install lattifai[all]         # everything
+- pip install lattifai[diarization] # + speaker diarization
+- pip install lattifai[event]       # + event detection
+- pip install lattifai[all]         # transcription + youtube
 """
 
 import importlib
@@ -24,7 +24,7 @@ def _can_import(module_name: str) -> bool:
 
 
 # =============================================================================
-# Base installation (always available)
+# Base installation (includes alignment)
 # =============================================================================
 
 
@@ -56,16 +56,6 @@ class TestBaseInstall:
 
         assert safe_print is not None
 
-
-# =============================================================================
-# Core installation
-# =============================================================================
-
-
-@pytest.mark.skipif(not _can_import("lattifai.caption"), reason="lattifai[core] not installed")
-class TestCoreInstall:
-    """Tests for core installation: pip install lattifai[core]"""
-
     def test_captions_package(self):
         """lattifai-captions should be available."""
         from lattifai.caption import Caption, Supervision
@@ -84,16 +74,6 @@ class TestCoreInstall:
         from lattifai_core.client import SyncAPIClient
 
         assert SyncAPIClient is not None
-
-
-# =============================================================================
-# Alignment installation
-# =============================================================================
-
-
-@pytest.mark.skipif(not _can_import("k2"), reason="lattifai[alignment] not installed")
-class TestAlignmentInstall:
-    """Tests for alignment installation: pip install lattifai[alignment]"""
 
     def test_lhotse(self):
         """lhotse should be available."""
@@ -218,6 +198,44 @@ class TestYouTubeInstall:
 
 
 # =============================================================================
+# Diarization installation
+# =============================================================================
+
+
+@pytest.mark.skipif(not _can_import("pyannote.audio"), reason="lattifai[diarization] not installed")
+class TestDiarizationInstall:
+    """Tests for diarization installation: pip install lattifai[diarization]"""
+
+    def test_pyannote(self):
+        """pyannote-audio should be available."""
+        import pyannote.audio
+
+        assert pyannote.audio is not None
+
+    def test_diarization_config(self):
+        """DiarizationConfig should be importable."""
+        from lattifai.config import DiarizationConfig
+
+        assert DiarizationConfig is not None
+
+
+# =============================================================================
+# Event detection installation
+# =============================================================================
+
+
+@pytest.mark.skipif(not _can_import("pyannote.audio"), reason="lattifai[event] not installed")
+class TestEventInstall:
+    """Tests for event installation: pip install lattifai[event]"""
+
+    def test_event_config(self):
+        """EventConfig should be importable."""
+        from lattifai.config import EventConfig
+
+        assert EventConfig is not None
+
+
+# =============================================================================
 # Full installation summary
 # =============================================================================
 
@@ -228,11 +246,10 @@ class TestInstallSummary:
     def test_report_installed_extras(self):
         """Report which extras are installed."""
         extras = {
-            "base": ["dotenv", "colorful"],
-            "core": ["lattifai.caption", "lattifai_core"],
-            "alignment": ["k2", "lhotse", "onnxruntime", "av"],
+            "base": ["dotenv", "colorful", "lattifai.caption", "lattifai_core", "k2", "lhotse", "onnxruntime"],
             "transcription": ["google.genai", "OmniSenseVoice"],
             "youtube": ["yt_dlp", "questionary"],
+            "diarization": ["pyannote.audio"],
         }
 
         print("\n" + "=" * 60)
