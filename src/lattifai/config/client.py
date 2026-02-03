@@ -54,10 +54,10 @@ class ClientConfig:
         # Auto-load client version from package if not provided
         if self.client_version is None:
             try:
-                from lattifai import __version__
+                from importlib.metadata import version
 
-                object.__setattr__(self, "client_version", __version__)
-            except ImportError:
+                object.__setattr__(self, "client_version", version("lattifai"))
+            except Exception:
                 object.__setattr__(self, "client_version", "unknown")
 
         # Validate API parameters

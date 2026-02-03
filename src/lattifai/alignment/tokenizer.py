@@ -247,13 +247,12 @@ class LatticeTokenizer:
 
     def _get_client_info(self) -> Dict[str, Optional[str]]:
         """Get client identification info for usage tracking."""
-        client_name = None
-        client_version = None
-        if hasattr(self.client_wrapper, "get_client_name"):
-            client_name = self.client_wrapper.get_client_name()
-        if hasattr(self.client_wrapper, "get_client_version"):
-            client_version = self.client_wrapper.get_client_version()
-        return {"client_name": client_name, "client_version": client_version}
+        try:
+            from importlib.metadata import version
+
+            return {"client_name": "python-sdk", "client_version": version("lattifai")}
+        except Exception:
+            return {"client_name": "python-sdk", "client_version": "unknown"}
 
     def tokenize(
         self,
