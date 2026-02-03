@@ -30,7 +30,12 @@ Major refactoring release with modular architecture improvements.
 ## Installation
 
 ```bash
-pip install --upgrade lattifai
+# Full installation (recommended)
+pip install --upgrade "lattifai[all]"
+
+# Or specific features only
+pip install "lattifai[alignment]"      # Forced alignment
+pip install "lattifai[transcription]"  # ASR models
 ```
 
 ---
