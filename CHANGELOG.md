@@ -17,7 +17,7 @@
 ### Changed
 - **Caption Module Migration**: Moved caption formats to `lattifai-captions` package (reduced core dependencies)
 - **Config Centralization**: Migrated CaptionConfig from lattifai-captions to lattifai-python
-- **Dependency Restructure**: Minimal base install with optional extras (`alignment-flash`, `alignment`, `transcription`, etc.)
+- **Dependency Restructure**: Base install now includes alignment; optional extras for `transcription`, `youtube`, `diarization`, `event`
 
 ### Fixed
 - GeminiTranscriber now properly supports Caption objects in `write()` method
