@@ -85,15 +85,26 @@ uv run lai alignment align audio.wav caption.srt output.srt
 ### Using pip
 
 ```bash
-# Install everything
-pip install lattifai[all]
-
-# Install with alignment support
-pip install lattifai[alignment]
-
-# Install with transcription support
-pip install lattifai[transcription]
+# Full installation (recommended)
+pip install "lattifai[all]"
 ```
+
+### Installation Options
+
+| Extra | Command | Includes |
+|-------|---------|----------|
+| `all` | `pip install "lattifai[all]"` | Everything below |
+| `alignment` | `pip install "lattifai[alignment]"` | Forced alignment (Lattice-1, k2py, ONNX) |
+| `transcription` | `pip install "lattifai[transcription]"` | ASR models (Gemini, Parakeet, SenseVoice) |
+| `youtube` | `pip install "lattifai[youtube]"` | YouTube download (yt-dlp) |
+| `core` | `pip install "lattifai[core]"` | Caption formats only |
+| (base) | `pip install lattifai` | Minimal (dotenv, colorful) |
+
+**Note:** Base installation only includes minimal dependencies. For most users, `lattifai[all]` is recommended.
+
+### Caption Format Support
+
+Caption/subtitle format parsing is provided by [lattifai-captions](https://github.com/lattifai/captions), a separate package supporting 30+ formats (SRT, VTT, ASS, TTML, TextGrid, NLE formats, etc.). It is automatically installed with `lattifai[core]` or `lattifai[all]`.
 
 ### API Keys
 
