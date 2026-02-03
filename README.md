@@ -78,7 +78,7 @@ uvx --from lattifai lai --help
 
 # Or create a project
 mkdir my-project && cd my-project
-uv init --bare && uv add lattifai
+uv init --bare && uv add "lattifai[all]"
 uv run lai alignment align audio.wav caption.srt output.srt
 ```
 
@@ -436,7 +436,7 @@ Recognized speaker patterns are preserved during alignment:
 | **Video** | MP4, MKV, MOV, WEBM, AVI, and more |
 | **Caption** | SRT, VTT, ASS, SSA, SRV3, JSON, TextGrid, TSV, CSV, LRC, TTML, and more |
 
-> **Note**: Caption format handling is provided by [lattifai-captions](https://github.com/lattifai/lattifai-captions), which is automatically installed as a dependency. For standalone caption processing without alignment features, install `pip install lattifai-captions`.
+> **Note**: Caption format handling is provided by [lattifai-captions](https://github.com/lattifai/captions), which is automatically installed as a dependency. For standalone caption processing without alignment features, install `pip install lattifai-captions`.
 
 ### JSON Format
 
