@@ -204,6 +204,12 @@ class Lattice1Aligner(object):
         self.worker.profile()
 
 
+def _is_event_segment(text: str) -> bool:
+    """Check if text is an event marker like [MUSIC], [Applause], [Writes equation]."""
+    text = text.strip()
+    return text.startswith("[") and text.endswith("]")
+
+
 def _detect_score_anomalies(
     alignments: List[Supervision],
     drop_threshold: float = 0.08,
@@ -215,6 +221,9 @@ def _detect_score_anomalies(
     When the drop is significant, it indicates the audio doesn't match
     the text starting at that position.
 
+    Event segments like [MUSIC], [Applause] are excluded from scoring as they
+    naturally have low alignment scores.
+
     Args:
         alignments: List of aligned supervisions with scores
         drop_threshold: Minimum drop between before/after averages to trigger
@@ -223,9 +232,15 @@ def _detect_score_anomalies(
     Returns:
         Dict with anomaly info if found, None otherwise
     """
-    scores = [s.score for s in alignments if s.score is not None]
-    if len(scores) < window_size * 2:
+    # Build (original_index, score) pairs, excluding events and None scores
+    indexed_scores = [
+        (i, s.score) for i, s in enumerate(alignments) if s.score is not None and not _is_event_segment(s.text)
+    ]
+    if len(indexed_scores) < window_size * 2:
         return None
+
+    scores = [score for _, score in indexed_scores]
+    orig_indices = [idx for idx, _ in indexed_scores]
 
     for i in range(window_size, len(scores) - window_size):
         before_avg = np.mean(scores[i - window_size : i])
@@ -236,12 +251,15 @@ def _detect_score_anomalies(
         if drop > drop_threshold:
             # Find the exact mutation point (largest single-step drop)
             max_drop = 0
-            mutation_idx = i
+            filtered_mutation_idx = i
             for j in range(i - 1, min(i + window_size, len(scores) - 1)):
                 single_drop = scores[j] - scores[j + 1]
                 if single_drop > max_drop:
                     max_drop = single_drop
-                    mutation_idx = j + 1
+                    filtered_mutation_idx = j + 1
+
+            # Map back to original alignments index
+            mutation_idx = orig_indices[filtered_mutation_idx]
 
             # Segments: last normal + anomaly segments
             last_normal = alignments[mutation_idx - 1] if mutation_idx > 0 else None
