@@ -2861,62 +2861,45 @@ wheels = [
 
 [[package]]
 name = "lattifai"
-version = "1.3.0"
+version = "1.3.1"
 source = { editable = "." }
 dependencies = [
+    { name = "av" },
     { name = "colorful" },
+    { name = "error-align-fix" },
+    { name = "g2p-phonemizer" },
+    { name = "k2py" },
+    { name = "lattifai-captions", extra = ["splitting"] },
+    { name = "lattifai-core" },
+    { name = "lattifai-run" },
+    { name = "lhotse" },
+    { name = "msgpack" },
+    { name = "onnxruntime" },
     { name = "python-dotenv" },
 ]
 
 [package.optional-dependencies]
-alignment = [
-    { name = "av" },
-    { name = "error-align-fix" },
-    { name = "g2p-phonemizer" },
-    { name = "k2py" },
-    { name = "lattifai-captions", extra = ["splitting"] },
-    { name = "lattifai-core-hq" },
-    { name = "lhotse" },
-    { name = "msgpack" },
-    { name = "onnxruntime" },
-]
-alignment-flash = [
-    { name = "av" },
-    { name = "k2py" },
-    { name = "lattifai-captions", extra = ["splitting"] },
-    { name = "lattifai-core-hq" },
-    { name = "lhotse" },
-    { name = "msgpack" },
-    { name = "onnxruntime" },
-]
 all = [
-    { name = "av" },
-    { name = "error-align-fix" },
-    { name = "g2p-phonemizer" },
     { name = "google-genai" },
-    { name = "k2py" },
-    { name = "lattifai-captions", extra = ["splitting"] },
-    { name = "lattifai-core-hq" },
-    { name = "lattifai-run" },
-    { name = "lhotse" },
-    { name = "msgpack" },
     { name = "nemo-toolkit-asr", extra = ["asr"] },
     { name = "omnisensevoice" },
-    { name = "onnxruntime" },
     { name = "pyannote-audio-notorchdeps" },
     { name = "pycryptodome" },
     { name = "questionary" },
     { name = "yt-dlp" },
-]
-core = [
-    { name = "lattifai-captions", extra = ["splitting"] },
-    { name = "lattifai-core-hq" },
 ]
 dev = [
     { name = "black" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
+]
+diarization = [
+    { name = "nemo-toolkit-asr", extra = ["asr"] },
+    { name = "pyannote-audio-notorchdeps" },
+]
+event = [
+    { name = "pyannote-audio-notorchdeps" },
 ]
 transcription = [
     { name = "google-genai" },
@@ -2932,26 +2915,26 @@ youtube = [
 
 [package.metadata]
 requires-dist = [
-    { name = "av", marker = "extra == 'alignment-flash'" },
+    { name = "av" },
     { name = "black", marker = "extra == 'dev'" },
     { name = "colorful", specifier = ">=0.5.6" },
-    { name = "error-align-fix", marker = "extra == 'alignment'", specifier = ">=0.1.4" },
-    { name = "g2p-phonemizer", marker = "extra == 'alignment'", specifier = ">=0.4.0" },
+    { name = "error-align-fix", specifier = ">=0.1.4" },
+    { name = "g2p-phonemizer", specifier = ">=0.4.0" },
     { name = "google-genai", marker = "extra == 'transcription'", specifier = ">=1.22.0" },
-    { name = "k2py", marker = "extra == 'alignment-flash'", specifier = "==0.2.4" },
-    { name = "lattifai", extras = ["alignment"], marker = "extra == 'all'" },
-    { name = "lattifai", extras = ["alignment-flash"], marker = "extra == 'alignment'" },
-    { name = "lattifai", extras = ["core"], marker = "extra == 'alignment-flash'" },
+    { name = "k2py", specifier = "==0.2.4" },
     { name = "lattifai", extras = ["transcription"], marker = "extra == 'all'" },
     { name = "lattifai", extras = ["youtube"], marker = "extra == 'all'" },
-    { name = "lattifai-captions", extras = ["splitting"], marker = "extra == 'core'", specifier = ">=0.1.6" },
-    { name = "lattifai-core-hq", marker = "extra == 'core'", specifier = ">=0.6.4" },
-    { name = "lattifai-run", marker = "extra == 'all'", specifier = ">=1.0.1" },
-    { name = "lhotse", marker = "extra == 'alignment-flash'", specifier = ">=1.26.0" },
-    { name = "msgpack", marker = "extra == 'alignment-flash'" },
+    { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.1.6" },
+    { name = "lattifai-core", specifier = ">=0.6.4" },
+    { name = "lattifai-run", specifier = ">=1.0.1" },
+    { name = "lhotse", specifier = ">=1.26.0" },
+    { name = "msgpack" },
+    { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'diarization'", specifier = ">=2.7.0rc4" },
     { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'transcription'", specifier = ">=2.7.0rc4" },
     { name = "omnisensevoice", marker = "extra == 'transcription'", specifier = ">=0.4.2" },
-    { name = "onnxruntime", marker = "extra == 'alignment-flash'" },
+    { name = "onnxruntime" },
+    { name = "pyannote-audio-notorchdeps", marker = "extra == 'diarization'", specifier = ">=4.0.2" },
+    { name = "pyannote-audio-notorchdeps", marker = "extra == 'event'", specifier = ">=4.0.2" },
     { name = "pyannote-audio-notorchdeps", marker = "extra == 'transcription'", specifier = ">=4.0.2" },
     { name = "pycryptodome", marker = "extra == 'youtube'" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
@@ -2961,7 +2944,7 @@ requires-dist = [
     { name = "questionary", marker = "extra == 'youtube'", specifier = ">=2.0" },
     { name = "yt-dlp", marker = "extra == 'youtube'" },
 ]
-provides-extras = ["core", "alignment-flash", "alignment", "transcription", "youtube", "dev", "all"]
+provides-extras = ["event", "diarization", "transcription", "youtube", "dev", "all"]
 
 [[package]]
 name = "lattifai-captions"
@@ -2983,9 +2966,9 @@ splitting = [
 ]
 
 [[package]]
-name = "lattifai-core-hq"
+name = "lattifai-core"
 version = "0.6.4"
-source = { registry = "https://pypi.org/simple" }
+source = { registry = "https://lattifai.github.io/pypi/simple/" }
 dependencies = [
     { name = "cryptography" },
     { name = "httpx" },
@@ -2994,21 +2977,21 @@ dependencies = [
     { name = "sebbs" },
 ]
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/16/a3/7d392ca9fd1caf5e90f4efb9bccf48034be9739c0d70bae8bad05c495c8c/lattifai_core_hq-0.6.4-cp310-cp310-macosx_11_0_universal2.whl", hash = "sha256:0de732e8faccea28d1a814c69964ce9536e6de9d90f51ab99cbe5ac35e5854d4", size = 1114600, upload-time = "2026-02-03T15:37:32.544Z" },
-    { url = "https://files.pythonhosted.org/packages/a9/36/0e052ae26590fa671af6850c61313978c3fe0176d2489316cb1015ab8ecb/lattifai_core_hq-0.6.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:9dc33d59785e3ce9aaab8f0dce8532f26b569b179be718364bfe55bde1b5187d", size = 1262574, upload-time = "2026-02-03T15:37:34.6Z" },
-    { url = "https://files.pythonhosted.org/packages/72/f1/02fbc9faff794d68f02adc00089b4dbeef4f5b8c37edda9e47d7fd939b38/lattifai_core_hq-0.6.4-cp310-cp310-win_amd64.whl", hash = "sha256:a4d1a54421432d60d5b9b8aa1c49de4985d4292caa61d98cc32cd6f98232874a", size = 1153024, upload-time = "2026-02-03T15:37:36.605Z" },
-    { url = "https://files.pythonhosted.org/packages/69/87/f79a4bf3e417a90e837fba356b047cbcdf1d98bce67bb344af013c42e26d/lattifai_core_hq-0.6.4-cp311-cp311-macosx_11_0_universal2.whl", hash = "sha256:ae198d26299579d708cc156a4eb98855c3d4baa6befb6858cf539c86e31b19e7", size = 1270933, upload-time = "2026-02-03T15:37:38.513Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/4c/052eca66700f469336e0ac147b1092410d755475da3bef21f9e7a2377619/lattifai_core_hq-0.6.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:c8920a8ec52b3abd525bd2f658d3b048f57ee496afc690f6bc2a8f11eff8ebf5", size = 1415344, upload-time = "2026-02-03T15:37:40.483Z" },
-    { url = "https://files.pythonhosted.org/packages/78/65/dff31e0dac6316834e7665ba4b1621aa099b89ed49677952aa77f3014882/lattifai_core_hq-0.6.4-cp311-cp311-win_amd64.whl", hash = "sha256:81f782ecee9fd04d27a1947b4830f125ddb832348faf380c9bcbab1551722b83", size = 1308283, upload-time = "2026-02-03T15:37:42.048Z" },
-    { url = "https://files.pythonhosted.org/packages/91/82/897016da6b9c753174083a456cc92bdca30ed1cc957d2a78bbc81075e859/lattifai_core_hq-0.6.4-cp312-cp312-macosx_11_0_universal2.whl", hash = "sha256:8480b69a06cf6dcf8120b1c9a00254d389f8d144817c033cbfebcff40dcfc6ba", size = 1230507, upload-time = "2026-02-03T15:37:43.463Z" },
-    { url = "https://files.pythonhosted.org/packages/8d/37/01123155f610c14eb423967b7a9a187b16c37f1462488b24f93979bebad1/lattifai_core_hq-0.6.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:afd82935c4a33c2c8891e24127e45912636ce43e55518eb38b599cada6bf0e22", size = 1379251, upload-time = "2026-02-03T15:37:45.101Z" },
-    { url = "https://files.pythonhosted.org/packages/45/29/7079b8765de97d344da9878c666758799efaca1d3ffc11cb5313b5d9ea3f/lattifai_core_hq-0.6.4-cp312-cp312-win_amd64.whl", hash = "sha256:9151e745ffe38cc67216c8be1b8bbf8002349a11b3a148adfc1932cadec647ff", size = 1270500, upload-time = "2026-02-03T15:37:47.075Z" },
-    { url = "https://files.pythonhosted.org/packages/fc/12/9e2ecda33f7a13223269007e6612844f7841d5ca0953b0b75bc916c07ef8/lattifai_core_hq-0.6.4-cp313-cp313-macosx_11_0_universal2.whl", hash = "sha256:d4c119f47e5749073bdf144a7ca1371b82f0f0eadcdccc8d4f35626667150e1e", size = 1235250, upload-time = "2026-02-03T15:37:48.998Z" },
-    { url = "https://files.pythonhosted.org/packages/74/f7/5325f9085a25de9b1b525bfe3b5b40e79ffbf14c8195559c82629b55f82d/lattifai_core_hq-0.6.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:40e9433c61164ad62c6d6d2a2033d585a95891ecb4d6f5749da06adcff795e72", size = 1381015, upload-time = "2026-02-03T15:37:50.422Z" },
-    { url = "https://files.pythonhosted.org/packages/f8/0f/1868b760645e0e16de740195331129439f325aa1d2cca353b1b37ac4ba1f/lattifai_core_hq-0.6.4-cp313-cp313-win_amd64.whl", hash = "sha256:061cc7c494e1d609509a9046298da0ff5a7bd6c9d948009ba8d1e91d5aee30d4", size = 1273622, upload-time = "2026-02-03T15:37:52.03Z" },
-    { url = "https://files.pythonhosted.org/packages/77/34/05ba2c0685b2e5eb5a4eed422f9075159a87f2ffbe3cbfd72321d7e9c3ad/lattifai_core_hq-0.6.4-cp314-cp314-macosx_11_0_universal2.whl", hash = "sha256:ecd2df4627846fc4274e5d681a40b389ce3e521bd7b566f22a1372a079affda8", size = 1288540, upload-time = "2026-02-03T15:37:53.555Z" },
-    { url = "https://files.pythonhosted.org/packages/de/9e/4ae5c6cf1b6c6fb944a1d9b0f9f50bed69e90204fc7e151369d277318e30/lattifai_core_hq-0.6.4-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:9ceec1efd0e32f92b667d888c6b892ab01b1f05e532d07f961e0eb6920284639", size = 1433618, upload-time = "2026-02-03T15:37:55.081Z" },
-    { url = "https://files.pythonhosted.org/packages/3d/2d/9953e1626f2d07d1545da3d8bd62a89229080be670d4ccd670837822056c/lattifai_core_hq-0.6.4-cp314-cp314-win_amd64.whl", hash = "sha256:629853e7223d3b3689efeceea0051780d4ae05f019f2cdc912ad1aa8eaa12da5", size = 1363240, upload-time = "2026-02-03T15:37:56.512Z" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp310-cp310-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp310-cp310-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp311-cp311-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp311-cp311-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp312-cp312-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp312-cp312-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp313-cp313-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp313-cp313-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp314-cp314-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.6.4-cp314-cp314-win_amd64.whl" },
 ]
 
 [[package]]

@@ -53,7 +53,7 @@ jobs:
 
       - name: Run basic tests
         run: |
-          pip install dist/*.whl
+          pip install dist/*.whl --extra-index-url https://lattifai.github.io/pypi/simple/
           python tests/test_basic.py  # Run basic tests directly
 
   build-macos:
@@ -89,7 +89,7 @@ jobs:
 
       - name: Run basic tests
         run: |
-          pip install dist/*.whl
+          pip install dist/*.whl --extra-index-url https://lattifai.github.io/pypi/simple/
           python tests/test_basic.py  # Run basic tests directly
 
   build-windows:
@@ -128,5 +128,5 @@ jobs:
 
       - name: Run basic tests
         run: |
-          pip install (Get-ChildItem dist/*.whl)
+          pip install (Get-ChildItem dist/*.whl) --extra-index-url https://lattifai.github.io/pypi/simple/
           python tests/test_basic.py  # Run basic tests directly

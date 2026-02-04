@@ -35,7 +35,7 @@ jobs:
 
       - name: Install alignment extras
         run: |
-          pip install -e ".[alignment]"
+          pip install -e ".[alignment]" --extra-index-url https://lattifai.github.io/pypi/simple/
 
       - name: Verify installation
         run: |

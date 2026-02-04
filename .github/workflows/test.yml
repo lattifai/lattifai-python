@@ -63,7 +63,7 @@ jobs:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          pip install -e ".[all,dev]"  # Install all features + test dependencies
+          pip install -e ".[all,dev]" --extra-index-url https://lattifai.github.io/pypi/simple/
           python tests/test_basic.py  # Run basic tests
           pytest ./tests/streaming
           bash tests/test_audio_formats.sh  # Run audio format tests
