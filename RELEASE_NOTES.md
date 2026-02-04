@@ -1,4 +1,4 @@
-# Release Notes - LattifAI Python v1.3.2
+# Release Notes - LattifAI Python v1.3.4
 
 **Release Date:** February 4, 2026
 

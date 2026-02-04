@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## [1.3.2] - 2026-02-04
+## [1.3.4] - 2026-02-04
 
 ### Added
 - **Event Detection**: Automatic detection and timestamp alignment of non-speech audio events (`[MUSIC]`, `[APPLAUSE]`, etc.)
