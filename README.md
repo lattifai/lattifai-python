@@ -67,14 +67,14 @@ client = LattifAI(alignment_config=AlignmentConfig(model_hub="modelscope"))
 
 ### Using uv (Recommended)
 
-[uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip).
+[uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip). **No extra configuration needed** - uv automatically uses our package index.
 
 ```bash
 # Install uv
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Quick start (run without installing)
-uvx --from lattifai lai --help
+uvx --from lattifai --extra-index-url https://lattifai.github.io/pypi/simple/ lai --help
 
 # Or create a project
 mkdir my-project && cd my-project
@@ -86,7 +86,15 @@ uv run lai alignment align audio.wav caption.srt output.srt
 
 ```bash
 # Full installation (recommended)
-pip install "lattifai[all]"
+pip install "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+**Configure pip globally** (optional, to avoid `--extra-index-url` each time):
+
+```bash
+# Add to ~/.pip/pip.conf (Linux/macOS) or %APPDATA%\pip\pip.ini (Windows)
+[global]
+extra-index-url = https://lattifai.github.io/pypi/simple/
 ```
 
 ### Installation Options
@@ -555,11 +563,11 @@ Visit [lattifai.com/roadmap](https://lattifai.com/roadmap) for updates.
 git clone https://github.com/lattifai/lattifai-python.git
 cd lattifai-python
 
-# Using uv (recommended)
+# Using uv (recommended, auto-configures extra index)
 uv sync && source .venv/bin/activate
 
-# Or pip
-pip install -e ".[all,dev]"
+# Or pip (requires extra-index-url for lattifai-core)
+pip install -e ".[all,dev]" --extra-index-url https://lattifai.github.io/pypi/simple/
 
 # Run tests
 pytest
