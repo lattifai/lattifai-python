@@ -21,7 +21,7 @@ class AlignmentConfig:
     model_name: str = "LattifAI/Lattice-1"
     """Model identifier or path to local model directory (e.g., 'LattifAI/Lattice-1')."""
 
-    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
+    model_hub: Literal["huggingface", "modelscope"] = "modelscope"
     """Which model hub to use when resolving remote model names: 'huggingface' or 'modelscope'."""
 
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
@@ -105,6 +105,13 @@ class AlignmentConfig:
     A negative value penalizes transitions (moving to next token), making the model prefer
     self-loops (staying on current token longer). This helps prevent spurious short-duration alignments.
     Default: 0.0 (no penalty). Typical range: -1.0 to 0.0 (e.g., -0.5).
+    """
+
+    check_sanity: bool = True
+    """Whether to perform sanity checks on alignment results.
+    When True, raises an error if media and caption content don't match.
+    When False, outputs a warning instead of raising an error on mismatch.
+    Default: True.
     """
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)

@@ -165,10 +165,16 @@ class Lattice1Aligner(object):
                 return_details=return_details,
                 start_margin=self.config.start_margin,
                 end_margin=self.config.end_margin,
-                check_sanity=True,
+                check_sanity=self.config.check_sanity,
             )
             if verbose:
                 safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
+            if not self.config.check_sanity:
+                # Check for score anomalies (media-text mismatch)
+                anomaly = _detect_score_anomalies(alignments)
+                if anomaly:
+                    anomaly_str = _format_anomaly_warning(anomaly)
+                    safe_print(colorful.yellow(anomaly_str))
         except LatticeDecodingError as e:
             safe_print(colorful.red("         x Failed to decode lattice alignment results"))
             _alignments = self.tokenizer.detokenize(
