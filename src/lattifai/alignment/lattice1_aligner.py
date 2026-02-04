@@ -170,11 +170,10 @@ class Lattice1Aligner(object):
             if verbose:
                 safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
             if not self.config.check_sanity:
-                # Check for score anomalies (media-text mismatch)
-                anomaly = _detect_score_anomalies(alignments)
-                if anomaly:
-                    anomaly_str = _format_anomaly_warning(anomaly)
-                    safe_print(colorful.yellow(anomaly_str))
+                # Find and report low-score segments
+                low_score_segments = _find_low_score_segments(alignments)
+                if low_score_segments:
+                    safe_print(colorful.yellow(_format_low_score_warning(low_score_segments)))
         except LatticeDecodingError as e:
             safe_print(colorful.red("         x Failed to decode lattice alignment results"))
             _alignments = self.tokenizer.detokenize(
@@ -186,18 +185,17 @@ class Lattice1Aligner(object):
                 end_margin=self.config.end_margin,
                 check_sanity=False,
             )
-            # Check for score anomalies (media-text mismatch)
-            anomaly = _detect_score_anomalies(_alignments)
-            if anomaly:
-                anomaly_str = _format_anomaly_warning(anomaly)
-                del _alignments
+            # Find low-score segments to provide helpful error context
+            low_score_segments = _find_low_score_segments(_alignments)
+            del _alignments
+            if low_score_segments:
+                warning_str = _format_low_score_warning(low_score_segments)
                 raise LatticeDecodingError(
                     lattice_id,
-                    message=colorful.yellow("Score anomaly detected - media and text mismatch:\n" + anomaly_str),
-                    skip_help=True,  # anomaly info is more specific than default help
+                    message=colorful.yellow("Media-text mismatch detected:\n" + warning_str),
+                    skip_help=True,
                 )
             else:
-                del _alignments
                 raise e
         except Exception as e:
             safe_print(colorful.red("         x Failed to decode lattice alignment results"))
@@ -313,4 +311,36 @@ def _format_anomaly_warning(anomaly: Dict[str, Any]) -> str:
 
     lines.append("")
     lines.append("    Possible causes: Transcription error, missing content, or wrong audio region")
+    return "\n".join(lines)
+
+
+def _find_low_score_segments(
+    alignments: List[Supervision],
+    threshold: float = 0.7,
+) -> List[Tuple[int, Supervision]]:
+    """Find segments with scores below threshold, excluding event markers.
+
+    Args:
+        alignments: List of aligned supervisions with scores
+        threshold: Score threshold (segments below this are considered low)
+
+    Returns:
+        List of (index, supervision) tuples for low-score segments
+    """
+    return [
+        (i, s)
+        for i, s in enumerate(alignments)
+        if s.score is not None and s.score < threshold and not _is_event_segment(s.text)
+    ]
+
+
+def _format_low_score_warning(low_score_segments: List[Tuple[int, Supervision]]) -> str:
+    """Format low-score segments as warning message."""
+    lines = [
+        f"⚠️  Found {len(low_score_segments)} low-score segments (potential mismatches):",
+        "",
+    ]
+    for idx, seg in low_score_segments:
+        text_preview = seg.text[:50] + "..." if len(seg.text) > 50 else seg.text
+        lines.append(f'    #{idx} [{seg.start:.2f}s-{seg.end:.2f}s] score={seg.score:.4f} "{text_preview}"')
     return "\n".join(lines)
