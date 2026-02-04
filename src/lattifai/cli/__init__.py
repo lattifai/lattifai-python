@@ -1,5 +1,7 @@
 """CLI module for LattifAI with nemo_run entry points."""
 
+import lattifai._init  # noqa: F401 # isort: skip  # Suppress warnings early
+
 import nemo_run as run  # noqa: F401
 
 # Import and re-export entrypoints at package level so NeMo Run can find them
