@@ -63,7 +63,7 @@ jobs:
           # alignment align
           uv run bash tests/test_audio_formats.sh  # Run audio format tests
           # Gemini Model
-          uv run lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-2.5-pro -v
+          uv run lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview -v
           uv run lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=gemini-3-flash-preview
 
       # - name: Test Cli Commands (Windows)
