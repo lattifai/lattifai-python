@@ -4,9 +4,14 @@ Test suite for LattifAI alignment API
 Tests the actual alignment() method signature and return types
 """
 
-import pytest
+import os
 
-from lattifai.caption import Supervision
+import pytest
+from dotenv import find_dotenv, load_dotenv
+
+from lattifai.caption import Caption, Supervision
+
+load_dotenv(find_dotenv(usecwd=True))
 
 
 class TestAlignmentAPISignature:
@@ -85,7 +90,7 @@ class TestAlignmentAPISignature:
 class TestAlignmentReturnValue:
     """Test the alignment() method return value structure."""
 
-    @pytest.mark.skipif(True, reason="Requires actual audio file and API key")
+    @pytest.mark.skipif(not os.environ.get("LATTIFAI_API_KEY"), reason="Requires LATTIFAI_API_KEY environment variable")
     def test_alignment_returns_tuple(self, tmp_path):
         """Test that alignment() returns a tuple with correct structure."""
         from lattifai.client import LattifAI
@@ -97,16 +102,13 @@ class TestAlignmentReturnValue:
         client = LattifAI()
 
         # Example usage (would run with real files):
-        # alignments, output_path = client.alignment(
-        #     audio='test.wav',
-        #     caption='test.srt',
-        #     output_caption_path='output.srt'
-        # )
-        #
-        # assert isinstance(alignments, list)
-        # assert all(isinstance(a, Supervision) for a in alignments)
-        # assert output_path is not None
+        caption = client.alignment(
+            input_media="tests/data/SA1.mp3",
+            input_caption="tests/data/SA1.txt",
+            output_caption_path="tests/data/SA1.srt",
+        )
 
+        assert isinstance(caption, Caption)
         del client
 
     def test_alignment_docstring(self):

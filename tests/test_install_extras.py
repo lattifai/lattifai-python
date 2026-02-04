@@ -158,15 +158,15 @@ class TestTranscriptionInstall:
         assert TranscriptionConfig is not None
 
 
-@pytest.mark.skipif(not _can_import("OmniSenseVoice"), reason="OmniSenseVoice not installed")
+@pytest.mark.skipif(not _can_import("omnisense"), reason="OmniSenseVoice not installed")
 class TestSenseVoiceInstall:
     """Tests for SenseVoice transcription."""
 
     def test_omnisensevoice(self):
         """OmniSenseVoice should be available."""
-        import OmniSenseVoice
+        from omnisense.models import OmniSenseVoiceSmall
 
-        assert OmniSenseVoice is not None
+        assert OmniSenseVoiceSmall is not None
 
 
 # =============================================================================

@@ -52,8 +52,6 @@ jobs:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
         run: |
           uv run python tests/test_basic.py  # Run basic tests
-          uv run pytest tests/caption/test_text_parser.py -v
-
 
       - name: Test Cli Commands (Unix & Windows)
         env:

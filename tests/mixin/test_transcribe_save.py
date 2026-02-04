@@ -9,6 +9,9 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from dotenv import find_dotenv, load_dotenv
+
+load_dotenv(find_dotenv(usecwd=True))
 
 
 @pytest.mark.skipif(
@@ -30,7 +33,7 @@ class TestTranscribeGeminiSave:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             client = LattifAI(
-                transcription=TranscriptionConfig(
+                transcription_config=TranscriptionConfig(
                     model_name="gemini-2.5-pro",
                     gemini_api_key=os.environ["GEMINI_API_KEY"],
                 )
