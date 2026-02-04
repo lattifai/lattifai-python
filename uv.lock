@@ -2926,7 +2926,7 @@ requires-dist = [
     { name = "lattifai", extras = ["youtube"], marker = "extra == 'all'" },
     { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.1.7" },
     { name = "lattifai-core", specifier = ">=0.6.5" },
-    { name = "lattifai-run", specifier = ">=1.0.1" },
+    { name = "lattifai-run", specifier = ">=1.0.2" },
     { name = "lhotse", specifier = ">=1.26.0" },
     { name = "msgpack" },
     { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'diarization'", specifier = ">=2.7.0rc4" },
@@ -2997,7 +2997,7 @@ wheels = [
 
 [[package]]
 name = "lattifai-run"
-version = "1.0.1"
+version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "catalogue" },
@@ -3015,7 +3015,7 @@ dependencies = [
     { name = "torchx" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a9/27/54372feb1a7c11ec70958c350e465744ff8ef33e07f2803eb02127b16ec9/lattifai_run-1.0.1.tar.gz", hash = "sha256:83c97316bb4214e56a30cd92a21f966c698370ae777e72ca5622a19e265dfeef", size = 2291737, upload-time = "2025-11-30T03:07:20.164Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/89/f6/c400dfaecbbee2f19b3bea71321443eb75acff12eabf5955106c6ce59ce1/lattifai_run-1.0.2.tar.gz", hash = "sha256:6dca43e82ff30ea2e9565dbc688833c294b8c545427ec019d53cbb532813e3a2", size = 2449296, upload-time = "2026-02-04T12:16:23.72Z" }
 
 [[package]]
 name = "lazy-dataset"
