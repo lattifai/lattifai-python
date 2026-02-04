@@ -1,14 +1,13 @@
 """Transcription module for LattifAI."""
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from lattifai.config import TranscriptionConfig
 
-from .gemini import GeminiTranscriber
-from .lattifai import LattifAITranscriber
-
 if TYPE_CHECKING:
     from .base import BaseTranscriber
+    from .gemini import GeminiTranscriber
+    from .lattifai import LattifAITranscriber
 
 __all__ = [
     "LattifAITranscriber",
@@ -58,11 +57,15 @@ def create_transcriber(
         assert (
             transcription_config.gemini_api_key is not None
         ), "Gemini API key must be provided in TranscriptionConfig for Gemini models."
+        from .gemini import GeminiTranscriber
+
         return GeminiTranscriber(transcription_config=transcription_config)
 
     # LattifAI local models (HuggingFace/NVIDIA models)
     # Pattern: nvidia/*, iic/*, or any HF model path
     elif "/" in model_name:
+        from .lattifai import LattifAITranscriber
+
         return LattifAITranscriber(transcription_config=transcription_config)
 
     else:

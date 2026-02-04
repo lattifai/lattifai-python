@@ -75,11 +75,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Quick start (run without installing)
 uvx --from lattifai --extra-index-url https://lattifai.github.io/pypi/simple/ lai --help
-
-# Or create a project
-mkdir my-project && cd my-project
-uv init --bare && uv add "lattifai[all]"
-uv run lai alignment align audio.wav caption.srt output.srt
 ```
 
 ### Using pip
