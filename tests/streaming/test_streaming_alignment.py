@@ -5,7 +5,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import torch
 
 from lattifai.audio2 import AudioData
 from lattifai.client import LattifAI

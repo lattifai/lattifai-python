@@ -5,11 +5,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Awaitable, Optional, Union
 
 import colorful
-from lhotse.utils import Pathlike
 
 from lattifai.audio2 import AudioData
 from lattifai.data import Caption
 from lattifai.errors import CaptionProcessingError
+from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
 if TYPE_CHECKING:

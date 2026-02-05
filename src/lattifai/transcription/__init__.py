@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING
 
 from lattifai.config import TranscriptionConfig
 
-if TYPE_CHECKING:
-    from .base import BaseTranscriber
-    from .gemini import GeminiTranscriber
-    from .lattifai import LattifAITranscriber
+from .base import BaseTranscriber
+from .gemini import GeminiTranscriber
+from .lattifai import LattifAITranscriber
 
 __all__ = [
+    "BaseTranscriber",
     "LattifAITranscriber",
     "GeminiTranscriber",
     "create_transcriber",

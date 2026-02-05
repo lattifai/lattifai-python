@@ -3,12 +3,13 @@
 from pathlib import Path
 from typing import List, TypeAlias, Union
 
-from lhotse.utils import Pathlike
-
 from lattifai.caption import Supervision
 
-# Path-like types
-PathLike: TypeAlias = Pathlike  # Re-export for convenience (str | Path)
+# Path-like types (replaces lhotse.utils.Pathlike)
+Pathlike: TypeAlias = Union[str, Path]
+"""Type alias for path-like objects (str or Path)."""
+
+PathLike: TypeAlias = Pathlike  # Re-export for convenience
 
 # Caption types
 SupervisionList: TypeAlias = List[Supervision]

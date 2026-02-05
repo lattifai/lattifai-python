@@ -91,7 +91,7 @@ class TestAlignmentReturnValue:
     """Test the alignment() method return value structure."""
 
     @pytest.mark.skipif(not os.environ.get("LATTIFAI_API_KEY"), reason="Requires LATTIFAI_API_KEY environment variable")
-    def test_alignment_returns_tuple(self, tmp_path):
+    def test_alignment(self, tmp_path):
         """Test that alignment() returns a tuple with correct structure."""
         from lattifai.client import LattifAI
 

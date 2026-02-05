@@ -4,7 +4,6 @@ import sys
 from typing import Optional
 
 import nemo_run as run
-from lhotse.utils import Pathlike
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
@@ -18,6 +17,7 @@ from lattifai.config import (
     TranscriptionConfig,
 )
 from lattifai.errors import LattifAIError
+from lattifai.types import Pathlike
 
 __all__ = ["align"]
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
-from lhotse.utils import Pathlike
+from lattifai.types import Pathlike
 
 # Supported media formats for both audio and video content
 AUDIO_FORMATS = (

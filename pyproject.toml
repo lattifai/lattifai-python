@@ -39,15 +39,15 @@ dependencies = [
     "python-dotenv",
     "colorful>=0.5.6",
     "lattifai-run>=1.0.2",
-    "lattifai-core>=0.6.6",
-    "lattifai-captions[splitting]>=0.1.7",
+    "lattifai-core>=0.6.8",
+    "lattifai-captions[splitting]>=0.1.8",
     "g2p-phonemizer>=0.4.0",
     "error-align-fix>=0.1.4",
-    "lhotse>=1.26.0",
     "k2py==0.2.4",
     "onnxruntime",
     "av",
     "msgpack",
+    "google-genai>=1.22.0",
 ]
 
 [project.optional-dependencies]
@@ -64,7 +64,6 @@ diarization = [
 transcription = [
     "OmniSenseVoice>=0.4.2",
     "nemo_toolkit_asr[asr]>=2.7.0rc4",
-    "google-genai>=1.22.0",
     "pyannote-audio-notorchdeps>=4.0.2",
 ]
 # Workflow: YouTube download, interactive prompts
@@ -123,6 +122,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]
+"lattifai.data.resamplers" = ["*.onnx"]
 
 [tool.pytest.ini_options]
 addopts = "--durations=10"

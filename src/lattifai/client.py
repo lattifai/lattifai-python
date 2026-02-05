@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Optional, Union
 
 import colorful
 from lattifai_core.client import SyncAPIClient
-from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
@@ -26,6 +25,7 @@ from lattifai.errors import (
     LatticeEncodingError,
 )
 from lattifai.mixin import LattifAIClientMixin
+from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
 if TYPE_CHECKING:

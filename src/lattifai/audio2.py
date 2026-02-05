@@ -5,12 +5,13 @@ from pathlib import Path
 from typing import BinaryIO, Optional, Tuple, Union
 
 import numpy as np
+import onnxruntime as ort
 import soundfile as sf
-import torch
-from lhotse.augmentation import get_or_create_resampler
-from lhotse.utils import Pathlike
 
 from lattifai.errors import AudioLoadError
+from lattifai.types import Pathlike
+
+_RESAMPLER_DIR = Path(__file__).parent / "data" / "resamplers"
 
 # ChannelSelectorType = Union[int, Iterable[int], str]
 ChannelSelectorType = Union[int, str]
@@ -121,7 +122,7 @@ class AudioLoader:
         Args:
             audio_sr: Tuple of (audio, original_sample_rate).
             sampling_rate: Target sampling rate.
-            device: Device to perform resampling on.
+            device: Device to perform resampling on (ignored, kept for API compat).
             channel_selector: How to select channels.
 
         Returns:
@@ -146,15 +147,52 @@ class AudioLoader:
 
         # tensor: np.ndarray (channels, samples)
         if sr != sampling_rate:
-            cache_key = (sr, sampling_rate, device)
-            if cache_key not in self._resampler_cache:
-                self._resampler_cache[cache_key] = get_or_create_resampler(sr, sampling_rate).to(device=device)
-            resampler = self._resampler_cache[cache_key]
-
-            tensor = resampler(torch.from_numpy(tensor).to(device=device))
-            tensor = tensor.cpu().numpy()
+            onnx_path = _RESAMPLER_DIR / f"resampler_{sr}.onnx"
+            if onnx_path.exists():
+                tensor = self._resample_onnx(tensor, sr, onnx_path)
+            else:
+                tensor = self._resample_scipy(tensor, sr, sampling_rate)
 
         return tensor
+
+    def _resample_onnx(self, tensor: np.ndarray, sr: int, onnx_path: Path) -> np.ndarray:
+        """Resample using pre-exported ONNX model (source_sr -> 16kHz)."""
+        cache_key = sr
+        if cache_key not in self._resampler_cache:
+            self._resampler_cache[cache_key] = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
+        session = self._resampler_cache[cache_key]
+
+        # ONNX models were exported with 1-second dummy input;
+        # process longer audio in 1-second chunks to avoid output truncation.
+        chunk_samples = sr  # 1 second at source sample rate
+        channels = []
+        for ch in range(tensor.shape[0]):
+            ch_data = tensor[ch : ch + 1].astype(np.float32)
+            total = ch_data.shape[1]
+            if total <= chunk_samples:
+                out = session.run(None, {"input": ch_data})[0]
+            else:
+                parts = []
+                for offset in range(0, total, chunk_samples):
+                    chunk = ch_data[:, offset : offset + chunk_samples]
+                    parts.append(session.run(None, {"input": chunk})[0])
+                out = np.concatenate(parts, axis=1)
+            channels.append(out)
+        return np.concatenate(channels, axis=0)
+
+    @staticmethod
+    def _resample_scipy(tensor: np.ndarray, sr: int, target_sr: int) -> np.ndarray:
+        """Fallback resampler using scipy for unsupported sample rate pairs."""
+        from math import gcd
+
+        from scipy.signal import resample_poly
+
+        g = gcd(sr, target_sr)
+        up, down = target_sr // g, sr // g
+        channels = []
+        for ch in range(tensor.shape[0]):
+            channels.append(resample_poly(tensor[ch], up, down).astype(np.float32))
+        return np.stack(channels, axis=0)
 
     def _load_audio(
         self,

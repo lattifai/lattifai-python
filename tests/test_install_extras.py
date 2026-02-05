@@ -75,12 +75,6 @@ class TestBaseInstall:
 
         assert SyncAPIClient is not None
 
-    def test_lhotse(self):
-        """lhotse should be available."""
-        import lhotse
-
-        assert lhotse is not None
-
     def test_k2py(self):
         """k2py should be available."""
         import k2
@@ -258,7 +252,7 @@ class TestInstallSummary:
     def test_report_installed_extras(self):
         """Report which extras are installed."""
         extras = {
-            "base": ["dotenv", "colorful", "lattifai.caption", "lattifai_core", "k2", "lhotse", "onnxruntime", "av"],
+            "base": ["dotenv", "colorful", "lattifai.caption", "lattifai_core", "k2", "onnxruntime", "av"],
             "transcription": ["google.genai", "OmniSenseVoice", "nemo.collections.asr"],
             "youtube": ["yt_dlp", "questionary", "Crypto"],
             "diarization": ["pyannote.audio", "nemo.collections.asr"],
