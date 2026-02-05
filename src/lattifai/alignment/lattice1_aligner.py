@@ -96,6 +96,7 @@ class Lattice1Aligner(object):
         emission: Optional[np.ndarray] = None,
         offset: float = 0.0,
         verbose: bool = True,
+        metadata: Optional[dict] = None,
     ) -> Tuple[List[Supervision], List[Supervision]]:
         """
         Perform alignment on audio and supervisions.
@@ -122,6 +123,7 @@ class Lattice1Aligner(object):
                 split_sentence=split_sentence,
                 boost=self.config.boost,
                 transition_penalty=self.config.transition_penalty,
+                metadata=metadata,
             )
             if verbose:
                 safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))

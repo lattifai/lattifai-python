@@ -260,6 +260,7 @@ class LatticeTokenizer:
         split_sentence: bool = False,
         boost: float = 0.0,
         transition_penalty: Optional[float] = 0.0,
+        metadata: Optional[dict] = None,
     ) -> Tuple[str, Dict[str, Any]]:
         client_info = self._get_client_info()
 
@@ -276,6 +277,7 @@ class LatticeTokenizer:
                     "pronunciation_dictionaries": pronunciation_dictionaries,
                     **client_info,
                     "transition_penalty": transition_penalty,
+                    "metadata": metadata,
                 },
             )
         else:
@@ -291,6 +293,7 @@ class LatticeTokenizer:
                     "pronunciation_dictionaries": pronunciation_dictionaries,
                     "boost": boost,
                     **client_info,
+                    "metadata": metadata,
                 },
             )
 

@@ -112,6 +112,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         split_sentence: Optional[bool] = None,
         channel_selector: Optional[str | int] = "average",
         streaming_chunk_secs: Optional[float] = None,
+        metadata: Optional[dict] = None,
     ) -> Caption:
         try:
             # Step 1: Get caption
@@ -227,6 +228,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         emission=emission,
                         offset=offset,
                         verbose=False,
+                        metadata=metadata,
                     )
 
                     supervisions.extend(_supervisions)
@@ -241,6 +243,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     caption.supervisions,
                     split_sentence=split_sentence or self.caption_config.split_sentence,
                     return_details=True,
+                    metadata=metadata,
                 )
 
             # Update caption with aligned results
@@ -387,6 +390,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             split_sentence=split_sentence,
             channel_selector=channel_selector,
             streaming_chunk_secs=None,
+            metadata={"video_url": url},
         )
 
         return caption
