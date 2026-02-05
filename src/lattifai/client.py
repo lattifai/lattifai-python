@@ -253,10 +253,6 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
 
-            # Profile if enabled
-            if self.config.profile:
-                self.aligner.profile()
-
         except (CaptionProcessingError, LatticeEncodingError) as e:
             # Re-raise our specific errors as-is
             raise e
@@ -286,6 +282,12 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             caption = self.event_detector.detect_and_update_caption(caption, media_audio)
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
+
+        # Step 7: Profile (all operations completed)
+        if self.config.profile:
+            self.aligner.profile()
+            if self.event_detector:
+                self.event_detector.profile()
 
         return caption
 

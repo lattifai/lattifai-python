@@ -102,11 +102,11 @@ class LattifAIEventDetector:
             custom_aliases=self.config.event_aliases or {},
         )
 
-    def profiling(self, reset: bool = False) -> str:
-        """Get profiling information for the detector."""
+    def profile(self, reset: bool = False) -> None:
+        """Print formatted profiling statistics."""
         if self._detector is None:
-            return ""
-        return self.detector.profiling(reset=reset, logger=self.logger)
+            return
+        self.detector.profile(reset=reset)
 
     def detect_and_update_caption(
         self,
