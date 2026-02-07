@@ -96,10 +96,9 @@ extra-index-url = https://lattifai.github.io/pypi/simple/
 
 | Extra | Command | Includes |
 |-------|---------|----------|
-| (base) | `pip install lattifai` | Forced alignment (Lattice-1, k2py, ONNX, captions) |
+| (base) | `pip install lattifai` | Forced alignment (Lattice-1, k2py, ONNX, captions and YouTube) |
 | `all` | `pip install "lattifai[all]"` | Base + transcription + youtube |
 | `transcription` | `pip install "lattifai[transcription]"` | ASR models (Gemini, Parakeet, SenseVoice) |
-| `youtube` | `pip install "lattifai[youtube]"` | YouTube download (yt-dlp) |
 | `diarization` | `pip install "lattifai[diarization]"` | Speaker diarization (NeMo, pyannote) |
 | `event` | `pip install "lattifai[event]"` | Audio event detection |
 

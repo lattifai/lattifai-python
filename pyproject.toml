@@ -48,6 +48,9 @@ dependencies = [
     "av",
     "msgpack",
     "google-genai>=1.22.0",
+    "questionary>=2.0",
+    "yt-dlp",
+    "pycryptodome",
 ]
 
 [project.optional-dependencies]
@@ -63,12 +66,6 @@ diarization = [
 transcription = [
     "lattifai-core[transcription]>=0.6.8",
 ]
-# Workflow: YouTube download, interactive prompts
-youtube = [
-    "questionary>=2.0",
-    "yt-dlp",
-    "pycryptodome",
-]
 # Development
 dev = [
     "black",
@@ -78,6 +75,8 @@ dev = [
 ]
 # All: install everything
 all = [
+    "lattifai[event]",
+    "lattifai[diarization]",
     "lattifai[transcription]",
     "lattifai[youtube]",
 ]
