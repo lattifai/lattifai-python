@@ -53,18 +53,15 @@ dependencies = [
 [project.optional-dependencies]
 # Event
 event = [
-    "pyannote-audio-notorchdeps>=4.0.2",
+    "lattifai-core[event]>=0.6.8",
 ]
 # Diarization
 diarization = [
-    "nemo_toolkit_asr[asr]>=2.7.0rc4",
-    "pyannote-audio-notorchdeps>=4.0.2",
+    "lattifai-core[diarization]>=0.6.8",
 ]
 # Transcription: ASR models + diarization
 transcription = [
-    "OmniSenseVoice>=0.4.2",
-    "nemo_toolkit_asr[asr]>=2.7.0rc4",
-    "pyannote-audio-notorchdeps>=4.0.2",
+    "lattifai-core[transcription]>=0.6.8",
 ]
 # Workflow: YouTube download, interactive prompts
 youtube = [
