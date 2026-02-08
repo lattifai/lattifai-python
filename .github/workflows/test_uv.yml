@@ -31,7 +31,7 @@ jobs:
           path: |
             ~/.cache/huggingface/hub
             ~/.cache/modelscope/hub
-          key: models-${{ runner.os }}
+          key: models-v2-${{ runner.os }}
 
       - name: Set up Python
         if: steps.cache-models.outputs.cache-hit != 'true'
@@ -42,9 +42,14 @@ jobs:
       - name: Download models
         if: steps.cache-models.outputs.cache-hit != 'true'
         run: |
-          pip install modelscope
+          pip install modelscope huggingface_hub
+          # ModelScope: alignment models
           python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/Lattice-1-Alpha')"
           python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/Lattice-1')"
+          # ModelScope: transcription model
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('iic/SenseVoiceSmall')"
+          # ModelScope: sentence splitter (wtpsplit/SaT) for split_sentence=true
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/OmniTokenizer')"
 
   test:
     needs: [download-models]
@@ -80,7 +85,7 @@ jobs:
           path: |
             ~/.cache/huggingface/hub
             ~/.cache/modelscope/hub
-          key: models-${{ runner.os }}
+          key: models-v2-${{ runner.os }}
 
       - name: Build and Test
         if: runner.os != 'Windows'
