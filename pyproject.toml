@@ -45,6 +45,7 @@ dependencies = [
     "error-align-fix>=0.1.4",
     "k2py==0.2.4",
     "onnxruntime",
+    "soundfile",
     "av",
     "msgpack",
     "google-genai>=1.22.0",

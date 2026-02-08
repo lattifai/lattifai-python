@@ -14,9 +14,6 @@ resolution-markers = [
     "python_full_version < '3.11' and sys_platform != 'linux'",
 ]
 
-[options]
-prerelease-mode = "allow"
-
 [[package]]
 name = "absl-py"
 version = "2.3.1"
@@ -2897,6 +2894,7 @@ dependencies = [
     { name = "pycryptodome" },
     { name = "python-dotenv" },
     { name = "questionary" },
+    { name = "soundfile" },
     { name = "yt-dlp" },
 ]
 
@@ -2947,6 +2945,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "python-dotenv" },
     { name = "questionary", specifier = ">=2.0" },
+    { name = "soundfile" },
     { name = "yt-dlp" },
 ]
 provides-extras = ["event", "diarization", "transcription", "dev", "all"]
