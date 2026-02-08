@@ -52,6 +52,18 @@ def export_resampler(source_sr: int, target_sr: int, output_path: Path) -> None:
 
     # Inline external data into the .onnx file and remove .data files
     onnx_model = onnx.load(str(output_path), load_external_data=True)
+
+    # Fix output shape: torch.onnx.export records a fixed dim_value from the
+    # dummy input even with dynamic_axes, because torchaudio's Resample uses
+    # shape-dependent ops.  Clear the fixed value and set a symbolic dim_param
+    # so onnxruntime won't emit VerifyOutputSizes warnings at inference time.
+    for output in onnx_model.graph.output:
+        shape = output.type.tensor_type.shape
+        if shape and len(shape.dim) > 1:
+            dim = shape.dim[1]
+            dim.Clear()
+            dim.dim_param = "num_samples"
+
     onnx.save_model(onnx_model, str(output_path), save_as_external_data=False)
     data_path = Path(str(output_path) + ".data")
     if data_path.exists():
