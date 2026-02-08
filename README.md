@@ -70,10 +70,17 @@ client = LattifAI(alignment_config=AlignmentConfig(model_hub="modelscope"))
 [uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip). **No extra configuration needed** - uv automatically uses our package index.
 
 ```bash
-# Install uv
+# Install uv (skip if already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Quick start (run without installing)
+# Create a new project and add lattifai
+uv init my-project && cd my-project
+uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+
+# Or add to an existing project
+uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+
+# Run CLI without installing (quick test)
 uvx --from lattifai --extra-index-url https://lattifai.github.io/pypi/simple/ lai --help
 ```
 
@@ -94,13 +101,13 @@ extra-index-url = https://lattifai.github.io/pypi/simple/
 
 ### Installation Options
 
-| Extra | Command | Includes |
-|-------|---------|----------|
-| (base) | `pip install lattifai` | Forced alignment (Lattice-1, k2py, ONNX, captions and YouTube) |
-| `all` | `pip install "lattifai[all]"` | Base + transcription + youtube |
-| `transcription` | `pip install "lattifai[transcription]"` | ASR models (Gemini, Parakeet, SenseVoice) |
-| `diarization` | `pip install "lattifai[diarization]"` | Speaker diarization (NeMo, pyannote) |
-| `event` | `pip install "lattifai[event]"` | Audio event detection |
+| Extra | Includes |
+|-------|----------|
+| (base) | Forced alignment (Lattice-1, k2py, ONNX, captions and YouTube) |
+| `all` | Base + transcription + youtube |
+| `transcription` | ASR models (Gemini, Parakeet, SenseVoice) |
+| `diarization` | Speaker diarization (NeMo, pyannote) |
+| `event` | Audio event detection |
 
 **Note:** Base installation includes full alignment functionality. Use `[all]` for transcription and YouTube features.
 
