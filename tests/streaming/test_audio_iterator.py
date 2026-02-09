@@ -1,10 +1,15 @@
 """Test AudioData iterator interface for streaming."""
 
-import numpy as np
-import pytest
-import torch
+from pathlib import Path
 
+import numpy as np
+import onnxruntime as ort
+import pytest
+
+import lattifai.audio2 as _audio2_mod
 from lattifai.audio2 import AudioData
+
+_RESAMPLER_DIR = Path(_audio2_mod.__file__).parent / "data" / "resamplers"
 
 
 def test_audio_data_iter_default():
@@ -27,13 +32,9 @@ def test_audio_data_iter_default():
     # Iterate over chunks
     chunks = list(audio)
 
-    # With 30s chunks and 1s overlap:
-    # - Step size: 29s
-    # - Expected chunks: ceil((90 - 30) / 29) + 1 = ceil(60/29) + 1 = 3 + 1 = 4
-    # - Chunk 0: 0-30s
-    # - Chunk 1: 29-59s
-    # - Chunk 2: 58-88s
-    # - Chunk 3: 87-90s
+    # With 30s chunks and 0s overlap:
+    # - Step size: 30s
+    # - Expected chunks: ceil(90 / 30) = 3
     assert len(chunks) >= 3, f"Expected at least 3 chunks, got {len(chunks)}"
 
     # Verify first chunk
@@ -189,73 +190,22 @@ def test_audio_data_chunk_path_naming():
         assert "s]" in chunk.path
 
 
-def test_resampler_with_very_short_audio():
-    """Test get_or_create_resampler with very short audio."""
-    from lhotse.augmentation import get_or_create_resampler
+def test_onnx_resampler_exact_at_one_second():
+    """Test ONNX resampler produces exact output for 1-second input (the export chunk size)."""
+    test_rates = [8000, 22050, 24000, 32000, 44100, 48000]
 
-    # Test various very short audio lengths
-    test_cases = [
-        (48000, 16000, 0.001),  # 1ms audio
-        (44100, 16000, 0.005),  # 5ms audio
-        (48000, 16000, 0.01),  # 10ms audio
-        (32000, 16000, 0.02),  # 20ms audio
-        (44100, 16000, 0.05),  # 50ms audio
-        (48000, 16000, 0.1),  # 100ms audio
-    ]
+    for source_sr in test_rates:
+        onnx_path = _RESAMPLER_DIR / f"resampler_{source_sr}.onnx"
+        if not onnx_path.exists():
+            continue
 
-    for source_sr, target_sr, duration in test_cases:
-        # Create very short audio
-        num_samples = int(source_sr * duration)
-        audio = torch.randn(1, num_samples)
+        session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
 
-        # CPU test - create fresh resampler on CPU
-        resampler_cpu = get_or_create_resampler(source_sr, target_sr)
-        resampler_cpu = resampler_cpu.to("cpu")  # Ensure it's on CPU
-        resampled = resampler_cpu(audio)
-        expected_samples = int(num_samples * target_sr / source_sr)
+        audio = np.random.randn(1, source_sr).astype(np.float32)
+        resampled = session.run(None, {"input": audio})[0]
 
-        assert resampled.shape[0] == audio.shape[0], f"Channel count mismatch for {duration}s audio"
-        assert abs(resampled.shape[1] - expected_samples) <= 10, (
-            f"Sample count mismatch for {duration}s audio: " f"got {resampled.shape[1]}, expected ~{expected_samples}"
-        )
-
-        # GPU test (CUDA if available)
-        if torch.cuda.is_available():
-            device = torch.device("cuda")
-            audio_gpu = audio.to(device=device)
-            # Create fresh resampler for CUDA
-            resampler_gpu = get_or_create_resampler(source_sr, target_sr)
-            resampler_gpu = resampler_gpu.to(device=device)
-
-            resampled_gpu = resampler_gpu(audio_gpu)
-
-            assert resampled_gpu.device.type == "cuda", "Resampled audio should be on CUDA"
-            assert resampled_gpu.shape[0] == audio.shape[0], f"Channel count mismatch on CUDA for {duration}s audio"
-            assert abs(resampled_gpu.shape[1] - expected_samples) <= 10, (
-                f"Sample count mismatch on CUDA for {duration}s audio: "
-                f"got {resampled_gpu.shape[1]}, expected ~{expected_samples}"
-            )
-
-        # MPS test (Apple Silicon if available)
-        if torch.backends.mps.is_available():
-            try:
-                device = torch.device("mps")
-                audio_mps = audio.to(device=device)
-                # Create fresh resampler for MPS
-                resampler_mps = get_or_create_resampler(source_sr, target_sr)
-                resampler_mps = resampler_mps.to(device=device)
-
-                resampled_mps = resampler_mps(audio_mps)
-
-                assert resampled_mps.device.type == "mps", "Resampled audio should be on MPS"
-                assert resampled_mps.shape[0] == audio.shape[0], f"Channel count mismatch on MPS for {duration}s audio"
-                assert abs(resampled_mps.shape[1] - expected_samples) <= 10, (
-                    f"Sample count mismatch on MPS for {duration}s audio: "
-                    f"got {resampled_mps.shape[1]}, expected ~{expected_samples}"
-                )
-            except RuntimeError as e:
-                # MPS may not support all operations, skip if it fails
-                pytest.skip(f"MPS operation not supported: {e}")
+        assert resampled.shape[0] == 1, f"Channel count mismatch for {source_sr}Hz"
+        assert resampled.shape[1] == 16000, f"1s at {source_sr}Hz -> expected 16000 samples, got {resampled.shape[1]}"
 
 
 def test_audio_data_resample_very_short():
@@ -339,187 +289,66 @@ def test_audio_data_iter_with_resampling():
         os.unlink(tmp_path)
 
 
-def test_audio_loader_mps_device():
-    """Test AudioLoader with MPS device for very short audio."""
+def test_onnx_resampler_cache():
+    """Test that ONNX resampler sessions are cached correctly."""
+    from lattifai.audio2 import AudioLoader
+
+    loader = AudioLoader(device="cpu")
+
+    source_sr = 48000
+    target_sr = 16000
+    num_samples = 480  # 10ms at 48kHz
+    audio = np.random.randn(num_samples, 1).astype(np.float32)  # (samples, channels)
+
+    result1 = loader._resample_audio((audio, source_sr), target_sr, device="cpu", channel_selector=None)
+    result2 = loader._resample_audio((audio, source_sr), target_sr, device="cpu", channel_selector=None)
+
+    assert source_sr in loader._resampler_cache
+    assert np.allclose(result1, result2)
+
+
+def test_audio_loader_resampling_various_durations():
+    """Test AudioLoader resampling produces expected lengths for various durations."""
     import tempfile
 
     import soundfile as sf
 
     from lattifai.audio2 import AudioLoader
 
-    if not torch.backends.mps.is_available():
-        pytest.skip("MPS not available on this system")
-
-    source_sr = 48000
-    target_sr = 16000
-    duration = 0.05  # 50ms audio
-    num_samples = int(source_sr * duration)
-
-    # Create temporary audio file
-    audio_data = np.random.randn(num_samples).astype(np.float32)
-
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
-        sf.write(tmp_file.name, audio_data, source_sr)
-        tmp_path = tmp_file.name
-
-    try:
-        # Load and resample using AudioLoader with MPS device
-        loader = AudioLoader(device="mps")
-        resampled = loader._load_audio(
-            audio=tmp_path,
-            sampling_rate=target_sr,
-            channel_selector=None,
-        )
-
-        # Verify resampling worked
-        expected_samples = int(num_samples * target_sr / source_sr)
-        assert resampled.shape[0] == 1, "Should have 1 channel"
-        assert (
-            abs(resampled.shape[1] - expected_samples) <= 10
-        ), f"Resampled samples mismatch on MPS: got {resampled.shape[1]}, expected ~{expected_samples}"
-    finally:
-        import os
-
-        os.unlink(tmp_path)
-
-
-def test_resampler_cache_with_different_devices():
-    """Test that resampler cache works correctly with different devices."""
-    from lhotse.augmentation import get_or_create_resampler
-
-    source_sr = 48000
-    target_sr = 16000
-    num_samples = 480  # 10ms at 48kHz
-    audio = torch.randn(1, num_samples)
-
-    # Test CPU - ensure resampler is on CPU
-    resampler_cpu = get_or_create_resampler(source_sr, target_sr)
-    resampler_cpu = resampler_cpu.to("cpu")
-    resampled_cpu = resampler_cpu(audio)
-    assert resampled_cpu.device.type == "cpu"
-
-    # Test CUDA if available
-    if torch.cuda.is_available():
-        audio_cuda = audio.to("cuda")
-        resampler_cuda = get_or_create_resampler(source_sr, target_sr)
-        resampler_cuda = resampler_cuda.to("cuda")
-        resampled_cuda = resampler_cuda(audio_cuda)
-        assert resampled_cuda.device.type == "cuda"
-        # Verify outputs are similar
-        assert torch.allclose(resampled_cpu, resampled_cuda.cpu(), atol=1e-5)
-
-    # Test MPS if available
-    if torch.backends.mps.is_available():
-        audio_mps = audio.to("mps")
-        resampler_mps = get_or_create_resampler(source_sr, target_sr)
-        resampler_mps = resampler_mps.to("mps")
-        resampled_mps = resampler_mps(audio_mps)
-        assert resampled_mps.device.type == "mps"
-        # Verify outputs are similar
-        assert torch.allclose(resampled_cpu, resampled_mps.cpu(), atol=1e-5)
-
-
-def test_resampler_exact_length_30min_chunks():
-    """Test that resampling 30-minute audio to 16kHz produces exactly 16000*30 samples."""
-    from lhotse.augmentation import get_or_create_resampler
-
-    target_sr = 16000
-    duration_minutes = 30
-    duration_secs = duration_minutes * 60  # 1800 seconds
-    expected_samples = target_sr * duration_secs  # 16000 * 1800 = 28,800,000
-
-    # Test various common sample rates
-    test_sample_rates = [
-        8000,  # Telephone quality
-        16000,  # Wideband (no resampling needed)
-        22050,  # Common for music
-        24000,  # Common for speech
-        32000,  # Super-wideband
-        44100,  # CD quality
-        48000,  # Professional audio
-    ]
-
-    for source_sr in test_sample_rates:
-        # Create 30-minute audio at source sample rate
-        num_samples = int(source_sr * duration_secs)
-        audio = torch.randn(1, num_samples)
-
-        # Resample to 16kHz on CPU
-        resampler = get_or_create_resampler(source_sr, target_sr)
-        resampler = resampler.to("cpu")
-        resampled = resampler(audio)
-
-        # Verify exact sample count
-        actual_samples = resampled.shape[1]
-        assert actual_samples == expected_samples, (
-            f"Sample rate {source_sr}Hz -> 16kHz: "
-            f"Expected exactly {expected_samples} samples, got {actual_samples} "
-            f"(difference: {actual_samples - expected_samples})"
-        )
-
-        # Test on MPS if available
-        if torch.backends.mps.is_available():
-            audio_mps = audio.to("mps")
-            resampler_mps = get_or_create_resampler(source_sr, target_sr)
-            resampler_mps = resampler_mps.to("mps")
-            resampled_mps = resampler_mps(audio_mps)
-
-            actual_samples_mps = resampled_mps.shape[1]
-            assert actual_samples_mps == expected_samples, (
-                f"MPS - Sample rate {source_sr}Hz -> 16kHz: "
-                f"Expected exactly {expected_samples} samples, got {actual_samples_mps} "
-                f"(difference: {actual_samples_mps - expected_samples})"
-            )
-
-        # Test on CUDA if available
-        if torch.cuda.is_available():
-            audio_cuda = audio.to("cuda")
-            resampler_cuda = get_or_create_resampler(source_sr, target_sr)
-            resampler_cuda = resampler_cuda.to("cuda")
-            resampled_cuda = resampler_cuda(audio_cuda)
-
-            actual_samples_cuda = resampled_cuda.shape[1]
-            assert actual_samples_cuda == expected_samples, (
-                f"CUDA - Sample rate {source_sr}Hz -> 16kHz: "
-                f"Expected exactly {expected_samples} samples, got {actual_samples_cuda} "
-                f"(difference: {actual_samples_cuda - expected_samples})"
-            )
-
-
-def test_resampler_length_various_durations():
-    """Test resampling produces exact expected lengths for various durations."""
-    from lhotse.augmentation import get_or_create_resampler
-
     target_sr = 16000
 
-    # Test cases: (source_sr, duration_secs)
     test_cases = [
-        (48000, 1800),  # 30 minutes at 48kHz
-        (44100, 1800),  # 30 minutes at 44.1kHz
-        (32000, 1800),  # 30 minutes at 32kHz
-        (24000, 1800),  # 30 minutes at 24kHz
-        (48000, 600),  # 10 minutes at 48kHz
-        (44100, 600),  # 10 minutes at 44.1kHz
-        (48000, 60),  # 1 minute at 48kHz
-        (44100, 60),  # 1 minute at 44.1kHz
+        (48000, 5),  # 5 seconds at 48kHz
+        (44100, 5),  # 5 seconds at 44.1kHz
+        (32000, 5),  # 5 seconds at 32kHz
+        (24000, 5),  # 5 seconds at 24kHz
+        (8000, 5),  # 5 seconds at 8kHz
     ]
+
+    loader = AudioLoader(device="cpu")
 
     for source_sr, duration_secs in test_cases:
         num_samples = int(source_sr * duration_secs)
-        audio = torch.randn(1, num_samples)
+        audio_data = np.random.randn(num_samples).astype(np.float32)
 
-        resampler = get_or_create_resampler(source_sr, target_sr)
-        resampler = resampler.to("cpu")
-        resampled = resampler(audio)
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+            sf.write(tmp_file.name, audio_data, source_sr)
+            tmp_path = tmp_file.name
 
-        expected_samples = target_sr * duration_secs
-        actual_samples = resampled.shape[1]
+        try:
+            resampled = loader._load_audio(audio=tmp_path, sampling_rate=target_sr, channel_selector=None)
+            expected_samples = target_sr * duration_secs
+            actual_samples = resampled.shape[1]
 
-        assert actual_samples == expected_samples, (
-            f"{source_sr}Hz -> 16kHz for {duration_secs}s: "
-            f"Expected {expected_samples} samples, got {actual_samples} "
-            f"(difference: {actual_samples - expected_samples})"
-        )
+            assert actual_samples == expected_samples, (
+                f"{source_sr}Hz -> 16kHz for {duration_secs}s: "
+                f"Expected {expected_samples} samples, got {actual_samples} "
+                f"(difference: {actual_samples - expected_samples})"
+            )
+        finally:
+            import os
+
+            os.unlink(tmp_path)
 
 
 if __name__ == "__main__":

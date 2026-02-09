@@ -18,7 +18,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  download-models:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Cache model files
+        uses: actions/cache@v4
+        id: cache-models
+        with:
+          path: |
+            ~/.cache/huggingface/hub
+            ~/.cache/modelscope/hub
+          key: models-v2-${{ runner.os }}
+
+      - name: Set up Python
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download models
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        run: |
+          pip install modelscope huggingface_hub
+          # ModelScope: alignment models
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/Lattice-1-Alpha')"
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/Lattice-1')"
+          # ModelScope: transcription model
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('iic/SenseVoiceSmall')"
+          # ModelScope: sentence splitter (wtpsplit/SaT) for split_sentence=true
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/OmniTokenizer')"
+
   test:
+    needs: [download-models]
     runs-on: ubuntu-24.04
     strategy:
       matrix:
@@ -57,6 +88,14 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip setuptools
+
+      - name: Restore model cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/huggingface/hub
+            ~/.cache/modelscope/hub
+          key: models-v2-${{ runner.os }}
 
       - name: Build and Test
         env:
@@ -107,7 +146,7 @@ jobs:
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=iic/SenseVoiceSmall
           # Event
           lai alignment align -Y -v tests/data/DQacCB9tDaw_16K_First05Mins.mp3 tests/data/DQacCB9tDaw_16K_First05Mins.md \
-              alignment.model_name=LattifAI/Lattice-1 alignment.event.enabled=true caption.split_sentence=true
+              alignment.model_name=LattifAI/Lattice-1 event.enabled=true caption.split_sentence=true caption.input_format=gemini
 
       - name: Run All Tests
         if: startsWith(github.ref, 'refs/tags/v')  # Only run on release tags (vx.x.x)
@@ -121,3 +160,4 @@ jobs:
           # LattifAI transcription command
           # lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview -v
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
+          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/canary-1b-v2

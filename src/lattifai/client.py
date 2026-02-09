@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Optional, Union
 
 import colorful
 from lattifai_core.client import SyncAPIClient
-from lhotse.utils import Pathlike
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
@@ -26,6 +25,7 @@ from lattifai.errors import (
     LatticeEncodingError,
 )
 from lattifai.mixin import LattifAIClientMixin
+from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
 if TYPE_CHECKING:
@@ -112,6 +112,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         split_sentence: Optional[bool] = None,
         channel_selector: Optional[str | int] = "average",
         streaming_chunk_secs: Optional[float] = None,
+        metadata: Optional[dict] = None,
     ) -> Caption:
         try:
             # Step 1: Get caption
@@ -227,6 +228,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         emission=emission,
                         offset=offset,
                         verbose=False,
+                        metadata=metadata,
                     )
 
                     supervisions.extend(_supervisions)
@@ -241,6 +243,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     caption.supervisions,
                     split_sentence=split_sentence or self.caption_config.split_sentence,
                     return_details=True,
+                    metadata=metadata,
                 )
 
             # Update caption with aligned results
@@ -249,10 +252,6 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
-
-            # Profile if enabled
-            if self.config.profile:
-                self.aligner.profile()
 
         except (CaptionProcessingError, LatticeEncodingError) as e:
             # Re-raise our specific errors as-is
@@ -283,6 +282,12 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             caption = self.event_detector.detect_and_update_caption(caption, media_audio)
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
+
+        # Step 7: Profile (all operations completed)
+        if self.config.profile:
+            self.aligner.profile()
+            if self.event_detector:
+                self.event_detector.profile()
 
         return caption
 
@@ -387,6 +392,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             split_sentence=split_sentence,
             channel_selector=channel_selector,
             streaming_chunk_secs=None,
+            metadata={"video_url": url},
         )
 
         return caption

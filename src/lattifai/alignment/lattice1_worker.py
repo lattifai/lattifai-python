@@ -7,11 +7,11 @@ from typing import Any, Dict, Optional, Tuple
 import colorful
 import numpy as np
 import onnxruntime as ort
-from lhotse.utils import Pathlike
 from tqdm import tqdm
 
 from lattifai.audio2 import AudioData
 from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
+from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
 
