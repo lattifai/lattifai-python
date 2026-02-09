@@ -144,6 +144,7 @@ def align(
     return client.alignment(
         input_media=media_config.input_path,
         input_caption=caption_config.input_path,
+        input_caption_format=caption_config.input_format,
         output_caption_path=caption_config.output_path,
         split_sentence=caption_config.split_sentence,
         channel_selector=media_config.channel_selector,
