@@ -246,6 +246,8 @@ class TestDiarizationConfig:
         assert config.model_name == "pyannote/speaker-diarization-community-1"
         assert config.verbose is False
         assert config.debug is False
+        assert config.min_claim_duration == 2.0
+        assert config.min_claim_count == 1
 
     def test_custom_values(self):
         """Test custom configuration values."""
@@ -321,3 +323,19 @@ class TestDiarizationConfig:
         """Test various invalid device values."""
         with pytest.raises(ValueError, match="device must be one of"):
             DiarizationConfig(device=invalid_device)
+
+    def test_custom_claim_thresholds(self):
+        """Test custom min_claim_duration and min_claim_count."""
+        config = DiarizationConfig(min_claim_duration=5.0, min_claim_count=3)
+        assert config.min_claim_duration == 5.0
+        assert config.min_claim_count == 3
+
+    def test_invalid_min_claim_duration(self):
+        """Test validation of min_claim_duration parameter."""
+        with pytest.raises(ValueError, match="min_claim_duration must be non-negative"):
+            DiarizationConfig(min_claim_duration=-1.0)
+
+    def test_invalid_min_claim_count(self):
+        """Test validation of min_claim_count parameter."""
+        with pytest.raises(ValueError, match="min_claim_count must be at least 1"):
+            DiarizationConfig(min_claim_count=0)

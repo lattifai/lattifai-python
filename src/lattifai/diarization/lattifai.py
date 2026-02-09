@@ -81,7 +81,6 @@ class LattifAIDiarizer:
         alignment_fn: Optional[Callable] = None,
         transcribe_fn: Optional[Callable] = None,
         separate_fn: Optional[Callable] = None,
-        debug: bool = False,
         output_path: Optional[str] = None,
     ) -> Tuple[DiarizationOutput, List[Supervision]]:
         """Diarize the given media input and return alignments with refined speaker labels."""
@@ -95,6 +94,8 @@ class LattifAIDiarizer:
             alignment_fn=alignment_fn,
             transcribe_fn=transcribe_fn,
             separate_fn=separate_fn,
-            debug=debug,
             output_path=output_path,
+            debug=self.config.debug,
+            min_claim_duration=self.config.min_claim_duration,
+            min_claim_count=self.config.min_claim_count,
         )
