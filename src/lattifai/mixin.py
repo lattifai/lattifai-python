@@ -432,9 +432,17 @@ class LattifAIClientMixin:
             transcription = await self.transcriber.transcribe_file(media_file, language=source_lang)
             safe_print(colorful.green("         ✓ Transcription completed."))
 
+            # Keep raw transcription for saving to file (before potential conversion)
+            raw_transcription = transcription
+
             if "gemini" in self.transcriber.name.lower():
                 safe_print(colorful.yellow("🔍 Gemini raw output:"))
                 safe_print(colorful.yellow(f"{transcription[:1000]}..."))  # Print first 1000 chars
+
+                # Save to output_dir first (before converting to Caption)
+                if output_dir:
+                    await asyncio.to_thread(self.transcriber.write, raw_transcription, transcript_file, encoding="utf-8")
+                    safe_print(colorful.green(f"         ✓ Transcription saved to: {transcript_file}"))
 
                 # write to temp file and use Caption read
                 # On Windows, we need to close the file before writing to it
@@ -447,7 +455,7 @@ class LattifAIClientMixin:
                 try:
                     await asyncio.to_thread(
                         self.transcriber.write,
-                        transcription,
+                        raw_transcription,
                         tmp_path,
                         encoding="utf-8",
                     )
@@ -465,9 +473,10 @@ class LattifAIClientMixin:
                     if transcription.transcription:
                         safe_print(colorful.yellow(f"First segment: {transcription.transcription[0].text}"))
 
-            if output_dir:
-                await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
-                safe_print(colorful.green(f"         ✓ Transcription saved to: {transcript_file}"))
+                # Save non-Gemini transcription to file
+                if output_dir:
+                    await asyncio.to_thread(self.transcriber.write, raw_transcription, transcript_file, encoding="utf-8")
+                    safe_print(colorful.green(f"         ✓ Transcription saved to: {transcript_file}"))
 
             return transcription
 
