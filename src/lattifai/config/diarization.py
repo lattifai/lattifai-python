@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Literal, Optional
 from ..utils import _select_device
 
 if TYPE_CHECKING:
-    from ..base_client import SyncAPIClient
+    from ..client import SyncAPIClient
 
 
 @dataclass
@@ -34,6 +34,11 @@ class DiarizationConfig:
 
     model_name: str = "pyannote/speaker-diarization-community-1"
     """Model name for speaker diarization."""
+
+    segmentation_step: float = 0.1
+    """The segmentation model is applied on a window sliding over the whole audio file.
+    `segmentation_step` controls the step of this window, provided as a ratio of its duration.
+    Default is 0.1 (i.e. 10%)."""
 
     verbose: bool = False
     """Enable debug logging for diarization operations."""
@@ -104,3 +109,8 @@ class DiarizationConfig:
 
         if self.min_claim_count < 1:
             raise ValueError("min_claim_count must be at least 1")
+
+        if self.segmentation_step >= 1.0:
+            raise ValueError(
+                f"segmentation_step must be < 1.0 (ratio of window duration), got {self.segmentation_step}"
+            )
