@@ -68,6 +68,7 @@ class LattifAIDiarizer:
             num_speakers=num_speakers,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            segmentation_step=self.config.segmentation_step,
         )
 
     def diarize_with_alignments(
@@ -81,7 +82,6 @@ class LattifAIDiarizer:
         alignment_fn: Optional[Callable] = None,
         transcribe_fn: Optional[Callable] = None,
         separate_fn: Optional[Callable] = None,
-        debug: bool = False,
         output_path: Optional[str] = None,
     ) -> Tuple[DiarizationOutput, List[Supervision]]:
         """Diarize the given media input and return alignments with refined speaker labels."""
@@ -95,6 +95,7 @@ class LattifAIDiarizer:
             alignment_fn=alignment_fn,
             transcribe_fn=transcribe_fn,
             separate_fn=separate_fn,
-            debug=debug,
+            debug=self.config.debug,
+            segmentation_step=self.config.segmentation_step,
             output_path=output_path,
         )
