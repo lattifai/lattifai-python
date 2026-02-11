@@ -68,6 +68,7 @@ class LattifAIDiarizer:
             num_speakers=num_speakers,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            segmentation_step=self.config.segmentation_step,
         )
 
     def diarize_with_alignments(
@@ -92,6 +93,7 @@ class LattifAIDiarizer:
             min_speakers=min_speakers,
             max_speakers=max_speakers,
             alignment_fn=alignment_fn,
+            segmentation_step=self.config.segmentation_step,
             transcribe_fn=transcribe_fn,
             separate_fn=separate_fn,
             output_path=output_path,

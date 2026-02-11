@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Dict, Literal, Optional
 from ..utils import _select_device
 
 if TYPE_CHECKING:
-    from ..base_client import SyncAPIClient
+    from ..client import SyncAPIClient
 
 
 @dataclass
