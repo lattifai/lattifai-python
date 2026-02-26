@@ -521,7 +521,7 @@ lai caption convert input.json output.vtt \
 
 #### Gemini Models (100+ Languages)
 
-**Models**: `gemini-2.5-pro`, `gemini-3-pro-preview`, `gemini-3-flash-preview`
+**Models**: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-3-pro-preview`, `gemini-3-flash-preview`, `gemini-3.1-pro-preview`
 
 English, Chinese (Mandarin & Cantonese), Spanish, French, German, Italian, Portuguese, Japanese, Korean, Arabic, Russian, Hindi, Bengali, Turkish, Dutch, Polish, Swedish, Danish, Norwegian, Finnish, Greek, Hebrew, Thai, Vietnamese, Indonesian, Malay, Filipino, Ukrainian, Czech, Romanian, Hungarian, and 70+ more.
 
