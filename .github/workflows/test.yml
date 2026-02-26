@@ -8,14 +8,16 @@ on:
     paths:
       - 'src/**'
       - 'pyproject.toml'
-    tags:
-      - 'v*.*.*'  # Trigger on release tags like v0.2.5, v1.0.0, etc.
   pull_request:
     branches: [ main ]
     paths-ignore: '**.md'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   download-models:
@@ -148,16 +150,23 @@ jobs:
           lai alignment align -Y -v tests/data/DQacCB9tDaw_16K_First05Mins.mp3 tests/data/DQacCB9tDaw_16K_First05Mins.md \
               alignment.model_name=LattifAI/Lattice-1 event.enabled=true caption.split_sentence=true caption.input_format=gemini
 
-      - name: Run All Tests
-        if: startsWith(github.ref, 'refs/tags/v')  # Only run on release tags (vx.x.x)
-        env:
-          LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          LATTIFAI_TESTS_CLI_DRYRUN: ${{ secrets.LATTIFAI_TESTS_CLI_DRYRUN }}
+  verify-imports:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install alignment extras
         run: |
-          # Run comprehensive test suite on release tags
-          pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
-          # LattifAI transcription command
-          # lai-transcribe -Y tests/data/SA1.wav transcription.model_name=gemini-3-pro-preview -v
-          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
-          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/canary-1b-v2
+          pip install -e ".[alignment]" --extra-index-url https://lattifai.github.io/pypi/simple/
+
+      - name: Verify module imports
+        run: |
+          python -c "from lattifai.alignment import Lattice1Aligner, SentenceSplitter; print('alignment module imported successfully')"
+          python -c "from lattifai.caption import Caption, Supervision; print('caption module imported successfully')"
+          python -c "from lattifai.config import AlignmentConfig; print('config module imported successfully')"

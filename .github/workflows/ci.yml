@@ -4,12 +4,56 @@ on:
   push:
     tags:
       - 'v*.*.*'
-    paths-ignore: '**.md'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
+  release-test:
+    name: Release Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache model files
+        uses: actions/cache@v4
+        id: cache-models
+        with:
+          path: |
+            ~/.cache/huggingface/hub
+            ~/.cache/modelscope/hub
+          key: models-v2-${{ runner.os }}
+
+      - name: Download models
+        if: steps.cache-models.outputs.cache-hit != 'true'
+        run: |
+          pip install modelscope huggingface_hub
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/Lattice-1-Alpha')"
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/Lattice-1')"
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('iic/SenseVoiceSmall')"
+          python -c "from modelscope.hub.snapshot_download import snapshot_download; snapshot_download('LattifAI/OmniTokenizer')"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools
+          pip install -e ".[all,dev]" --extra-index-url https://lattifai.github.io/pypi/simple/
+
+      - name: Run All Tests
+        env:
+          LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LATTIFAI_TESTS_CLI_DRYRUN: ${{ secrets.LATTIFAI_TESTS_CLI_DRYRUN }}
+        run: |
+          pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
+          lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/canary-1b-v2
+
   build-linux:
     if: false  # Disable Linux build for now
     name: Build Linux

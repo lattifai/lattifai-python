@@ -8,14 +8,16 @@ on:
     paths:
       - 'src/**'
       - 'pyproject.toml'
-    tags:
-      - 'v*.*.*'  # Trigger on release tags like v0.2.5, v1.0.0, etc.
   pull_request:
     branches: [ main ]
     paths-ignore: '**.md'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   download-models:
