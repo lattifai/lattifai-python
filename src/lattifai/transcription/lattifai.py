@@ -288,33 +288,17 @@ class LattifAITranscriber(BaseTranscriber):
         except (ImportError, IndexError):
             pass
 
-        if return_hypotheses:
+        if not return_hypotheses:
             if isinstance(audio, (list, tuple)):
-                if is_omnisense:
-                    return [
-                        Supervision(
-                            text=hyp.text,
-                            duration=_audio.shape[-1] / _ASR_SAMPLE_RATE,
-                            alignment={"word": hyp.words} if hyp.words is not None else None,
-                            custom={
-                                "language": hyp.language,
-                                "emotion": hyp.emotion,
-                                "event": hyp.event,
-                                "textnorm": hyp.textnorm,
-                            },
-                        )
-                        for _audio, hyp in zip(audio, hypotheses)
-                    ]
-                return [
-                    Supervision(text=hyp.text, duration=_audio.shape[-1] / _ASR_SAMPLE_RATE)
-                    for _audio, hyp in zip(audio, hypotheses)
-                ]
+                return [hyp.text for hyp in hypotheses]
+            return hypotheses[0].text
 
-            hyp = hypotheses[0]
+        def _make_sup(arr, hyp):
+            duration = arr.shape[-1] / _ASR_SAMPLE_RATE
             if is_omnisense:
                 return Supervision(
                     text=hyp.text,
-                    duration=audio.shape[-1] / _ASR_SAMPLE_RATE,
+                    duration=duration,
                     alignment={"word": hyp.words} if hyp.words is not None else None,
                     custom={
                         "language": hyp.language,
@@ -323,12 +307,11 @@ class LattifAITranscriber(BaseTranscriber):
                         "textnorm": hyp.textnorm,
                     },
                 )
-            return Supervision(text=hyp.text, duration=audio.shape[-1] / _ASR_SAMPLE_RATE)
+            return Supervision(text=hyp.text, duration=duration)
 
-        # text only
         if isinstance(audio, (list, tuple)):
-            return [hyp.text for hyp in hypotheses]
-        return hypotheses[0].text
+            return [_make_sup(arr, hyp) for arr, hyp in zip(audio, hypotheses)]
+        return _make_sup(audio, hypotheses[0])
 
     # ------------------------------------------------------------------
     # Public API

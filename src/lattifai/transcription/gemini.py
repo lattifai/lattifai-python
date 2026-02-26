@@ -1,10 +1,12 @@
 """Gemini 2.5 Pro transcription module with config-driven architecture."""
 
 import asyncio
+import tempfile
 from pathlib import Path
 from typing import List, Optional, Union
 
 import numpy as np
+import soundfile as sf
 from google import genai
 from google.genai.types import GenerateContentConfig, Part, ThinkingConfig
 
@@ -25,9 +27,6 @@ class GeminiTranscriber(BaseTranscriber):
 
     # Transcriber metadata
     file_suffix = ".md"
-
-    # The specific Gem URL
-    GEM_URL = "https://gemini.google.com/gem/1870ly7xvW2hU_umtv-LedGsjywT0sQiN"
 
     def __init__(
         self,
@@ -78,8 +77,6 @@ class GeminiTranscriber(BaseTranscriber):
             contents = Part.from_uri(file_uri=url, mime_type="video/*")
             return await self._run_generation(contents, source=url)
 
-        except ImportError:
-            raise RuntimeError("Google GenAI SDK not installed. Please install with: pip install google-genai")
         except Exception as e:
             self.logger.error(f"Gemini transcription failed: {str(e)}")
             raise RuntimeError(f"Gemini transcription failed: {str(e)}")
@@ -115,8 +112,6 @@ class GeminiTranscriber(BaseTranscriber):
             contents = Part.from_uri(file_uri=media_file.uri, mime_type=media_file.mime_type)
             return await self._run_generation(contents, source=media_file, client=client)
 
-        except ImportError:
-            raise RuntimeError("Google GenAI SDK not installed. Please install with: pip install google-genai")
         except Exception as e:
             self.logger.error(f"Gemini transcription failed: {str(e)}")
             raise RuntimeError(f"Gemini transcription failed: {str(e)}")
@@ -162,10 +157,6 @@ class GeminiTranscriber(BaseTranscriber):
             raise ValueError(f"Audio array must be 1D or 2D, got shape {audio_array.shape}")
 
         # Save numpy array to temporary file
-        import tempfile
-
-        import soundfile as sf
-
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
             # Transpose to (samples, channels) for soundfile
             sf.write(tmp_file.name, audio_array.T, sample_rate)
@@ -173,8 +164,6 @@ class GeminiTranscriber(BaseTranscriber):
 
         try:
             # Transcribe using simple ASR prompt
-            import asyncio
-
             transcript = asyncio.run(self._transcribe_with_simple_prompt(tmp_path, language=language))
 
             # Create Supervision object from transcript
@@ -283,21 +272,6 @@ class GeminiTranscriber(BaseTranscriber):
 
         self._system_prompt = base_prompt
         return self._system_prompt
-
-    def get_gem_info(self) -> dict:
-        """Get information about the Gem being used."""
-        return {
-            "gem_name": "Media Transcription Gem",
-            "gem_url": self.GEM_URL,
-            "model": self.config.model_name,
-            "description": "Specialized Gem for media content transcription",
-        }
-
-    def _build_result(self, transcript: str, output_file: Path) -> dict:
-        """Augment the base result with Gemini-specific metadata."""
-        base_result = super()._build_result(transcript, output_file)
-        base_result.update({"model": self.config.model_name, "language": self.config.language})
-        return base_result
 
     def _get_client(self) -> genai.Client:
         """Lazily create the Gemini client when first needed."""
@@ -410,37 +384,40 @@ class GeminiTranscriber(BaseTranscriber):
         lines = []
 
         # Model version
-        if hasattr(response, "model_version") and response.model_version:
-            lines.append(f"model_version: {response.model_version}")
+        model_version = getattr(response, "model_version", None)
+        if model_version:
+            lines.append(f"model_version: {model_version}")
 
         # Usage metadata (token counts)
-        if hasattr(response, "usage_metadata") and response.usage_metadata:
-            usage = response.usage_metadata
-            if hasattr(usage, "prompt_token_count"):
-                lines.append(f"prompt_tokens: {usage.prompt_token_count}")
-            if hasattr(usage, "candidates_token_count"):
-                lines.append(f"output_tokens: {usage.candidates_token_count}")
-            if hasattr(usage, "total_token_count"):
-                lines.append(f"total_tokens: {usage.total_token_count}")
-            # Thinking tokens if available
-            if hasattr(usage, "thoughts_token_count") and usage.thoughts_token_count:
-                lines.append(f"thinking_tokens: {usage.thoughts_token_count}")
+        usage = getattr(response, "usage_metadata", None)
+        if usage:
+            for attr, label in [
+                ("prompt_token_count", "prompt_tokens"),
+                ("candidates_token_count", "output_tokens"),
+                ("total_token_count", "total_tokens"),
+            ]:
+                val = getattr(usage, attr, None)
+                if val is not None:
+                    lines.append(f"{label}: {val}")
+            thoughts = getattr(usage, "thoughts_token_count", None)
+            if thoughts:
+                lines.append(f"thinking_tokens: {thoughts}")
 
         # Candidate-level metadata
         if response.candidates:
             candidate = response.candidates[0]
 
-            # Finish reason
-            if hasattr(candidate, "finish_reason") and candidate.finish_reason:
-                lines.append(f"finish_reason: {candidate.finish_reason}")
+            finish_reason = getattr(candidate, "finish_reason", None)
+            if finish_reason:
+                lines.append(f"finish_reason: {finish_reason}")
 
-            # Average log probability (confidence indicator)
-            if hasattr(candidate, "avg_logprobs") and candidate.avg_logprobs is not None:
-                lines.append(f"avg_logprobs: {candidate.avg_logprobs:.4f}")
+            avg_logprobs = getattr(candidate, "avg_logprobs", None)
+            if avg_logprobs is not None:
+                lines.append(f"avg_logprobs: {avg_logprobs:.4f}")
 
-            # Citation metadata
-            if hasattr(candidate, "citation_metadata") and candidate.citation_metadata:
-                citations = getattr(candidate.citation_metadata, "citations", [])
+            citation_metadata = getattr(candidate, "citation_metadata", None)
+            if citation_metadata:
+                citations = getattr(citation_metadata, "citations", [])
                 if citations:
                     lines.append("citations:")
                     for cite in citations:

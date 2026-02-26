@@ -9,7 +9,9 @@ import soundfile as sf
 
 from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
-from lattifai.transcription import GeminiTranscriber, LattifAITranscriber, create_transcriber
+from lattifai.transcription import create_transcriber
+from lattifai.transcription.gemini import GeminiTranscriber
+from lattifai.transcription.lattifai import LattifAITranscriber
 
 
 class MockClientWrapper:

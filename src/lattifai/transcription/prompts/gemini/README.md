@@ -21,4 +21,4 @@ To update the transcription behavior:
 
 ## Gem Information
 
-The original Gem configuration is preserved in the `GeminiTranscriber.GEM_URL` constant and can be accessed via the `get_gem_info()` method.
+The original Gem URL is: https://gemini.google.com/gem/1870ly7xvW2hU_umtv-LedGsjywT0sQiN

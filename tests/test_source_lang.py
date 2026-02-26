@@ -9,7 +9,7 @@ from lattifai.caption import Caption
 from lattifai.client import LattifAI
 from lattifai.config import CaptionConfig, TranscriptionConfig
 from lattifai.mixin import LattifAIClientMixin
-from lattifai.transcription import GeminiTranscriber
+from lattifai.transcription.gemini import GeminiTranscriber
 from lattifai.youtube import YouTubeDownloader
 
 
