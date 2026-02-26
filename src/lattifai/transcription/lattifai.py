@@ -84,7 +84,7 @@ class LattifAITranscriber(BaseTranscriber):
     LattifAI local transcription with config-driven architecture.
 
     Uses TranscriptionConfig for all behavioral settings.
-    Loads NeMo ASR models or OmniSenseVoice locally — no lattifai_core.transcription dependency.
+    Loads NeMo ASR models or OmniSenseVoice locally
     """
 
     file_suffix = ".ass"

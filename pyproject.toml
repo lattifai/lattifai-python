@@ -63,7 +63,7 @@ event = [
 diarization = [
     "lattifai-core[diarization]>=0.7.0",
 ]
-# Transcription: ASR models (inlined, no lattifai_core.transcription dependency)
+# Transcription: ASR models
 transcription = [
     "nemo-toolkit-asr[asr]==2.8.0rc2",
     "OmniSenseVoice>=0.4.2",
