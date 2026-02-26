@@ -1,6 +1,23 @@
 # CHANGELOG
 
 
+## [1.4.2] - 2026-02-26
+
+### Features
+- **Inline Transcription**: Core transcription logic inlined into lattifai-python, removing dependency on `lattifai_core.transcription`
+- **New Gemini Models**: Added support for `gemini-3.1-pro-preview`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+
+### Fixes
+- Updated `lattifai-captions` dependency to v0.2.2
+
+### Refactor
+- Extracted event detector initialization to `_ensure_event_detector()` in mixin (shared lazy init)
+- Removed dead code from transcription module (~45 lines): unused `GEM_URL`, `get_gem_info()`, `_build_result()`, dead `except ImportError` blocks
+- Consolidated `_to_supervisions` from 4 code paths to `_make_sup` helper + 2 branches
+- Replaced `hasattr` pattern with `getattr` in `_extract_response_metadata`
+- Moved inline imports (`tempfile`, `soundfile`, `asyncio`) to module level
+
+
 ## [1.3.4] - 2026-02-04
 
 ### Added

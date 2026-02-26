@@ -1,4 +1,45 @@
+# Release Notes - LattifAI Python v1.4.2
+
+**Release Date:** February 26, 2026
+
+---
+
+## Overview
+
+Transcription module now runs independently without `lattifai_core.transcription`, plus new Gemini model support.
+
+---
+
+## Key Changes
+
+### Inline Transcription
+- Core transcription logic inlined into `lattifai-python`, removing the `lattifai_core.transcription` dependency
+- No API changes — all existing code works as before
+
+### New Gemini Models
+- `gemini-3.1-pro-preview` — Latest flagship (Feb 2026)
+- `gemini-2.5-flash` — High performance, low latency
+- `gemini-2.5-flash-lite` — Fastest and most cost-effective
+
+### Dependencies
+- `lattifai-captions` updated to v0.2.2
+
+---
+
+## Installation
+
+```bash
+pip install --upgrade "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.3.4
+
+---
+
 
 **Release Date:** February 4, 2026
 
