@@ -104,7 +104,7 @@ class LattifAITranscriber(BaseTranscriber):
     # ------------------------------------------------------------------
     @property
     def event_detector(self):
-        """Lazy-init event detector from lattifai.event (not lattifai_core.event)."""
+        """Lazy-init event detector from lattifai.event."""
         if self._event_detector is None:
             try:
                 from lattifai.config.event import EventConfig
@@ -143,10 +143,6 @@ class LattifAITranscriber(BaseTranscriber):
     # ------------------------------------------------------------------
     # Model loading
     # ------------------------------------------------------------------
-    def _check_permission(self):
-        if self.config.client_wrapper is not None:
-            self.config.client_wrapper.check_permission("transcription")
-
     def _load_asr_model(self):
         """Load the ASR model based on config.model_name. Lazy imports torch/nemo/omnisense."""
         import torch
@@ -186,7 +182,6 @@ class LattifAITranscriber(BaseTranscriber):
         """Lazy initialise: suppress logging → check permission → load model."""
         if self._asr_model is None:
             _suppress_nemo_logging()
-            self._check_permission()
             self._asr_model = self._load_asr_model()
         return self._asr_model
 

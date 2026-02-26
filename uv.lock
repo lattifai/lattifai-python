@@ -2903,7 +2903,10 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
-    { name = "lattifai-core", extra = ["diarization", "event", "transcription"] },
+    { name = "lattifai-core", extra = ["diarization", "event"] },
+    { name = "nemo-toolkit-asr", extra = ["asr"] },
+    { name = "omnisensevoice" },
+    { name = "torch" },
 ]
 dev = [
     { name = "black" },
@@ -2918,7 +2921,9 @@ event = [
     { name = "lattifai-core", extra = ["event"] },
 ]
 transcription = [
-    { name = "lattifai-core", extra = ["transcription"] },
+    { name = "nemo-toolkit-asr", extra = ["asr"] },
+    { name = "omnisensevoice" },
+    { name = "torch" },
 ]
 
 [package.metadata]
@@ -2934,13 +2939,14 @@ requires-dist = [
     { name = "lattifai", extras = ["event"], marker = "extra == 'all'" },
     { name = "lattifai", extras = ["transcription"], marker = "extra == 'all'" },
     { name = "lattifai", extras = ["youtube"], marker = "extra == 'all'" },
-    { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.2.1" },
+    { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.2.2" },
     { name = "lattifai-core", specifier = ">=0.7.0" },
     { name = "lattifai-core", extras = ["diarization"], marker = "extra == 'diarization'", specifier = ">=0.7.0" },
     { name = "lattifai-core", extras = ["event"], marker = "extra == 'event'", specifier = ">=0.7.0" },
-    { name = "lattifai-core", extras = ["transcription"], marker = "extra == 'transcription'", specifier = ">=0.7.0" },
     { name = "lattifai-run", specifier = ">=1.0.2" },
     { name = "msgpack" },
+    { name = "nemo-toolkit-asr", extras = ["asr"], marker = "extra == 'transcription'", specifier = "==2.8.0rc2" },
+    { name = "omnisensevoice", marker = "extra == 'transcription'", specifier = ">=0.4.2" },
     { name = "onnxruntime" },
     { name = "pycryptodome" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
@@ -2949,22 +2955,23 @@ requires-dist = [
     { name = "python-dotenv" },
     { name = "questionary", specifier = ">=2.0" },
     { name = "soundfile" },
+    { name = "torch", marker = "extra == 'transcription'" },
     { name = "yt-dlp" },
 ]
 provides-extras = ["event", "diarization", "transcription", "dev", "all"]
 
 [[package]]
 name = "lattifai-captions"
-version = "0.2.1"
+version = "0.2.2"
 source = { registry = "https://lattifai.github.io/pypi/simple/" }
 dependencies = [
     { name = "praatio" },
     { name = "pysubs2" },
     { name = "tgt" },
 ]
-sdist = { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.2.1.tar.gz" }
+sdist = { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.2.2.tar.gz" }
 wheels = [
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.2.1-py3-none-any.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.2.2-py3-none-any.whl" },
 ]
 
 [package.optional-dependencies]
@@ -3017,12 +3024,6 @@ event = [
     { name = "sebbs" },
     { name = "setuptools" },
     { name = "torch" },
-]
-transcription = [
-    { name = "lattifai-captions" },
-    { name = "nemo-toolkit-asr", extra = ["asr"] },
-    { name = "omnisensevoice" },
-    { name = "pyannote-audio-notorchdeps" },
 ]
 
 [[package]]
