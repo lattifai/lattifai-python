@@ -93,52 +93,11 @@ class LattifAITranscriber(BaseTranscriber):
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
         self._asr_model = None
-        self._event_detector = None
+        self.event_detector = None
 
     @property
     def name(self) -> str:
         return self.config.model_name
-
-    # ------------------------------------------------------------------
-    # Event detector — reuse lattifai.event.LattifAIEventDetector
-    # ------------------------------------------------------------------
-    @property
-    def event_detector(self):
-        """Lazy-init event detector from lattifai.event."""
-        if self._event_detector is None:
-            try:
-                from lattifai.config.event import EventConfig
-                from lattifai.event import LattifAIEventDetector
-
-                event_config = EventConfig(
-                    enabled=True,
-                    device=self.config.device,
-                    model_path=self.config.lattice_model_path or "",
-                    client_wrapper=self.config.client_wrapper,
-                )
-                self._event_detector = LattifAIEventDetector(event_config)
-            except Exception as e:
-                error_msg = str(e)
-                if any(
-                    kw in error_msg
-                    for kw in [
-                        "numpy.core.multiarray",
-                        "_import_array",
-                        "NumPy 1.x",
-                        "NumPy 2.",
-                        "sed_scores_eval",
-                        "csebbs",
-                    ]
-                ):
-                    warnings.warn(
-                        f"Failed to initialize EventDetector due to NumPy compatibility issue. "
-                        f"Audio event detection will be disabled. "
-                        f"Original error: {e}",
-                        RuntimeWarning,
-                    )
-                    return None
-                raise
-        return self._event_detector
 
     # ------------------------------------------------------------------
     # Model loading

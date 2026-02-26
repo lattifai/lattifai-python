@@ -212,6 +212,15 @@ class LattifAIClientMixin:
         # downloader (lazy loaded when needed)
         self._downloader = None
 
+    def _ensure_event_detector(self):
+        """Return existing event_detector or force-init one from event_config."""
+        if getattr(self, "event_detector", None) is None:
+            self.event_config.enabled = True
+            from .event import LattifAIEventDetector
+
+            self.event_detector = LattifAIEventDetector(config=self.event_config)
+        return self.event_detector
+
     @property
     def transcriber(self):
         """Lazy load transcriber based on config."""
@@ -219,6 +228,9 @@ class LattifAIClientMixin:
             from .transcription import create_transcriber
 
             self._transcriber = create_transcriber(transcription_config=self.transcription_config)
+            # Inject event detector for VAD in local transcription
+            if hasattr(self._transcriber, "event_detector"):
+                self._transcriber.event_detector = self._ensure_event_detector()
         return self._transcriber
 
     @property

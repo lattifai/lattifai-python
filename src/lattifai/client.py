@@ -94,11 +94,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Initialize event detector if enabled
         self.event_config = event_config
-        self.event_detector: Optional["LattifAIEventDetector"] = None
+        self.event_detector = None
         if self.event_config.enabled:
-            from lattifai.event import LattifAIEventDetector  # noqa: F811
-
-            self.event_detector = LattifAIEventDetector(config=self.event_config)
+            self._ensure_event_detector()
 
         # Initialize shared components (transcriber, downloader)
         self._init_shared_components(transcription_config)
