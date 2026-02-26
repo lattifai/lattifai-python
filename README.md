@@ -103,17 +103,17 @@ extra-index-url = https://lattifai.github.io/pypi/simple/
 
 | Extra | Includes |
 |-------|----------|
-| (base) | Forced alignment (Lattice-1, k2py, ONNX, captions and YouTube) |
-| `all` | Base + transcription + youtube |
-| `transcription` | ASR models (Gemini, Parakeet, SenseVoice) |
+| (base) | Forced alignment, Gemini transcription, YouTube, captions |
+| `transcription` | Local ASR models (Parakeet, SenseVoice) |
 | `diarization` | Speaker diarization (NeMo, pyannote) |
 | `event` | Audio event detection |
+| `all` | Base + transcription + diarization + event |
 
-**Note:** Base installation includes full alignment functionality. Use `[all]` for transcription and YouTube features.
+**Note:** Base installation includes alignment, Gemini transcription, and YouTube. Use `[all]` for local ASR models and all optional features.
 
 ### Caption Format Support
 
-Caption/subtitle format parsing is provided by [lattifai-captions](https://github.com/lattifai/captions), a separate package supporting 30+ formats (SRT, VTT, ASS, TTML, TextGrid, NLE formats, etc.). It is automatically installed with `lattifai[core]` or `lattifai[all]`.
+Caption/subtitle format parsing is provided by [lattifai-captions](https://github.com/lattifai/captions), a separate package supporting 30+ formats (SRT, VTT, ASS, TTML, TextGrid, NLE formats, etc.). It is automatically installed with `lattifai`.
 
 ### API Keys
 
@@ -195,13 +195,13 @@ media.channel_selector=left    # left, right, average, or index
 ### Transcription Models
 
 ```bash
-# Gemini (100+ languages, requires GEMINI_API_KEY)
+# Gemini (100+ languages, included in base install, requires GEMINI_API_KEY)
 transcription.model_name=gemini-2.5-pro
 
-# Parakeet (24 European languages)
+# Parakeet (24 European languages, requires [transcription] extra)
 transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
 
-# SenseVoice (zh, en, ja, ko, yue)
+# SenseVoice (zh, en, ja, ko, yue, requires [transcription] extra)
 transcription.model_name=iic/SenseVoiceSmall
 ```
 
