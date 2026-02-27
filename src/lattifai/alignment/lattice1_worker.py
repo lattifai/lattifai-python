@@ -72,13 +72,10 @@ class Lattice1Worker:
         # Initialize separator if available
         separator_model_path = Path(model_path) / "separator.onnx"
         if separator_model_path.exists():
-            try:
-                self.separator_ort = ort.InferenceSession(
-                    str(separator_model_path),
-                    providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
-                )
-            except Exception as e:
-                raise ModelLoadError(f"separator model from {model_path}", original_error=e)
+            self.separator_ort = ort.InferenceSession(
+                str(separator_model_path),
+                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+            )
         else:
             self.separator_ort = None
 
