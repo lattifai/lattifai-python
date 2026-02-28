@@ -72,7 +72,7 @@ class AlignmentConfig:
     Default: 80. Typical range: 10-200.
     """
 
-    min_active_states: int = 400
+    min_active_states: int = 1000
     """Minimum number of active states during decoding. Controls memory and search space.
     Default: 400. Typical range: 30-1000.
     """
