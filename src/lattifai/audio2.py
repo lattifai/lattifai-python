@@ -13,6 +13,36 @@ from lattifai.types import Pathlike
 
 _RESAMPLER_DIR = Path(__file__).parent / "data" / "resamplers"
 
+# RMS-based volume normalization constants (matching lattifai-site alignment.worker.ts)
+_NORM_TARGET_DB = -14.0
+_NORM_THRESHOLD_DB = -24.0
+_NORM_MAX_GAIN_DB = 40.0
+_NORM_FLOOR_DB = -80.0
+
+
+def normalize_volume(audio: np.ndarray) -> np.ndarray:
+    """RMS-based volume normalization for alignment.
+
+    Matches lattifai-site alignment.worker.ts normalizeVolume().
+    Only boosts quiet audio; loud audio passes through unchanged.
+
+    Args:
+        audio: shape (1, T) or (C, T), float32
+
+    Returns:
+        Normalized audio (same shape), or original if no normalization needed.
+    """
+    rms = np.sqrt(np.mean(audio[:, ::16] ** 2))
+    rms_db = 20 * np.log10(rms + 1e-10)
+
+    if rms_db < _NORM_FLOOR_DB or rms_db >= _NORM_THRESHOLD_DB:
+        return audio
+
+    gain_db = min(_NORM_TARGET_DB - rms_db, _NORM_MAX_GAIN_DB)
+    gain = 10 ** (gain_db / 20)
+    return (audio * gain).astype(np.float32)
+
+
 # ChannelSelectorType = Union[int, Iterable[int], str]
 ChannelSelectorType = Union[int, str]
 

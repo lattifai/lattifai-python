@@ -94,6 +94,11 @@ class Lattice1Worker:
         Returns:
             Emission numpy array of shape (1, T, vocab_size)
         """
+        if self.alignment_config and self.alignment_config.normalize_volume:
+            from lattifai.audio2 import normalize_volume
+
+            ndarray = normalize_volume(ndarray)
+
         _start = time.time()
 
         if ndarray.shape[1] < 160:

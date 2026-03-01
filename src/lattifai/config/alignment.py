@@ -107,6 +107,10 @@ class AlignmentConfig:
     Default: 0.0 (no penalty). Typical range: -1.0 to 0.0 (e.g., -0.5).
     """
 
+    normalize_volume: bool = True
+    """Enable RMS-based volume normalization before ONNX inference.
+    Boosts quiet audio to improve alignment quality. Default: True."""
+
     check_sanity: bool = True
     """Whether to perform sanity checks on alignment results.
     When True, raises an error if media and caption content don't match.
