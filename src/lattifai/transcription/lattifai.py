@@ -202,6 +202,7 @@ class LattifAITranscriber(BaseTranscriber):
                         if model_name == "nvidia/canary-1b-v2"
                         else {}
                     ),
+                    verbose=progress_bar,
                 )
                 hypotheses = self._to_supervisions(audio, hypotheses, return_hypotheses)
 
