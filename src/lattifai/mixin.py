@@ -1,5 +1,6 @@
 """Mixin class providing shared functionality for LattifAI clients."""
 
+import re
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Awaitable, Optional, Union
@@ -11,6 +12,11 @@ from lattifai.data import Caption
 from lattifai.errors import CaptionProcessingError
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
+
+# HH:MM:SS.mmm / HH:MM:SS,mmm / H:MM:SS.hh
+_TIMESTAMP_RE = re.compile(r"\d{1,2}:\d{2}:\d{2}[,.]\d{2,3}")
+_TIMESTAMP_DENSITY_THRESHOLD = 0.2
+_TIMESTAMP_MIN_COUNT = 3
 
 if TYPE_CHECKING:
     from .config import AlignmentConfig, DiarizationConfig, EventConfig, TranscriptionConfig
@@ -314,9 +320,50 @@ class LattifAIClientMixin:
 
                 caption.event = LEDOutput.read(event_file)
 
+            # Check for timestamp contamination in parsed text
+            if caption.supervisions:
+                contaminated = [
+                    s
+                    for s in caption.supervisions
+                    if s.text and any(_TIMESTAMP_RE.fullmatch(w) for w in s.text.split())
+                ]
+                total = len(caption.supervisions)
+                if (
+                    len(contaminated) >= _TIMESTAMP_MIN_COUNT
+                    and len(contaminated) / total > _TIMESTAMP_DENSITY_THRESHOLD
+                ):
+                    samples = []
+                    for s in contaminated[:3]:
+                        samples.extend(w for w in s.text.split() if _TIMESTAMP_RE.fullmatch(w))
+                    safe_print(
+                        colorful.red(
+                            f"\n⚠️  WARNING: {len(contaminated)}/{total} caption segments contain "
+                            f"unparsed timestamps (e.g. {samples[:3]}).\n"
+                            f"   This usually means the caption file was not parsed correctly.\n"
+                            f"   File: {input_caption}\n"
+                        )
+                        + colorful.yellow(
+                            "   If you believe this is a parsing bug, please report it at:\n"
+                            "   https://github.com/LattifAI/captions/issues\n"
+                            "   (include the caption file so we can reproduce the issue)\n"
+                        )
+                    )
+                    try:
+                        answer = input(colorful.yellow("   Continue anyway? [y/N] ")).strip().lower()
+                    except (EOFError, KeyboardInterrupt):
+                        answer = ""
+                    if answer not in ("y", "yes"):
+                        raise CaptionProcessingError(
+                            "Aborted: caption text contains unparsed timestamps. "
+                            "Please check the file format and content.",
+                            caption_path=str(input_caption),
+                        )
+
             if verbose:
                 safe_print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
             return caption
+        except CaptionProcessingError:
+            raise
         except Exception as e:
             raise CaptionProcessingError(
                 f"Failed to parse caption file: {input_caption}",
