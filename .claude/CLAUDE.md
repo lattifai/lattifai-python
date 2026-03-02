@@ -200,7 +200,7 @@ YouTube URL → Downloader → Media File + Auto Caption
 
 2. **Streaming Mode** (`media.streaming_chunk_secs`):
    - Enables processing of long audio (up to 20 hours)
-   - Default chunk size: 600 seconds (10 minutes)
+   - Default chunk size: 300 seconds (5 minutes)
    - Preserves alignment accuracy with minimal memory overhead
 
 3. **Sentence Splitting** (`caption.split_sentence`):

@@ -186,7 +186,7 @@ caption.split_sentence=true    # Smart sentence splitting
 caption.word_level=true        # Word-level timestamps
 
 # Streaming for long audio
-media.streaming_chunk_secs=600
+media.streaming_chunk_secs=300
 
 # Channel selection
 media.channel_selector=left    # left, right, average, or index
@@ -322,7 +322,7 @@ Process audio up to 20 hours with minimal memory:
 caption = client.alignment(
     input_media="long_audio.wav",
     input_caption="subtitle.srt",
-    streaming_chunk_secs=600.0,  # 10-minute chunks
+    streaming_chunk_secs=300.0,  # 5-minute chunks
 )
 ```
 

@@ -87,7 +87,7 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "path", "st
         """Iterate over audio chunks with configurable duration and overlap.
 
         Args:
-            chunk_secs: Duration of each chunk in seconds (default: uses streaming_chunk_secs or 600.0).
+            chunk_secs: Duration of each chunk in seconds (default: uses streaming_chunk_secs or 300.0).
             overlap_secs: Overlap between consecutive chunks in seconds (default: uses overlap_secs or 0.0).
 
         Yields:
@@ -98,7 +98,7 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "path", "st
             >>> for chunk in audio.iter_chunks(chunk_secs=60.0, overlap_secs=2.0):
             ...     process(chunk)
         """
-        chunk_duration = chunk_secs or self.streaming_chunk_secs or 600.0
+        chunk_duration = chunk_secs or self.streaming_chunk_secs or 300.0
         overlap_duration = overlap_secs or self.overlap_secs or 0.0
 
         chunk_size = int(chunk_duration * self.sampling_rate)
