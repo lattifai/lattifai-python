@@ -79,7 +79,7 @@ class LattifAIDiarizer:
         num_speakers: Optional[int] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
-        alignment_fn: Optional[Callable] = None,
+        alignment_fn: Optional[Tuple[Callable, Callable]] = None,
         transcribe_fn: Optional[Callable] = None,
         separate_fn: Optional[Callable] = None,
         output_path: Optional[str] = None,
