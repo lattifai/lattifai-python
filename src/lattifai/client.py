@@ -544,7 +544,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             input_media,
             caption.alignments,
             diarization=caption.diarization,
-            alignment_fn=self.aligner.alignment,
+            alignment_fn=(self.aligner.alignment, self.aligner.emission),
             transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
             separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
             output_path=output_caption_path,
