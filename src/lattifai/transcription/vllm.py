@@ -44,17 +44,28 @@ class VLLMTranscriber(BaseTranscriber):
     # ------------------------------------------------------------------
     # Core API call
     # ------------------------------------------------------------------
-    def _transcribe_audio_file(self, file_path: Path) -> str:
+    _MIME_TYPES = {
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg",
+        ".flac": "audio/flac",
+        ".ogg": "audio/ogg",
+        ".m4a": "audio/mp4",
+        ".mp4": "audio/mp4",
+        ".webm": "audio/webm",
+    }
+
+    def _transcribe_audio_file(self, file_path: Path, language: Optional[str] = None) -> str:
         """Send audio file to /v1/audio/transcriptions and return text."""
         import httpx
 
         url = f"{self._api_base_url}/audio/transcriptions"
+        mime_type = self._MIME_TYPES.get(file_path.suffix.lower(), "audio/wav")
 
         with open(file_path, "rb") as f:
-            files = {"file": (file_path.name, f, "audio/wav")}
+            files = {"file": (file_path.name, f, mime_type)}
             data = {"model": self.config.model_name}
-            if self.config.language:
-                data["language"] = self.config.language
+            if language or self.config.language:
+                data["language"] = language or self.config.language
             if self.config.temperature is not None:
                 data["temperature"] = str(self.config.temperature)
             if self.config.prompt:
@@ -84,12 +95,12 @@ class VLLMTranscriber(BaseTranscriber):
         """
         if isinstance(media_file, AudioData):
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-                sf.write(f.name, media_file.waveform, media_file.sample_rate)
+                sf.write(f.name, media_file.ndarray.T, media_file.sampling_rate)
                 file_path = Path(f.name)
         else:
             file_path = Path(media_file)
 
-        text = self._transcribe_audio_file(file_path)
+        text = self._transcribe_audio_file(file_path, language=language)
 
         supervision = Supervision(start=0.0, end=0.0, text=text, speaker=None)
         return Caption(supervisions=[supervision])
@@ -110,7 +121,7 @@ class VLLMTranscriber(BaseTranscriber):
             sf.write(f.name, audio, 16000)
             file_path = Path(f.name)
 
-        text = self._transcribe_audio_file(file_path)
+        text = self._transcribe_audio_file(file_path, language=language)
         return Supervision(start=0.0, end=0.0, text=text, speaker=None)
 
     def write(self, transcript: Union[str, Caption], output_file: Path, encoding: str = "utf-8") -> Path:

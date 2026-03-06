@@ -75,7 +75,7 @@ class GeminiTranscriber(BaseTranscriber):
 
         try:
             contents = Part.from_uri(file_uri=url, mime_type="video/*")
-            return await self._run_generation(contents, source=url)
+            return await self._run_generation(contents, source=url, language=language)
 
         except Exception as e:
             self.logger.error(f"Gemini transcription failed: {str(e)}")
@@ -110,7 +110,7 @@ class GeminiTranscriber(BaseTranscriber):
             media_file = client.files.upload(file=media_file)
 
             contents = Part.from_uri(file_uri=media_file.uri, mime_type=media_file.mime_type)
-            return await self._run_generation(contents, source=media_file, client=client)
+            return await self._run_generation(contents, source=media_file, client=client, language=language)
 
         except Exception as e:
             self.logger.error(f"Gemini transcription failed: {str(e)}")
@@ -234,74 +234,60 @@ class GeminiTranscriber(BaseTranscriber):
 
         return transcript
 
-    def _get_transcription_prompt(self) -> str:
-        """Get (and cache) transcription system prompt.
-
-        Priority:
-        1. Custom prompt from config.prompt (file path or text)
-        2. Default prompt from prompts/gemini/transcription_gem.txt
-        """
-        if self._system_prompt is not None:
-            return self._system_prompt
-
-        # Check for custom prompt
-        if self.config.prompt:
-            prompt_path = Path(self.config.prompt)
-            if prompt_path.exists() and prompt_path.is_file():
-                # Load from file
-                base_prompt = prompt_path.read_text(encoding="utf-8").strip()
-                if self.config.verbose:
-                    self.logger.info(f"📝 Using custom prompt from file: {prompt_path}")
+    def _load_base_prompt(self) -> str:
+        """Load and cache the base transcription prompt (without language/description)."""
+        if self._system_prompt is None:
+            if self.config.prompt:
+                prompt_path = Path(self.config.prompt)
+                if prompt_path.exists() and prompt_path.is_file():
+                    self._system_prompt = prompt_path.read_text(encoding="utf-8").strip()
+                else:
+                    self._system_prompt = self.config.prompt
             else:
-                # Use as direct text
-                base_prompt = self.config.prompt
-                if self.config.verbose:
-                    self.logger.info("📝 Using custom prompt text")
-        else:
-            # Load default prompt from prompts/gemini/transcription_gem.txt
-            prompt_loader = get_prompt_loader()
-            base_prompt = prompt_loader.get_gemini_transcription_prompt()
-
-        # Add language-specific instruction if configured
-        if self.config.language:
-            base_prompt += f"\n\n* Use {self.config.language} language for transcription."
-
-        # Add media description context if available
-        if self.config.description:
-            base_prompt += f"\n\n## Media Context\n\n{self.config.description}"
-
-        self._system_prompt = base_prompt
+                self._system_prompt = get_prompt_loader().get_gemini_transcription_prompt()
         return self._system_prompt
+
+    def _build_prompt(self, language: Optional[str] = None) -> str:
+        """Build the full prompt by combining base prompt + language + description."""
+        parts = [self._load_base_prompt()]
+        if language:
+            parts.append(f"\n\n* Use {language} language for transcription.")
+        if self.config.description:
+            parts.append(f"\n\n## Media Context\n\n{self.config.description}")
+        return "".join(parts)
+
+    def _build_thinking_config(self) -> Optional[ThinkingConfig]:
+        """Build ThinkingConfig if thinking mode is enabled."""
+        if not self.config.thinking:
+            return None
+        return ThinkingConfig(include_thoughts=self.config.include_thoughts, thinking_budget=-1)
 
     def _get_client(self) -> genai.Client:
         """Lazily create the Gemini client when first needed."""
         if not self.config.gemini_api_key:
             raise ValueError("Gemini API key is required for transcription")
-
         if self._client is None:
             self._client = genai.Client(api_key=self.config.gemini_api_key)
         return self._client
 
-    def _get_generation_config(self) -> GenerateContentConfig:
-        """Lazily build the generation config since it rarely changes."""
-        if self._generation_config is None:
-            # Only include thinking_config if thinking mode is enabled
-            thinking_config = None
-            if self.config.thinking:
-                thinking_config = ThinkingConfig(
-                    include_thoughts=self.config.include_thoughts,
-                    thinking_budget=-1,
-                )
+    def _get_generation_config(self, language: Optional[str] = None) -> GenerateContentConfig:
+        """Build GenerateContentConfig. Caches only when no language override."""
+        if self._generation_config is not None and not language:
+            return self._generation_config
 
-            self._generation_config = GenerateContentConfig(
-                system_instruction=self._get_transcription_prompt(),
-                response_modalities=["TEXT"],
-                thinking_config=thinking_config,
-                temperature=self.config.temperature,
-                top_k=self.config.top_k,
-                top_p=self.config.top_p,
-            )
-        return self._generation_config
+        effective_language = language or self.config.language
+        config = GenerateContentConfig(
+            system_instruction=self._build_prompt(language=effective_language),
+            response_modalities=["TEXT"],
+            thinking_config=self._build_thinking_config(),
+            temperature=self.config.temperature,
+            top_k=self.config.top_k,
+            top_p=self.config.top_p,
+        )
+
+        if not language:
+            self._generation_config = config
+        return config
 
     async def _run_generation(
         self,
@@ -309,12 +295,13 @@ class GeminiTranscriber(BaseTranscriber):
         *,
         source: str,
         client: Optional[genai.Client] = None,
+        language: Optional[str] = None,
     ) -> str:
         """
         Shared helper for sending generation requests and handling the response.
         """
         client = client or self._get_client()
-        config = self._get_generation_config()
+        config = self._get_generation_config(language=language)
 
         if self.config.verbose:
             self.logger.info(f"🔄 Sending transcription request to {self.config.model_name} ({source})...")

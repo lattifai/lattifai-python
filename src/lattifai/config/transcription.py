@@ -13,9 +13,10 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
-    "gemini-3-pro-preview",
+    # "gemini-3-pro-preview",  # Deprecated, auto-switched to gemini-3.1-pro-preview
     "gemini-3-flash-preview",
     "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview",
     "nvidia/parakeet-tdt-0.6b-v3",
     "nvidia/canary-1b-v2",
     "iic/SenseVoiceSmall",
@@ -32,8 +33,9 @@ class TranscriptionConfig:
     Settings for audio/video transcription using various providers.
     """
 
-    model_name: SUPPORTED_TRANSCRIPTION_MODELS = "nvidia/parakeet-tdt-0.6b-v3"
-    """Model name for transcription."""
+    model_name: str = "nvidia/parakeet-tdt-0.6b-v3"
+    """Model name for transcription. See SUPPORTED_TRANSCRIPTION_MODELS for built-in models.
+    Any model name is accepted when api_base_url is set (vLLM/SGLang)."""
 
     gemini_api_key: Optional[str] = None
     """Gemini API key. If None, reads from GEMINI_API_KEY environment variable."""
@@ -91,8 +93,24 @@ class TranscriptionConfig:
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
+    # Deprecated model -> replacement mapping
+    # https://ai.google.dev/gemini-api/docs/deprecations
+    _DEPRECATED_MODELS = {
+        "gemini-3-pro-preview": "gemini-3.1-pro-preview",
+    }
+
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
+
+        # Auto-switch deprecated models
+        if self.model_name in self._DEPRECATED_MODELS:
+            replacement = self._DEPRECATED_MODELS[self.model_name]
+            import logging
+
+            logging.getLogger(__name__).warning(
+                f"Model '{self.model_name}' is deprecated, auto-switching to '{replacement}'"
+            )
+            self.model_name = replacement
 
         # When api_base_url is set, any model name is valid (forwarded to vLLM/SGLang server)
         if self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__ and not self.api_base_url:
