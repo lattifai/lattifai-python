@@ -46,8 +46,14 @@ def create_transcriber(
     """
     model_name = transcription_config.model_name
 
+    # vLLM/SGLang-served models (any model with api_base_url set)
+    if transcription_config.api_base_url:
+        from .vllm import VLLMTranscriber
+
+        return VLLMTranscriber(transcription_config=transcription_config)
+
     # Gemini models (API-based)
-    if "gemini" in model_name:
+    elif "gemini" in model_name:
         assert (
             transcription_config.gemini_api_key is not None
         ), "Gemini API key must be provided in TranscriptionConfig for Gemini models."
@@ -67,7 +73,8 @@ def create_transcriber(
         raise ValueError(
             f"Cannot determine transcriber for model_name='{transcription_config.model_name}'. "
             f"Supported patterns: \n"
-            f"  - Gemini API models: 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3.1-pro-preview', etc.\n"
+            f"  - vLLM/SGLang models: set api_base_url='http://localhost:8000/v1'\n"
+            f"  - Gemini API models: 'gemini-2.5-pro', 'gemini-2.5-flash', etc.\n"
             f"  - Local HF models: 'nvidia/parakeet-*', 'iic/SenseVoiceSmall', etc.\n"
             f"Please specify a valid model_name."
         )

@@ -19,6 +19,8 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "nvidia/parakeet-tdt-0.6b-v3",
     "nvidia/canary-1b-v2",
     "iic/SenseVoiceSmall",
+    # Any model served via vLLM/SGLang with api_base_url is also supported
+    # (Whisper, Qwen3-ASR, GLM-ASR, Fun-ASR, VibeVoice, Voxtral, etc.)
 ]
 
 
@@ -81,16 +83,23 @@ class TranscriptionConfig:
     model_hub: Literal["huggingface", "modelscope"] = "huggingface"
     """Which model hub to use when resolving lattice models for transcription."""
 
+    api_base_url: Optional[str] = None
+    """Base URL for OpenAI-compatible API server (e.g. http://localhost:8000/v1).
+    When set, routes to VLLMTranscriber which uses the /v1/audio/transcriptions endpoint.
+    Works with any ASR model served via vLLM/SGLang (Whisper, Qwen3-ASR, GLM-ASR, etc.)."""
+
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
-        if self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__:
+        # When api_base_url is set, any model name is valid (forwarded to vLLM/SGLang server)
+        if self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__ and not self.api_base_url:
             raise ValueError(
                 f"Unsupported model_name: '{self.model_name}'. "
-                f"Supported models are: {SUPPORTED_TRANSCRIPTION_MODELS.__args__}"
+                f"Supported models are: {SUPPORTED_TRANSCRIPTION_MODELS.__args__}. "
+                f"For vLLM/SGLang-served models, set api_base_url to enable any model."
             )
 
         # Load environment variables from .env file

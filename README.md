@@ -35,7 +35,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 | Feature | Description |
 |---------|-------------|
 | **Forced Alignment** | Word-level and segment-level audio-text synchronization powered by [Lattice-1](https://huggingface.co/LattifAI/Lattice-1) |
-| **Multi-Model Transcription** | Gemini (100+ languages), Parakeet (24 languages), SenseVoice (5 languages) |
+| **Multi-Model Transcription** | Gemini (100+ languages), Parakeet (24 languages), SenseVoice (5 languages), vLLM/SGLang (any ASR model) |
 | **Speaker Diarization** | Multi-speaker identification with label preservation |
 | **Streaming Mode** | Process audio up to 20 hours with minimal memory |
 | **Universal Format Support** | 30+ caption/subtitle formats |
@@ -203,6 +203,10 @@ transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
 
 # SenseVoice (zh, en, ja, ko, yue, requires [transcription] extra)
 transcription.model_name=iic/SenseVoiceSmall
+
+# vLLM/SGLang (any ASR model served via OpenAI-compatible API)
+transcription.model_name=Qwen/Qwen3-ASR-1.7B \
+    transcription.api_base_url=http://localhost:8000/v1
 ```
 
 ### lai transcribe run
@@ -543,6 +547,28 @@ English, Chinese (Mandarin & Cantonese), Spanish, French, German, Italian, Portu
 **Model**: `iic/SenseVoiceSmall`
 
 Chinese/Mandarin (zh), English (en), Japanese (ja), Korean (ko), Cantonese (yue)
+
+#### vLLM/SGLang (Any ASR Model)
+
+Any ASR model served via [vLLM](https://docs.vllm.ai) or [SGLang](https://sgl-project.github.io/) with an OpenAI-compatible API. Uses the standard `/v1/audio/transcriptions` endpoint.
+
+Supported models include Whisper, Qwen3-ASR, GLM-ASR, Fun-ASR, VibeVoice, Voxtral, and more.
+
+```bash
+# 1. Install vLLM with audio support (requires CUDA GPU)
+pip install vllm "vllm[audio]"
+
+# 2. Start vLLM server (auto-downloads the model)
+vllm serve Qwen/Qwen3-ASR-1.7B
+# Other models:
+#   vllm serve openai/whisper-large-v3-turbo
+#   vllm serve GLM-ASR-Nano-2512
+
+# 3. Transcribe with LattifAI
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=Qwen/Qwen3-ASR-1.7B \
+    transcription.api_base_url=http://localhost:8000/v1
+```
 
 ---
 
