@@ -233,10 +233,10 @@ class LattifAIClientMixin:
         if self._transcriber is None and self.transcription_config:
             from .transcription import create_transcriber
 
-            self._transcriber = create_transcriber(transcription_config=self.transcription_config)
-            # Inject event detector for VAD in local transcription
-            if hasattr(self._transcriber, "event_detector"):
-                self._transcriber.event_detector = self._ensure_event_detector()
+            self._transcriber = create_transcriber(
+                transcription_config=self.transcription_config,
+                event_config=self.event_config,
+            )
         return self._transcriber
 
     @property

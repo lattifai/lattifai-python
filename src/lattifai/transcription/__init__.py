@@ -1,6 +1,8 @@
 """Transcription module for LattifAI."""
 
-from lattifai.config import TranscriptionConfig
+from typing import Optional
+
+from lattifai.config import EventConfig, TranscriptionConfig
 
 from .base import BaseTranscriber
 
@@ -12,37 +14,24 @@ __all__ = [
 
 def create_transcriber(
     transcription_config: TranscriptionConfig,
+    event_config: Optional[EventConfig] = None,
 ) -> "BaseTranscriber":
     """
     Create a transcriber instance based on model_name in configuration.
 
-    This factory method automatically selects the appropriate transcriber
-    implementation based on the model_name specified in TranscriptionConfig.
+    Optionally injects an event_detector for VAD-based audio segmentation.
+    When ``event_config`` is provided (or defaults are used), a
+    ``LattifAIEventDetector`` is created and attached to the transcriber
+    so that long audio is automatically split into speech segments.
 
     Args:
-        transcription_config: Transcription configuration. If None, uses default
-                            (which defaults to Gemini 2.5 Pro).
+        transcription_config: Transcription configuration.
+        event_config: Event detection configuration. When ``enabled=True``,
+            a LattifAIEventDetector is injected into the transcriber for
+            VAD segmentation. Pass ``None`` to skip event detection.
 
     Returns:
-        BaseTranscriber: An instance of GeminiTranscriber or LattifAITranscriber
-
-    Raises:
-        ValueError: If model_name is not supported or ambiguous.
-
-    Example:
-        >>> from lattifai.config import TranscriptionConfig
-        >>> from lattifai.transcription import create_transcriber
-        >>>
-        >>> # Create Gemini transcriber (default)
-        >>> transcriber = create_transcriber()
-        >>>
-        >>> # Create specific transcriber
-        >>> config = TranscriptionConfig(model_name="gemini-2.5-pro")
-        >>> transcriber = create_transcriber(config)
-        >>>
-        >>> # Use local model
-        >>> config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b")
-        >>> transcriber = create_transcriber(config)
+        BaseTranscriber: A transcriber instance with optional event_detector.
     """
     model_name = transcription_config.model_name
 
@@ -50,7 +39,7 @@ def create_transcriber(
     if transcription_config.api_base_url:
         from .vllm import VLLMTranscriber
 
-        return VLLMTranscriber(transcription_config=transcription_config)
+        transcriber = VLLMTranscriber(transcription_config=transcription_config)
 
     # Gemini models (API-based)
     elif "gemini" in model_name:
@@ -59,17 +48,16 @@ def create_transcriber(
         ), "Gemini API key must be provided in TranscriptionConfig for Gemini models."
         from .gemini import GeminiTranscriber
 
-        return GeminiTranscriber(transcription_config=transcription_config)
+        transcriber = GeminiTranscriber(transcription_config=transcription_config)
 
     # LattifAI local models (HuggingFace/NVIDIA models)
     # Pattern: nvidia/*, iic/*, or any HF model path
     elif "/" in model_name:
         from .lattifai import LattifAITranscriber
 
-        return LattifAITranscriber(transcription_config=transcription_config)
+        transcriber = LattifAITranscriber(transcription_config=transcription_config)
 
     else:
-        # No clear indicator, raise error
         raise ValueError(
             f"Cannot determine transcriber for model_name='{transcription_config.model_name}'. "
             f"Supported patterns: \n"
@@ -78,3 +66,18 @@ def create_transcriber(
             f"  - Local HF models: 'nvidia/parakeet-*', 'iic/SenseVoiceSmall', etc.\n"
             f"Please specify a valid model_name."
         )
+
+    # Inject event_detector for transcribers that need VAD segmentation
+    # (e.g. VLLMTranscriber, LattifAITranscriber — not GeminiTranscriber)
+    if transcriber.needs_vad:
+        if event_config is None:
+            event_config = EventConfig(enabled=True)
+        else:
+            event_config.enabled = True
+        from lattifai.event import LattifAIEventDetector
+
+        event_config.client_wrapper = transcription_config.client_wrapper
+        event_config.model_path = transcription_config.lattice_model_path
+        transcriber.event_detector = LattifAIEventDetector(config=event_config)
+
+    return transcriber

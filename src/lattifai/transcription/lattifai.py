@@ -89,11 +89,11 @@ class LattifAITranscriber(BaseTranscriber):
 
     file_suffix = ".ass"
     supports_url = False
+    needs_vad = True
 
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
         self._asr_model = None
-        self.event_detector = None
 
     @property
     def name(self) -> str:
@@ -165,27 +165,13 @@ class LattifAITranscriber(BaseTranscriber):
 
         with torch.inference_mode():
             # If input is AudioData, run event detection for VAD segmentation
-            if hasattr(audio, "sampling_rate") and hasattr(audio, "ndarray"):
+            if isinstance(audio, AudioData):
                 assert audio.ndarray.ndim == 2, "AudioData.ndarray must be 2D (channels, samples)"
                 assert audio.ndarray.shape[0] == 1, "AudioData.ndarray must have 1 channel for transcription"
 
-                # AED — use lattifai.event wrapper
-                detector = self.event_detector
-                if detector is not None:
-                    try:
-                        led = detector.detect(audio, fast_mode=True, vad_chunk_size=30.0, vad_max_gap=4.0)
-                    except Exception as e:
-                        logger.warning("Event detection failed, proceeding without VAD: %s", e)
-                        led = None
-
-                if led is not None:
-                    segments = [
-                        (event.start_time, event.end_time) for event in led.audio_events.get_tier_by_name("VAD")
-                    ]
-                    audio = [
-                        audio.ndarray[0, int(start * audio.sampling_rate) : int(end * audio.sampling_rate)]
-                        for start, end in segments
-                    ]
+                segments, led = self._vad_segment(audio)
+                if segments:
+                    audio = self._slice_audio_by_segments(audio, segments)
 
             model_name = self.config.model_name
             asr_model = self._asr_model
@@ -310,7 +296,7 @@ class LattifAITranscriber(BaseTranscriber):
         )
         return result[0]
 
-    def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_event: bool = True) -> Path:
+    def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_event: bool = False) -> Path:
         """Persist transcript text to disk and return the file path."""
         transcript.write(output_file, include_speaker_in_text=False)
         if cache_event and transcript.event:

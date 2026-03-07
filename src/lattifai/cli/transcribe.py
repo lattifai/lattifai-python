@@ -11,6 +11,7 @@ from lattifai.config import (
     CaptionConfig,
     ClientConfig,
     DiarizationConfig,
+    EventConfig,
     MediaConfig,
     TranscriptionConfig,
 )
@@ -24,6 +25,7 @@ def transcribe(
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
     transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
+    event: Annotated[Optional[EventConfig], run.Config[EventConfig]] = None,
 ):
     """
     Transcribe audio/video file or YouTube URL to caption.
@@ -111,7 +113,8 @@ def transcribe(
         transcription_config.lattice_model_path = _resolve_model_path(
             "LattifAI/Lattice-1", getattr(transcription_config, "model_hub", "huggingface")
         )
-    transcriber = create_transcriber(transcription_config=transcription_config)
+    event_config = event or EventConfig()
+    transcriber = create_transcriber(transcription_config=transcription_config, event_config=event_config)
 
     safe_print(colorful.cyan(f"🎤 Starting transcription with {transcriber.name}..."))
     safe_print(colorful.cyan(f"    Input: {media_config.input_path}"))

@@ -204,9 +204,9 @@ transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
 # SenseVoice (zh, en, ja, ko, yue, requires [transcription] extra)
 transcription.model_name=iic/SenseVoiceSmall
 
-# vLLM/SGLang (any ASR model served via OpenAI-compatible API)
+# vLLM/SGLang (any ASR model, chat mode is the default)
 transcription.model_name=Qwen/Qwen3-ASR-1.7B \
-    transcription.api_base_url=http://localhost:8000/v1
+    transcription.api_base_url=http://localhost:8081/v1
 ```
 
 ### lai transcribe run
@@ -550,7 +550,14 @@ Chinese/Mandarin (zh), English (en), Japanese (ja), Korean (ko), Cantonese (yue)
 
 #### vLLM/SGLang (Any ASR Model)
 
-Any ASR model served via [vLLM](https://docs.vllm.ai) or [SGLang](https://sgl-project.github.io/) with an OpenAI-compatible API. Uses the standard `/v1/audio/transcriptions` endpoint.
+Any ASR model served via [vLLM](https://docs.vllm.ai) or [SGLang](https://sgl-project.github.io/) with an OpenAI-compatible API.
+
+Two API modes are supported:
+
+| Mode | Endpoint | Use Case |
+|------|----------|----------|
+| `chat` (default, recommended) | `/v1/chat/completions` | Qwen3-ASR, GLM-ASR, Whisper, and most models |
+| `transcriptions` | `/v1/audio/transcriptions` | Fallback; support is incomplete in vLLM |
 
 Supported models include Whisper, Qwen3-ASR, GLM-ASR, Fun-ASR, VibeVoice, Voxtral, and more.
 
@@ -559,15 +566,23 @@ Supported models include Whisper, Qwen3-ASR, GLM-ASR, Fun-ASR, VibeVoice, Voxtra
 pip install vllm "vllm[audio]"
 
 # 2. Start vLLM server (auto-downloads the model)
-vllm serve Qwen/Qwen3-ASR-1.7B
+vllm serve Qwen/Qwen3-ASR-1.7B --gpu-memory-utilization 0.8 --host 0.0.0.0 --port 8081
+# On Linux, open the firewall port if needed:
+#   sudo ufw allow 8081
 # Other models:
 #   vllm serve openai/whisper-large-v3-turbo
 #   vllm serve GLM-ASR-Nano-2512
 
-# 3. Transcribe with LattifAI
+# 3. Transcribe with LattifAI (chat mode is the default)
 lai transcribe run audio.wav output.srt \
     transcription.model_name=Qwen/Qwen3-ASR-1.7B \
-    transcription.api_base_url=http://localhost:8000/v1
+    transcription.api_base_url=http://localhost:8081/v1
+
+# Transcriptions mode (incomplete vLLM support, use only if needed)
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=openai/whisper-large-v3-turbo \
+    transcription.api_base_url=http://localhost:8081/v1 \
+    transcription.api_mode=transcriptions
 ```
 
 ---
@@ -580,7 +595,7 @@ Visit [lattifai.com/roadmap](https://lattifai.com/roadmap) for updates.
 |------|---------|----------|
 | **Oct 2025** | Lattice-1-Alpha | ✅ English forced alignment, multi-format support |
 | **Nov 2025** | Lattice-1 | ✅ EN+ZH+DE, speaker diarization, multi-model transcription |
-| **Q1 2026** | Lattice-2 | ✅ Streaming mode, 🔮 40+ languages, real-time alignment |
+| **Q2 2026**  | Lattice-2 | ✅ Streaming mode, 🔮 40+ languages, real-time alignment |
 
 ---
 

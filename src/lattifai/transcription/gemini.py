@@ -419,7 +419,7 @@ class GeminiTranscriber(BaseTranscriber):
         return lines
 
     def write(
-        self, transcript: Union[str, Caption], output_file: Path, encoding: str = "utf-8", cache_event: bool = True
+        self, transcript: Union[str, Caption], output_file: Path, encoding: str = "utf-8", cache_event: bool = False
     ) -> Path:
         """
         Persist transcript to disk and return the file path.
