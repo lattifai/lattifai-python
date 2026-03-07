@@ -35,7 +35,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 | Feature | Description |
 |---------|-------------|
 | **Forced Alignment** | Word-level and segment-level audio-text synchronization powered by [Lattice-1](https://huggingface.co/LattifAI/Lattice-1) |
-| **Multi-Model Transcription** | Gemini (100+ languages), Parakeet (24 languages), SenseVoice (5 languages), vLLM/SGLang (any ASR model) |
+| **Multi-Model Transcription** | Gemini, Parakeet, SenseVoice, Fun-ASR, Qwen3-ASR, Whisper, and any vLLM/SGLang-served model |
 | **Speaker Diarization** | Multi-speaker identification with label preservation |
 | **Streaming Mode** | Process audio up to 20 hours with minimal memory |
 | **Universal Format Support** | 30+ caption/subtitle formats |
@@ -104,7 +104,7 @@ extra-index-url = https://lattifai.github.io/pypi/simple/
 | Extra | Includes |
 |-------|----------|
 | (base) | Forced alignment, Gemini transcription, YouTube, captions |
-| `transcription` | Local ASR models (Parakeet, SenseVoice) |
+| `transcription` | Local ASR models (Parakeet, SenseVoice, Fun-ASR) |
 | `diarization` | Speaker diarization (NeMo, pyannote) |
 | `event` | Audio event detection |
 | `all` | Base + transcription + diarization + event |
@@ -194,17 +194,30 @@ media.channel_selector=left    # left, right, average, or index
 
 ### Transcription Models
 
+LattifAI supports a wide range of ASR models — from cloud APIs to local inference to self-hosted servers:
+
+| Model | Type | Languages | Install Extra |
+|-------|------|-----------|---------------|
+| [Gemini 2.5 Pro/Flash](https://ai.google.dev/) | Cloud API | 100+ | (base) |
+| [NVIDIA Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) | Local | 24 (European) | `[transcription]` |
+| [SenseVoice](https://huggingface.co/iic/SenseVoiceSmall) | Local | zh, en, ja, ko, yue | `[transcription]` |
+| [Fun-ASR-Nano](https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512) | Local | 31 (incl. zh dialects) | `[transcription]` |
+| [Fun-ASR-MLT-Nano](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Local | 31 (incl. zh dialects) | `[transcription]` |
+| [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | vLLM/SGLang | zh, en, ja, ko, yue | — |
+| [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) | vLLM/SGLang | 99 | — |
+| [GLM-ASR](https://huggingface.co/GLM-ASR-Nano-2512) | vLLM/SGLang | zh, en | — |
+| [Voxtral](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | vLLM/SGLang | 13 (European) | — |
+
 ```bash
-# Gemini (100+ languages, included in base install, requires GEMINI_API_KEY)
+# Gemini (cloud API, requires GEMINI_API_KEY)
 transcription.model_name=gemini-2.5-pro
 
-# Parakeet (24 European languages, requires [transcription] extra)
+# Local models (requires [transcription] extra)
 transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
-
-# SenseVoice (zh, en, ja, ko, yue, requires [transcription] extra)
 transcription.model_name=iic/SenseVoiceSmall
+transcription.model_name=FunAudioLLM/Fun-ASR-MLT-Nano-2512
 
-# vLLM/SGLang (any ASR model, chat mode is the default)
+# vLLM/SGLang-served models (requires a running vLLM server)
 transcription.model_name=Qwen/Qwen3-ASR-1.7B \
     transcription.api_base_url=http://localhost:8081/v1
 ```
@@ -548,6 +561,32 @@ English, Chinese (Mandarin & Cantonese), Spanish, French, German, Italian, Portu
 
 Chinese/Mandarin (zh), English (en), Japanese (ja), Korean (ko), Cantonese (yue)
 
+#### FunAudioLLM Fun-ASR-Nano (31 Languages)
+
+**Models**: [`FunAudioLLM/Fun-ASR-Nano-2512`](https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512), [`FunAudioLLM/Fun-ASR-MLT-Nano-2512`](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512)
+
+800M parameter end-to-end ASR model from Tongyi Lab, excelling at far-field, high-noise, dialect/accent, and music lyric recognition.
+
+| Region | Languages |
+|--------|-----------|
+| East Asia | Chinese (+ 7 dialects, 26 accents), Japanese, Korean, Cantonese |
+| Southeast Asia | Vietnamese, Indonesian, Thai, Malay, Filipino |
+| South Asia | Hindi |
+| Middle East | Arabic |
+| Europe | English, Bulgarian, Croatian, Czech, Danish, Dutch, Estonian, Finnish, Greek, Hungarian, Irish, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Slovak, Slovenian, Swedish |
+
+```bash
+# Use ModelScope (default for China)
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=FunAudioLLM/Fun-ASR-MLT-Nano-2512 \
+    transcription.model_hub=modelscope
+
+# Use HuggingFace
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=FunAudioLLM/Fun-ASR-MLT-Nano-2512 \
+    transcription.model_hub=huggingface
+```
+
 #### vLLM/SGLang (Any ASR Model)
 
 Any ASR model served via [vLLM](https://docs.vllm.ai) or [SGLang](https://sgl-project.github.io/) with an OpenAI-compatible API.
@@ -557,15 +596,13 @@ Two API modes are supported:
 | Mode | Endpoint | Use Case |
 |------|----------|----------|
 | `chat` (default, recommended) | `/v1/chat/completions` | Qwen3-ASR, GLM-ASR, Whisper, and most models |
-| `transcriptions` | `/v1/audio/transcriptions` | Fallback; support is incomplete in vLLM |
-
-Supported models include Whisper, Qwen3-ASR, GLM-ASR, Fun-ASR, VibeVoice, Voxtral, and more.
+| `transcriptions` | `/v1/audio/transcriptions` | Whisper with segment timestamps |
 
 ```bash
 # 1. Install vLLM with audio support (requires CUDA GPU)
 pip install vllm "vllm[audio]"
 
-# 2. Start vLLM server (auto-downloads the model)
+# 2. Start vLLM server on a Linux GPU machine (auto-downloads the model)
 vllm serve Qwen/Qwen3-ASR-1.7B --gpu-memory-utilization 0.8 --host 0.0.0.0 --port 8081
 # On Linux, open the firewall port if needed:
 #   sudo ufw allow 8081
@@ -578,7 +615,7 @@ lai transcribe run audio.wav output.srt \
     transcription.model_name=Qwen/Qwen3-ASR-1.7B \
     transcription.api_base_url=http://localhost:8081/v1
 
-# Transcriptions mode (incomplete vLLM support, use only if needed)
+# Transcriptions mode (for Whisper segment timestamps)
 lai transcribe run audio.wav output.srt \
     transcription.model_name=openai/whisper-large-v3-turbo \
     transcription.api_base_url=http://localhost:8081/v1 \
