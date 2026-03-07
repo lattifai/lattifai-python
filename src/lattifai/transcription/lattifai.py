@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,21 @@ class LattifAITranscriber(BaseTranscriber):
 
             return OmniSenseVoiceSmall("iic/SenseVoiceSmall", quantize=False, device_id=device_id, device=str(device))
 
+        elif model_name in ("FunAudioLLM/Fun-ASR-Nano-2512", "FunAudioLLM/Fun-ASR-MLT-Nano-2512"):
+            import sys
+
+            import funasr
+            from funasr import AutoModel
+
+            # funasr's fun_asr_nano uses bare `from ctc import CTC` which needs the
+            # package's own directory on sys.path
+            nano_dir = os.path.join(os.path.dirname(funasr.__file__), "models", "fun_asr_nano")
+            if nano_dir not in sys.path:
+                sys.path.insert(0, nano_dir)
+
+            hub = self.config.model_hub  # "huggingface" or "modelscope"
+            return AutoModel(model=model_name, trust_remote_code=True, device=str(device), hub=hub, disable_update=True)
+
         else:
             raise ValueError(f"Unsupported model_name: {model_name}")
 
@@ -206,6 +222,30 @@ class LattifAITranscriber(BaseTranscriber):
                     progressbar=progress_bar,
                 )
                 hypotheses = self._to_supervisions(audio, hypotheses, return_hypotheses)
+
+            elif model_name in ("FunAudioLLM/Fun-ASR-Nano-2512", "FunAudioLLM/Fun-ASR-MLT-Nano-2512"):
+                # Fun-ASR-Nano: funasr AutoModel, accepts file paths or torch.Tensor
+                device = self.config.device
+                if isinstance(audio, np.ndarray):
+                    audio = [audio]
+                inputs = audio if isinstance(audio, list) else [audio]
+                hypotheses = []
+                iterable = tqdm(inputs, desc="Transcribing", unit="seg") if progress_bar else inputs
+                for inp in iterable:
+                    if isinstance(inp, np.ndarray):
+                        dur = inp.shape[-1] / _ASR_SAMPLE_RATE
+                        inp = torch.from_numpy(inp).to(device)
+                    elif isinstance(inp, torch.Tensor):
+                        dur = inp.shape[-1] / _ASR_SAMPLE_RATE
+                        inp = inp.to(device)
+                    else:
+                        dur = 0.0
+                    res = asr_model.generate(
+                        input=[inp], cache={}, batch_size=1, language=language or "auto", itn=True, disable_pbar=True
+                    )
+                    text = res[0]["text"] if res else ""
+                    hypotheses.append(Supervision(text=text, duration=dur))
+
             else:
                 raise ValueError(f"Unsupported model_name: {model_name}")
 

@@ -8,7 +8,6 @@ Works with any ASR model served by vLLM or SGLang, including:
 - Whisper (openai/whisper-large-v3-turbo, etc.)
 - Qwen3-ASR (Qwen/Qwen3-ASR-0.6B, Qwen/Qwen3-ASR-1.7B)
 - GLM-ASR (GLM-ASR-Nano-2512)
-- Fun-ASR (Fun-ASR-Nano-2512)
 - VibeVoice, Voxtral, etc.
 """
 

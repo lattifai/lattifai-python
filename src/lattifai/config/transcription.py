@@ -20,8 +20,10 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "nvidia/parakeet-tdt-0.6b-v3",
     "nvidia/canary-1b-v2",
     "iic/SenseVoiceSmall",
+    "FunAudioLLM/Fun-ASR-Nano-2512",
+    "FunAudioLLM/Fun-ASR-MLT-Nano-2512",
     # Any model served via vLLM/SGLang with api_base_url is also supported
-    # (Whisper, Qwen3-ASR, GLM-ASR, Fun-ASR, VibeVoice, Voxtral, etc.)
+    # (Whisper, Qwen3-ASR, GLM-ASR, VibeVoice, Voxtral, etc.)
 ]
 
 
@@ -36,6 +38,9 @@ class TranscriptionConfig:
     model_name: str = "nvidia/parakeet-tdt-0.6b-v3"
     """Model name for transcription. See SUPPORTED_TRANSCRIPTION_MODELS for built-in models.
     Any model name is accepted when api_base_url is set (vLLM/SGLang)."""
+
+    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
+    """Which model hub to use when resolving lattice models for transcription."""
 
     gemini_api_key: Optional[str] = None
     """Gemini API key. If None, reads from GEMINI_API_KEY environment variable."""
@@ -81,9 +86,6 @@ class TranscriptionConfig:
 
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
-
-    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
-    """Which model hub to use when resolving lattice models for transcription."""
 
     api_base_url: Optional[str] = None
     """Base URL for OpenAI-compatible API server (e.g. http://localhost:8000/v1).
