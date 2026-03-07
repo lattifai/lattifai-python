@@ -23,6 +23,7 @@ from .diarization import DiarizationConfig
 from .event import EventConfig
 from .media import AUDIO_FORMATS, MEDIA_FORMATS, VIDEO_FORMATS, MediaConfig
 from .transcription import TranscriptionConfig
+from .translation import TranslationConfig
 
 __all__ = [
     "EventConfig",
@@ -45,4 +46,5 @@ __all__ = [
     "AUDIO_FORMATS",
     "VIDEO_FORMATS",
     "MEDIA_FORMATS",
+    "TranslationConfig",
 ]
