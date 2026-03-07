@@ -37,6 +37,18 @@ class PromptLoader:
         """Get the Gemini transcription Gem prompt"""
         return self.load_prompt("gemini", "transcription_gem")
 
+    def get_podcast_transcription_prompt(self, context: str = "") -> str:
+        """Get the podcast-specific Gemini transcription prompt.
+
+        Args:
+            context: Show notes and speaker context to inject into the prompt.
+
+        Returns:
+            Formatted podcast transcription prompt.
+        """
+        template = self.load_prompt("gemini", "podcast_transcription")
+        return template.replace("{context}", context or "No additional context available.")
+
 
 # Global instance
 _loader: Optional[PromptLoader] = None

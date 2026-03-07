@@ -15,6 +15,7 @@ from lattifai.config import (
     ClientConfig,
     DiarizationConfig,
     EventConfig,
+    PodcastConfig,
     TranscriptionConfig,
 )
 from lattifai.data import Caption
@@ -31,6 +32,8 @@ from lattifai.utils import safe_print
 if TYPE_CHECKING:
     from lattifai.diarization import LattifAIDiarizer  # noqa: F401
     from lattifai.event import LattifAIEventDetector  # noqa: F401
+    from lattifai.podcast import PodcastLoader, SpeakerIdentifier  # noqa: F401
+    from lattifai.podcast.types import EpisodeMetadata  # noqa: F401
 
 
 class LattifAI(LattifAIClientMixin, SyncAPIClient):
@@ -51,6 +54,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         transcription_config: Optional[TranscriptionConfig] = None,
         diarization_config: Optional[DiarizationConfig] = None,
         event_config: Optional[EventConfig] = None,
+        podcast_config: Optional[PodcastConfig] = None,
     ) -> None:
         __doc__ = LattifAIClientMixin._INIT_DOC.format(
             client_class="LattifAI",
@@ -100,6 +104,223 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Initialize shared components (transcriber, downloader)
         self._init_shared_components(transcription_config)
+
+        # Initialize podcast config
+        self.podcast_config = podcast_config or PodcastConfig(enabled=False)
+        self._podcast_loader: Optional["PodcastLoader"] = None
+        self._speaker_identifier: Optional["SpeakerIdentifier"] = None
+
+    @property
+    def podcast_loader(self) -> "PodcastLoader":
+        """Lazy load podcast loader."""
+        if self._podcast_loader is None:
+            from lattifai.podcast import PodcastLoader
+
+            self._podcast_loader = PodcastLoader()
+        return self._podcast_loader
+
+    @property
+    def speaker_identifier(self) -> "SpeakerIdentifier":
+        """Lazy load speaker identifier."""
+        if self._speaker_identifier is None:
+            from lattifai.podcast import SpeakerIdentifier
+
+            gemini_key = (
+                getattr(self.transcription_config, "gemini_api_key", None) if self.transcription_config else None
+            )
+            gemini_model = (
+                getattr(self.transcription_config, "model_name", "gemini-2.5-flash")
+                if self.transcription_config
+                else "gemini-2.5-flash"
+            )
+            self._speaker_identifier = SpeakerIdentifier(
+                gemini_api_key=gemini_key,
+                gemini_model=gemini_model,
+                intro_words=self.podcast_config.intro_words,
+            )
+        return self._speaker_identifier
+
+    def podcast(
+        self,
+        url: Optional[str] = None,
+        input_media: Optional[Union[Pathlike, "AudioData"]] = None,
+        output_dir: Optional[Pathlike] = None,
+        output_caption_path: Optional[Pathlike] = None,
+        split_sentence: Optional[bool] = None,
+        channel_selector: Optional[str | int] = "average",
+        streaming_chunk_secs: Optional[float] = None,
+        podcast_config: Optional[PodcastConfig] = None,
+    ) -> Caption:
+        """Transcribe and align a podcast episode with speaker identification.
+
+        This method adds a podcast-specific layer around the existing alignment()
+        pipeline: metadata extraction, audio download, context injection for the
+        transcription prompt, and post-alignment speaker identification.
+
+        The heavy lifting (transcription, alignment, diarization, event detection)
+        is fully delegated to alignment().
+
+        Args:
+            url: Podcast episode URL.
+            input_media: Local audio/video file path or AudioData object.
+            output_dir: Output directory for downloads and results.
+            output_caption_path: Path for aligned caption output.
+            split_sentence: Enable sentence splitting for alignment.
+            channel_selector: Audio channel selection.
+            streaming_chunk_secs: Chunk size for streaming long audio.
+            podcast_config: Override podcast config for this call.
+
+        Returns:
+            Caption object with aligned, speaker-labeled segments.
+        """
+        from lattifai.podcast.types import PodcastPlatform
+
+        pc = podcast_config or self.podcast_config
+        output_dir_path = self._prepare_youtube_output_dir(output_dir)
+
+        # --- Phase 1: Podcast-specific — resolve media + metadata ---
+        episode = None
+        if url:
+            from lattifai.podcast.platforms import detect_platform
+
+            platform = detect_platform(url)
+            if platform == PodcastPlatform.YOUTUBE:
+                safe_print(colorful.cyan("🎬 YouTube URL detected, delegating to youtube() workflow..."))
+                return self.youtube(
+                    url=url,
+                    output_dir=output_dir,
+                    output_caption_path=output_caption_path,
+                    split_sentence=split_sentence,
+                    channel_selector=channel_selector,
+                    streaming_chunk_secs=streaming_chunk_secs,
+                )
+
+            safe_print(colorful.cyan(f"🎙️ Starting podcast workflow for: {url}"))
+            safe_print(colorful.cyan(f"    Platform: {platform.value}"))
+
+            episode = self.podcast_loader.get_episode_metadata(url, rss_feed_url=pc.rss_feed_url)
+            safe_print(colorful.green(f"    ✓ Episode: {episode.title}"))
+            if episode.host_names:
+                safe_print(colorful.green(f"    ✓ Host(s): {', '.join(episode.host_names)}"))
+            if episode.guest_names:
+                safe_print(colorful.green(f"    ✓ Guest(s): {', '.join(episode.guest_names)}"))
+
+            safe_print(colorful.cyan("📥 Downloading podcast audio..."))
+            media_file = self.podcast_loader.download_audio(episode, output_dir=str(output_dir_path))
+            safe_print(colorful.green(f"    ✓ Audio downloaded: {media_file}"))
+            input_media = media_file
+        elif input_media:
+            media_file = "audio_data" if isinstance(input_media, AudioData) else str(input_media)
+            safe_print(colorful.cyan(f"🎙️ Starting podcast workflow for local audio: {media_file}"))
+        else:
+            raise ValueError("Either url or input_media must be provided.")
+
+        # --- Phase 2: Podcast-specific — inject context into transcription prompt ---
+        description_parts = self._build_podcast_description(pc, episode)
+        original_tc = self.transcription_config
+        original_transcriber = self._transcriber
+        if description_parts and self.transcription_config:
+            import copy
+
+            self.transcription_config = copy.copy(self.transcription_config)
+            self.transcription_config.description = "\n".join(description_parts)
+            self.transcription_config.prompt = str(
+                Path(__file__).parent / "transcription" / "prompts" / "gemini" / "podcast_transcription.txt"
+            )
+            self._transcriber = None  # force re-init with new prompt
+
+        # --- Phase 3: Reuse alignment() — handles transcription + alignment + diarization ---
+        # Propagate podcast num_speakers to diarization config if specified
+        original_num_speakers = None
+        if pc.num_speakers and self.diarization_config:
+            original_num_speakers = self.diarization_config.num_speakers
+            self.diarization_config.num_speakers = pc.num_speakers
+
+        output_caption_path = output_caption_path or self._generate_output_caption_path(
+            None, media_file, output_dir_path
+        )
+        try:
+            caption = self.alignment(
+                input_media=input_media,
+                output_caption_path=output_caption_path,
+                split_sentence=split_sentence,
+                channel_selector=channel_selector,
+                streaming_chunk_secs=streaming_chunk_secs,
+                metadata={"podcast_url": url} if url else None,
+            )
+        finally:
+            self.transcription_config = original_tc
+            self._transcriber = original_transcriber
+            if original_num_speakers is not None and self.diarization_config:
+                self.diarization_config.num_speakers = original_num_speakers
+
+        # --- Phase 4: Podcast-specific — speaker identification ---
+        if pc.identify_speakers and caption.alignments:
+            self._identify_and_apply_speakers(caption, episode, pc, output_caption_path)
+
+        return caption
+
+    def _build_podcast_description(
+        self,
+        pc: PodcastConfig,
+        episode: Optional["EpisodeMetadata"] = None,
+    ) -> list:
+        """Build description parts from podcast config and episode metadata."""
+        parts = []
+        if pc.show_notes:
+            parts.append(pc.show_notes)
+        elif episode and episode.show_notes:
+            parts.append(episode.show_notes)
+        if pc.host_names:
+            parts.append(f"Host(s): {', '.join(pc.host_names)}")
+        elif episode and episode.host_names:
+            parts.append(f"Host(s): {', '.join(episode.host_names)}")
+        if pc.guest_names:
+            parts.append(f"Guest(s): {', '.join(pc.guest_names)}")
+        elif episode and episode.guest_names:
+            parts.append(f"Guest(s): {', '.join(episode.guest_names)}")
+        return parts
+
+    def _identify_and_apply_speakers(
+        self,
+        caption: Caption,
+        episode,
+        pc: PodcastConfig,
+        output_caption_path: Optional[Pathlike],
+    ) -> None:
+        """Run speaker identification and apply name mapping to caption."""
+        safe_print(colorful.cyan("🔍 Identifying speakers..."))
+        transcript_text = "\n".join(f"{s.speaker or ''}: {s.text}" for s in caption.alignments if s.text)
+        speakers = self.speaker_identifier.identify(
+            transcript_text=transcript_text,
+            episode=episode,
+            method=pc.identification_method,
+            host_names=pc.host_names or (episode.host_names if episode else None),
+            guest_names=pc.guest_names or (episode.guest_names if episode else None),
+            intro_words=pc.intro_words,
+        )
+        if not speakers:
+            return
+
+        tiers = sorted(set(s.speaker for s in caption.alignments if s.speaker))
+        if not tiers:
+            return
+
+        tier_mapping = self.speaker_identifier.map_to_diarization_tiers(speakers, transcript_text, tiers)
+        if not tier_mapping:
+            return
+
+        safe_print(colorful.green(f"    ✓ Speaker mapping: {tier_mapping}"))
+        for sup_list in [caption.alignments, caption.supervisions or []]:
+            for sup in sup_list:
+                if sup.speaker and sup.speaker in tier_mapping:
+                    if sup.custom is None:
+                        sup.custom = {}
+                    sup.custom["original_speaker"] = sup.speaker
+                    sup.speaker = tier_mapping[sup.speaker]
+
+        if output_caption_path:
+            self._write_caption(caption, output_caption_path)
 
     def alignment(
         self,
