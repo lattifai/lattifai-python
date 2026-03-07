@@ -70,6 +70,7 @@ class VLLMTranscriber(BaseTranscriber):
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
         self._api_base_url = transcription_config.api_base_url.rstrip("/")
+        self._supports_verbose_json = True
 
     @property
     def name(self) -> str:
@@ -105,7 +106,10 @@ class VLLMTranscriber(BaseTranscriber):
     def _transcribe_via_transcriptions(
         self, file_path: Path, language: Optional[str] = None
     ) -> Tuple[List[Supervision], Optional[str]]:
-        """Send audio file to /v1/audio/transcriptions with verbose_json.
+        """Send audio file to /v1/audio/transcriptions.
+
+        Tries verbose_json first for segment-level timestamps; falls back to
+        plain JSON when the model doesn't support verbose_json (e.g. Qwen3-ASR).
 
         Returns:
             (list_of_supervisions, detected_language)
@@ -114,29 +118,47 @@ class VLLMTranscriber(BaseTranscriber):
 
         url = f"{self._api_base_url}/audio/transcriptions"
         mime_type = self._MIME_TYPES.get(file_path.suffix.lower(), "audio/wav")
+        lang = language or self.config.language
+
+        data: dict = {"model": self.config.model_name}
+        if lang:
+            data["language"] = lang.split("-")[0].lower()
+        if self.config.temperature is not None:
+            data["temperature"] = max(self.config.temperature, 0.01)
+        if self.config.prompt:
+            data["prompt"] = self.config.prompt
+
+        if self._supports_verbose_json:
+            data["response_format"] = "verbose_json"
+            data["timestamp_granularities[]"] = "segment"
+        else:
+            data["response_format"] = "json"
 
         with open(file_path, "rb") as f:
             files = {"file": (file_path.name, f, mime_type)}
-            data: dict = {
-                "model": self.config.model_name,
-                "response_format": "verbose_json",
-                "timestamp_granularities[]": "segment",
-            }
-            lang = language or self.config.language
-            if lang:
-                # Normalize language codes: "zh-cn" -> "zh", "en-us" -> "en"
-                data["language"] = lang.split("-")[0].lower()
-            if self.config.temperature is not None:
-                data["temperature"] = max(self.config.temperature, 0.01)
-            if self.config.prompt:
-                data["prompt"] = self.config.prompt
+            resp = httpx.post(url, files=files, data=data, timeout=120.0)
 
-            resp = httpx.post(url, files=files, data=data, timeout=20.0)
-            if resp.status_code != 200:
-                import logging
+        if resp.status_code == 400 and "verbose_json" in resp.text:
+            # Model doesn't support verbose_json — remember and retry with json
+            import colorful
 
-                logging.getLogger(__name__).error("vLLM transcriptions error %d: %s", resp.status_code, resp.text)
-            resp.raise_for_status()
+            from lattifai.utils import safe_print
+
+            safe_print(
+                colorful.yellow(f"⚠️  verbose_json not supported by {self.config.model_name}, falling back to json")
+            )
+            self._supports_verbose_json = False
+            data.pop("timestamp_granularities[]", None)
+            data["response_format"] = "json"
+            with open(file_path, "rb") as f:
+                files = {"file": (file_path.name, f, mime_type)}
+                resp = httpx.post(url, files=files, data=data, timeout=120.0)
+
+        if resp.status_code != 200:
+            import logging
+
+            logging.getLogger(__name__).error("vLLM transcriptions error %d: %s", resp.status_code, resp.text)
+        resp.raise_for_status()
 
         result = resp.json()
         detected_lang = result.get("language") or lang
@@ -156,12 +178,12 @@ class VLLMTranscriber(BaseTranscriber):
                 if seg.get("text", "").strip()
             ]
         else:
-            # Fallback: no segments, use full text
+            # No segments (json mode or empty verbose_json) — single supervision
+            raw_text = result.get("text", "")
+            _, cleaned = _parse_asr_output(raw_text)
             info = sf.info(str(file_path))
             supervisions = [
-                Supervision(
-                    text=result.get("text", ""), start=0.0, duration=info.duration, language=detected_lang, speaker=None
-                )
+                Supervision(text=cleaned, start=0.0, duration=info.duration, language=detected_lang, speaker=None)
             ]
 
         return supervisions, detected_lang
