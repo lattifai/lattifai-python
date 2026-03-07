@@ -1,17 +1,21 @@
 """vLLM/SGLang transcription via OpenAI-compatible API.
 
-Supports two API modes:
+Supports three API modes:
 - 'transcriptions': /v1/audio/transcriptions (multipart file upload)
 - 'chat': /v1/chat/completions (base64 audio_url in messages)
+- 'realtime': /v1/realtime WebSocket (for Voxtral Realtime models)
 
 Works with any ASR model served by vLLM or SGLang, including:
 - Whisper (openai/whisper-large-v3-turbo, etc.)
 - Qwen3-ASR (Qwen/Qwen3-ASR-0.6B, Qwen/Qwen3-ASR-1.7B)
 - GLM-ASR (GLM-ASR-Nano-2512)
-- VibeVoice, Voxtral, etc.
+- Voxtral Realtime (mistralai/Voxtral-Mini-4B-Realtime-2602)
+- VibeVoice, etc.
 """
 
+import asyncio
 import base64
+import json
 import re
 import tempfile
 from pathlib import Path
@@ -102,7 +106,11 @@ class VLLMTranscriber(BaseTranscriber):
         Returns:
             (supervisions, detected_language)
         """
-        if self.config.api_mode == "chat":
+        if self.config.api_mode == "realtime":
+            text, lang = self._transcribe_via_realtime(file_path, language=language)
+            info = sf.info(str(file_path))
+            return [Supervision(text=text, start=0.0, duration=info.duration, language=lang, speaker=None)], lang
+        elif self.config.api_mode == "chat":
             text, lang = self._transcribe_via_chat(file_path, language=language)
             info = sf.info(str(file_path))
             return [Supervision(text=text, start=0.0, duration=info.duration, language=lang, speaker=None)], lang
@@ -192,6 +200,75 @@ class VLLMTranscriber(BaseTranscriber):
             ]
 
         return supervisions, detected_lang
+
+    def _transcribe_via_realtime(self, file_path: Path, language: Optional[str] = None) -> Tuple[str, Optional[str]]:
+        """Send audio to /v1/realtime WebSocket and return (text, language).
+
+        Protocol (OpenAI Realtime API):
+        1. Connect to ws://<host>/v1/realtime
+        2. Receive session.created
+        3. Send session.update with model
+        4. Send audio chunks as input_audio_buffer.append (PCM16 base64)
+        5. Send input_audio_buffer.commit with final=True
+        6. Receive transcription.delta / transcription.done
+        """
+        import librosa
+
+        # Load and convert to PCM16 @ 16kHz
+        audio, _ = librosa.load(str(file_path), sr=16000, mono=True)
+        pcm16 = (audio * 32767).astype(np.int16)
+        audio_bytes = pcm16.tobytes()
+
+        # Build WebSocket URL from api_base_url (http -> ws)
+        ws_url = self._api_base_url.replace("https://", "wss://").replace("http://", "ws://")
+        # /v1 -> /v1/realtime
+        if ws_url.endswith("/v1"):
+            ws_url += "/realtime"
+        elif not ws_url.endswith("/realtime"):
+            ws_url = ws_url.rstrip("/") + "/v1/realtime"
+
+        async def _ws_transcribe():
+            import websockets
+
+            async with websockets.connect(ws_url) as ws:
+                # 1. Wait for session.created
+                resp = json.loads(await ws.recv())
+                if resp["type"] != "session.created":
+                    raise RuntimeError(f"Expected session.created, got: {resp['type']}")
+
+                # 2. Send session.update with model
+                await ws.send(json.dumps({"type": "session.update", "model": self.config.model_name}))
+
+                # 3. Initial commit to signal ready
+                await ws.send(json.dumps({"type": "input_audio_buffer.commit"}))
+
+                # 4. Send audio in 4KB chunks
+                chunk_size = 4096
+                for i in range(0, len(audio_bytes), chunk_size):
+                    chunk = audio_bytes[i : i + chunk_size]
+                    await ws.send(
+                        json.dumps({"type": "input_audio_buffer.append", "audio": base64.b64encode(chunk).decode()})
+                    )
+
+                # 5. Signal done
+                await ws.send(json.dumps({"type": "input_audio_buffer.commit", "final": True}))
+
+                # 6. Collect transcription
+                text_parts = []
+                while True:
+                    resp = json.loads(await ws.recv())
+                    if resp["type"] == "transcription.delta":
+                        text_parts.append(resp["delta"])
+                    elif resp["type"] == "transcription.done":
+                        return resp.get("text", "".join(text_parts))
+                    elif resp["type"] == "error":
+                        raise RuntimeError(f"Realtime API error: {resp['error']}")
+
+        from lattifai.llm.base import _run_async
+
+        text = _run_async(_ws_transcribe())
+        lang = language or self.config.language
+        return text, lang
 
     def _transcribe_via_chat(self, file_path: Path, language: Optional[str] = None) -> Tuple[str, Optional[str]]:
         """Send audio as base64 data URI to /v1/chat/completions and return (text, language)."""

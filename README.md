@@ -207,6 +207,7 @@ LattifAI supports a wide range of ASR models — from cloud APIs to local infere
 | [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) | vLLM/SGLang | 99 | — |
 | [GLM-ASR](https://huggingface.co/GLM-ASR-Nano-2512) | vLLM/SGLang | zh, en | — |
 | [Voxtral](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | vLLM/SGLang | 13 (European) | — |
+| [Voxtral Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | vLLM (realtime) | 13 (European) | — |
 
 ```bash
 # Gemini (cloud API, requires GEMINI_API_KEY)
@@ -597,6 +598,7 @@ Two API modes are supported:
 |------|----------|----------|
 | `chat` (default, recommended) | `/v1/chat/completions` | Qwen3-ASR, GLM-ASR, Whisper, and most models |
 | `transcriptions` | `/v1/audio/transcriptions` | Whisper with segment timestamps |
+| `realtime` | `/v1/realtime` (WebSocket) | Voxtral Realtime (<500ms latency) |
 
 ```bash
 # 1. Install vLLM with audio support (requires CUDA GPU)
@@ -620,6 +622,14 @@ lai transcribe run audio.wav output.srt \
     transcription.model_name=openai/whisper-large-v3-turbo \
     transcription.api_base_url=http://localhost:8081/v1 \
     transcription.api_mode=transcriptions
+
+# Voxtral Realtime (streaming WebSocket, <500ms latency)
+# Server: VLLM_DISABLE_COMPILE_CACHE=1 vllm serve mistralai/Voxtral-Mini-4B-Realtime-2602 \
+#   --host 0.0.0.0 --port 8086 --compilation_config '{"cudagraph_mode": "PIECEWISE"}'
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=mistralai/Voxtral-Mini-4B-Realtime-2602 \
+    transcription.api_base_url=http://localhost:8086/v1 \
+    transcription.api_mode=realtime
 ```
 
 ---

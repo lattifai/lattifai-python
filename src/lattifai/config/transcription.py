@@ -92,9 +92,10 @@ class TranscriptionConfig:
     When set, routes to VLLMTranscriber which uses the /v1/audio/transcriptions endpoint.
     Works with any ASR model served via vLLM/SGLang (Whisper, Qwen3-ASR, GLM-ASR, etc.)."""
 
-    api_mode: Literal["transcriptions", "chat"] = "chat"
+    api_mode: Literal["transcriptions", "chat", "realtime"] = "chat"
     """API mode for vLLM/SGLang. 'chat' (default, recommended) uses /v1/chat/completions with audio_url (base64).
     'transcriptions' uses /v1/audio/transcriptions (multipart upload, support is incomplete in vLLM).
+    'realtime' uses /v1/realtime WebSocket endpoint (for Voxtral Realtime models).
     Use 'chat' for Qwen3-ASR, GLM-ASR, Whisper, and most models."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
