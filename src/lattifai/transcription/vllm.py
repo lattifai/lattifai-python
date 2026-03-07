@@ -24,6 +24,7 @@ from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.data import Caption
+from lattifai.llm import OpenAIClient
 from lattifai.transcription.base import BaseTranscriber
 
 _ASR_TAG_RE = re.compile(r"^<\|([a-z]{2,})\|>")
@@ -70,6 +71,11 @@ class VLLMTranscriber(BaseTranscriber):
         super().__init__(config=transcription_config)
         self._api_base_url = transcription_config.api_base_url.rstrip("/")
         self._supports_verbose_json = True
+        self._llm_client = OpenAIClient(
+            api_key="not-needed",
+            model=transcription_config.model_name,
+            base_url=self._api_base_url,
+        )
 
     @property
     def name(self) -> str:
@@ -189,9 +195,8 @@ class VLLMTranscriber(BaseTranscriber):
 
     def _transcribe_via_chat(self, file_path: Path, language: Optional[str] = None) -> Tuple[str, Optional[str]]:
         """Send audio as base64 data URI to /v1/chat/completions and return (text, language)."""
-        import httpx
+        from lattifai.llm.base import _run_async
 
-        url = f"{self._api_base_url}/chat/completions"
         mime_type = self._MIME_TYPES.get(file_path.suffix.lower(), "audio/wav")
         audio_b64 = base64.b64encode(file_path.read_bytes()).decode("ascii")
 
@@ -200,21 +205,12 @@ class VLLMTranscriber(BaseTranscriber):
         if self.config.prompt:
             content.insert(0, {"type": "text", "text": self.config.prompt})
 
-        payload: dict = {
-            "model": self.config.model_name,
-            "messages": [{"role": "user", "content": content}],
-        }
-        if self.config.temperature is not None:
-            payload["temperature"] = max(self.config.temperature, 0.01)
+        messages = [{"role": "user", "content": content}]
+        temperature = max(self.config.temperature, 0.01) if self.config.temperature is not None else None
 
-        resp = httpx.post(url, json=payload, timeout=300.0)
-        if resp.status_code != 200:
-            import logging
+        response = _run_async(self._llm_client.chat(messages, temperature=temperature, timeout=300.0))
 
-            logging.getLogger(__name__).error("vLLM chat error %d: %s", resp.status_code, resp.text)
-        resp.raise_for_status()
-
-        raw_text = resp.json()["choices"][0]["message"]["content"]
+        raw_text = response.choices[0].message.content
         detected_lang, cleaned = _parse_asr_output(raw_text)
         return cleaned, detected_lang or language or self.config.language
 

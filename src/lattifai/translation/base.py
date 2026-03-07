@@ -2,37 +2,39 @@
 
 import asyncio
 import logging
-from abc import ABC, abstractmethod
 from typing import Optional
 
 from lattifai.caption import Supervision
 from lattifai.config.translation import TranslationConfig
+from lattifai.llm import BaseLLMClient
 
 logger = logging.getLogger(__name__)
 
 
-class BaseTranslator(ABC):
+class BaseTranslator:
     """
-    Base class for LLM-based caption translators.
+    LLM-based caption translator.
 
-    Subclasses implement the LLM API call; the base class handles
-    batching, context windows, and the quick/normal/refined pipeline.
+    Uses a BaseLLMClient for LLM calls; handles batching, context windows,
+    and the quick/normal/refined pipeline.
     """
 
-    def __init__(self, config: TranslationConfig):
+    def __init__(self, config: TranslationConfig, client: BaseLLMClient):
         self.config = config
+        self.client = client
 
     @property
-    @abstractmethod
     def name(self) -> str:
         """Human-readable name of the translator."""
+        return f"{self.client.provider_name}:{self.config.model_name}"
 
-    @abstractmethod
     async def _call_llm(self, prompt: str) -> str:
-        """Send a prompt to the LLM and return raw text response.
+        """Send a prompt to the LLM and return raw JSON text response."""
+        result = await self.client.generate_json(prompt, model=self.config.model_name)
+        # generate_json returns parsed object; re-serialize for backward compat
+        import json
 
-        The response is expected to be valid JSON.
-        """
+        return json.dumps(result, ensure_ascii=False)
 
     async def translate_batch(
         self,

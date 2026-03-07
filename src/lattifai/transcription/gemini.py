@@ -7,13 +7,13 @@ from typing import List, Optional, Union
 
 import numpy as np
 import soundfile as sf
-from google import genai
 from google.genai.types import GenerateContentConfig, Part, ThinkingConfig
 
 from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.data import Caption
+from lattifai.llm import GeminiClient
 from lattifai.transcription.base import BaseTranscriber
 from lattifai.transcription.prompts import get_prompt_loader
 
@@ -40,7 +40,7 @@ class GeminiTranscriber(BaseTranscriber):
         """
         super().__init__(config=transcription_config)
 
-        self._client: Optional[genai.Client] = None
+        self._llm_client: Optional[GeminiClient] = None
         self._generation_config: Optional[GenerateContentConfig] = None
         self._system_prompt: Optional[str] = None
 
@@ -102,15 +102,15 @@ class GeminiTranscriber(BaseTranscriber):
             self.logger.info(f"🎤 Starting Gemini transcription for file: {media_file}")
 
         try:
-            client = self._get_client()
+            llm_client = self._get_llm_client()
 
             # Upload audio file
             if self.config.verbose:
                 self.logger.info("📤 Uploading audio file to Gemini...")
-            media_file = client.files.upload(file=media_file)
+            media_file = llm_client.raw_client.files.upload(file=media_file)
 
             contents = Part.from_uri(file_uri=media_file.uri, mime_type=media_file.mime_type)
-            return await self._run_generation(contents, source=media_file, client=client, language=language)
+            return await self._run_generation(contents, source=media_file, language=language)
 
         except Exception as e:
             self.logger.error(f"Gemini transcription failed: {str(e)}")
@@ -196,12 +196,12 @@ class GeminiTranscriber(BaseTranscriber):
         Returns:
             Transcribed text
         """
-        client = self._get_client()
+        llm_client = self._get_llm_client()
 
         # Upload audio file
         if self.config.verbose:
             self.logger.info("📤 Uploading audio file to Gemini...")
-        uploaded_file = client.files.upload(file=str(media_file))
+        uploaded_file = llm_client.raw_client.files.upload(file=str(media_file))
 
         # Simple ASR prompt
         system_prompt = "Transcribe the audio."
@@ -215,14 +215,7 @@ class GeminiTranscriber(BaseTranscriber):
         )
 
         contents = Part.from_uri(file_uri=uploaded_file.uri, mime_type=uploaded_file.mime_type)
-        response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: client.models.generate_content(
-                model=self.config.model_name,
-                contents=contents,
-                config=simple_config,
-            ),
-        )
+        response = await llm_client.generate_content(contents, config=simple_config)
 
         if not response.text:
             raise RuntimeError("Empty response from Gemini API")
@@ -262,13 +255,13 @@ class GeminiTranscriber(BaseTranscriber):
             return None
         return ThinkingConfig(include_thoughts=self.config.include_thoughts, thinking_budget=-1)
 
-    def _get_client(self) -> genai.Client:
-        """Lazily create the Gemini client when first needed."""
-        if not self.config.gemini_api_key:
-            raise ValueError("Gemini API key is required for transcription")
-        if self._client is None:
-            self._client = genai.Client(api_key=self.config.gemini_api_key)
-        return self._client
+    def _get_llm_client(self) -> GeminiClient:
+        """Lazily create the Gemini LLM client when first needed."""
+        if self._llm_client is None:
+            if not self.config.gemini_api_key:
+                raise ValueError("Gemini API key is required for transcription")
+            self._llm_client = GeminiClient(api_key=self.config.gemini_api_key, model=self.config.model_name)
+        return self._llm_client
 
     def _get_generation_config(self, language: Optional[str] = None) -> GenerateContentConfig:
         """Build GenerateContentConfig. Caches only when no language override."""
@@ -294,26 +287,18 @@ class GeminiTranscriber(BaseTranscriber):
         contents: Part,
         *,
         source: str,
-        client: Optional[genai.Client] = None,
         language: Optional[str] = None,
     ) -> str:
         """
         Shared helper for sending generation requests and handling the response.
         """
-        client = client or self._get_client()
+        llm_client = self._get_llm_client()
         config = self._get_generation_config(language=language)
 
         if self.config.verbose:
             self.logger.info(f"🔄 Sending transcription request to {self.config.model_name} ({source})...")
 
-        response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: client.models.generate_content(
-                model=self.config.model_name,
-                contents=contents,
-                config=config,
-            ),
-        )
+        response = await llm_client.generate_content(contents, config=config)
 
         # Extract content based on include_thoughts setting
         if self.config.include_thoughts:

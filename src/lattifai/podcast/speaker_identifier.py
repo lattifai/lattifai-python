@@ -47,6 +47,7 @@ class SpeakerIdentifier:
         gemini_api_key: Optional[str] = None,
         gemini_model: str = "gemini-2.5-flash",
         intro_words: int = 500,
+        llm_client=None,
     ):
         """Initialize SpeakerIdentifier.
 
@@ -54,10 +55,12 @@ class SpeakerIdentifier:
             gemini_api_key: Gemini API key for AI-based identification.
             gemini_model: Gemini model to use for identification.
             intro_words: Number of words from transcript start for analysis.
+            llm_client: Optional BaseLLMClient instance. If None, creates one from api_key.
         """
         self.gemini_api_key = gemini_api_key
         self.gemini_model = gemini_model
         self.intro_words = intro_words
+        self._llm_client = llm_client
 
     def identify(
         self,
@@ -186,6 +189,14 @@ class SpeakerIdentifier:
 
         return results
 
+    def _get_llm_client(self):
+        """Get or create the LLM client for speaker identification."""
+        if self._llm_client is None:
+            from lattifai.llm import create_client
+
+            self._llm_client = create_client("gemini", api_key=self.gemini_api_key, model=self.gemini_model)
+        return self._llm_client
+
     def _extract_via_gemini(
         self,
         intro_text: str,
@@ -193,14 +204,7 @@ class SpeakerIdentifier:
         existing_candidates: List[SpeakerIdentification],
     ) -> List[SpeakerIdentification]:
         """Use Gemini to identify speakers from intro text + metadata."""
-        try:
-            from google import genai
-            from google.genai.types import GenerateContentConfig
-        except ImportError:
-            logger.warning("google-genai not installed, falling back to heuristic")
-            return self._extract_via_heuristic(intro_text)
-
-        if not self.gemini_api_key:
+        if not self.gemini_api_key and self._llm_client is None:
             logger.warning("No Gemini API key, falling back to heuristic")
             return self._extract_via_heuristic(intro_text)
 
@@ -233,25 +237,12 @@ Return ONLY the JSON array, no other text. Example:
 """
 
         try:
-            client = genai.Client(api_key=self.gemini_api_key)
-            response = client.models.generate_content(
-                model=self.gemini_model,
-                contents=prompt,
-                config=GenerateContentConfig(
-                    temperature=0.1,
-                    response_mime_type="application/json",
-                ),
-            )
+            client = self._get_llm_client()
+            speakers_data = client.generate_json_sync(prompt, temperature=0.1)
 
-            # Parse JSON response
-            text = response.text.strip()
-            # Handle markdown code blocks
-            if text.startswith("```"):
-                text = re.sub(r"^```(?:json)?\s*", "", text)
-                text = re.sub(r"\s*```$", "", text)
-
-            speakers_data = json.loads(text)
             results = []
+            if not isinstance(speakers_data, list):
+                speakers_data = [speakers_data]
             for sp in speakers_data:
                 results.append(
                     SpeakerIdentification(

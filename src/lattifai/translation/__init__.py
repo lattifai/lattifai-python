@@ -1,6 +1,7 @@
 """Translation module for LattifAI."""
 
 from lattifai.config.translation import TranslationConfig
+from lattifai.llm import create_client
 
 from .base import BaseTranslator
 
@@ -17,17 +18,12 @@ def create_translator(config: TranslationConfig) -> BaseTranslator:
         config: Translation configuration.
 
     Returns:
-        BaseTranslator instance.
+        BaseTranslator instance backed by the configured LLM provider.
     """
-    if config.provider == "gemini":
-        from .gemini import GeminiTranslator
-
-        return GeminiTranslator(config)
-    elif config.provider == "openai":
-        from .openai_compat import OpenAITranslator
-
-        return OpenAITranslator(config)
-    else:
-        raise ValueError(
-            f"Unsupported translation provider: '{config.provider}'. " f"Supported providers: 'gemini', 'openai'."
-        )
+    client = create_client(
+        provider=config.provider,
+        api_key=config.api_key,
+        model=config.model_name,
+        base_url=config.api_base_url,
+    )
+    return BaseTranslator(config, client)
