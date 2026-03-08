@@ -150,6 +150,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         channel_selector: Optional[str | int] = "average",
         streaming_chunk_secs: Optional[float] = None,
         podcast_config: Optional[PodcastConfig] = None,
+        use_transcription: bool = False,
     ) -> Caption:
         """Transcribe and align a podcast episode with speaker identification.
 
@@ -193,6 +194,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     split_sentence=split_sentence,
                     channel_selector=channel_selector,
                     streaming_chunk_secs=streaming_chunk_secs,
+                    use_transcription=True,
                 )
 
             safe_print(colorful.cyan(f"🎙️ Starting podcast workflow for: {url}"))
