@@ -70,6 +70,7 @@ class EpisodeMetadata:
     host_names: List[str] = field(default_factory=list)
     guest_names: List[str] = field(default_factory=list)
     show_notes: str = ""
+    transcript_url: Optional[str] = None
 
 
 @dataclass

@@ -206,9 +206,16 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 safe_print(colorful.green(f"    ✓ Host(s): {', '.join(episode.host_names)}"))
             if episode.guest_names:
                 safe_print(colorful.green(f"    ✓ Guest(s): {', '.join(episode.guest_names)}"))
+            if episode.transcript_url:
+                safe_print(colorful.green(f"    ✓ Transcript: {episode.transcript_url}"))
+                self._download_transcript(episode.transcript_url, output_dir_path)
 
             safe_print(colorful.cyan("📥 Downloading podcast audio..."))
-            media_file = self.podcast_loader.download_audio(episode, output_dir=str(output_dir_path))
+            media_file = self.podcast_loader.download_audio(
+                episode,
+                output_dir=str(output_dir_path),
+                source_url=url,
+            )
             safe_print(colorful.green(f"    ✓ Audio downloaded: {media_file}"))
             input_media = media_file
         elif input_media:
@@ -261,6 +268,49 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             self._identify_and_apply_speakers(caption, episode, pc, output_caption_path)
 
         return caption
+
+    def _download_transcript(self, transcript_url: str, output_dir: Path) -> Optional[Path]:
+        """Download transcript from URL and save to output directory."""
+        import requests
+
+        try:
+            resp = requests.get(transcript_url, timeout=30)
+            resp.raise_for_status()
+        except Exception as e:
+            safe_print(colorful.yellow(f"    ⚠ Failed to download transcript: {e}"))
+            return None
+
+        # Derive filename from URL path
+        from urllib.parse import urlparse
+
+        slug = urlparse(transcript_url).path.strip("/").replace("/", "_") or "transcript"
+        out_path = output_dir / f"{slug}.md"
+        if out_path.exists():
+            safe_print(colorful.green(f"    ✓ Transcript already exists: {out_path}"))
+            return out_path
+
+        # Convert HTML to plain text with basic structure
+        html = resp.text
+        # Extract <article> or <main> content if available
+        import re as _re
+
+        article_match = _re.search(r"<(?:article|main)[^>]*>(.*?)</(?:article|main)>", html, _re.DOTALL)
+        content = article_match.group(1) if article_match else html
+
+        # Simple HTML to markdown: preserve paragraphs and links
+        content = _re.sub(r"<br\s*/?>", "\n", content)
+        content = _re.sub(r"<p[^>]*>", "\n\n", content)
+        content = _re.sub(r"</p>", "", content)
+        content = _re.sub(r"<a\s+href=[\"']([^\"']+)[\"'][^>]*>([^<]*)</a>", r"[\2](\1)", content)
+        content = _re.sub(r"<[^>]+>", "", content)
+        from html import unescape
+
+        content = unescape(content)
+        content = _re.sub(r"\n{3,}", "\n\n", content).strip()
+
+        out_path.write_text(content, encoding="utf-8")
+        safe_print(colorful.green(f"    ✓ Transcript saved: {out_path}"))
+        return out_path
 
     def _build_podcast_description(
         self,

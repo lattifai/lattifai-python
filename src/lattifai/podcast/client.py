@@ -3,10 +3,16 @@
 import json
 import logging
 import re
+import shutil
+import socket
+import ssl
+import subprocess
 import tempfile
+import time
 from html import unescape
 from pathlib import Path
 from typing import Dict, List, Optional
+from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -33,6 +39,9 @@ _CONTENT_NS = "http://purl.org/rss/1.0/modules/content/"
 _MAX_RSS_SIZE = 50 * 1024 * 1024  # 50 MB for RSS feeds
 _MAX_HTML_SIZE = 10 * 1024 * 1024  # 10 MB for HTML pages
 _MAX_JSON_SIZE = 5 * 1024 * 1024  # 5 MB for JSON API responses
+_HTTP_RETRIES = 3
+_HTTP_RETRY_BACKOFF = 1.5
+_YTDLP_TIMEOUT = 900
 
 # Regex patterns for extracting guest names from episode titles
 # NOTE: No re.IGNORECASE — require capitalized proper names (English)
@@ -55,19 +64,57 @@ def _strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+# Pattern: <b>Transcript:</b> ... <a href="URL">
+_TRANSCRIPT_LINK_RE = re.compile(
+    r"(?:transcript|full\s+transcript)\s*:?\s*</\w+>\s*(?:<br\s*/?>)?\s*<a\s+href=[\"']([^\"']+)[\"']",
+    re.IGNORECASE,
+)
+
+
+def _extract_transcript_url(html: str) -> Optional[str]:
+    """Extract transcript URL from RSS description HTML."""
+    if not html:
+        return None
+    m = _TRANSCRIPT_LINK_RE.search(html)
+    return m.group(1) if m else None
+
+
 def _http_get(url: str, timeout: int = 20, max_size: int = _MAX_RSS_SIZE) -> bytes:
     """Perform an HTTP GET request with URL validation and size limits."""
     validate_url(url)
-    req = Request(url, headers={"User-Agent": _USER_AGENT})
-    with urlopen(req, timeout=timeout) as resp:
-        # Check Content-Length if available
-        content_length = resp.headers.get("Content-Length")
-        if content_length and int(content_length) > max_size:
-            raise ValueError(f"Response too large: {content_length} bytes (max {max_size})")
-        data = resp.read(max_size + 1)
-        if len(data) > max_size:
-            raise ValueError(f"Response exceeded max size of {max_size} bytes")
-        return data
+    last_error: Exception | None = None
+
+    for attempt in range(1, _HTTP_RETRIES + 1):
+        try:
+            req = Request(url, headers={"User-Agent": _USER_AGENT})
+            with urlopen(req, timeout=timeout) as resp:
+                # Check Content-Length if available
+                content_length = resp.headers.get("Content-Length")
+                if content_length and int(content_length) > max_size:
+                    raise ValueError(f"Response too large: {content_length} bytes (max {max_size})")
+                data = resp.read(max_size + 1)
+                if len(data) > max_size:
+                    raise ValueError(f"Response exceeded max size of {max_size} bytes")
+                return data
+        except (URLError, socket.timeout, TimeoutError, ssl.SSLError, ConnectionResetError) as exc:
+            last_error = exc
+            if attempt >= _HTTP_RETRIES:
+                break
+
+            delay = _HTTP_RETRY_BACKOFF * (2 ** (attempt - 1))
+            logger.warning(
+                "HTTP GET failed (%s/%s) for %s: %s. Retrying in %.1fs...",
+                attempt,
+                _HTTP_RETRIES,
+                url,
+                exc,
+                delay,
+            )
+            time.sleep(delay)
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"HTTP GET failed unexpectedly for {url}")
 
 
 def _http_get_json(url: str, timeout: int = 15) -> dict:
@@ -79,16 +126,145 @@ def _http_get_json(url: str, timeout: int = 15) -> dict:
 def _http_download_to_file(url: str, output_path: Path, timeout: int = 300) -> int:
     """Stream-download a file to disk without loading entirely into memory."""
     validate_url(url)
-    req = Request(url, headers={"User-Agent": _USER_AGENT})
-    total = 0
-    with urlopen(req, timeout=timeout) as resp, open(output_path, "wb") as f:
-        while True:
-            chunk = resp.read(65536)
-            if not chunk:
+    partial_path = output_path.with_name(f"{output_path.name}.part")
+    last_error: Exception | None = None
+
+    for attempt in range(1, _HTTP_RETRIES + 1):
+        total = 0
+        try:
+            req = Request(url, headers={"User-Agent": _USER_AGENT, "Connection": "close"})
+            with urlopen(req, timeout=timeout) as resp, open(partial_path, "wb") as f:
+                while True:
+                    chunk = resp.read(65536)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    total += len(chunk)
+
+            partial_path.replace(output_path)
+            return total
+        except (URLError, socket.timeout, TimeoutError, ssl.SSLError, ConnectionResetError) as exc:
+            last_error = exc
+            if partial_path.exists():
+                partial_path.unlink()
+
+            if attempt >= _HTTP_RETRIES:
                 break
-            f.write(chunk)
-            total += len(chunk)
-    return total
+
+            delay = _HTTP_RETRY_BACKOFF * (2 ** (attempt - 1))
+            logger.warning(
+                "Audio download failed (%s/%s) for %s: %s. Retrying in %.1fs...",
+                attempt,
+                _HTTP_RETRIES,
+                url,
+                exc,
+                delay,
+            )
+            time.sleep(delay)
+
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError(f"Audio download failed unexpectedly for {url}")
+
+
+def _is_hostname_like(value: str) -> bool:
+    """Return True if a string looks like a valid hostname."""
+    if not value or "." not in value:
+        return False
+    return bool(re.fullmatch(r"[A-Za-z0-9.-]+", value))
+
+
+def _build_audio_download_candidates(audio_url: str) -> list[str]:
+    """Build candidate download URLs with platform-specific fallbacks.
+
+    For Blubrry proxied URLs such as:
+    https://media.blubrry.com/<show>/<origin-host>/<path>
+
+    this adds:
+    https://<origin-host>/<path>
+    """
+    candidates = [audio_url]
+    parsed = urlparse(audio_url)
+    if parsed.hostname != "media.blubrry.com":
+        return candidates
+
+    parts = [p for p in parsed.path.split("/") if p]
+    query = f"?{parsed.query}" if parsed.query else ""
+
+    # Common format: /<show>/<origin-host>/<rest...>
+    if len(parts) >= 3 and _is_hostname_like(parts[1]):
+        fallback = f"{parsed.scheme}://{parts[1]}/{'/'.join(parts[2:])}{query}"
+        if fallback not in candidates:
+            candidates.append(fallback)
+
+    # Alternate format: /<origin-host>/<rest...>
+    if len(parts) >= 2 and _is_hostname_like(parts[0]):
+        fallback = f"{parsed.scheme}://{parts[0]}/{'/'.join(parts[1:])}{query}"
+        if fallback not in candidates:
+            candidates.append(fallback)
+
+    return candidates
+
+
+def _build_ytdlp_download_candidates(source_url: Optional[str], audio_candidates: list[str]) -> list[str]:
+    """Build de-duplicated URL candidates for yt-dlp fallback."""
+    candidates: list[str] = []
+    for url in [source_url, *audio_candidates]:
+        if not url or url in candidates:
+            continue
+        try:
+            validate_url(url)
+        except Exception:
+            continue
+        candidates.append(url)
+    return candidates
+
+
+def _download_with_ytdlp(url: str, output_path: Path, timeout: int = _YTDLP_TIMEOUT) -> Path:
+    """Download audio using yt-dlp as a robust network fallback."""
+    validate_url(url)
+    ytdlp_bin = shutil.which("yt-dlp")
+    if not ytdlp_bin:
+        raise RuntimeError("yt-dlp is not installed. Install it to enable podcast download fallback.")
+
+    output_template = str(output_path.with_suffix(".%(ext)s"))
+    existing_files = {p.name for p in output_path.parent.glob(f"{output_path.stem}.*")}
+
+    cmd = [
+        ytdlp_bin,
+        "--quiet",
+        "--no-warnings",
+        "--no-progress",
+        "--no-part",
+        "--no-playlist",
+        "--force-overwrites",
+        "--retries",
+        str(_HTTP_RETRIES),
+        "--fragment-retries",
+        str(_HTTP_RETRIES),
+        "--extractor-retries",
+        str(_HTTP_RETRIES),
+        "--socket-timeout",
+        "30",
+        "-o",
+        output_template,
+        url,
+    ]
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=timeout)
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(detail or f"yt-dlp failed with exit code {proc.returncode}")
+
+    new_files = [
+        p
+        for p in output_path.parent.glob(f"{output_path.stem}.*")
+        if p.is_file() and p.name not in existing_files and p.stat().st_size > 0
+    ]
+    if not new_files:
+        raise RuntimeError("yt-dlp completed but no output audio file was found.")
+
+    new_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return new_files[0]
 
 
 def _parse_xml(data: bytes) -> ET.Element:
@@ -191,12 +367,14 @@ class PodcastLoader:
         self,
         episode: EpisodeMetadata,
         output_dir: Optional[str] = None,
+        source_url: Optional[str] = None,
     ) -> str:
         """Download episode audio to local file (streaming, memory-safe).
 
         Args:
             episode: Episode metadata containing audio_url.
             output_dir: Output directory. If None, uses cache_dir.
+            source_url: Original episode page URL for downloader fallbacks (e.g. Apple URL).
 
         Returns:
             Path to downloaded audio file.
@@ -222,16 +400,47 @@ class PodcastLoader:
             logger.info(f"Audio file already exists: {output_path}")
             return str(output_path)
 
-        logger.info(f"Downloading audio from: {episode.audio_url}")
-        try:
-            total_bytes = _http_download_to_file(episode.audio_url, output_path, timeout=300)
-            logger.info(f"Audio downloaded: {output_path} ({total_bytes / 1024 / 1024:.1f} MB)")
-            return str(output_path)
-        except Exception as e:
-            # Clean up partial download
-            if output_path.exists():
-                output_path.unlink()
-            raise RuntimeError(f"Failed to download audio from {episode.audio_url}: {e}")
+        candidate_urls = _build_audio_download_candidates(episode.audio_url)
+        errors: list[str] = []
+
+        for index, candidate_url in enumerate(candidate_urls, 1):
+            logger.info("Downloading audio (candidate %s/%s): %s", index, len(candidate_urls), candidate_url)
+            try:
+                total_bytes = _http_download_to_file(candidate_url, output_path, timeout=300)
+                logger.info(f"Audio downloaded: {output_path} ({total_bytes / 1024 / 1024:.1f} MB)")
+                if candidate_url != episode.audio_url:
+                    logger.info("Download succeeded via fallback URL.")
+                return str(output_path)
+            except Exception as exc:
+                errors.append(f"{candidate_url} -> {exc}")
+                logger.warning("Audio download failed for candidate %s/%s: %s", index, len(candidate_urls), exc)
+
+        ytdlp_candidates = _build_ytdlp_download_candidates(source_url, candidate_urls)
+        for index, candidate_url in enumerate(ytdlp_candidates, 1):
+            logger.info(
+                "Downloading audio via yt-dlp (candidate %s/%s): %s",
+                index,
+                len(ytdlp_candidates),
+                candidate_url,
+            )
+            try:
+                ytdlp_path = _download_with_ytdlp(candidate_url, output_path, timeout=_YTDLP_TIMEOUT)
+                total_bytes = ytdlp_path.stat().st_size
+                logger.info(f"Audio downloaded via yt-dlp: {ytdlp_path} ({total_bytes / 1024 / 1024:.1f} MB)")
+                return str(ytdlp_path)
+            except Exception as exc:
+                errors.append(f"yt-dlp:{candidate_url} -> {exc}")
+                logger.warning(
+                    "yt-dlp audio download failed for candidate %s/%s: %s",
+                    index,
+                    len(ytdlp_candidates),
+                    exc,
+                )
+
+        # Clean up partial download
+        if output_path.exists():
+            output_path.unlink()
+        raise RuntimeError("Failed to download audio after trying all candidates:\n" + "\n".join(errors))
 
     def _fetch_rss(self, feed_url: str) -> ET.Element:
         """Fetch and parse RSS feed XML (with XXE protection)."""
@@ -294,6 +503,17 @@ class PodcastLoader:
         Apple episode IDs don't directly map to RSS GUIDs. We use the iTunes
         Lookup API to get the episode title, then match by title in the RSS.
         """
+        channel = rss_root.find("channel")
+        if channel is None:
+            channel = rss_root
+
+        # Fast path: try direct ID match in RSS link/guid first.
+        for item in channel.findall("item"):
+            link = _text(item, "link")
+            guid = _text(item, "guid")
+            if (link and f"i={apple_episode_id}" in link) or (guid and apple_episode_id in guid):
+                return self._parse_rss_episode(item, podcast)
+
         try:
             lookup_url = f"https://itunes.apple.com/lookup?id={apple_episode_id}&entity=podcastEpisode"
             data = _http_get_json(lookup_url)
@@ -302,7 +522,6 @@ class PodcastLoader:
                 ep_data = results[0]
                 target_title = ep_data.get("trackName", "")
                 if target_title:
-                    channel = rss_root.find("channel") or rss_root
                     for item in channel.findall("item"):
                         item_title = _text(item, "title")
                         if item_title and _titles_match(item_title, target_title):
@@ -350,11 +569,13 @@ class PodcastLoader:
     ) -> EpisodeMetadata:
         """Parse a single RSS <item> element into EpisodeMetadata."""
         title = _text(item, "title")
-        description = _strip_html(
+        raw_description = (
             _text(item, "description")
             or _text(item, f"{{{_ITUNES_NS}}}summary")
             or _text(item, f"{{{_CONTENT_NS}}}encoded")
         )
+        transcript_url = _extract_transcript_url(raw_description)
+        description = _strip_html(raw_description)
 
         # Audio URL from <enclosure>
         audio_url = ""
@@ -392,6 +613,7 @@ class PodcastLoader:
             host_names=host_names,
             guest_names=guest_names,
             show_notes=_build_show_notes(podcast.author, guest_names, title, description),
+            transcript_url=transcript_url,
         )
 
     def _get_xiaoyuzhou_metadata(self, url: str, episode_id: str) -> EpisodeMetadata:
