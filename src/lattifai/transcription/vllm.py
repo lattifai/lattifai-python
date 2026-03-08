@@ -403,30 +403,17 @@ class VLLMTranscriber(BaseTranscriber):
         segments, led = self._vad_segment(audio, vad_chunk_size=self._get_vad_chunk_size())
 
         if segments:
-            from tqdm import tqdm
-
             chunks = self._slice_audio_by_segments(audio, segments)
-            all_supervisions = []
-            pbar = tqdm(
-                zip(segments, chunks),
-                total=len(segments),
-                desc="Transcribing",
-                unit="seg",
-                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]",
-            )
-            detected_lang = None
-            for (start, end), chunk in pbar:
-                dur = len(chunk) / audio.sampling_rate
-                pbar.set_postfix_str(f"{start:.1f}s-{end:.1f}s ({dur:.1f}s)")
-                chunk_sups, chunk_lang = self._transcribe_numpy_chunk(chunk, audio.sampling_rate, language=language)
-                if chunk_lang and not detected_lang:
-                    detected_lang = chunk_lang
-                for sup in chunk_sups:
-                    if sup.text and sup.text.strip():
-                        # Offset timestamps relative to the VAD segment start
-                        sup.start += start
-                        all_supervisions.append(sup)
-            pbar.close()
+            batch_size = getattr(self.config, "batch_size", 1) or 1
+
+            if batch_size > 1:
+                all_supervisions, detected_lang = self._transcribe_chunks_batch(
+                    segments, chunks, audio.sampling_rate, language, batch_size
+                )
+            else:
+                all_supervisions, detected_lang = self._transcribe_chunks_sequential(
+                    segments, chunks, audio.sampling_rate, language
+                )
             caption = Caption(supervisions=all_supervisions, language=detected_lang)
         else:
             # No VAD — transcribe full audio
@@ -438,6 +425,90 @@ class VLLMTranscriber(BaseTranscriber):
         if led is not None:
             caption.event = led
         return caption
+
+    def _transcribe_chunks_sequential(
+        self,
+        segments: list,
+        chunks: list,
+        sr: int,
+        language: Optional[str],
+    ) -> Tuple[List[Supervision], Optional[str]]:
+        """Transcribe VAD chunks one at a time."""
+        from tqdm import tqdm
+
+        all_supervisions = []
+        detected_lang = None
+        pbar = tqdm(
+            zip(segments, chunks),
+            total=len(segments),
+            desc="Transcribing",
+            unit="seg",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]",
+        )
+        for (start, end), chunk in pbar:
+            dur = len(chunk) / sr
+            pbar.set_postfix_str(f"{start:.1f}s-{end:.1f}s ({dur:.1f}s)")
+            chunk_sups, chunk_lang = self._transcribe_numpy_chunk(chunk, sr, language=language)
+            if chunk_lang and not detected_lang:
+                detected_lang = chunk_lang
+            for sup in chunk_sups:
+                if sup.text and sup.text.strip():
+                    sup.start += start
+                    all_supervisions.append(sup)
+        pbar.close()
+        return all_supervisions, detected_lang
+
+    def _transcribe_chunks_batch(
+        self,
+        segments: list,
+        chunks: list,
+        sr: int,
+        language: Optional[str],
+        batch_size: int,
+    ) -> Tuple[List[Supervision], Optional[str]]:
+        """Transcribe VAD chunks concurrently using a thread pool."""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        from tqdm import tqdm
+
+        all_results: list = [None] * len(segments)
+        detected_lang = None
+
+        pbar = tqdm(
+            total=len(segments),
+            desc=f"Transcribing (batch={batch_size})",
+            unit="seg",
+            bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+        )
+
+        with ThreadPoolExecutor(max_workers=batch_size) as pool:
+            future_to_idx = {}
+            for idx, (seg, chunk) in enumerate(zip(segments, chunks)):
+                future = pool.submit(self._transcribe_numpy_chunk, chunk, sr, language)
+                future_to_idx[future] = (idx, seg)
+
+            for future in as_completed(future_to_idx):
+                idx, (start, end) = future_to_idx[future]
+                chunk_sups, chunk_lang = future.result()
+                if chunk_lang and not detected_lang:
+                    detected_lang = chunk_lang
+                # Offset timestamps and filter empty
+                valid_sups = []
+                for sup in chunk_sups:
+                    if sup.text and sup.text.strip():
+                        sup.start += start
+                        valid_sups.append(sup)
+                all_results[idx] = valid_sups
+                pbar.update(1)
+
+        pbar.close()
+
+        # Flatten in original segment order
+        all_supervisions = []
+        for sups in all_results:
+            if sups:
+                all_supervisions.extend(sups)
+        return all_supervisions, detected_lang
 
     def transcribe_numpy(
         self,

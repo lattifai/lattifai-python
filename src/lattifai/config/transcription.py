@@ -102,6 +102,11 @@ class TranscriptionConfig:
     """Maximum output tokens for chat/realtime API modes (vLLM/SGLang only).
     If None, defaults to 4096 for chat mode. Increase for long audio transcription."""
 
+    batch_size: int = 1
+    """Number of concurrent requests for VAD chunk transcription (vLLM/SGLang only).
+    Set >1 to parallelize HTTP requests to the server. Requires server-side concurrency support.
+    Note: gemma-3n does NOT support concurrent audio requests in vLLM."""
+
     vad_chunk_size: Optional[float] = None
     """Maximum audio chunk size in seconds for VAD segmentation (vLLM/SGLang only).
     If None, auto-estimated from the model's max_model_len and tokens_per_second."""
