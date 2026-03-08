@@ -115,7 +115,6 @@ caption = "lattifai.cli"
 transcribe = "lattifai.cli"
 diarization = "lattifai.cli"
 translate = "lattifai.cli"
-podcast = "lattifai.cli"
 serve = "lattifai.cli"
 
 [tool.setuptools.packages.find]

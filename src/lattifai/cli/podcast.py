@@ -94,7 +94,6 @@ def podcast_transcribe(
         split_sentence=caption_config.split_sentence,
         channel_selector=media_config.channel_selector,
         streaming_chunk_secs=media_config.streaming_chunk_secs,
-        use_transcription=True,
     )
 
 
