@@ -1040,6 +1040,241 @@ class YouTubeDownloader:
             quality=quality,
         )
 
+    @staticmethod
+    def _extract_transcript_url_from_description(description: str) -> Optional[str]:
+        """Extract a transcript URL from YouTube video description.
+
+        Looks for patterns like:
+          *Transcript:*
+          https://lexfridman.com/some-guest-transcript
+
+        Or inline:
+          Transcript: https://example.com/transcript
+          Substack Article w/Show Notes: https://www.latent.space/p/jeffdean
+
+        Returns:
+            Full transcript URL or None
+        """
+        if not description:
+            return None
+
+        # Keywords that indicate a transcript or show notes URL
+        _LABEL_KEYWORDS = r"transcript|show\s*notes"
+
+        lines = description.split("\n")
+        for i, line in enumerate(lines):
+            stripped = line.strip().lower()
+            # Check if this line is a standalone label (e.g., "*Transcript:*", "Show Notes:")
+            if re.match(rf"^[\*_]*(?:{_LABEL_KEYWORDS})[\s:]*[\*_]*\s*$", stripped):
+                # Look at the next non-empty line for URL
+                for j in range(i + 1, min(i + 3, len(lines))):
+                    next_line = lines[j].strip()
+                    if next_line.startswith("http"):
+                        return next_line
+            # Check if URL is on the same line after a keyword
+            # Matches: "Transcript: URL", "Show Notes: URL", "Substack Article w/Show Notes: URL"
+            m = re.search(rf"(?:{_LABEL_KEYWORDS})\s*[:\-–]\s*(https?://\S+)", stripped)
+            if m:
+                # Re-extract from original case line to preserve URL case
+                m2 = re.search(r"https?://\S+", line)
+                if m2:
+                    return m2.group(0)
+
+        return None
+
+    async def _download_external_transcript(
+        self,
+        transcript_url: str,
+        output_dir: str,
+        video_id: str,
+        youtube_url: Optional[str] = None,
+    ) -> Optional[str]:
+        """Download and parse a transcript from an external URL.
+
+        Fetches the webpage, extracts text content with speaker labels and timestamps.
+        Saves as {video_id}.transcript.md in podcast-transcript format compatible
+        with lattifai-captions PodcastTranscriptReader.
+
+        Returns:
+            Path to saved transcript file, or None on failure
+        """
+        output_path = Path(output_dir).expanduser() / f"{video_id}.transcript.md"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Skip if already downloaded
+        if output_path.exists():
+            self.logger.info(f"✅ Using existing external transcript: {output_path}")
+            return str(output_path)
+
+        self.logger.info(f"📥 Downloading external transcript from: {transcript_url}")
+
+        try:
+            loop = asyncio.get_event_loop()
+
+            def _fetch():
+                import urllib.request
+
+                # Build opener with proxy support from environment variables
+                proxy_handler = urllib.request.ProxyHandler()  # reads HTTP_PROXY/HTTPS_PROXY from env
+                opener = urllib.request.build_opener(proxy_handler)
+                req = urllib.request.Request(
+                    transcript_url,
+                    headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+                )
+                with opener.open(req, timeout=30) as resp:
+                    return resp.read().decode("utf-8")
+
+            html = await loop.run_in_executor(None, _fetch)
+
+            # Parse HTML to extract transcript in podcast-transcript markdown format
+            transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
+            if not transcript_text:
+                self.logger.warning("Failed to extract transcript content from page")
+                return None
+
+            output_path.write_text(transcript_text, encoding="utf-8")
+            self.logger.info(f"✅ Saved external transcript: {output_path} ({len(transcript_text)} chars)")
+            return str(output_path)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to download external transcript: {e}")
+            return None
+
+    @staticmethod
+    def _parse_transcript_html(html: str, youtube_url: Optional[str] = None) -> Optional[str]:
+        """Parse transcript HTML into podcast-transcript Markdown format.
+
+        Output is compatible with lattifai-captions PodcastTranscriptReader:
+
+            Speaker Name
+            [(HH:MM:SS)](youtube_url&t=N)
+            Transcript text...
+
+        For pages without timestamps (Substack/Dwarkesh), outputs dialogue format:
+
+            Speaker Name
+            Transcript text...
+        """
+        try:
+            from html.parser import HTMLParser
+
+            class TranscriptParser(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.lines = []
+                    self.current_text = []
+                    self.in_body = False
+                    self.skip_depth = 0
+
+                def handle_starttag(self, tag, attrs):
+                    if tag == "body":
+                        self.in_body = True
+                    elif tag in ("script", "style", "nav", "header", "footer", "noscript"):
+                        self.skip_depth += 1
+                    elif tag in ("p", "br", "h1", "h2", "h3", "h4", "h5", "h6"):
+                        self._flush()
+
+                def handle_endtag(self, tag):
+                    if tag in ("script", "style", "nav", "header", "footer", "noscript"):
+                        self.skip_depth = max(0, self.skip_depth - 1)
+                    elif tag in ("p", "div", "h1", "h2", "h3", "h4", "h5", "h6"):
+                        self._flush()
+
+                def handle_data(self, data):
+                    if self.in_body and self.skip_depth == 0:
+                        text = data.strip()
+                        if text:
+                            self.current_text.append(text)
+
+                def _flush(self):
+                    if self.current_text:
+                        line = " ".join(self.current_text).strip()
+                        if line:
+                            self.lines.append(line)
+                        self.current_text = []
+
+                def get_text(self):
+                    self._flush()
+                    return "\n".join(self.lines)
+
+            parser = TranscriptParser()
+            parser.feed(html)
+            text = parser.get_text()
+            lines = text.split("\n")
+
+            base_yt = youtube_url.split("?")[0] if youtube_url else None
+
+            def _hms_to_secs(hms: str) -> int:
+                parts = hms.split(":")
+                if len(parts) == 3:
+                    return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0]) * 60 + int(parts[1])
+                return int(parts[0])
+
+            # Strategy 1: timestamped lines "Speaker Name (HH:MM:SS) text"
+            # Convert to podcast-transcript format:
+            #   Speaker Name
+            #   [(HH:MM:SS)](youtube_url&t=N)
+            #   text
+            ts_pattern = re.compile(r"^(.+?)\s+\((\d{1,2}:\d{2}:\d{2})\)\s*(.*)")
+            ts_segments = []
+            in_transcript = False
+            current_seg = None
+
+            for line in lines:
+                m = ts_pattern.match(line)
+                if m:
+                    in_transcript = True
+                    if current_seg:
+                        ts_segments.append(current_seg)
+                    current_seg = {"speaker": m.group(1), "hms": m.group(2), "text": m.group(3).strip()}
+                elif in_transcript and current_seg:
+                    if re.match(r"^(Skip to|Go back|Watch the|Useful links|Table of Contents)", line):
+                        continue
+                    if len(line) > 10:
+                        current_seg["text"] += " " + line.strip()
+
+            if current_seg:
+                ts_segments.append(current_seg)
+
+            if ts_segments:
+                md_lines = []
+                for seg in ts_segments:
+                    md_lines.append(seg["speaker"])
+                    secs = _hms_to_secs(seg["hms"])
+                    if base_yt:
+                        md_lines.append(f"[({seg['hms']})]({base_yt}?t={secs})")
+                    else:
+                        md_lines.append(f"[({seg['hms']})](#{secs})")
+                    md_lines.append(seg["text"])
+                    md_lines.append("")
+                return "\n".join(md_lines)
+
+            # Strategy 2: dialogue lines "Speaker Name: text" (Substack/Dwarkesh style)
+            dialogue_pattern = re.compile(
+                r"^([A-Z][a-zA-Z\u00C0-\u024F'.\-]+(?: [A-Z][a-zA-Z\u00C0-\u024F'.\-]+){0,3}):\s+(.+)"
+            )
+            dialogue_segments = []
+            for line in lines:
+                m = dialogue_pattern.match(line)
+                if m:
+                    dialogue_segments.append({"speaker": m.group(1), "text": m.group(2).strip()})
+
+            if len(dialogue_segments) >= 3:
+                md_lines = []
+                for seg in dialogue_segments:
+                    md_lines.append(seg["speaker"])
+                    md_lines.append(seg["text"])
+                    md_lines.append("")
+                return "\n".join(md_lines)
+
+            # Fallback: return all body text if no structured transcript found
+            return text if len(text) > 200 else None
+
+        except Exception:
+            return None
+
     async def download_captions(
         self,
         url: str,
@@ -1066,8 +1301,32 @@ class YouTubeDownloader:
         # Create output directory if it doesn't exist
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        # Extract video ID and check for existing caption files
+        # Extract video ID
         video_id = self.extract_video_id(url)
+
+        # Priority 1: Check for external transcript URL in video description
+        # This provides higher-quality human-edited transcripts (e.g., Lex Fridman, Dwarkesh)
+        try:
+            # Quick check: if .transcript.md already exists, use it directly
+            transcript_md = target_dir / f"{video_id}.transcript.md"
+            if transcript_md.exists() and not force_overwrite:
+                self.logger.info(f"✅ Using existing external transcript: {transcript_md}")
+                return str(transcript_md)
+
+            info = await self.get_video_info(url)
+            description = info.get("description", "")
+            transcript_url = self._extract_transcript_url_from_description(description)
+            if transcript_url:
+                self.logger.info(f"🔗 Found transcript URL in description: {transcript_url}")
+                ext_path = await self._download_external_transcript(
+                    transcript_url, output_dir, video_id, youtube_url=url
+                )
+                if ext_path:
+                    return ext_path
+        except Exception as e:
+            self.logger.debug(f"External transcript check skipped: {e}")
+
+        # Priority 2: Check for existing caption files (vtt, srt, etc.)
         if not force_overwrite:
             existing_files = FileExistenceManager.check_existing_files(
                 video_id, str(target_dir), caption_formats=CAPTION_FORMATS

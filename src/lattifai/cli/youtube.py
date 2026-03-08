@@ -138,6 +138,87 @@ def youtube(
     )
 
 
+@run.cli.entrypoint(name="transcript", namespace="youtube")
+def transcript(
+    yt_url: Optional[str] = None,
+    media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
+):
+    """
+    Download external transcript from a YouTube video's description.
+
+    Extracts transcript/show-notes URLs from the video description and downloads
+    the content as a podcast-transcript Markdown file (.transcript.md).
+
+    Supported description patterns:
+        *Transcript:*                         (Lex Fridman)
+        https://lexfridman.com/guest-transcript
+
+        * Transcript: https://dwarkesh.com/p/guest   (Dwarkesh Patel)
+
+        Substack Article w/Show Notes: https://...    (Latent Space)
+
+    Args:
+        yt_url: YouTube video URL
+        media: Media configuration. Uses media.output_dir for save location.
+
+    Examples:
+        lai youtube transcript "https://www.youtube.com/watch?v=VIDEO_ID"
+
+        lai youtube transcript "https://www.youtube.com/watch?v=VIDEO_ID" \\
+            media.output_dir=./transcripts
+    """
+    import asyncio
+
+    from lattifai.youtube.client import YouTubeDownloader
+
+    media_config = media or MediaConfig()
+
+    if not yt_url and not media_config.input_path:
+        raise ValueError("YouTube URL is required.")
+    url = yt_url or media_config.input_path
+
+    output_dir = media_config.output_dir or "."
+
+    from lattifai.utils import safe_print
+
+    try:
+        import colorful
+    except ImportError:
+        colorful = None
+
+    async def _run():
+        downloader = YouTubeDownloader()
+        video_id = downloader.extract_video_id(url)
+
+        info = await downloader.get_video_info(url)
+        description = info.get("description", "")
+        title = info.get("title", "")
+
+        transcript_url = downloader._extract_transcript_url_from_description(description)
+        if not transcript_url:
+            msg = f"❌ No transcript URL found in description for: {title}"
+            safe_print(colorful.red(msg) if colorful else msg)
+            return None
+
+        safe_print(
+            colorful.cyan(f"🔗 Found transcript URL: {transcript_url}")
+            if colorful
+            else f"🔗 Found transcript URL: {transcript_url}"
+        )
+
+        result = await downloader._download_external_transcript(transcript_url, output_dir, video_id, youtube_url=url)
+
+        if result:
+            safe_print(colorful.green(f"✅ Saved: {result}") if colorful else f"✅ Saved: {result}")
+        else:
+            safe_print(
+                colorful.red("❌ Failed to download transcript") if colorful else "❌ Failed to download transcript"
+            )
+        return result
+
+    return asyncio.run(_run())
+
+
 def main():
     run.cli.main(youtube)
 

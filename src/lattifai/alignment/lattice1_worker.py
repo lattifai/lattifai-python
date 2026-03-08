@@ -74,7 +74,7 @@ class Lattice1Worker:
         if separator_model_path.exists():
             self.separator_ort = ort.InferenceSession(
                 str(separator_model_path),
-                providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
+                providers=providers + ["CPUExecutionProvider"],
             )
         else:
             self.separator_ort = None
