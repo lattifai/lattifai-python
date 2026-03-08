@@ -320,6 +320,7 @@ lai translate run input.srt output.srt \
 |--------|---------|-------------|
 | `target_lang` | `zh` | Target language code (see [supported languages](#translation-language-support)) |
 | `source_lang` | auto | Source language (auto-detected if not set) |
+| `approach` | `rewrite` | `rewrite`: natural expression, idiom adaptation; `translate`: accuracy, source fidelity |
 | `mode` | `normal` | Translation mode: `quick`, `normal`, `refined` |
 | `bilingual` | `true` | Output bilingual captions (original + translation) |
 | `style` | `technical` | Style hint: `storytelling`, `formal`, `casual`, `technical` |

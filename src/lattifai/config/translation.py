@@ -36,6 +36,15 @@ class TranslationConfig:
     mode: Literal["quick", "normal", "refined"] = "normal"
     """Translation mode: 'quick' (direct), 'normal' (analyze+translate), 'refined' (analyze+translate+review)."""
 
+    approach: Literal["rewrite", "translate"] = "rewrite"
+    """Translation approach:
+    - 'rewrite': Express the speaker's intent naturally in the target language.
+      Prioritizes fluency, idiom adaptation, and emotional fidelity. Best for
+      storytelling, casual content, and publication-quality caption/subtitles.
+    - 'translate': Stay close to the original wording and structure.
+      Prioritizes accuracy, completeness, and source fidelity. Best for
+      technical content, language learning, and compliance caption/subtitles."""
+
     bilingual: bool = True
     """Output bilingual captions (original + translation)."""
 

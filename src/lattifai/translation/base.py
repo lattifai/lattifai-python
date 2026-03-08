@@ -124,6 +124,7 @@ class BaseTranslator:
             style=cfg.style,
             analysis=analysis,
             glossary=merged_glossary,
+            approach=cfg.approach,
         )
 
         if cfg.save_artifacts:
@@ -235,7 +236,9 @@ class BaseTranslator:
         from lattifai.translation.analyzer import ContentAnalyzer
 
         analyzer = ContentAnalyzer(self)
-        return await analyzer.analyze(texts, source_lang=config.source_lang, target_lang=config.target_lang)
+        return await analyzer.analyze(
+            texts, source_lang=config.source_lang, target_lang=config.target_lang, approach=config.approach
+        )
 
     async def _review_draft(
         self,
@@ -255,6 +258,7 @@ class BaseTranslator:
             target_lang=config.target_lang,
             analysis=analysis,
             glossary=glossary,
+            approach=config.approach,
         )
 
         if config.save_artifacts:

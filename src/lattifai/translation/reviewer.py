@@ -41,6 +41,7 @@ class TranslationReviewer:
         target_lang: str,
         analysis: Optional[dict] = None,
         glossary: Optional[dict[str, str]] = None,
+        approach: str = "rewrite",
     ) -> ReviewOutcome:
         """Review and revise translations.
 
@@ -50,6 +51,7 @@ class TranslationReviewer:
             target_lang: Target language code.
             analysis: Content analysis from analyzer.
             glossary: Merged glossary.
+            approach: 'rewrite' for natural expression, 'translate' for source fidelity.
 
         Returns:
             ReviewOutcome with revised translations and critique notes.
@@ -71,6 +73,7 @@ class TranslationReviewer:
                 target_lang=target_lang,
                 analysis=analysis,
                 glossary=glossary,
+                approach=approach,
             )
 
             try:
