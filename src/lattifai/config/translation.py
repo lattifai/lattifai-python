@@ -90,6 +90,14 @@ class TranslationConfig:
             elif self.provider == "openai":
                 self.api_key = os.environ.get("OPENAI_API_KEY")
 
+        if self.provider == "openai":
+            if self.api_base_url is None:
+                self.api_base_url = os.environ.get("OPENAI_API_BASE_URL") or os.environ.get("OPENAI_API_BASE")
+            if self.model_name == "gemini-3-flash-preview":
+                env_model = os.environ.get("OPENAI_MODEL")
+                if env_model:
+                    self.model_name = env_model
+
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         if self.context_lines < 0:
