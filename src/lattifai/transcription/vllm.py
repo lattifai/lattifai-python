@@ -112,6 +112,11 @@ class VLLMTranscriber(BaseTranscriber):
             base_url=self._api_base_url,
         )
 
+        # Auto-route: general-purpose LLMs must use chat mode (transcriptions API is ASR-only)
+        if not self._is_dedicated_asr_model() and self.config.api_mode == "transcriptions":
+            logger.info("Auto-switching api_mode to 'chat' for general-purpose model %s", self.config.model_name)
+            self.config.api_mode = "chat"
+
     @property
     def name(self) -> str:
         return self.config.model_name
