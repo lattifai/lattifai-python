@@ -205,9 +205,11 @@ LattifAI supports a wide range of ASR models — from cloud APIs to local infere
 | [Fun-ASR-MLT-Nano](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Local | 31 (incl. zh dialects) | `[transcription]` |
 | [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | vLLM/SGLang | zh, en, ja, ko, yue | — |
 | [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) | vLLM/SGLang | 99 | — |
-| [GLM-ASR](https://huggingface.co/GLM-ASR-Nano-2512) | vLLM/SGLang | zh, en | — |
 | [Voxtral](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | vLLM/SGLang | 13 (European) | — |
 | [Voxtral Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | vLLM (realtime) | 13 (European) | — |
+| [Gemma-3n](https://huggingface.co/google/gemma-3n-E4B-it) | vLLM (chat) | 140+ | — ⚠️ |
+
+> ⚠️ **Gemma-3n** is a general-purpose multimodal LLM, not a dedicated ASR model. It has a [hard 30s audio encoder limit](https://huggingface.co/google/gemma-3n-E4B-it/discussions/37), ~3x higher WER than Whisper, and weaker multilingual transcription. Best suited for transcription + downstream understanding (summarization, translation) rather than pure ASR accuracy.
 
 ```bash
 # Gemini (cloud API, requires GEMINI_API_KEY)
@@ -592,13 +594,28 @@ lai transcribe run audio.wav output.srt \
 
 Any ASR model served via [vLLM](https://docs.vllm.ai) or [SGLang](https://sgl-project.github.io/) with an OpenAI-compatible API.
 
-Two API modes are supported:
+**Supported models and limitations:**
+
+| Model | Audio tok/s | Max Audio | API Mode | Batch | Notes |
+|-------|-------------|-----------|----------|-------|-------|
+| [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) (0.6B/1.7B) | 25 | auto | transcriptions | Yes | Best for zh/en/ja/ko |
+| [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) | 50 | **30s** | transcriptions | Yes | Fixed 30s context window |
+| [Voxtral](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | 12.5 | auto | transcriptions | Yes | European languages |
+| [Voxtral Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | 12.5 | auto | realtime | Yes | WebSocket, <500ms latency |
+| [Ultravox](https://huggingface.co/fixie-ai/ultravox-v0_5) | 6.25 | auto | transcriptions | Yes | Confirmed in vLLM source |
+| [Gemma-3n](https://huggingface.co/google/gemma-3n-E4B-it) | 6.25 | **30s** | chat (auto) | **No** | Not a dedicated ASR model (~3x Whisper WER), [30s encoder limit](https://huggingface.co/google/gemma-3n-E4B-it/discussions/37), no concurrent requests |
+
+- **Max Audio**: "auto" = estimated from `max_model_len`; bold values are hard encoder limits
+- **Batch**: Whether `batch_size>1` concurrent requests are supported
+- **API Mode**: `transcriptions` is the default; general-purpose LLMs auto-switch to `chat`
+
+**API modes:**
 
 | Mode | Endpoint | Use Case |
 |------|----------|----------|
-| `chat` (default, recommended) | `/v1/chat/completions` | Qwen3-ASR, GLM-ASR, Whisper, and most models |
-| `transcriptions` | `/v1/audio/transcriptions` | Whisper with segment timestamps |
-| `realtime` | `/v1/realtime` (WebSocket) | Voxtral Realtime (<500ms latency) |
+| `transcriptions` (default) | `/v1/audio/transcriptions` | Dedicated ASR models (Qwen3-ASR, Whisper, GLM-ASR, etc.) |
+| `chat` | `/v1/chat/completions` | General-purpose LLMs (Gemma-3n, etc.) — auto-selected for non-ASR models |
+| `realtime` | `/v1/realtime` (WebSocket) | Voxtral Realtime |
 
 ```bash
 # 1. Install vLLM with audio support (requires CUDA GPU)
@@ -606,22 +623,26 @@ pip install vllm "vllm[audio]"
 
 # 2. Start vLLM server on a Linux GPU machine (auto-downloads the model)
 vllm serve Qwen/Qwen3-ASR-1.7B --gpu-memory-utilization 0.8 --host 0.0.0.0 --port 8081
-# On Linux, open the firewall port if needed:
-#   sudo ufw allow 8081
 # Other models:
 #   vllm serve openai/whisper-large-v3-turbo
-#   vllm serve GLM-ASR-Nano-2512
+#   vllm serve google/gemma-3n-E4B-it --max-model-len 32000 --enforce-eager
 
-# 3. Transcribe with LattifAI (chat mode is the default)
+# 3. Transcribe (default: transcriptions mode)
 lai transcribe run audio.wav output.srt \
     transcription.model_name=Qwen/Qwen3-ASR-1.7B \
     transcription.api_base_url=http://localhost:8081/v1
 
-# Transcriptions mode (for Whisper segment timestamps)
+# Batch mode for faster processing (4 concurrent requests)
 lai transcribe run audio.wav output.srt \
-    transcription.model_name=openai/whisper-large-v3-turbo \
+    transcription.model_name=Qwen/Qwen3-ASR-1.7B \
     transcription.api_base_url=http://localhost:8081/v1 \
-    transcription.api_mode=transcriptions
+    transcription.batch_size=4
+
+# General-purpose LLM (auto-switches to chat mode with ASR system prompt)
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=google/gemma-3n-E4B-it \
+    transcription.api_base_url=http://localhost:8084/v1 \
+    transcription.language=zh
 
 # Voxtral Realtime (streaming WebSocket, <500ms latency)
 # Server: VLLM_DISABLE_COMPILE_CACHE=1 vllm serve mistralai/Voxtral-Mini-4B-Realtime-2602 \
