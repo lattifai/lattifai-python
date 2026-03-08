@@ -127,6 +127,7 @@ class Caption(BaseCaption):
         word_level: bool = False,
         karaoke_config=None,
         metadata: Optional[Dict[str, Any]] = None,
+        translation_first: bool = False,
     ):
         """
         Write caption to file or return as bytes.
@@ -140,6 +141,7 @@ class Caption(BaseCaption):
             word_level: Use word-level output format if supported
             karaoke_config: Karaoke configuration
             metadata: Optional metadata dict to pass to writer
+            translation_first: When True, render translation text above original text
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -160,6 +162,7 @@ class Caption(BaseCaption):
                 word_level=word_level,
                 karaoke_config=karaoke_config,
                 metadata=metadata,
+                translation_first=translation_first,
             )
         finally:
             # Restore original supervisions

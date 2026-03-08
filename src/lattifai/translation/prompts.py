@@ -11,38 +11,14 @@ Caption-specific principles:
 - Keep it concise -- captions must convey meaning in limited space
 - Stay conversational -- captions represent spoken language
 - Speaker consistency -- same speaker should have consistent translation style
+
+Reference: https://x.com/dotey/status/2029969547927658673
 """
 
 import json
 from typing import Optional
 
-LANGUAGE_NAMES = {
-    "zh": "Chinese (Simplified)",
-    "zh-TW": "Chinese (Traditional)",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "en": "English",
-    "es": "Spanish",
-    "fr": "French",
-    "de": "German",
-    "pt": "Portuguese",
-    "ru": "Russian",
-    "ar": "Arabic",
-    "hi": "Hindi",
-    "it": "Italian",
-    "nl": "Dutch",
-    "pl": "Polish",
-    "th": "Thai",
-    "vi": "Vietnamese",
-    "id": "Indonesian",
-    "tr": "Turkish",
-    "sv": "Swedish",
-}
-
-
-def get_language_name(lang_code: str) -> str:
-    """Get human-readable language name from code."""
-    return LANGUAGE_NAMES.get(lang_code, lang_code)
+from lattifai.languages import LANGUAGE_NAMES, get_language_name  # noqa: F401
 
 
 def build_analysis_prompt(full_text: str, source_lang: Optional[str] = None) -> str:

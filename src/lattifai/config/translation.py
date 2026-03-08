@@ -26,7 +26,9 @@ class TranslationConfig:
     """Base URL for OpenAI-compatible API (e.g. http://localhost:8000/v1)."""
 
     target_lang: str = "zh"
-    """Target language code (e.g. 'zh', 'ja', 'en', 'ko')."""
+    """Target language code (BCP 47 / ISO 639-1).
+    See lattifai.languages.SUPPORTED_LANGUAGES for the full list (55+ languages).
+    Common codes: zh, zh-TW, en, ja, ko, es, fr, de, pt, ru, ar, hi, th, vi, id, tr."""
 
     source_lang: Optional[str] = None
     """Source language code. Auto-detected if None."""
@@ -34,10 +36,10 @@ class TranslationConfig:
     mode: Literal["quick", "normal", "refined"] = "normal"
     """Translation mode: 'quick' (direct), 'normal' (analyze+translate), 'refined' (analyze+translate+review)."""
 
-    bilingual: bool = False
+    bilingual: bool = True
     """Output bilingual captions (original + translation)."""
 
-    style: str = "storytelling"
+    style: str = "technical"
     """Translation style hint (e.g. 'storytelling', 'formal', 'casual', 'technical')."""
 
     batch_size: int = 30

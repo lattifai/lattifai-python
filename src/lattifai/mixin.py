@@ -395,6 +395,7 @@ class LattifAIClientMixin:
                 include_speaker_in_text=self.caption_config.include_speaker_in_text,
                 word_level=self.caption_config.word_level,
                 karaoke_config=self.caption_config.karaoke,
+                translation_first=self.caption_config.translation_first,
             )
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if not diarization_file.exists() and caption.diarization:

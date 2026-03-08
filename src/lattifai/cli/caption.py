@@ -19,6 +19,7 @@ def convert(
     normalize_text: bool = False,
     word_level: bool = False,
     karaoke: bool = False,
+    translation_first: bool = False,
 ):
     """
     Convert caption file to another format.
@@ -41,6 +42,8 @@ def convert(
             JSON format will include a 'words' field with word-level timestamps.
         karaoke: Enable karaoke styling (requires word_level=True).
             When True: outputs karaoke format (ASS \\kf tags, enhanced LRC, etc.).
+        translation_first: Place translation text above original text in bilingual output.
+            When True: translation appears on the first line, original on the second line.
 
     Examples:
         # Basic format conversion (positional arguments)
@@ -79,6 +82,7 @@ def convert(
         include_speaker_in_text=include_speaker_in_text,
         word_level=word_level,
         karaoke_config=karaoke_config,
+        translation_first=translation_first,
     )
 
     safe_print(f"✅ Converted {input_path} -> {output_path}")

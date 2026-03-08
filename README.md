@@ -21,6 +21,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
+  - [Translation](#lai-translate-run)
 - [Python SDK](#python-sdk)
 - [Advanced Features](#advanced-features)
 - [Text Processing](#text-processing)
@@ -37,6 +38,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 | **Forced Alignment** | Word-level and segment-level audio-text synchronization powered by [Lattice-1](https://huggingface.co/LattifAI/Lattice-1) |
 | **Multi-Model Transcription** | Gemini, Parakeet, SenseVoice, Fun-ASR, Qwen3-ASR, Whisper, and any vLLM/SGLang-served model |
 | **Speaker Diarization** | Multi-speaker identification with label preservation |
+| **Caption Translation** | LLM-powered translation with terminology consistency and bilingual output |
 | **Streaming Mode** | Process audio up to 20 hours with minimal memory |
 | **Universal Format Support** | 30+ caption/subtitle formats |
 
@@ -175,6 +177,7 @@ caption = client.alignment(
 | `lai alignment youtube` | Download & align YouTube | `lai alignment youtube "https://youtube.com/watch?v=ID"` |
 | `lai transcribe run` | Transcribe audio/video | `lai transcribe run audio.wav output.srt` |
 | `lai transcribe align` | Transcribe and align | `lai transcribe align audio.wav output.srt` |
+| `lai translate run` | Translate captions | `lai translate run input.srt output.srt translation.target_lang=zh` |
 | `lai caption convert` | Convert caption formats | `lai caption convert input.srt output.vtt` |
 | `lai caption shift` | Shift timestamps | `lai caption shift input.srt output.srt 2.0` |
 | `lai serve run` | Start local web UI playground | `lai serve run` |
@@ -268,6 +271,82 @@ lai transcribe align audio.wav output.srt \
     caption.word_level=true
 ```
 
+### lai translate run
+
+Translate caption files to any target language using LLM providers (Gemini, OpenAI-compatible).
+
+Three translation modes with increasing quality:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| `quick` | Direct batch translation, no analysis | Quick gist, informal review |
+| `normal` | Analyze content first (terminology, style), then translate | Default — good balance of speed and quality |
+| `refined` | Analyze → translate → review → revise | Publication-quality, professional subtitles |
+
+```bash
+# Basic (default: normal mode, bilingual, target=zh)
+lai translate run input.srt output.srt
+
+# Quick mode to English
+lai translate run input.srt output.srt \
+    translation.target_lang=en \
+    translation.mode=quick
+
+# Refined mode with artifacts saved
+lai translate run input.srt output.srt \
+    translation.target_lang=ja \
+    translation.mode=refined \
+    translation.save_artifacts=true
+
+# Bilingual output with translation on top
+lai translate run input.srt output.srt \
+    translation.target_lang=zh \
+    caption.translation_first=true
+
+# OpenAI-compatible API (local or third-party)
+lai translate run input.srt output.srt \
+    translation.provider=openai \
+    translation.api_base_url=http://localhost:8000/v1 \
+    translation.model_name=qwen3
+
+# With custom glossary
+lai translate run input.srt output.srt \
+    translation.glossary_file=glossary.yaml
+```
+
+**TranslationConfig Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `target_lang` | `zh` | Target language code (see [supported languages](#translation-language-support)) |
+| `source_lang` | auto | Source language (auto-detected if not set) |
+| `mode` | `normal` | Translation mode: `quick`, `normal`, `refined` |
+| `bilingual` | `true` | Output bilingual captions (original + translation) |
+| `style` | `technical` | Style hint: `storytelling`, `formal`, `casual`, `technical` |
+| `model_name` | `gemini-3-flash-preview` | LLM model name |
+| `provider` | `gemini` | LLM provider: `gemini` or `openai` |
+| `batch_size` | `30` | Segments per API call |
+| `max_concurrent` | `5` | Max concurrent batch requests |
+| `glossary_file` | — | Path to custom glossary (YAML or Markdown) |
+| `save_artifacts` | `false` | Save intermediate files (analysis, prompts) |
+
+#### Translation Language Support
+
+55+ languages supported. Common codes:
+
+| Region | Languages |
+|--------|-----------|
+| East Asian | `zh` Chinese (Simplified), `zh-TW` Traditional, `ja` Japanese, `ko` Korean |
+| South/SE Asian | `hi` Hindi, `bn` Bengali, `th` Thai, `vi` Vietnamese, `id` Indonesian, `ms` Malay |
+| Western European | `en` English, `es` Spanish, `fr` French, `de` German, `pt` Portuguese, `it` Italian, `nl` Dutch |
+| Northern European | `sv` Swedish, `da` Danish, `no` Norwegian, `fi` Finnish |
+| Eastern European | `ru` Russian, `uk` Ukrainian, `pl` Polish, `cs` Czech, `ro` Romanian, `hu` Hungarian |
+| Middle Eastern | `ar` Arabic, `fa` Persian, `he` Hebrew, `tr` Turkish |
+
+Full list: `lattifai.languages.SUPPORTED_LANGUAGES`
+
+> Translation approach inspired by [宝玉's AI translation methodology](https://x.com/dotey/status/2029969547927658673).
+
 ---
 
 ## Python SDK
@@ -319,6 +398,7 @@ caption = client.youtube(
 | `word_level` | `False` | Include word-level timestamps in output |
 | `normalize_text` | `True` | Clean HTML entities and special characters |
 | `include_speaker_in_text` | `True` | Include speaker labels in text output |
+| `translation_first` | `False` | Place translation above original in bilingual output |
 
 ```python
 from lattifai.client import LattifAI

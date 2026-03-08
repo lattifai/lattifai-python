@@ -121,10 +121,12 @@ def translate(
     # Write output
     from lattifai.caption import GeminiWriter
 
+    caption_config = caption or CaptionConfig()
+
     if output_path.suffix.lower() == ".md":
         GeminiWriter.write(cap.supervisions, str(output_path))
     else:
-        cap.write(str(output_path))
+        cap.write(str(output_path), translation_first=caption_config.translation_first)
 
     safe_print(colorful.green(f"Translation saved: {output_path}"))
 
