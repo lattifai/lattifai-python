@@ -98,6 +98,10 @@ class TranscriptionConfig:
     'realtime' uses /v1/realtime WebSocket endpoint (for Voxtral Realtime models).
     Use 'chat' for Qwen3-ASR, GLM-ASR, Whisper, and most models."""
 
+    max_tokens: Optional[int] = None
+    """Maximum output tokens for chat/realtime API modes (vLLM/SGLang only).
+    If None, defaults to 4096 for chat mode. Increase for long audio transcription."""
+
     vad_chunk_size: Optional[float] = None
     """Maximum audio chunk size in seconds for VAD segmentation (vLLM/SGLang only).
     If None, auto-estimated from the model's max_model_len and tokens_per_second."""

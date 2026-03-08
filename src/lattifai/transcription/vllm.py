@@ -82,6 +82,7 @@ class VLLMTranscriber(BaseTranscriber):
         "ultravox": 6.25,  # Whisper conv(50fps) / stack_factor=8, confirmed in ultravox.py docstring
         "voxtral": 12.5,  # Whisper conv(50fps) / downsample_factor=4
         "glm": 12.0,  # conv2(50fps), merge_factor=4: (50-4)//4+1 ≈ 12
+        "gemma": 6.25,  # USM encoder (6.25 tok/s); hard 30s limit per audio clip
     }
     _DEFAULT_TOKENS_PER_SECOND = 25.0
 
@@ -105,8 +106,13 @@ class VLLMTranscriber(BaseTranscriber):
         if self._vad_chunk_size is not None:
             return self._vad_chunk_size
 
-        # Whisper models have a fixed 30s context window
-        if "whisper" in self.config.model_name.lower():
+        # Models with hard 30s audio encoder limit
+        # - Whisper: fixed 30s context window
+        # - Gemma-3n: USM encoder hard-caps at 30s, audio beyond 30s is silently dropped.
+        #   Ref: https://huggingface.co/google/gemma-3n-E4B-it/discussions/37
+        #   Ref: https://ai.google.dev/gemma/docs/capabilities/audio
+        model_lower = self.config.model_name.lower()
+        if any(k in model_lower for k in ("whisper", "gemma")):
             self._vad_chunk_size = 30.0
             return 30.0
 
@@ -303,8 +309,11 @@ class VLLMTranscriber(BaseTranscriber):
                 if resp["type"] != "session.created":
                     raise RuntimeError(f"Expected session.created, got: {resp['type']}")
 
-                # 2. Send session.update with model
-                await ws.send(json.dumps({"type": "session.update", "model": self.config.model_name}))
+                # 2. Send session.update with model (and optional instructions)
+                session_cfg = {"type": "session.update", "model": self.config.model_name}
+                if self.config.prompt:
+                    session_cfg["instructions"] = self.config.prompt
+                await ws.send(json.dumps(session_cfg))
 
                 # 3. Initial commit to signal ready
                 await ws.send(json.dumps({"type": "input_audio_buffer.commit"}))
@@ -351,8 +360,11 @@ class VLLMTranscriber(BaseTranscriber):
 
         messages = [{"role": "user", "content": content}]
         temperature = max(self.config.temperature, 0.01) if self.config.temperature is not None else None
+        max_tokens = self.config.max_tokens or 4096
 
-        response = _run_async(self._llm_client.chat(messages, temperature=temperature, timeout=300.0))
+        response = _run_async(
+            self._llm_client.chat(messages, temperature=temperature, max_tokens=max_tokens, timeout=300.0)
+        )
 
         raw_text = response.choices[0].message.content
         detected_lang, cleaned = _parse_asr_output(raw_text)
