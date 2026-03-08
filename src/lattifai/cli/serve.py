@@ -334,6 +334,7 @@ class ServeHandler(BaseHTTPRequestHandler):
             target_lang=target_lang,
             mode=mode,
             bilingual=bilingual,
+            ask_refine_after_normal=False,
         )
         translate_run(
             input=str(caption_file),

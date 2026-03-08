@@ -28,15 +28,17 @@ class ContentAnalyzer:
         self,
         texts: list[str],
         source_lang: Optional[str] = None,
+        target_lang: Optional[str] = None,
     ) -> Optional[dict]:
-        """Analyze full caption text for translation preparation.
+        """Analyze full caption text to prepare for rewriting in the target language.
 
         Args:
             texts: All caption segment texts.
             source_lang: Source language code (optional).
+            target_lang: Target language code (optional, improves analysis quality).
 
         Returns:
-            Analysis dict with terminology, style, register, speakers, notes.
+            Analysis dict with terminology, metaphor_map, cultural_notes, style, register, speakers, notes.
             Returns None if analysis fails.
         """
         full_text = "\n".join(texts)
@@ -46,7 +48,7 @@ class ContentAnalyzer:
             logger.info("Text too long for analysis (%d chars), truncating to %d", len(full_text), MAX_ANALYSIS_CHARS)
             full_text = full_text[:MAX_ANALYSIS_CHARS]
 
-        prompt = build_analysis_prompt(full_text, source_lang)
+        prompt = build_analysis_prompt(full_text, source_lang, target_lang)
 
         try:
             response_text = await self.translator._call_llm(prompt)

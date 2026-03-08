@@ -55,10 +55,16 @@ class TranslationConfig:
     """Path to custom glossary file (YAML or Markdown)."""
 
     save_artifacts: bool = False
-    """Save intermediate artifacts (analysis report, prompts)."""
+    """Save intermediate artifacts (analysis, prompts, drafts, review notes, revisions)."""
 
     artifacts_dir: Optional[str] = None
     """Directory for artifacts. Defaults to output file's parent directory."""
+
+    ask_refine_after_normal: bool = True
+    """Prompt interactively to continue with refined review after normal mode translation."""
+
+    auto_refine_after_normal: bool = False
+    """Automatically run refined review after normal mode without prompting."""
 
     verbose: bool = False
     """Enable verbose logging."""

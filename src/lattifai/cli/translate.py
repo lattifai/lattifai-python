@@ -9,6 +9,26 @@ from lattifai.config import CaptionConfig
 from lattifai.config.translation import TranslationConfig
 
 
+def _should_continue_with_refined(translation_config: TranslationConfig) -> bool:
+    """Decide whether to continue from normal mode to refined review."""
+    import sys
+
+    if translation_config.mode != "normal":
+        return False
+    if translation_config.auto_refine_after_normal:
+        return True
+    if not translation_config.ask_refine_after_normal:
+        return False
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return False
+
+    try:
+        answer = input("Normal translation complete. Continue with refined review? [y/N]: ").strip().lower()
+    except EOFError:
+        return False
+    return answer in {"y", "yes"}
+
+
 @run.cli.entrypoint(name="run", namespace="translate")
 def translate(
     input: Optional[str] = None,
@@ -29,7 +49,8 @@ def translate(
         output: Path for output caption file (positional argument)
         translation: Translation configuration.
             Fields: model_name, provider, target_lang, mode, bilingual, style,
-                    batch_size, glossary_file, save_artifacts
+                    batch_size, glossary_file, save_artifacts,
+                    ask_refine_after_normal, auto_refine_after_normal
         caption: Caption I/O configuration.
             Fields: input_format, output_format
 
@@ -115,8 +136,21 @@ def translate(
         )
     )
 
-    # Run translation
+    source_texts = [sup.text or "" for sup in cap.supervisions]
+
+    # Run translation (quick / normal / refined)
     asyncio.run(translator.translate_captions(cap.supervisions, translation_config))
+
+    # Progressive upgrade: normal -> refined without retranslating draft
+    if _should_continue_with_refined(translation_config):
+        safe_print(colorful.cyan("Continuing with refined review pass..."))
+        asyncio.run(
+            translator.refine_existing_draft(
+                cap.supervisions,
+                translation_config,
+                source_texts=source_texts,
+            )
+        )
 
     # Write output
     from lattifai.caption import GeminiWriter
