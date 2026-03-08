@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LattifAI Serve</title>
+  <style>
+    :root {
+      --bg-1: #f8fbff;
+      --bg-2: #eef4ff;
+      --ink: #13244b;
+      --ink-soft: #465f8a;
+      --brand: #7182FF;
+      --brand-primary: #7182FF;
+      --brand-secondary: #06B6D4;
+      --brand-accent: #10B981;
+      --brand-grad: linear-gradient(
+        to right,
+        var(--brand-primary),
+        var(--brand-secondary),
+        var(--brand-accent)
+      );
+      --line: #c9d6ed;
+      --panel: #ffffff;
+      --ok: #197d59;
+      --err: #cb3f3f;
+      --pending: #06B6D4;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: "Space Grotesk", "Avenir Next", "Trebuchet MS", sans-serif;
+      background:
+        radial-gradient(1200px 640px at -10% -10%, #eef1ff 0%, transparent 58%),
+        radial-gradient(1100px 520px at 110% -5%, #e6f9fd 0%, transparent 52%),
+        linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    }
+
+    .shell {
+      position: relative;
+      width: min(980px, 92vw);
+      margin: 28px auto;
+      padding: 22px;
+      border: 1px solid #ffffff88;
+      border-radius: 20px;
+      background: var(--panel);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 20px 44px #11224014;
+    }
+
+    .shell::before {
+      content: "";
+      position: absolute;
+      left: 22px;
+      right: 22px;
+      top: 0;
+      height: 3px;
+      border-radius: 999px;
+      background: var(--brand-grad);
+      opacity: 0.95;
+    }
+
+    .title {
+      margin: 0;
+      font-size: clamp(1.4rem, 2.4vw, 2rem);
+      letter-spacing: 0.01em;
+    }
+
+    .subtitle {
+      margin: 6px 0 18px;
+      color: var(--ink-soft);
+      font-size: 0.95rem;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tabs button {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+      color: var(--ink);
+      padding: 10px 12px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, color 140ms ease, background 140ms ease;
+    }
+
+    .tabs button:hover {
+      transform: translateY(-1px);
+      border-color: var(--brand);
+    }
+
+    .tabs button.active {
+      background: var(--brand-grad);
+      border-color: transparent;
+      color: #fff;
+      box-shadow: inset 0 0 0 1px #ffffff55;
+    }
+
+    .panel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      background: #fff;
+      animation: enter 220ms ease;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    @keyframes enter {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 12px;
+    }
+
+    .wide {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: var(--ink-soft);
+    }
+
+    input,
+    select {
+      width: 100%;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    .checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      color: var(--ink-soft);
+      font-size: 0.88rem;
+    }
+
+    .checks label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.88rem;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+
+    .checks input {
+      width: auto;
+      margin: 0;
+    }
+
+    .submit {
+      justify-self: start;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font: inherit;
+      font-weight: 700;
+      color: #fff;
+      background: var(--brand-grad);
+      cursor: pointer;
+      transition: filter 120ms ease, transform 120ms ease;
+    }
+
+    .submit:hover {
+      transform: translateY(-1px);
+      filter: saturate(1.08);
+    }
+
+    .submit:disabled {
+      opacity: 0.65;
+      cursor: wait;
+      transform: none;
+    }
+
+    .result {
+      margin-top: 12px;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 10px 11px;
+      min-height: 46px;
+      color: var(--ink-soft);
+      font-size: 0.9rem;
+      line-height: 1.45;
+      background: #fdfefe;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .result.success {
+      border-color: #aadfc8;
+      color: #0a6a43;
+      background: #f2fff8;
+    }
+
+    .result.error {
+      border-color: #f2b3b3;
+      color: var(--err);
+      background: #fff7f7;
+    }
+
+    .result.pending {
+      border-color: #b8e8ef;
+      color: var(--pending);
+      background: #f3fdff;
+    }
+
+    input[type="checkbox"] {
+      accent-color: var(--brand-primary);
+    }
+
+    .result a {
+      color: inherit;
+      font-weight: 700;
+    }
+
+    .foot {
+      margin-top: 14px;
+      font-size: 0.78rem;
+      color: #5b6f91;
+    }
+
+    @media (max-width: 760px) {
+      .shell {
+        padding: 14px;
+      }
+
+      .tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      form {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1 class="title">LattifAI Local Playground</h1>
+    <p class="subtitle">Native HTML demo with four tabs: Align, Transcribe, Translate, Convert.</p>
+
+    <div class="tabs" role="tablist" aria-label="Workflows">
+      <button type="button" class="active" data-tab="align">Align</button>
+      <button type="button" data-tab="transcribe">Transcribe</button>
+      <button type="button" data-tab="translate">Translate</button>
+      <button type="button" data-tab="convert">Convert</button>
+    </div>
+
+    <section id="tab-align" class="panel active">
+      <form id="form-align" enctype="multipart/form-data">
+        <label>
+          Media File
+          <input type="file" name="media_file" accept="audio/*,video/*" required>
+        </label>
+        <label>
+          Caption File
+          <input type="file" name="caption_file" accept=".srt,.vtt,.ass,.ssa,.txt,.json,.md" required>
+        </label>
+        <label>
+          Output Format
+          <select name="output_format">
+            <option value="srt">SRT</option>
+            <option value="vtt">VTT</option>
+            <option value="ass">ASS</option>
+            <option value="json">JSON</option>
+            <option value="textgrid">TextGrid</option>
+          </select>
+        </label>
+        <label>
+          Device
+          <select name="device">
+            <option value="auto">Auto</option>
+            <option value="cpu">CPU</option>
+            <option value="cuda">CUDA</option>
+            <option value="mps">MPS</option>
+          </select>
+        </label>
+        <div class="checks wide">
+          <label><input type="checkbox" name="split_sentence" value="true" checked>Split sentence</label>
+          <label><input type="checkbox" name="word_level" value="true">Word-level output</label>
+        </div>
+        <button class="submit wide" type="submit">Run Alignment</button>
+      </form>
+      <div id="result-align" class="result">Ready.</div>
+    </section>
+
+    <section id="tab-transcribe" class="panel">
+      <form id="form-transcribe" enctype="multipart/form-data">
+        <label>
+          Media File
+          <input type="file" name="media_file" accept="audio/*,video/*" required>
+        </label>
+        <label>
+          Model Name
+          <input type="text" name="model_name" value="gemini-2.5-flash" required>
+        </label>
+        <label>
+          Output Format
+          <select name="output_format">
+            <option value="srt">SRT</option>
+            <option value="vtt">VTT</option>
+            <option value="ass">ASS</option>
+            <option value="json">JSON</option>
+            <option value="textgrid">TextGrid</option>
+          </select>
+        </label>
+        <label>
+          Device
+          <select name="device">
+            <option value="auto">Auto</option>
+            <option value="cpu">CPU</option>
+            <option value="cuda">CUDA</option>
+            <option value="mps">MPS</option>
+          </select>
+        </label>
+        <label>
+          Language (Optional)
+          <input type="text" name="language" placeholder="en, zh, ja ...">
+        </label>
+        <label>
+          API Base URL (Optional)
+          <input type="text" name="api_base_url" placeholder="http://localhost:8000/v1">
+        </label>
+        <label class="wide">
+          Gemini API Key (Optional)
+          <input type="password" name="gemini_api_key" placeholder="Uses GEMINI_API_KEY when empty">
+        </label>
+        <button class="submit wide" type="submit">Run Transcription</button>
+      </form>
+      <div id="result-transcribe" class="result">Ready.</div>
+    </section>
+
+    <section id="tab-translate" class="panel">
+      <form id="form-translate" enctype="multipart/form-data">
+        <label>
+          Caption File
+          <input type="file" name="caption_file" accept=".srt,.vtt,.ass,.json,.md,.txt" required>
+        </label>
+        <label>
+          Target Language
+          <input type="text" name="target_lang" value="zh" required>
+        </label>
+        <label>
+          Provider
+          <select name="provider">
+            <option value="gemini">Gemini</option>
+            <option value="openai">OpenAI-Compatible</option>
+          </select>
+        </label>
+        <label>
+          Mode
+          <select name="mode">
+            <option value="normal">normal</option>
+            <option value="quick">quick</option>
+            <option value="refined">refined</option>
+          </select>
+        </label>
+        <label>
+          Model Name
+          <input type="text" name="model_name" value="gemini-3-flash-preview" required>
+        </label>
+        <label>
+          Output Format
+          <select name="output_format">
+            <option value="srt">SRT</option>
+            <option value="vtt">VTT</option>
+            <option value="ass">ASS</option>
+            <option value="json">JSON</option>
+            <option value="textgrid">TextGrid</option>
+            <option value="txt">TXT</option>
+          </select>
+        </label>
+        <label class="wide">
+          API Key (Optional)
+          <input type="password" name="api_key" placeholder="Uses env key when empty">
+        </label>
+        <label class="wide">
+          API Base URL (Optional)
+          <input type="text" name="api_base_url" placeholder="For OpenAI-compatible providers">
+        </label>
+        <div class="checks wide">
+          <label><input type="checkbox" name="bilingual" value="true">Bilingual output</label>
+        </div>
+        <button class="submit wide" type="submit">Run Translation</button>
+      </form>
+      <div id="result-translate" class="result">Ready.</div>
+    </section>
+
+    <section id="tab-convert" class="panel">
+      <form id="form-convert" enctype="multipart/form-data">
+        <label>
+          Caption File
+          <input type="file" name="caption_file" accept=".srt,.vtt,.ass,.ssa,.sub,.json,.md,.txt" required>
+        </label>
+        <label>
+          Output Format
+          <select name="output_format">
+            <option value="vtt">VTT</option>
+            <option value="srt">SRT</option>
+            <option value="ass">ASS</option>
+            <option value="json">JSON</option>
+            <option value="textgrid">TextGrid</option>
+            <option value="txt">TXT</option>
+          </select>
+        </label>
+        <div class="checks wide">
+          <label><input type="checkbox" name="include_speaker" value="true">Include speaker in text</label>
+          <label><input type="checkbox" name="normalize_text" value="true">Normalize text</label>
+          <label><input type="checkbox" name="word_level" value="true">Word-level mode</label>
+          <label><input type="checkbox" name="karaoke" value="true">Karaoke output</label>
+        </div>
+        <button class="submit wide" type="submit">Run Conversion</button>
+      </form>
+      <div id="result-convert" class="result">Ready.</div>
+    </section>
+
+    <div class="foot">Files are processed locally on your machine. Output files are downloadable from this page.</div>
+  </div>
+
+  <script>
+    const tabButtons = document.querySelectorAll(".tabs button");
+    const panels = document.querySelectorAll(".panel");
+
+    tabButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const tabId = button.dataset.tab;
+
+        tabButtons.forEach((b) => b.classList.remove("active"));
+        panels.forEach((p) => p.classList.remove("active"));
+
+        button.classList.add("active");
+        document.getElementById(`tab-${tabId}`).classList.add("active");
+      });
+    });
+
+    async function submitForm(event, endpoint, resultId) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const result = document.getElementById(resultId);
+      const submit = form.querySelector("button[type='submit']");
+      const formData = new FormData(form);
+
+      submit.disabled = true;
+      result.className = "result pending";
+      result.textContent = "Running...";
+
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          body: formData,
+        });
+        const payload = await response.json();
+
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || `Request failed (${response.status})`);
+        }
+
+        result.className = "result success";
+        result.innerHTML = `Done: ${payload.output_file}<br><a href="${payload.download_url}" target="_blank" rel="noopener">Download output</a>`;
+      } catch (error) {
+        result.className = "result error";
+        result.textContent = error instanceof Error ? error.message : String(error);
+      } finally {
+        submit.disabled = false;
+      }
+    }
+
+    document.getElementById("form-align").addEventListener("submit", (event) => {
+      submitForm(event, "/api/align", "result-align");
+    });
+
+    document.getElementById("form-transcribe").addEventListener("submit", (event) => {
+      submitForm(event, "/api/transcribe", "result-transcribe");
+    });
+
+    document.getElementById("form-translate").addEventListener("submit", (event) => {
+      submitForm(event, "/api/translate", "result-translate");
+    });
+
+    document.getElementById("form-convert").addEventListener("submit", (event) => {
+      submitForm(event, "/api/convert", "result-convert");
+    });
+  </script>
+</body>
+</html>

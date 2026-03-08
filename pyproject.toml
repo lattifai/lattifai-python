@@ -107,6 +107,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md'
 "laicap-shift" = "lattifai.cli.caption:main_shift"
 "laicap-diff" = "lattifai.cli.caption:main_diff"
 "lai-translate" = "lattifai.cli.translate:main"
+"lai-serve" = "lattifai.cli.serve:main"
 
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"
@@ -115,6 +116,7 @@ transcribe = "lattifai.cli"
 diarization = "lattifai.cli"
 translate = "lattifai.cli"
 podcast = "lattifai.cli"
+serve = "lattifai.cli"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -131,6 +133,7 @@ include-package-data = true
 "lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]
 "lattifai.data.resamplers" = ["*.onnx"]
 "lattifai.translation" = ["**/*.yaml", "**/*.md"]
+"lattifai.cli" = ["serve.html"]
 
 [tool.pytest.ini_options]
 addopts = "--durations=10"

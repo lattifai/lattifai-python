@@ -147,6 +147,9 @@ lai alignment align audio.wav subtitle.srt output.srt
 
 # YouTube video
 lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
+
+# Start local browser playground (4 tabs)
+lai serve run
 ```
 
 ### Python SDK
@@ -174,6 +177,7 @@ caption = client.alignment(
 | `lai transcribe align` | Transcribe and align | `lai transcribe align audio.wav output.srt` |
 | `lai caption convert` | Convert caption formats | `lai caption convert input.srt output.vtt` |
 | `lai caption shift` | Shift timestamps | `lai caption shift input.srt output.srt 2.0` |
+| `lai serve run` | Start local web UI playground | `lai serve run` |
 
 ### Common Options
 
