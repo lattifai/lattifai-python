@@ -86,6 +86,21 @@ class VLLMTranscriber(BaseTranscriber):
     }
     _DEFAULT_TOKENS_PER_SECOND = 25.0
 
+    # Dedicated ASR models that need no prompt — they transcribe by default.
+    _ASR_MODEL_KEYWORDS = ("whisper", "qwen3-asr", "fun-asr", "glm-asr", "sensevoice", "voxtral", "parakeet", "canary")
+
+    # Default system prompt for general-purpose LLMs doing ASR via chat mode.
+    _DEFAULT_ASR_SYSTEM_PROMPT = (
+        "You are a speech transcription assistant. "
+        "Output only the exact verbatim transcription of the audio. "
+        "Do not add any commentary, explanation, or summary."
+    )
+
+    def _is_dedicated_asr_model(self) -> bool:
+        """Check if the model is a dedicated ASR model (no prompt needed)."""
+        model_lower = self.config.model_name.lower()
+        return any(k in model_lower for k in self._ASR_MODEL_KEYWORDS)
+
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
         self._api_base_url = transcription_config.api_base_url.rstrip("/")
@@ -355,11 +370,41 @@ class VLLMTranscriber(BaseTranscriber):
 
         content = [{"type": "audio_url", "audio_url": {"url": f"data:{mime_type};base64,{audio_b64}"}}]
 
-        if self.config.prompt:
-            content.insert(0, {"type": "text", "text": self.config.prompt})
+        # Build user-level text prompt
+        user_prompt = self.config.prompt
+        if not user_prompt and not self._is_dedicated_asr_model():
+            # General-purpose LLMs need explicit transcription instruction
+            lang_name = {
+                "zh": "Chinese",
+                "en": "English",
+                "ja": "Japanese",
+                "ko": "Korean",
+                "es": "Spanish",
+                "fr": "French",
+                "de": "German",
+                "ru": "Russian",
+            }.get(
+                (language or self.config.language or "")[:2],
+                language or self.config.language or "the original language",
+            )
+            user_prompt = f"Transcribe this audio verbatim in {lang_name}."
 
-        messages = [{"role": "user", "content": content}]
-        temperature = max(self.config.temperature, 0.01) if self.config.temperature is not None else None
+        if user_prompt:
+            content.insert(0, {"type": "text", "text": user_prompt})
+
+        # Build messages with system prompt for general-purpose LLMs
+        messages = []
+        if not self._is_dedicated_asr_model():
+            messages.append({"role": "system", "content": self._DEFAULT_ASR_SYSTEM_PROMPT})
+        messages.append({"role": "user", "content": content})
+
+        # Temperature: default to 0.0 (greedy) for non-ASR models for deterministic transcription
+        if self.config.temperature is not None:
+            temperature = max(self.config.temperature, 0.01)
+        elif not self._is_dedicated_asr_model():
+            temperature = 0.01  # greedy decoding for ASR accuracy
+        else:
+            temperature = None
         max_tokens = self.config.max_tokens or 4096
 
         response = _run_async(
