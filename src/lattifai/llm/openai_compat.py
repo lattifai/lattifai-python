@@ -104,11 +104,16 @@ class OpenAIClient(BaseLLMClient):
         client = self._get_client()
         resolved_model = self._resolve_model(model)
 
+        # Extract timeout from kwargs — it's a client-level param, not a create() param
+        timeout = kwargs.pop("timeout", None)
+
         create_kwargs = {"model": resolved_model, "messages": messages, **kwargs}
         if temperature is not None:
             create_kwargs["temperature"] = temperature
         if json_mode:
             create_kwargs["response_format"] = {"type": "json_object"}
+        if timeout is not None:
+            create_kwargs["timeout"] = timeout
 
         return await asyncio.get_event_loop().run_in_executor(
             None,

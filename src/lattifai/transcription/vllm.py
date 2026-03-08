@@ -16,6 +16,7 @@ Works with any ASR model served by vLLM or SGLang, including:
 import asyncio
 import base64
 import json
+import logging
 import re
 import tempfile
 from pathlib import Path
@@ -23,6 +24,8 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import soundfile as sf
+
+logger = logging.getLogger(__name__)
 
 from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
@@ -71,10 +74,22 @@ class VLLMTranscriber(BaseTranscriber):
     supports_url = False
     needs_vad = True
 
+    # Audio tokens per second after all downsampling stages.
+    # Used to estimate max audio duration from max_model_len.
+    # Sources: vllm/model_executor/models/{qwen2_audio,ultravox,voxtral,glmasr}.py
+    _TOKENS_PER_SECOND = {
+        "qwen": 25.0,  # Whisper conv(50fps) + 2x pooling in _get_feat_extract_output_lengths
+        "ultravox": 6.25,  # Whisper conv(50fps) / stack_factor=8, confirmed in ultravox.py docstring
+        "voxtral": 12.5,  # Whisper conv(50fps) / downsample_factor=4
+        "glm": 12.0,  # conv2(50fps), merge_factor=4: (50-4)//4+1 ≈ 12
+    }
+    _DEFAULT_TOKENS_PER_SECOND = 25.0
+
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
         self._api_base_url = transcription_config.api_base_url.rstrip("/")
         self._supports_verbose_json = True
+        self._vad_chunk_size: Optional[float] = transcription_config.vad_chunk_size
         self._llm_client = OpenAIClient(
             api_key="not-needed",
             model=transcription_config.model_name,
@@ -84,6 +99,54 @@ class VLLMTranscriber(BaseTranscriber):
     @property
     def name(self) -> str:
         return self.config.model_name
+
+    def _get_vad_chunk_size(self) -> float:
+        """Return VAD chunk size, auto-estimating from model's max_model_len if needed."""
+        if self._vad_chunk_size is not None:
+            return self._vad_chunk_size
+
+        # Whisper models have a fixed 30s context window
+        if "whisper" in self.config.model_name.lower():
+            self._vad_chunk_size = 30.0
+            return 30.0
+
+        # Try to query /v1/models for max_model_len
+        try:
+            import httpx
+
+            resp = httpx.get(f"{self._api_base_url}/models", timeout=5.0)
+            if resp.status_code == 200:
+                data = resp.json().get("data", [])
+                if data:
+                    max_model_len = data[0].get("max_model_len")
+                    if max_model_len:
+                        tps = self._guess_tokens_per_second()
+                        # Reserve 40% for text output tokens
+                        audio_budget = max_model_len * 0.6
+                        estimated = audio_budget / tps
+                        # Clamp to [30, 600] seconds
+                        self._vad_chunk_size = max(30.0, min(estimated, 600.0))
+                        logger.info(
+                            "Auto-estimated vad_chunk_size=%.0fs (max_model_len=%d, tokens/s=%.1f)",
+                            self._vad_chunk_size,
+                            max_model_len,
+                            tps,
+                        )
+                        return self._vad_chunk_size
+        except Exception:
+            pass
+
+        # Fallback default
+        self._vad_chunk_size = 120.0
+        return self._vad_chunk_size
+
+    def _guess_tokens_per_second(self) -> float:
+        """Guess audio tokens/second from model name."""
+        model_lower = self.config.model_name.lower()
+        for key, tps in self._TOKENS_PER_SECOND.items():
+            if key in model_lower:
+                return tps
+        return self._DEFAULT_TOKENS_PER_SECOND
 
     # ------------------------------------------------------------------
     # Core API call
@@ -184,16 +247,20 @@ class VLLMTranscriber(BaseTranscriber):
                     text=seg["text"].strip(),
                     start=seg["start"],
                     duration=seg["end"] - seg["start"],
-                    language=detected_lang,
+                    language=seg.get("language") or detected_lang,
                     speaker=None,
                 )
                 for seg in segments
                 if seg.get("text", "").strip()
             ]
+            # Update detected_lang from first segment if top-level was missing
+            if not detected_lang and supervisions:
+                detected_lang = supervisions[0].language
         else:
             # No segments (json mode or empty verbose_json) — single supervision
             raw_text = result.get("text", "")
-            _, cleaned = _parse_asr_output(raw_text)
+            parsed_lang, cleaned = _parse_asr_output(raw_text)
+            detected_lang = parsed_lang or detected_lang
             info = sf.info(str(file_path))
             supervisions = [
                 Supervision(text=cleaned, start=0.0, duration=info.duration, language=detected_lang, speaker=None)
@@ -266,9 +333,9 @@ class VLLMTranscriber(BaseTranscriber):
 
         from lattifai.llm.base import _run_async
 
-        text = _run_async(_ws_transcribe())
-        lang = language or self.config.language
-        return text, lang
+        raw_text = _run_async(_ws_transcribe())
+        detected_lang, cleaned = _parse_asr_output(raw_text)
+        return cleaned, detected_lang or language or self.config.language
 
     def _transcribe_via_chat(self, file_path: Path, language: Optional[str] = None) -> Tuple[str, Optional[str]]:
         """Send audio as base64 data URI to /v1/chat/completions and return (text, language)."""
@@ -316,12 +383,12 @@ class VLLMTranscriber(BaseTranscriber):
 
         # File path — send directly
         file_path = Path(media_file)
-        supervisions, _ = self._transcribe_audio_file(file_path, language=language)
-        return Caption(supervisions=supervisions)
+        supervisions, detected_lang = self._transcribe_audio_file(file_path, language=language)
+        return Caption(supervisions=supervisions, language=detected_lang)
 
     def _transcribe_audio_data(self, audio: AudioData, language: Optional[str] = None) -> Caption:
         """Transcribe AudioData, using VAD segmentation if available."""
-        segments, led = self._vad_segment(audio, vad_chunk_size=120.0)
+        segments, led = self._vad_segment(audio, vad_chunk_size=self._get_vad_chunk_size())
 
         if segments:
             from tqdm import tqdm
@@ -335,23 +402,26 @@ class VLLMTranscriber(BaseTranscriber):
                 unit="seg",
                 bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {postfix}]",
             )
+            detected_lang = None
             for (start, end), chunk in pbar:
                 dur = len(chunk) / audio.sampling_rate
                 pbar.set_postfix_str(f"{start:.1f}s-{end:.1f}s ({dur:.1f}s)")
-                chunk_sups, _ = self._transcribe_numpy_chunk(chunk, audio.sampling_rate, language=language)
+                chunk_sups, chunk_lang = self._transcribe_numpy_chunk(chunk, audio.sampling_rate, language=language)
+                if chunk_lang and not detected_lang:
+                    detected_lang = chunk_lang
                 for sup in chunk_sups:
                     if sup.text and sup.text.strip():
                         # Offset timestamps relative to the VAD segment start
                         sup.start += start
                         all_supervisions.append(sup)
             pbar.close()
-            caption = Caption(supervisions=all_supervisions)
+            caption = Caption(supervisions=all_supervisions, language=detected_lang)
         else:
             # No VAD — transcribe full audio
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
                 sf.write(f.name, audio.ndarray.T, audio.sampling_rate)
-                supervisions, _ = self._transcribe_audio_file(Path(f.name), language=language)
-            caption = Caption(supervisions=supervisions)
+                supervisions, detected_lang = self._transcribe_audio_file(Path(f.name), language=language)
+            caption = Caption(supervisions=supervisions, language=detected_lang)
 
         if led is not None:
             caption.event = led
