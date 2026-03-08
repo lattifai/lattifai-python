@@ -94,3 +94,4 @@ tests/data/SA1.srt
 tests/data/SA1.LattifAI.srt
 .claude/worktrees/
 scripts/
+debug/
