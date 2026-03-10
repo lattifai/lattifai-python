@@ -109,6 +109,7 @@ Changelog = 'https://github.com/lattifai/lattifai-python/blob/main/CHANGELOG.md'
 "lai-translate" = "lattifai.cli.translate:main"
 "lai-serve" = "lattifai.cli.serve:main"
 "lai-update" = "lattifai.cli.update:main"
+"lai-doctor" = "lattifai.cli.doctor:main"
 
 [project.entry-points."lai_run.cli"]
 alignment = "lattifai.cli"
@@ -117,6 +118,7 @@ transcribe = "lattifai.cli"
 diarization = "lattifai.cli"
 translate = "lattifai.cli"
 update = "lattifai.cli"
+doctor = "lattifai.cli"
 youtube = "lattifai.cli"
 serve = "lattifai.cli"
 

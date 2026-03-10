@@ -7,6 +7,16 @@ from typing import Optional
 
 from lattifai.errors import ModelLoadError
 
+# Package version -> required model revision metadata.
+# When a new lattifai release requires a newer model, bump `updated_at`.
+# Cache markers dated before `updated_at` are treated as stale.
+REQUIRED_MODEL_VERSIONS = {
+    "LattifAI/Lattice-1": {
+        "min_revision": "v1.2",
+        "updated_at": "20260310",
+    },
+}
+
 
 def safe_print(text: str, **kwargs) -> None:
     """
@@ -50,8 +60,14 @@ def _get_cache_marker_path(cache_dir: Path) -> Path:
     return cache_dir / f".done{today}"
 
 
-def _is_cache_valid(cache_dir: Path) -> bool:
-    """Check if cached model is valid (exists and not older than 1 days)."""
+def _is_cache_valid(cache_dir: Path, model_name: Optional[str] = None) -> bool:
+    """Check if cached model is valid (exists, not older than 7 days, and meets version requirements).
+
+    Args:
+        cache_dir: Path to the model cache directory.
+        model_name: Optional model identifier (e.g. "LattifAI/Lattice-1") used to
+            check against ``REQUIRED_MODEL_VERSIONS``.
+    """
     if not cache_dir.exists():
         return False
 
@@ -67,9 +83,18 @@ def _is_cache_valid(cache_dir: Path) -> bool:
     try:
         date_str = latest_marker.name.replace(".done", "")
         marker_date = datetime.strptime(date_str, "%Y%m%d")
-        # Check if marker is older than 1 days
+        # Check if marker is older than 7 days
         if datetime.now() - marker_date > timedelta(days=7):
             return False
+
+        # Check required model version – if the cache was created before the
+        # requirement was added, force a re-download.
+        if model_name and model_name in REQUIRED_MODEL_VERSIONS:
+            required = REQUIRED_MODEL_VERSIONS[model_name]
+            required_date = datetime.strptime(required["updated_at"], "%Y%m%d")
+            if marker_date < required_date:
+                return False
+
         return True
     except (ValueError, IndexError):
         # Invalid marker file format, treat as invalid cache
@@ -117,7 +142,7 @@ def _resolve_model_path(model_name_or_path: str, model_hub: str = "huggingface")
         cache_dir = Path(HF_HUB_CACHE) / f'models--{hf_repo_id.replace("/", "--")}'
 
         # Check if we have a valid cached version
-        if _is_cache_valid(cache_dir):
+        if _is_cache_valid(cache_dir, model_name=hf_repo_id):
             # Return the snapshot path (latest version)
             snapshots_dir = cache_dir / "snapshots"
             if snapshots_dir.exists():

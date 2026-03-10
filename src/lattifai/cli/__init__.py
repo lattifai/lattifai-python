@@ -8,6 +8,7 @@ import nemo_run as run  # noqa: F401
 from lattifai.cli.alignment import align
 from lattifai.cli.caption import convert, diff
 from lattifai.cli.diarization import diarize
+from lattifai.cli.doctor import doctor
 from lattifai.cli.serve import serve
 from lattifai.cli.transcribe import transcribe, transcribe_align
 from lattifai.cli.translate import translate
@@ -19,6 +20,7 @@ __all__ = [
     "convert",
     "diff",
     "diarize",
+    "doctor",
     "serve",
     "transcribe",
     "transcribe_align",
