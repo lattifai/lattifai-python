@@ -73,7 +73,7 @@ class DiarizationConfig:
     at least this many labeled segments overlapping with its dominant tier for the
     mapping to be accepted. Both thresholds must pass simultaneously.
 
-    Example: with min_claim_count=2, a single labeled line (even if long) won't
+    Example: with min_claim_count=1, a single labeled line (even if long) won't
     rename a tier — the same speaker must appear in at least two labeled segments.
 
     See min_claim_duration tip for how to disable renaming entirely.

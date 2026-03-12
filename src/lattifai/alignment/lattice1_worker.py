@@ -198,13 +198,15 @@ class Lattice1Worker:
                 allow_partial=True,
             )
 
-            # Streaming mode with confidence score accumulation
+            # Streaming mode with flush-and-accumulate for O(chunk) memory
             total_duration = audio.duration
             total_minutes = int(total_duration / 60.0)
 
             max_probs = []
             aligned_probs = []
-            prev_labels_len = 0
+            all_partial_tokens = []  # (tokens, frame_offset) per chunk
+            all_labels = []
+            frame_offset = 0
 
             with tqdm(
                 total=total_minutes,
@@ -215,26 +217,24 @@ class Lattice1Worker:
             ) as pbar:
                 for chunk in audio.iter_chunks():
                     chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale)
-                    intersecter.decode(chunk_emission[0])
 
                     __start = time.time()
-                    # Get partial labels and compute confidence stats for this chunk
-                    partial_labels = intersecter.get_partial_labels()
+                    # Decode, extract results, and flush history
+                    chunk_tokens, chunk_labels = intersecter.decode_and_flush(chunk_emission[0])
                     chunk_len = chunk_emission.shape[1]
 
-                    # Get labels for current chunk (new labels since last chunk)
-                    chunk_labels = partial_labels[prev_labels_len : prev_labels_len + chunk_len]
-                    prev_labels_len = len(partial_labels)
+                    # Accumulate per-chunk tokens with frame offset
+                    all_partial_tokens.append((chunk_tokens, frame_offset))
+                    all_labels.append(chunk_labels)
+                    frame_offset += chunk_len
 
                     # Compute emission-based confidence stats
                     probs = np.exp(chunk_emission[0])  # [T, V]
                     max_probs.append(np.max(probs, axis=-1))  # [T]
 
-                    # Handle case where chunk_labels length might differ from chunk_len
                     if len(chunk_labels) == chunk_len:
                         aligned_probs.append(probs[np.arange(chunk_len), chunk_labels])
                     else:
-                        # Fallback: use max probs as aligned probs (approximate)
                         aligned_probs.append(np.max(probs, axis=-1))
 
                     del chunk_emission, probs  # Free memory
@@ -250,9 +250,9 @@ class Lattice1Worker:
                 "aligned_probs": np.concatenate(aligned_probs),
             }
 
-            # Get results from intersecter
+            # Merge partial results: adjust timestamps and merge boundary tokens
             __start = time.time()
-            results, labels = intersecter.finish()
+            results, labels = _merge_partial_results(all_partial_tokens, all_labels)
             self.timings["align_>finish"] += time.time() - __start
         else:
             # Batch mode
@@ -317,6 +317,69 @@ class Lattice1Worker:
             f"{colorful.bold('Total Time'.ljust(20))} "
             f"{colorful.bold(colorful.yellow(f'{total_time:7.4f}s'.ljust(12)))}\n"
         )
+
+
+def _merge_partial_results(
+    all_partial_tokens: list,
+    all_labels: list,
+) -> tuple:
+    """Merge per-chunk partial alignment results into a single result.
+
+    Adjusts timestamps by frame offset and merges tokens that were split
+    at chunk boundaries (same token_id at end of chunk N and start of chunk N+1).
+
+    Args:
+        all_partial_tokens: List of (chunk_tokens, frame_offset) tuples
+        all_labels: List of per-chunk label arrays
+
+    Returns:
+        (results, labels) in the same format as intersecter.finish()
+    """
+    from k2py import AlignedToken
+
+    merged_tokens = []
+
+    for chunk_tokens, frame_offset in all_partial_tokens:
+        for token in chunk_tokens:
+            adjusted = AlignedToken(
+                token_id=token.token_id,
+                timestamp=token.timestamp + frame_offset,
+                duration=token.duration,
+                score=token.score,
+            )
+
+            # Merge with previous token if same token_id at chunk boundary
+            # Extra guard: previous token must extend to the chunk boundary
+            if (
+                merged_tokens
+                and adjusted.token_id == merged_tokens[-1].token_id
+                and frame_offset > 0
+                and token.timestamp == 0
+                and merged_tokens[-1].timestamp + merged_tokens[-1].duration >= frame_offset
+            ):
+                prev = merged_tokens[-1]
+                # Combine duration and weighted-average score
+                total_dur = prev.duration + adjusted.duration
+                prev_weight = prev.duration / total_dur if total_dur > 0 else 0.5
+                merged_tokens[-1] = AlignedToken(
+                    token_id=prev.token_id,
+                    timestamp=prev.timestamp,
+                    duration=total_dur,
+                    score=prev.score * prev_weight + adjusted.score * (1 - prev_weight),
+                )
+            else:
+                merged_tokens.append(adjusted)
+
+    # Concatenate per-frame labels
+    merged_labels = []
+    for chunk_labels in all_labels:
+        if isinstance(chunk_labels, np.ndarray):
+            merged_labels.extend(chunk_labels.tolist())
+        else:
+            merged_labels.extend(list(chunk_labels))
+
+    # Match finish() return format: wrapped in lists for batch consistency
+    return [merged_tokens], [merged_labels]
 
 
 def _load_worker(model_path: str, device: str, config: Optional[Any] = None) -> Lattice1Worker:
