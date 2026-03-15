@@ -1387,7 +1387,10 @@ class YouTubeDownloader:
                 if m:
                     dialogue_segments.append({"speaker": m.group(1), "text": m.group(2).strip()})
 
-            if len(dialogue_segments) >= 3:
+            # Require ≥10 segments with ≥2 distinct speakers to avoid false positives
+            # from navigation text like "Site Name: Subtitle"
+            dialogue_speakers = {s["speaker"] for s in dialogue_segments}
+            if len(dialogue_segments) >= 10 and len(dialogue_speakers) >= 2:
                 md_lines = []
                 for seg in dialogue_segments:
                     md_lines.append(seg["speaker"])
@@ -1396,7 +1399,9 @@ class YouTubeDownloader:
                 return "\n".join(md_lines)
 
             # Strategy 4: "Starting point is HH:MM:SS" blocks (podscripts.co)
-            sp_pattern = re.compile(r"^Starting point is (\d{1,2}:\d{2}:\d{2})\s*$")
+            # In markdown: timestamp and text on separate lines
+            # In HTML:     timestamp and text may be on the same line
+            sp_pattern = re.compile(r"^Starting point is (\d{1,2}:\d{2}:\d{2})\s*(.*)")
             sp_segments = []
             current_sp = None
             for line in lines:
@@ -1404,7 +1409,8 @@ class YouTubeDownloader:
                 if m:
                     if current_sp:
                         sp_segments.append(current_sp)
-                    current_sp = {"hms": m.group(1), "lines": []}
+                    inline_text = m.group(2).strip()
+                    current_sp = {"hms": m.group(1), "lines": [inline_text] if inline_text else []}
                 elif current_sp and line.strip():
                     current_sp["lines"].append(line.strip())
             if current_sp:

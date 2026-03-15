@@ -63,10 +63,24 @@ try {
   await autoScroll(cdp, sessionId, 10, 300);
   await new Promise((r) => setTimeout(r, 2000));
 
-  // Extract rendered HTML
-  const html = await evaluateScript<string>(cdp, sessionId, "document.documentElement.outerHTML");
+  // Extract rendered HTML — strip <script> tags to produce a static DOM snapshot.
+  // Without this, opening the saved file in a browser would re-execute SPA routers
+  // (e.g. Substack's lib-router) which redirect away from the local file and blank the page.
+  const html = await evaluateScript<string>(
+    cdp,
+    sessionId,
+    `(() => {
+      // Remove all script tags
+      document.querySelectorAll('script').forEach(s => s.remove());
+      // Remove noscript banners (no longer relevant)
+      document.querySelectorAll('noscript').forEach(s => s.remove());
+      // Freeze external stylesheet references to inline (prevent CORS failures)
+      // (skip — stylesheets still load fine from CDN for local files)
+      return document.documentElement.outerHTML;
+    })()`,
+  );
   process.stdout.write(html);
-  console.error(`OK: ${html.length} bytes`);
+  console.error(`OK: ${html.length} bytes (scripts stripped)`);
 
   cdp.close();
 } finally {
