@@ -46,7 +46,7 @@ class DiarizationConfig:
     debug: bool = False
     """Enable debug mode for diarization operations."""
 
-    min_claim_duration: float = 10.0
+    min_claim_duration: float = 0.5
     """Confidence gate for speaker-tier mapping: minimum total overlap in seconds.
     置信度门控：speaker 被标注的片段与 diarization tier 重叠的最小总时长（秒）。
 
@@ -65,7 +65,7 @@ class DiarizationConfig:
     如果希望保留 SPEAKER_XX 原始格式、不做任何重命名，将这两个值设得足够大即可。
     """
 
-    min_claim_count: int = 2
+    min_claim_count: int = 1
     """Confidence gate for speaker-tier mapping: minimum number of labeled segments.
     置信度门控：speaker 被标注的片段与 diarization tier 匹配的最小次数。
 
