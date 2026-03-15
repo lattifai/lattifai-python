@@ -1294,6 +1294,32 @@ class YouTubeDownloader:
 
             base_yt = youtube_url.split("?")[0] if youtube_url else None
 
+            # Patterns that indicate post-transcript UI noise (footer, social, nav).
+            # Must be precise to avoid matching spoken dialogue (e.g. "Subscribe to our YouTube...").
+            _ui_noise_re = re.compile(
+                r"^(\d+\s*Likes?\s*(∙|·)?\s*\d*\s*Restacks?"  # "36 Likes ∙ 7 Restacks"
+                r"|Discussion about this"
+                r"|Comments?\s*Restacks?"  # "Comments Restacks" nav
+                r"|Ready for more\?"
+                r"|Share$|Reply$|Like$|Subscribe$"  # standalone button labels
+                r"|©\s*\d{4}|Privacy\s*∙\s*Terms|Start your Substack|Get the app$"
+                r"|Show Topics$|See all$|Sign in$"
+                r"|Click on any sentence in the transcript"
+                r"|\d{1,2}月\d{1,2}日$"  # Chinese date (comment timestamps)
+                r"|OK: \d+ bytes)"  # CDP stderr leak
+            )
+
+            def _clean_trailing_noise(md_text: str) -> str:
+                """Remove UI noise lines from the end of parsed transcript."""
+                out_lines = md_text.rstrip().split("\n")
+                while out_lines:
+                    last = out_lines[-1].strip()
+                    if not last or _ui_noise_re.match(last):
+                        out_lines.pop()
+                    else:
+                        break
+                return "\n".join(out_lines) + "\n"
+
             def _hms_to_secs(hms: str) -> int:
                 parts = hms.split(":")
                 if len(parts) == 3:
@@ -1322,7 +1348,17 @@ class YouTubeDownloader:
                         ts_segments.append(current_seg)
                     current_seg = {"speaker": m.group(1), "hms": m.group(2), "text": m.group(3).strip()}
                 elif in_transcript and current_seg:
+                    # Skip navigation / UI noise lines
                     if re.match(r"^(Skip to|Go back|Watch the|Useful links|Table of Contents)", line):
+                        continue
+                    # Stop appending when we hit post-transcript UI elements
+                    if re.match(
+                        r"^(\d+\s*Likes?|Discussion|Comments|Restacks?|Subscribe|Ready for"
+                        r"|Share|Reply|Like$|©|Privacy|Terms|Start your|Substack"
+                        r"|Show Topics|See all|\d{1,2}月\d{1,2}日)",
+                        line,
+                    ):
+                        in_transcript = False
                         continue
                     if len(line) > 10:
                         current_seg["text"] += " " + line.strip()
@@ -1341,7 +1377,7 @@ class YouTubeDownloader:
                         md_lines.append(f"[({seg['hms']})](#{secs})")
                     md_lines.append(seg["text"])
                     md_lines.append("")
-                return "\n".join(md_lines)
+                return _clean_trailing_noise("\n".join(md_lines))
 
             # Strategy 2: block-based format "Speaker\n\nHH:MM:SS\n\ntext" (Rescript/podcast apps)
             # Checked before dialogue pattern because section headers like
@@ -1375,7 +1411,7 @@ class YouTubeDownloader:
                         md_lines.append(f"[({seg['hms']})](#{secs})")
                     md_lines.append(seg["text"])
                     md_lines.append("")
-                return "\n".join(md_lines)
+                return _clean_trailing_noise("\n".join(md_lines))
 
             # Strategy 3: dialogue lines "Speaker Name: text" (Substack/Dwarkesh style)
             dialogue_pattern = re.compile(
@@ -1396,7 +1432,7 @@ class YouTubeDownloader:
                     md_lines.append(seg["speaker"])
                     md_lines.append(seg["text"])
                     md_lines.append("")
-                return "\n".join(md_lines)
+                return _clean_trailing_noise("\n".join(md_lines))
 
             # Strategy 4: "Starting point is HH:MM:SS" blocks (podscripts.co)
             # In markdown: timestamp and text on separate lines
@@ -1431,7 +1467,7 @@ class YouTubeDownloader:
                         md_lines.append(f"[({seg['hms']})](#{secs})")
                     md_lines.append(seg_text)
                     md_lines.append("")
-                return "\n".join(md_lines)
+                return _clean_trailing_noise("\n".join(md_lines))
 
             # Fallback: return all body text if no structured transcript found
             return text if len(text) > 200 else None
