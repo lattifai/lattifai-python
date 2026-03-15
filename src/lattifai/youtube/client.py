@@ -1309,15 +1309,30 @@ class YouTubeDownloader:
                 r"|OK: \d+ bytes)"  # CDP stderr leak
             )
 
+            # Patterns to truncate from the end of the last segment's text content
+            _inline_noise_re = re.compile(
+                r"\s*(?:"
+                r"There aren't comments yet.*"
+                r"|Click on any sentence in the transcript.*"
+                r"|DO NOT SELL OR SHARE MY PERSONAL INFORMATION.*"
+                r"|What is this\?.*Report Ad.*"
+                r"|OK: \d+ bytes.*"
+                r")$"
+            )
+
             def _clean_trailing_noise(md_text: str) -> str:
-                """Remove UI noise lines from the end of parsed transcript."""
+                """Remove UI noise lines and inline noise from parsed transcript."""
                 out_lines = md_text.rstrip().split("\n")
+                # Remove trailing noise lines
                 while out_lines:
                     last = out_lines[-1].strip()
                     if not last or _ui_noise_re.match(last):
                         out_lines.pop()
                     else:
                         break
+                # Also truncate inline noise from the last text line
+                if out_lines:
+                    out_lines[-1] = _inline_noise_re.sub("", out_lines[-1])
                 return "\n".join(out_lines) + "\n"
 
             def _hms_to_secs(hms: str) -> int:
