@@ -1379,26 +1379,91 @@ class YouTubeDownloader:
                     md_lines.append("")
                 return _clean_trailing_noise("\n".join(md_lines))
 
-            # Strategy 2: block-based format "Speaker\n\nHH:MM:SS\n\ntext" (Rescript/podcast apps)
-            # Checked before dialogue pattern because section headers like
-            # "Topic: Subtitle" can be false positives for dialogue matching.
-            # Split into blocks separated by blank lines, then look for [name, timestamp, text] triples
+            # Split text into blocks for block-based strategies
             blocks = [b.strip() for b in re.split(r"\n\n+", text) if b.strip()]
+
+            # Strategy 2a: Dwarkesh/Substack article transcript (most specific — check first)
+            # Looks for "## Transcript" section with "**Speaker**" labels and
+            # "### HH:MM:SS - Topic" chapter headers.
+            if any(b == "## Transcript" or b.startswith("## Transcript\n") for b in blocks):
+                tx_start = next(
+                    (i for i, b in enumerate(blocks) if b == "## Transcript" or b.startswith("## Transcript\n")),
+                    None,
+                )
+                if tx_start is not None:
+                    bold_speaker = re.compile(r"^\*\*([^*]+)\*\*$")
+                    chapter_ts = re.compile(r"^###?\s+(\d{1,2}:\d{2}:\d{2})\s*[-–—]?\s*(.*)")
+                    art_segments = []
+                    current_speaker = "Unknown"
+                    current_hms = "0:00:00"
+
+                    for bi2 in range(tx_start + 1, len(blocks)):
+                        b = blocks[bi2]
+                        ch_m = chapter_ts.match(b)
+                        if ch_m:
+                            current_hms = ch_m.group(1)
+                            continue
+                        sp_m = bold_speaker.match(b)
+                        if sp_m:
+                            current_speaker = sp_m.group(1)
+                            continue
+                        if len(b) < 15:
+                            continue
+                        if b.startswith("[") and b.endswith(")") and len(b) < 200:
+                            continue
+                        art_segments.append({"speaker": current_speaker, "hms": current_hms, "text": b})
+
+                    if len(art_segments) >= 5:
+                        md_lines = []
+                        for seg in art_segments:
+                            md_lines.append(seg["speaker"])
+                            secs = _hms_to_secs(seg["hms"])
+                            if base_yt:
+                                md_lines.append(f"[({seg['hms']})]({base_yt}?t={secs})")
+                            else:
+                                md_lines.append(f"[({seg['hms']})](#{secs})")
+                            md_lines.append(seg["text"])
+                            md_lines.append("")
+                        return _clean_trailing_noise("\n".join(md_lines))
+
+            # Strategy 2b: block-based format (Rescript, podcast apps)
+            # Supports two block orderings:
+            #   A) Speaker → HH:MM:SS → text  (Rescript)
+            #   B) M:SS → SPEAKER N → text    (Dwarkesh audio player preview)
             block_segments = []
             bi = 0
             while bi < len(blocks) - 2:
-                b_name, b_ts, b_text = blocks[bi], blocks[bi + 1], blocks[bi + 2]
-                ts_m = re.match(r"^(\d{1,2}:\d{2}:\d{2})$", b_ts)
+                b0, b1, b2 = blocks[bi], blocks[bi + 1], blocks[bi + 2]
+                # Order A: [speaker, timestamp, text]
+                ts_a = re.match(r"^(\d{1,2}:\d{2}:\d{2})$", b1)
                 if (
-                    ts_m
-                    and len(b_name) < 80
-                    and not b_name.startswith(("#", "[", "!", "http", "---"))
-                    and not re.match(r"^\d", b_name)
+                    ts_a
+                    and len(b0) < 80
+                    and not b0.startswith(("#", "[", "!", "http", "---"))
+                    and not re.match(r"^\d", b0)
                 ):
-                    block_segments.append({"speaker": b_name, "hms": ts_m.group(1), "text": b_text})
+                    block_segments.append({"speaker": b0, "hms": ts_a.group(1), "text": b2})
                     bi += 3
-                else:
-                    bi += 1
+                    continue
+                # Order B: Dwarkesh/Substack — timestamps + optional speaker labels
+                # Format: "M:SS\n\n[SPEAKER N]\n\ntext" or "M:SS\n\ntext" (same speaker)
+                ts_b = re.match(r"^(\d{1,2}:\d{2}(?::\d{2})?)$", b0)
+                if ts_b:
+                    hms = ts_b.group(1)
+                    if hms.count(":") == 1:
+                        hms = "0:" + hms  # M:SS → 0:MM:SS
+                    # Check if b1 is a speaker label
+                    if re.match(r"^(SPEAKER\s*\d+)$", b1) and bi + 2 < len(blocks):
+                        block_segments.append({"speaker": b1, "hms": hms, "text": b2})
+                        bi += 3
+                        continue
+                    # No speaker label → text directly after timestamp, reuse last speaker
+                    elif len(b1) > 20 and not re.match(r"^\d{1,2}:\d{2}", b1):
+                        last_speaker = block_segments[-1]["speaker"] if block_segments else "Unknown"
+                        block_segments.append({"speaker": last_speaker, "hms": hms, "text": b1})
+                        bi += 2
+                        continue
+                bi += 1
 
             if len(block_segments) >= 3:
                 md_lines = []
