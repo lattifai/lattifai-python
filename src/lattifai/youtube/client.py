@@ -1095,6 +1095,10 @@ class YouTubeDownloader:
         Saves as {video_id}.transcript.md in podcast-transcript format compatible
         with lattifai-captions PodcastTranscriptReader.
 
+        Uses urllib first (fast, no dependencies). If the result looks like a
+        JS-rendered SPA (very little text content), falls back to headless Chrome
+        ``--dump-dom`` which executes JavaScript before returning the DOM.
+
         Returns:
             Path to saved transcript file, or None on failure
         """
@@ -1128,6 +1132,16 @@ class YouTubeDownloader:
 
             # Parse HTML to extract transcript in podcast-transcript markdown format
             transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
+
+            # Detect SPA: if parsed text is too short but HTML is large, content is JS-rendered
+            if (not transcript_text or len(transcript_text) < 200) and len(html) > 2000:
+                spa_indicators = ['<div id="root"></div>', '<div id="app"></div>', "noscript>You need to enable"]
+                if any(indicator in html for indicator in spa_indicators):
+                    self.logger.info("🔄 SPA detected, falling back to headless Chrome...")
+                    html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url)
+                    if html:
+                        transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
+
             if not transcript_text:
                 self.logger.warning("Failed to extract transcript content from page")
                 return None
@@ -1138,6 +1152,78 @@ class YouTubeDownloader:
 
         except Exception as e:
             self.logger.warning(f"Failed to download external transcript: {e}")
+            return None
+
+    @staticmethod
+    def _find_chrome() -> Optional[str]:
+        """Find Chrome/Chromium executable on the system."""
+        import shutil
+
+        candidates = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "google-chrome",
+            "google-chrome-stable",
+            "chromium",
+            "chromium-browser",
+        ]
+        # Allow override via environment variable
+        env_path = os.environ.get("CHROME_PATH") or os.environ.get("URL_CHROME_PATH")
+        if env_path:
+            candidates.insert(0, env_path)
+
+        for candidate in candidates:
+            if os.path.isfile(candidate) or shutil.which(candidate):
+                return candidate
+        return None
+
+    @staticmethod
+    def _fetch_with_headless_chrome(url: str, timeout: int = 45) -> Optional[str]:
+        """Fetch rendered page content using headless Chrome via CDP.
+
+        Zero-dependency fallback for SPA/CSR sites. Uses a lightweight TypeScript
+        script (fetch_rendered_html.ts) that launches system Chrome in headless mode,
+        waits for JS execution and network idle, then returns the rendered DOM.
+
+        Requires: system Chrome + bun (``npx -y bun``).
+        """
+        import shutil
+        import subprocess
+
+        logger = logging.getLogger(__name__)
+
+        # Locate the CDP fetch script (shipped alongside this module)
+        script = Path(__file__).parent / "fetch_rendered_html.ts"
+        if not script.exists():
+            logger.warning(f"CDP fetch script not found at {script}")
+            return None
+
+        # Check bun availability
+        if not shutil.which("bun") and not shutil.which("npx"):
+            logger.warning("Neither bun nor npx found. Cannot run headless Chrome CDP script.")
+            return None
+
+        runner = ["bun"] if shutil.which("bun") else ["npx", "-y", "bun"]
+
+        try:
+            result = subprocess.run(
+                [*runner, str(script), url, str(timeout * 1000)],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 10,  # subprocess timeout slightly longer than script timeout
+            )
+            html = result.stdout
+            if result.stderr:
+                logger.debug(f"CDP fetch: {result.stderr.strip()}")
+            if html and len(html) > 500:
+                return html
+            logger.warning(f"CDP fetch returned insufficient content ({len(html) if html else 0} bytes)")
+            return None
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Headless Chrome CDP timed out after {timeout}s for {url}")
+            return None
+        except Exception as e:
+            logger.warning(f"Headless Chrome CDP failed: {e}")
             return None
 
     @staticmethod
