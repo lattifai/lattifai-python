@@ -98,12 +98,12 @@ def translate(
         raise ValueError(f"Input file not found: {input}")
 
     # Load caption
-    from lattifai.caption import Caption, GeminiReader
+    from lattifai.caption import Caption, MarkdownReader
 
     safe_print(colorful.cyan(f"Loading: {input_path}"))
 
     if input_path.suffix.lower() == ".md":
-        supervisions = GeminiReader.extract_for_alignment(str(input_path))
+        supervisions = MarkdownReader.extract_for_alignment(str(input_path))
         cap = Caption.from_supervisions(supervisions)
     else:
         cap = Caption.read(str(input_path))
@@ -153,12 +153,12 @@ def translate(
         )
 
     # Write output
-    from lattifai.caption import GeminiWriter
+    from lattifai.caption import MarkdownWriter
 
     caption_config = caption or CaptionConfig()
 
     if output_path.suffix.lower() == ".md":
-        GeminiWriter.write(cap.supervisions, str(output_path))
+        MarkdownWriter.write(cap.supervisions, str(output_path))
     else:
         cap.write(str(output_path), translation_first=caption_config.translation_first)
 

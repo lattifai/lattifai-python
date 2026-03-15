@@ -512,7 +512,7 @@ class LattifAIClientMixin:
                         encoding="utf-8",
                     )
                     transcription = self._read_caption(
-                        tmp_path, input_caption_format="gemini", normalize_text=False, verbose=False
+                        tmp_path, input_caption_format="markdown", normalize_text=False, verbose=False
                     )
                 finally:
                     # Clean up temp file

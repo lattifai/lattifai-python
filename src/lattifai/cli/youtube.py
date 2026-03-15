@@ -147,7 +147,7 @@ def transcript(
     Download external transcript from a YouTube video's description.
 
     Extracts transcript/show-notes URLs from the video description and downloads
-    the content as a podcast-transcript Markdown file (.transcript.md).
+    the content as a Markdown transcript file (.transcript.md).
 
     Supported description patterns:
         *Transcript:*                         (Lex Fridman)
