@@ -1283,9 +1283,13 @@ class YouTubeDownloader:
                     self._flush()
                     return "\n".join(self.lines)
 
-            parser = TranscriptParser()
-            parser.feed(html)
-            text = parser.get_text()
+            # If input is not HTML (e.g. markdown from url-to-markdown), use as-is
+            if "<body" not in html.lower() and "<html" not in html.lower():
+                text = html
+            else:
+                parser = TranscriptParser()
+                parser.feed(html)
+                text = parser.get_text()
             lines = text.split("\n")
 
             base_yt = youtube_url.split("?")[0] if youtube_url else None
@@ -1298,12 +1302,14 @@ class YouTubeDownloader:
                     return int(parts[0]) * 60 + int(parts[1])
                 return int(parts[0])
 
-            # Strategy 1: timestamped lines "Speaker Name (HH:MM:SS) text"
+            # Strategy 1: timestamped lines with speaker names
+            # Supports: "Speaker (HH:MM:SS) text"       — lexfridman.com
+            #           "Speaker [HH:MM:SS]: text"      — latent.space / Substack
             # Convert to podcast-transcript format:
             #   Speaker Name
             #   [(HH:MM:SS)](youtube_url&t=N)
             #   text
-            ts_pattern = re.compile(r"^(.+?)\s+\((\d{1,2}:\d{2}:\d{2})\)\s*(.*)")
+            ts_pattern = re.compile(r"^(.+?)\s+[\(\[](\d{1,2}:\d{2}:\d{2})[\)\]]:?\s*(.*)")
             ts_segments = []
             in_transcript = False
             current_seg = None
@@ -1337,7 +1343,41 @@ class YouTubeDownloader:
                     md_lines.append("")
                 return "\n".join(md_lines)
 
-            # Strategy 2: dialogue lines "Speaker Name: text" (Substack/Dwarkesh style)
+            # Strategy 2: block-based format "Speaker\n\nHH:MM:SS\n\ntext" (Rescript/podcast apps)
+            # Checked before dialogue pattern because section headers like
+            # "Topic: Subtitle" can be false positives for dialogue matching.
+            # Split into blocks separated by blank lines, then look for [name, timestamp, text] triples
+            blocks = [b.strip() for b in re.split(r"\n\n+", text) if b.strip()]
+            block_segments = []
+            bi = 0
+            while bi < len(blocks) - 2:
+                b_name, b_ts, b_text = blocks[bi], blocks[bi + 1], blocks[bi + 2]
+                ts_m = re.match(r"^(\d{1,2}:\d{2}:\d{2})$", b_ts)
+                if (
+                    ts_m
+                    and len(b_name) < 80
+                    and not b_name.startswith(("#", "[", "!", "http", "---"))
+                    and not re.match(r"^\d", b_name)
+                ):
+                    block_segments.append({"speaker": b_name, "hms": ts_m.group(1), "text": b_text})
+                    bi += 3
+                else:
+                    bi += 1
+
+            if len(block_segments) >= 3:
+                md_lines = []
+                for seg in block_segments:
+                    md_lines.append(seg["speaker"])
+                    secs = _hms_to_secs(seg["hms"])
+                    if base_yt:
+                        md_lines.append(f"[({seg['hms']})]({base_yt}?t={secs})")
+                    else:
+                        md_lines.append(f"[({seg['hms']})](#{secs})")
+                    md_lines.append(seg["text"])
+                    md_lines.append("")
+                return "\n".join(md_lines)
+
+            # Strategy 3: dialogue lines "Speaker Name: text" (Substack/Dwarkesh style)
             dialogue_pattern = re.compile(
                 r"^([A-Z][a-zA-Z\u00C0-\u024F'.\-]+(?: [A-Z][a-zA-Z\u00C0-\u024F'.\-]+){0,3}):\s+(.+)"
             )
@@ -1352,6 +1392,38 @@ class YouTubeDownloader:
                 for seg in dialogue_segments:
                     md_lines.append(seg["speaker"])
                     md_lines.append(seg["text"])
+                    md_lines.append("")
+                return "\n".join(md_lines)
+
+            # Strategy 4: "Starting point is HH:MM:SS" blocks (podscripts.co)
+            sp_pattern = re.compile(r"^Starting point is (\d{1,2}:\d{2}:\d{2})\s*$")
+            sp_segments = []
+            current_sp = None
+            for line in lines:
+                m = sp_pattern.match(line)
+                if m:
+                    if current_sp:
+                        sp_segments.append(current_sp)
+                    current_sp = {"hms": m.group(1), "lines": []}
+                elif current_sp and line.strip():
+                    current_sp["lines"].append(line.strip())
+            if current_sp:
+                sp_segments.append(current_sp)
+
+            if len(sp_segments) >= 3:
+                md_lines = []
+                for seg in sp_segments:
+                    seg_text = " ".join(seg["lines"])
+                    if not seg_text:
+                        continue
+                    secs = _hms_to_secs(seg["hms"])
+                    # No speaker info from podscripts.co — use "Unknown"
+                    md_lines.append("Unknown")
+                    if base_yt:
+                        md_lines.append(f"[({seg['hms']})]({base_yt}?t={secs})")
+                    else:
+                        md_lines.append(f"[({seg['hms']})](#{secs})")
+                    md_lines.append(seg_text)
                     md_lines.append("")
                 return "\n".join(md_lines)
 
