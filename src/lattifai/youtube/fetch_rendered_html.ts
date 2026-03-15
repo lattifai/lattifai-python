@@ -7,8 +7,22 @@
  * Outputs the fully rendered DOM (document.documentElement.outerHTML) to stdout.
  * Called from Python via subprocess for SPA/CSR pages where plain HTTP returns an empty shell.
  *
- * Zero extra dependencies — uses system Chrome via raw CDP WebSocket.
+ * CDP core (CdpConnection, Chrome launcher, page-load helpers) is adapted from
+ * baoyu-url-to-markdown (https://github.com/nicepkg/baoyu-skills) — MIT License.
  */
+
+import {
+  CdpConnection,
+  getFreePort,
+  launchChrome,
+  waitForChromeDebugPort,
+  waitForPageLoad,
+  waitForNetworkIdle,
+  autoScroll,
+  evaluateScript,
+  killChrome,
+} from "/Users/feiteng/.claude/skills/baoyu-url-to-markdown/scripts/cdp.js";
+import { CDP_CONNECT_TIMEOUT_MS } from "/Users/feiteng/.claude/skills/baoyu-url-to-markdown/scripts/constants.js";
 
 const url = process.argv[2];
 const timeoutMs = parseInt(process.argv[3] || "30000");
@@ -18,107 +32,43 @@ if (!url) {
   process.exit(1);
 }
 
-// Find Chrome executable
-function findChrome(): string {
-  const envPath = process.env.CHROME_PATH || process.env.URL_CHROME_PATH;
-  if (envPath) return envPath;
-  const candidates =
-    process.platform === "darwin"
-      ? ["/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/Applications/Chromium.app/Contents/MacOS/Chromium"]
-      : ["/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser"];
-  for (const c of candidates) {
-    try {
-      if (Bun.file(c).size > 0) return c;
-    } catch {}
-  }
-  throw new Error("Chrome not found. Set CHROME_PATH environment variable.");
-}
-
-const chrome = findChrome();
-
-// Get a free port
-const server = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {}, open() {}, close() {} } });
-const port = server.port;
-server.stop();
-
-// Launch Chrome with the target URL
-const chromeProc = Bun.spawn(
-  [chrome, `--remote-debugging-port=${port}`, "--headless=new", "--disable-gpu", "--no-sandbox", "--disable-software-rasterizer", url],
-  { stdout: "ignore", stderr: "ignore" },
-);
-const cleanup = () => {
-  try {
-    chromeProc.kill();
-  } catch {}
-};
+const port = await getFreePort();
+const chromeProcess = await launchChrome(url, port, true /* headless */);
 
 try {
-  // Wait for CDP page target
-  let wsUrl = "";
-  for (let i = 0; i < 50; i++) {
-    try {
-      const r = await fetch(`http://127.0.0.1:${port}/json/list`);
-      const targets = (await r.json()) as any[];
-      const page = targets.find((t: any) => t.type === "page" && t.url.startsWith("http"));
-      if (page) {
-        wsUrl = page.webSocketDebuggerUrl;
-        break;
-      }
-    } catch {}
-    await Bun.sleep(300);
-  }
-  if (!wsUrl) throw new Error("No page target found");
+  const wsUrl = await waitForChromeDebugPort(port, CDP_CONNECT_TIMEOUT_MS);
+  const cdp = await CdpConnection.connect(wsUrl, CDP_CONNECT_TIMEOUT_MS);
 
-  // Connect WebSocket
-  const ws = new WebSocket(wsUrl);
-  let msgId = 0;
-  const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+  // Find the page target and attach
+  const targets = await cdp.send<{ targetInfos: Array<{ targetId: string; type: string; url: string }> }>("Target.getTargets");
+  const pageTarget = targets.targetInfos.find((t) => t.type === "page" && t.url.startsWith("http"));
+  if (!pageTarget) throw new Error("No page target found");
 
-  await new Promise<void>((resolve, reject) => {
-    ws.onopen = () => resolve();
-    ws.onerror = () => reject(new Error("WS connect failed"));
+  const { sessionId } = await cdp.send<{ sessionId: string }>("Target.attachToTarget", {
+    targetId: pageTarget.targetId,
+    flatten: true,
   });
-  ws.onmessage = (ev: MessageEvent) => {
-    const msg = JSON.parse(String(ev.data));
-    if (msg.id !== undefined) {
-      const p = pending.get(msg.id);
-      if (p) {
-        pending.delete(msg.id);
-        msg.error ? p.reject(new Error(msg.error.message)) : p.resolve(msg.result);
-      }
-    }
-  };
+  await cdp.send("Network.enable", {}, { sessionId });
+  await cdp.send("Page.enable", {}, { sessionId });
 
-  const send = (method: string, params: any = {}): Promise<any> => {
-    const id = ++msgId;
-    return new Promise((resolve, reject) => {
-      pending.set(id, { resolve, reject });
-      ws.send(JSON.stringify({ id, method, params }));
-    });
-  };
+  // Wait for page load + network idle
+  console.error(`Fetching: ${url}`);
+  await Promise.race([waitForPageLoad(cdp, sessionId, timeoutMs), new Promise((r) => setTimeout(r, timeoutMs))]);
+  await Promise.race([waitForNetworkIdle(cdp, sessionId, 3000), new Promise((r) => setTimeout(r, 5000))]);
 
-  // Wait for readyState === "complete"
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const { result } = await send("Runtime.evaluate", { expression: "document.readyState" });
-    if (result.value === "complete") break;
-    await Bun.sleep(500);
-  }
+  // Extra wait for SPA rendering
+  await new Promise((r) => setTimeout(r, 3000));
 
-  // Extra wait for SPA rendering + scroll to trigger lazy loading
-  await Bun.sleep(3000);
-  await send("Runtime.evaluate", {
-    expression: `(async()=>{const h=Math.min(document.body.scrollHeight,15000);for(let i=0;i<h;i+=window.innerHeight){window.scrollTo(0,i);await new Promise(r=>setTimeout(r,200))}window.scrollTo(0,0)})()`,
-    awaitPromise: true,
-  });
-  await Bun.sleep(2000);
+  // Scroll to trigger lazy loading
+  await autoScroll(cdp, sessionId, 10, 300);
+  await new Promise((r) => setTimeout(r, 2000));
 
   // Extract rendered HTML
-  const { result } = await send("Runtime.evaluate", { expression: "document.documentElement.outerHTML" });
-  process.stdout.write(result.value as string);
-  console.error(`OK: ${(result.value as string).length} bytes`);
+  const html = await evaluateScript<string>(cdp, sessionId, "document.documentElement.outerHTML");
+  process.stdout.write(html);
+  console.error(`OK: ${html.length} bytes`);
 
-  ws.close();
+  cdp.close();
 } finally {
-  cleanup();
+  killChrome(chromeProcess);
 }
