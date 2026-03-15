@@ -69,21 +69,28 @@ client = LattifAI(alignment_config=AlignmentConfig(model_hub="modelscope"))
 
 ### Using uv (Recommended)
 
-[uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip). **No extra configuration needed** - uv automatically uses our package index.
+[uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip).
 
 ```bash
 # Install uv (skip if already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-# Create a new project and add lattifai
-uv init my-project && cd my-project
-uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+**As a CLI tool** (recommended for most users):
 
-# Or add to an existing project
-uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+```bash
+# Install globally — lai command available everywhere
+uv tool install "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
 
-# Run CLI without installing (quick test)
+# Quick test without installing
 uvx --from lattifai --extra-index-url https://lattifai.github.io/pypi/simple/ lai --help
+```
+
+**As a project dependency** (for Python SDK usage):
+
+```bash
+# Add to an existing project
+uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
 ```
 
 ### Using pip
