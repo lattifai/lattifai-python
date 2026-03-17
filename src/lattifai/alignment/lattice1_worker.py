@@ -220,7 +220,7 @@ class Lattice1Worker:
             aligned_probs = []
 
             if use_flush:
-                all_partial_tokens = []  # (tokens, frame_offset) per chunk
+                all_tokens = []  # (tokens, frame_offset) per chunk
                 all_labels = []
                 frame_offset = 0
             else:
@@ -240,7 +240,7 @@ class Lattice1Worker:
                     __start = time.time()
                     if use_flush:
                         chunk_tokens, chunk_labels = intersecter.decode_and_flush(chunk_emission[0])
-                        all_partial_tokens.append((chunk_tokens, frame_offset))
+                        all_tokens.append((chunk_tokens, frame_offset))
                         all_labels.append(chunk_labels)
                         frame_offset += chunk_len
                     else:
@@ -273,7 +273,7 @@ class Lattice1Worker:
 
             __start = time.time()
             if use_flush:
-                results, labels = _merge_partial_results(all_partial_tokens, all_labels)
+                results, labels = _merge_partial_results(all_tokens, all_labels)
             else:
                 results, labels = intersecter.finish()
             self.timings["align_>finish"] += time.time() - __start
@@ -343,16 +343,17 @@ class Lattice1Worker:
 
 
 def _merge_partial_results(
-    all_partial_tokens: list,
+    all_tokens: list,
     all_labels: list,
 ) -> tuple:
     """Merge per-chunk partial alignment results into a single result.
 
-    Adjusts timestamps by frame offset and merges tokens that were split
-    at chunk boundaries (same token_id at end of chunk N and start of chunk N+1).
+    Adjusts timestamps by frame offset.  At chunk boundaries, only merges
+    adjacent tokens if the per-frame labels confirm continuity (last label
+    of chunk N == first label of chunk N+1 == the token_id).
 
     Args:
-        all_partial_tokens: List of (chunk_tokens, frame_offset) tuples
+        all_tokens: List of (chunk_tokens, frame_offset) tuples
         all_labels: List of per-chunk label arrays
 
     Returns:
@@ -360,9 +361,20 @@ def _merge_partial_results(
     """
     from k2py import AlignedToken
 
+    # Flatten labels and record per-chunk boundaries
+    merged_labels = []
+    chunk_boundaries = []  # (start_idx, end_idx) in merged_labels
+    for chunk_labels in all_labels:
+        start = len(merged_labels)
+        if isinstance(chunk_labels, np.ndarray):
+            merged_labels.extend(chunk_labels.tolist())
+        else:
+            merged_labels.extend(list(chunk_labels))
+        chunk_boundaries.append((start, len(merged_labels)))
+
     merged_tokens = []
 
-    for chunk_tokens, frame_offset in all_partial_tokens:
+    for ci, (chunk_tokens, frame_offset) in enumerate(all_tokens):
         for token in chunk_tokens:
             adjusted = AlignedToken(
                 token_id=token.token_id,
@@ -371,8 +383,7 @@ def _merge_partial_results(
                 score=token.score,
             )
 
-            # Merge with previous token if same token_id at chunk boundary
-            # Extra guard: previous token must extend to the chunk boundary
+            # At chunk boundary: only merge if labels confirm same token
             if (
                 merged_tokens
                 and adjusted.token_id == merged_tokens[-1].token_id
@@ -380,26 +391,30 @@ def _merge_partial_results(
                 and token.timestamp == 0
                 and merged_tokens[-1].timestamp + merged_tokens[-1].duration >= frame_offset
             ):
-                prev = merged_tokens[-1]
-                # Combine duration and weighted-average score
-                total_dur = prev.duration + adjusted.duration
-                prev_weight = prev.duration / total_dur if total_dur > 0 else 0.5
-                merged_tokens[-1] = AlignedToken(
-                    token_id=prev.token_id,
-                    timestamp=prev.timestamp,
-                    duration=total_dur,
-                    score=prev.score * prev_weight + adjusted.score * (1 - prev_weight),
-                )
+                # Check label continuity at boundary
+                prev_end = chunk_boundaries[ci - 1][1] - 1 if ci > 0 else -1
+                curr_start = chunk_boundaries[ci][0] if ci < len(chunk_boundaries) else -1
+                prev_label = merged_labels[prev_end] if 0 <= prev_end < len(merged_labels) else -1
+                curr_label = merged_labels[curr_start] if 0 <= curr_start < len(merged_labels) else -1
+
+                if prev_label == curr_label:
+                    # Labels confirm: same token spans boundary → merge
+                    prev = merged_tokens[-1]
+                    prev_end = prev.timestamp + prev.duration
+                    adj_end = adjusted.timestamp + adjusted.duration
+                    total_dur = max(prev_end, adj_end) - prev.timestamp
+                    prev_weight = prev.duration / total_dur if total_dur > 0 else 0.5
+                    merged_tokens[-1] = AlignedToken(
+                        token_id=prev.token_id,
+                        timestamp=prev.timestamp,
+                        duration=total_dur,
+                        score=prev.score * prev_weight + adjusted.score * (1 - prev_weight),
+                    )
+                else:
+                    # Labels differ → don't merge
+                    merged_tokens.append(adjusted)
             else:
                 merged_tokens.append(adjusted)
-
-    # Concatenate per-frame labels
-    merged_labels = []
-    for chunk_labels in all_labels:
-        if isinstance(chunk_labels, np.ndarray):
-            merged_labels.extend(chunk_labels.tolist())
-        else:
-            merged_labels.extend(list(chunk_labels))
 
     # Match finish() return format: wrapped in lists for batch consistency
     return [merged_tokens], [merged_labels]
