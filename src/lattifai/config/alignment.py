@@ -1,7 +1,7 @@
 """Alignment configuration for LattifAI."""
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Union
 
 from ..utils import _select_device
 
@@ -110,6 +110,13 @@ class AlignmentConfig:
     normalize_volume: bool = True
     """Enable RMS-based volume normalization before ONNX inference.
     Boosts quiet audio to improve alignment quality. Default: True."""
+
+    flush: Union[bool, Literal["auto"]] = "auto"
+    """Memory optimization for streaming alignment via state flushing.
+    - 'auto': enable when audio > 1 hour AND chunk >= 30s (default)
+    - True: always flush (O(chunk) memory, slight quality loss at boundaries)
+    - False: never flush (O(total) memory, globally optimal)
+    """
 
     check_sanity: bool = True
     """Whether to perform sanity checks on alignment results.
