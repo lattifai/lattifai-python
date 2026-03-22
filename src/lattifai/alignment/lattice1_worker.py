@@ -230,33 +230,52 @@ class Lattice1Worker:
                 unit_divisor=1,
             ) as pbar:
                 chunk_counter = 0
+                cycle_probs = []  # Accumulated emission probs within flush cycle
                 for chunk in audio.iter_chunks():
                     chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale)
                     chunk_len = chunk_emission.shape[1]
 
                     __start = time.time()
                     chunk_counter += 1
-                    if flush_interval > 0 and chunk_counter % flush_interval == 0:
-                        intersecter.decode_and_flush(chunk_emission[0])
-                    else:
-                        intersecter.decode(chunk_emission[0])
-                    chunk_labels = intersecter.get_partial_labels()
 
-                    # Compute emission-based confidence stats
                     probs = np.exp(chunk_emission[0])  # [T, V]
                     max_probs.append(np.max(probs, axis=-1))  # [T]
 
-                    if len(chunk_labels) == chunk_len:
-                        aligned_probs.append(probs[np.arange(chunk_len), chunk_labels])
+                    if flush_interval > 0 and chunk_counter % flush_interval == 0:
+                        intersecter.decode_and_flush(chunk_emission[0])
+                        cycle_probs.append(probs)
+                        # Labels cover entire flush cycle (N chunks)
+                        cycle_labels = intersecter.get_partial_labels()
+                        cycle_emission = np.concatenate(cycle_probs, axis=0)
+                        if len(cycle_labels) == len(cycle_emission):
+                            aligned_probs.append(cycle_emission[np.arange(len(cycle_labels)), cycle_labels])
+                        else:
+                            aligned_probs.append(np.max(cycle_emission, axis=-1))
+                        cycle_probs = []  # Reset for next cycle
                     else:
-                        aligned_probs.append(np.max(probs, axis=-1))
+                        intersecter.decode(chunk_emission[0])
+                        if flush_interval > 0:
+                            # Accumulate for flush cycle
+                            cycle_probs.append(probs)
+                        else:
+                            # No flush: per-chunk confidence
+                            chunk_labels = intersecter.get_partial_labels()
+                            if len(chunk_labels) == chunk_len:
+                                aligned_probs.append(probs[np.arange(chunk_len), chunk_labels])
+                            else:
+                                aligned_probs.append(np.max(probs, axis=-1))
 
-                    del chunk_emission, probs  # Free memory
+                    del chunk_emission  # Free memory
                     self.timings["align_>labels"] += time.time() - __start
 
                     # Update progress
                     chunk_duration = int(chunk.duration / 60.0)
                     pbar.update(chunk_duration)
+
+                # Handle remaining chunks in an incomplete flush cycle
+                if cycle_probs:
+                    cycle_emission = np.concatenate(cycle_probs, axis=0)
+                    aligned_probs.append(np.max(cycle_emission, axis=-1))
 
             # Build emission_stats for confidence calculation
             emission_stats = {
