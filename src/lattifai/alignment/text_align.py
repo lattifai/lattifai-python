@@ -452,6 +452,7 @@ def detect_duplicate_blocks(
     supervisions: List[Supervision],
     ngram: int = 8,
     min_match_words: int = 10,
+    min_match_chars: int = 20,
     max_word_gap: int = 300,
     max_time_gap: float = 300.0,
 ) -> List[DuplicateBlock]:
@@ -520,6 +521,11 @@ def detect_duplicate_blocks(
                     match_len += 1
 
                 if match_len >= min_match_words:
+                    # Check total character length to filter punctuation-inflated matches
+                    # (e.g., "C-L-A-U-D-E" = 11 tokens but only 11 chars)
+                    char_len = sum(len(words[pos_a + k]) for k in range(match_len))
+                    if char_len < min_match_chars:
+                        continue
                     time_gap = abs(supervisions[word_to_seg[pos_b]].start - supervisions[word_to_seg[pos_a]].start)
                     candidates.append((pos_a, pos_b, match_len, time_gap))
 

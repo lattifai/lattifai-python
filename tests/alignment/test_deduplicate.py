@@ -129,6 +129,22 @@ class TestDetectDuplicateBlocks:
         dups = detect_duplicate_blocks(sups, min_match_words=8, ngram=6)
         assert len(dups) >= 1
 
+    def test_spelled_out_word_not_detected_as_duplicate(self):
+        """Spelled-out words like C-L-A-U-D-E should not trigger duplicate detection.
+
+        Hyphens inflate token count (11 tokens) past min_match_words=10, but
+        total character length is only 11, well below min_match_chars=20.
+        """
+        sups = [
+            _sup(0, 5, "Some context before the spelling"),
+            _sup(5, 5, "Claude spelled with a W-C-L-A-U-D-E."),
+            _sup(10, 3, "A bridge between the two mentions"),
+            _sup(13, 7, "Versus C-L-A-U-D-E from Anthropic."),
+            _sup(20, 5, "Some context after the spelling"),
+        ]
+        dups = detect_duplicate_blocks(sups)
+        assert len(dups) == 0, f"Spelled-out word should not be flagged as duplicate, got {dups}"
+
     def test_intra_segment_parallel_structure_not_detected(self):
         """Parallel structure within a single supervision should NOT be flagged.
 
