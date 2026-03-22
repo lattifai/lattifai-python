@@ -409,6 +409,15 @@ class LatticeTokenizer:
             raise Exception("Failed to detokenize the alignment results.")
 
         alignments = [Supervision.from_dict(s) for s in result["supervisions"]]
+        if return_details:
+            word_ratio = sum(len(s.get("alignment", {}).get("word", [])) for s in alignments) / len(alignments)
+            if word_ratio < 0.5:
+                safe_print(
+                    colorful.yellow(
+                        f"⚠️  Low word-level alignment ratio ({word_ratio:.2%} of segments have word alignments). "
+                    )
+                )
+                raise Warning("Low word-level alignment ratio, results may be unreliable.")
 
         # Add emission confidence scores for segments and word-level alignments
         _add_confidence_scores(alignments, emission_stats, frame_shift, offset)
