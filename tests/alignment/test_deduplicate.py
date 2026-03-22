@@ -46,9 +46,7 @@ class TestDetectDuplicateBlocks:
         ]
         dups = detect_duplicate_blocks(sups, min_match_words=8)
         assert len(dups) >= 1
-        # Both block_a and block_b should reference segments containing the shared text
-        dup = dups[0]
-        assert dup.num_words >= 8
+        assert dups[0].matched_words >= 8
 
     def test_far_apart_not_detected(self):
         """Blocks separated by > max_word_gap should NOT be detected."""

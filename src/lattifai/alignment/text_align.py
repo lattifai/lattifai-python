@@ -445,7 +445,7 @@ def quality(
 # Nearby duplicate block detection
 # ---------------------------------------------------------------------------
 
-DuplicateBlock = namedtuple("DuplicateBlock", ["block_a", "block_b", "num_words", "time_gap"])
+DuplicateBlock = namedtuple("DuplicateBlock", ["first", "second", "matched_words", "time_gap"])
 
 
 def detect_duplicate_blocks(
@@ -469,9 +469,9 @@ def detect_duplicate_blocks(
         max_time_gap: Maximum time distance (seconds) between two blocks.
 
     Returns:
-        List of DuplicateBlock(block_a=(seg_start, seg_end),
-                               block_b=(seg_start, seg_end),
-                               num_words, time_gap).
+        List of DuplicateBlock(first=(seg_start, seg_end),
+                               second=(seg_start, seg_end),
+                               matched_words, time_gap).
     """
     if len(supervisions) < 2:
         return []
@@ -532,9 +532,9 @@ def detect_duplicate_blocks(
 
         seg_a = (word_to_seg[pa], word_to_seg[min(pa + mlen - 1, len(word_to_seg) - 1)])
         seg_b = (word_to_seg[pb], word_to_seg[min(pb + mlen - 1, len(word_to_seg) - 1)])
-        results.append(DuplicateBlock(block_a=seg_a, block_b=seg_b, num_words=mlen, time_gap=tgap))
+        results.append(DuplicateBlock(first=seg_a, second=seg_b, matched_words=mlen, time_gap=tgap))
 
-    return sorted(results, key=lambda x: x.block_a[0])
+    return sorted(results, key=lambda x: x.first[0])
 
 
 def deduplicate_supervisions(
@@ -556,8 +556,8 @@ def deduplicate_supervisions(
     # Collect segment indices to remove (shorter-duration copy)
     remove_indices: set = set()
     for dup in duplicates:
-        a_start, a_end = dup.block_a
-        b_start, b_end = dup.block_b
+        a_start, a_end = dup.first
+        b_start, b_end = dup.second
         a_duration = supervisions[a_end].end - supervisions[a_start].start
         b_duration = supervisions[b_end].end - supervisions[b_start].start
         if b_duration < a_duration:

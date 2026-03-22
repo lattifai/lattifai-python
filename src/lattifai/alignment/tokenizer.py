@@ -283,36 +283,40 @@ class LatticeTokenizer:
 
                 safe_print(colorful.yellow(f"⚠️  Detected {len(dup_blocks)} duplicate text block(s):"))
                 for dup in dup_blocks:
-                    a_s, a_e = dup.block_a
-                    b_s, b_e = dup.block_b
-                    text_a = " ".join(supervisions[i].text for i in range(a_s, a_e + 1))
-                    text_b = " ".join(supervisions[i].text for i in range(b_s, b_e + 1))
-                    ts_a = f"{_ts(supervisions[a_s].start)}-{_ts(supervisions[a_e].end)}"
-                    ts_b = f"{_ts(supervisions[b_s].start)}-{_ts(supervisions[b_e].end)}"
+                    first_start, first_end = dup.first
+                    second_start, second_end = dup.second
+                    first_text = " ".join(supervisions[i].text for i in range(first_start, first_end + 1))
+                    second_text = " ".join(supervisions[i].text for i in range(second_start, second_end + 1))
+                    first_ts = f"{_ts(supervisions[first_start].start)}-{_ts(supervisions[first_end].end)}"
+                    second_ts = f"{_ts(supervisions[second_start].start)}-{_ts(supervisions[second_end].end)}"
                     safe_print(
                         colorful.yellow(
-                            f"         [{ts_a}]: {text_a[:100]}...\n" f"         [{ts_b}]: {text_b[:100]}..."
+                            f"         [{first_ts}]: {first_text[:100]}...\n"
+                            f"         [{second_ts}]: {second_text[:100]}..."
                         )
                     )
-                try:
-                    answer = input(colorful.cyan("   Continue with alignment? [Y/n] ")).strip().lower()
-                except (EOFError, KeyboardInterrupt):
-                    answer = ""
-                if answer in ("n", "no"):
-                    raise Exception("Aborted: please fix duplicate blocks in the subtitle file and retry.")
+                import sys
+
+                if sys.stdin.isatty():
+                    try:
+                        answer = input(colorful.cyan("   Continue with alignment? [Y/n] ")).strip().lower()
+                    except (EOFError, KeyboardInterrupt):
+                        answer = ""
+                    if answer in ("n", "no"):
+                        raise Exception("Aborted: please fix duplicate blocks in the subtitle file and retry.")
 
             pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
-            response = self.client_wrapper.post(
-                "tokenize",
-                json={
-                    "model_name": self.model_name,
-                    "supervisions": [s.to_dict() for s in supervisions],
-                    "pronunciation_dictionaries": pronunciation_dictionaries,
-                    **client_info,
-                    "transition_penalty": transition_penalty,
-                    "metadata": metadata,
-                },
-            )
+            request_body = {
+                "model_name": self.model_name,
+                "supervisions": [s.to_dict() for s in supervisions],
+                "pronunciation_dictionaries": pronunciation_dictionaries,
+                **client_info,
+                "transition_penalty": transition_penalty,
+                "metadata": metadata,
+            }
+            if dup_blocks:
+                request_body["duplicate_blocks"] = [dup._asdict() for dup in dup_blocks]
+            response = self.client_wrapper.post("tokenize", json=request_body)
         else:
             pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions[0]])
             pronunciation_dictionaries.update(self.prenormalize([s.text for s in supervisions[1]]))
