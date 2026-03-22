@@ -118,7 +118,7 @@ class Lattice1Aligner(object):
         if verbose:
             safe_print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
         try:
-            supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
+            supervisions, lattice_id, lattice_graph, diff_detokenize = self.tokenizer.tokenize(
                 supervisions,
                 split_sentence=split_sentence,
                 boost=self.config.boost,
@@ -168,6 +168,7 @@ class Lattice1Aligner(object):
                 start_margin=self.config.start_margin,
                 end_margin=self.config.end_margin,
                 check_sanity=self.config.check_sanity,
+                diff_detokenize=diff_detokenize,
             )
             if verbose:
                 safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
@@ -186,6 +187,7 @@ class Lattice1Aligner(object):
                 start_margin=self.config.start_margin,
                 end_margin=self.config.end_margin,
                 check_sanity=False,
+                diff_detokenize=diff_detokenize,
             )
             # Find low-score segments to provide helpful error context
             low_score_segments = _find_low_score_segments(_alignments)

@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
+import colorful
 import numpy as np
 
 from lattifai.caption import SentenceSplitter, Supervision
@@ -14,6 +15,7 @@ from lattifai.errors import (
     ModelLoadError,
     QuotaExceededError,
 )
+from lattifai.utils import safe_print
 
 from .punctuation import PUNCTUATION, PUNCTUATION_SPACE
 from .text_align import TextAlignResult
@@ -268,6 +270,37 @@ class LatticeTokenizer:
             if split_sentence:
                 supervisions = self.split_sentences(supervisions)
 
+            # Detect nearby duplicate blocks before sending to backend
+            from lattifai.alignment.text_align import detect_duplicate_blocks
+
+            dup_blocks = detect_duplicate_blocks(supervisions)
+            if dup_blocks:
+
+                def _ts(s):
+                    h, rem = divmod(s, 3600)
+                    m, sec = divmod(rem, 60)
+                    return f"{int(h):02d}:{int(m):02d}:{sec:06.3f}"
+
+                safe_print(colorful.yellow(f"⚠️  Detected {len(dup_blocks)} duplicate text block(s):"))
+                for dup in dup_blocks:
+                    a_s, a_e = dup.block_a
+                    b_s, b_e = dup.block_b
+                    text_a = " ".join(supervisions[i].text for i in range(a_s, a_e + 1))
+                    text_b = " ".join(supervisions[i].text for i in range(b_s, b_e + 1))
+                    ts_a = f"{_ts(supervisions[a_s].start)}-{_ts(supervisions[a_e].end)}"
+                    ts_b = f"{_ts(supervisions[b_s].start)}-{_ts(supervisions[b_e].end)}"
+                    safe_print(
+                        colorful.yellow(
+                            f"         [{ts_a}]: {text_a[:100]}...\n" f"         [{ts_b}]: {text_b[:100]}..."
+                        )
+                    )
+                try:
+                    answer = input(colorful.cyan("   Continue with alignment? [Y/n] ")).strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    answer = ""
+                if answer in ("n", "no"):
+                    raise Exception("Aborted: please fix duplicate blocks in the subtitle file and retry.")
+
             pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
             response = self.client_wrapper.post(
                 "tokenize",
@@ -303,10 +336,13 @@ class LatticeTokenizer:
             raise Exception(f"Failed to tokenize texts: {response.text}")
         result = response.json()
         lattice_id = result["id"]
+        # Backend signals diff_detokenize when it built a diff graph; fallback to supervision type
+        diff_detokenize = result.get("diff_detokenize", not isinstance(supervisions[0], Supervision))
         return (
             supervisions,
             lattice_id,
             (result["lattice_graph"], result["final_state"], result.get("acoustic_scale", 1.0)),
+            diff_detokenize,
         )
 
     def detokenize(
@@ -318,45 +354,26 @@ class LatticeTokenizer:
         start_margin: float = 0.08,
         end_margin: float = 0.20,
         check_sanity: bool = True,
+        diff_detokenize: bool = False,
     ) -> List[Supervision]:
         emission_stats, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
         # emission_stats is a dict with 'max_probs' and 'aligned_probs' (unified for batch and streaming)
-        if isinstance(supervisions[0], Supervision):
-            response = self.client_wrapper.post(
-                "detokenize",
-                json={
-                    "model_name": self.model_name,
-                    "lattice_id": lattice_id,
-                    "frame_shift": frame_shift,
-                    "results": [t.to_dict() for t in results[0]],
-                    "labels": labels[0],
-                    "offset": offset,
-                    "channel": channel,
-                    "return_details": False if return_details is None else return_details,
-                    "destroy_lattice": True,
-                    "start_margin": start_margin,
-                    "end_margin": end_margin,
-                    "check_sanity": check_sanity,
-                },
-            )
-        else:
-            response = self.client_wrapper.post(
-                "diffdetokenize",
-                json={
-                    "model_name": self.model_name,
-                    "lattice_id": lattice_id,
-                    "frame_shift": frame_shift,
-                    "results": [t.to_dict() for t in results[0]],
-                    "labels": labels[0],
-                    "offset": offset,
-                    "channel": channel,
-                    "return_details": False if return_details is None else return_details,
-                    "destroy_lattice": True,
-                    "start_margin": start_margin,
-                    "end_margin": end_margin,
-                    "check_sanity": check_sanity,
-                },
-            )
+        detokenize_body = {
+            "model_name": self.model_name,
+            "lattice_id": lattice_id,
+            "frame_shift": frame_shift,
+            "results": [t.to_dict() for t in results[0]],
+            "labels": labels[0],
+            "offset": offset,
+            "channel": channel,
+            "return_details": False if return_details is None else return_details,
+            "destroy_lattice": True,
+            "start_margin": start_margin,
+            "end_margin": end_margin,
+            "check_sanity": check_sanity,
+        }
+        endpoint = "diffdetokenize" if diff_detokenize else "detokenize"
+        response = self.client_wrapper.post(endpoint, json=detokenize_body)
 
         if response.status_code == 400:
             raise LatticeDecodingError(
