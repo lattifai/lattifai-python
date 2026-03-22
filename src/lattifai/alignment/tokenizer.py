@@ -295,15 +295,28 @@ class LatticeTokenizer:
                             f"         [{second_ts}]: {second_text[:100]}..."
                         )
                     )
+                import select
                 import sys
 
+                safe_print(
+                    colorful.cyan(
+                        "   Auto-optimization handles duplicates with high accuracy (recommended).\n"
+                        "   Continue with alignment? [Y/n] (auto-yes in 10s) "
+                    ),
+                    end="",
+                    flush=True,
+                )
                 if sys.stdin.isatty():
                     try:
-                        answer = input(colorful.cyan("   Continue with alignment? [Y/n] ")).strip().lower()
+                        ready, _, _ = select.select([sys.stdin], [], [], 10.0)
+                        answer = sys.stdin.readline().strip().lower() if ready else ""
                     except (EOFError, KeyboardInterrupt):
                         answer = ""
+                    print()  # newline after prompt
                     if answer in ("n", "no"):
                         raise Exception("Aborted: please fix duplicate blocks in the subtitle file and retry.")
+                else:
+                    print()  # newline for non-interactive
 
             pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
             request_body = {
