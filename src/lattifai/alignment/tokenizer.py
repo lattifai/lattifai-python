@@ -89,7 +89,7 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True, attach_punct
     # - \u00C0-\u00FF: Latin-1 Supplement (À-ÿ)
     # - \u0100-\u017F: Latin Extended-A
     # - \u0180-\u024F: Latin Extended-B
-    pattern = re.compile(r"(\[[A-Z_]+\]|[a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
+    pattern = re.compile(r"(\[[^\]]+\]|[a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
 
     # filter(None, ...) removes any empty strings from re.findall results
     tokens = list(filter(None, pattern.findall(text)))
