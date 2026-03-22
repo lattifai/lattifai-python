@@ -111,11 +111,12 @@ class AlignmentConfig:
     """Enable RMS-based volume normalization before ONNX inference.
     Boosts quiet audio to improve alignment quality. Default: True."""
 
-    flush: Union[bool, Literal["auto"]] = "auto"
-    """Memory optimization for streaming alignment via state flushing.
-    - 'auto': enable when audio > 1 hour AND chunk >= 30s (default)
-    - True: always flush (O(chunk) memory, slight quality loss at boundaries)
-    - False: never flush (O(total) memory, globally optimal)
+    flush: Union[int, Literal["auto"]] = "auto"
+    """Flush interval for streaming alignment (every N chunks).
+    - 'auto': auto-decide based on audio duration and chunk size (default)
+    - 0: never flush (O(total) memory, globally optimal)
+    - N (positive int): flush every N chunks (higher N = better quality, more memory)
+      e.g. flush=1 flushes every chunk, flush=5 accumulates 5 chunks before flushing
     """
 
     check_sanity: bool = True

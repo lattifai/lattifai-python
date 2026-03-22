@@ -198,21 +198,24 @@ class Lattice1Worker:
                 allow_partial=True,
             )
 
-            # Streaming mode — choose O(chunk) flush path or legacy accumulate path.
-            # Flush caps memory at O(chunk) but uses per-chunk extraction.
+            # Streaming mode — flush every N chunks for memory/quality tradeoff.
+            # flush=0: never flush (O(total) memory, globally optimal)
+            # flush=N: flush every N chunks (higher N = better quality, more memory)
+            # flush="auto": auto-decide based on duration and chunk size
             flush_cfg = getattr(self.alignment_config, "flush", "auto") if self.alignment_config else "auto"
-            if flush_cfg is True:
-                use_flush = hasattr(intersecter, "decode_and_flush")
-            elif flush_cfg is False:
-                use_flush = False
-            else:  # "auto"
-                _MIN_DURATION = 3600  # 1 hour — below this legacy path fits in memory (~2GB)
+            has_flush = hasattr(intersecter, "decode_and_flush")
+            if isinstance(flush_cfg, int):
+                flush_interval = flush_cfg if has_flush else 0
+            elif flush_cfg == "auto":
+                _MIN_DURATION = 3600  # 1 hour
                 _MIN_CHUNK_SECS = 30  # chunk must be large enough for ShortestPath
-                use_flush = (
-                    hasattr(intersecter, "decode_and_flush")
-                    and audio.duration > _MIN_DURATION
-                    and audio.streaming_chunk_secs >= _MIN_CHUNK_SECS
-                )
+                if has_flush and audio.duration > _MIN_DURATION and audio.streaming_chunk_secs >= _MIN_CHUNK_SECS:
+                    # Auto: ~10 min worth of chunks per flush cycle
+                    flush_interval = max(1, int(600 / audio.streaming_chunk_secs))
+                else:
+                    flush_interval = 0
+            else:
+                flush_interval = 0
             total_duration = audio.duration
             total_minutes = int(total_duration / 60.0)
 
@@ -226,12 +229,14 @@ class Lattice1Worker:
                 unit_scale=False,
                 unit_divisor=1,
             ) as pbar:
+                chunk_counter = 0
                 for chunk in audio.iter_chunks():
                     chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale)
                     chunk_len = chunk_emission.shape[1]
 
                     __start = time.time()
-                    if use_flush:
+                    chunk_counter += 1
+                    if flush_interval > 0 and chunk_counter % flush_interval == 0:
                         intersecter.decode_and_flush(chunk_emission[0])
                     else:
                         intersecter.decode(chunk_emission[0])
