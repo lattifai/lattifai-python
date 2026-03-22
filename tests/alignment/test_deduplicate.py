@@ -91,6 +91,44 @@ class TestDetectDuplicateBlocks:
         dups = detect_duplicate_blocks(sups, max_time_gap=60)
         assert len(dups) == 0
 
+    def test_chinese_duplicate(self):
+        """CJK text without spaces should be tokenized per-character and detected."""
+        shared = "我刚刚把它做成了主动式的所以我添加了一个提示词最初只是一个提示词每半小时给我一个惊喜"
+        sups = [
+            _sup(0, 5, shared),
+            _sup(5, 3, "这是一段过渡文字"),
+            _sup(8, 4, shared),
+            _sup(12, 5, "结束语在这里"),
+        ]
+        dups = detect_duplicate_blocks(sups, min_match_words=10)
+        assert len(dups) >= 1
+        assert dups[0].matched_words >= 10
+
+    def test_mixed_cjk_latin_duplicate(self):
+        """Mixed Chinese-English text should be detected correctly."""
+        shared = "我用Claude来做forced alignment效果非常好每次都能得到精确的时间戳"
+        sups = [
+            _sup(0, 5, "这是开头的一段话"),
+            _sup(5, 8, shared),
+            _sup(13, 3, "中间有一些其他内容"),
+            _sup(16, 4, shared),
+            _sup(20, 5, "这是结尾"),
+        ]
+        dups = detect_duplicate_blocks(sups, min_match_words=8)
+        assert len(dups) >= 1
+
+    def test_japanese_duplicate(self):
+        """Japanese text (hiragana/katakana/kanji mix) should be detected."""
+        shared = "このシステムは音声とテキストを正確に同期させることができます"
+        sups = [
+            _sup(0, 5, shared),
+            _sup(5, 2, "別のテキスト"),
+            _sup(7, 4, shared),
+            _sup(11, 3, "終わり"),
+        ]
+        dups = detect_duplicate_blocks(sups, min_match_words=8, ngram=6)
+        assert len(dups) >= 1
+
 
 # ---------------------------------------------------------------------------
 # deduplicate_supervisions

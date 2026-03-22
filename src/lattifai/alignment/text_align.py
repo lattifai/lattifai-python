@@ -451,7 +451,7 @@ DuplicateBlock = namedtuple("DuplicateBlock", ["first", "second", "matched_words
 def detect_duplicate_blocks(
     supervisions: List[Supervision],
     ngram: int = 8,
-    min_match_words: int = 15,
+    min_match_words: int = 10,
     max_word_gap: int = 300,
     max_time_gap: float = 300.0,
 ) -> List[DuplicateBlock]:
@@ -476,11 +476,14 @@ def detect_duplicate_blocks(
     if len(supervisions) < 2:
         return []
 
-    # Build word stream with segment index mapping
+    # Build word stream with segment index mapping (multilingual-aware)
+    from .tokenizer import tokenize_multilingual_text
+
     words: List[str] = []
     word_to_seg: List[int] = []
     for seg_idx, sup in enumerate(supervisions):
-        for w in sup.text.lower().split():
+        tokens = tokenize_multilingual_text(sup.text.lower(), keep_spaces=False)
+        for w in tokens:
             words.append(w)
             word_to_seg.append(seg_idx)
 
