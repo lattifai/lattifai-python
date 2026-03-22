@@ -97,6 +97,7 @@ class Lattice1Aligner(object):
         offset: float = 0.0,
         verbose: bool = True,
         metadata: Optional[dict] = None,
+        skip_duplicate_prompt: bool = False,
     ) -> Tuple[List[Supervision], List[Supervision]]:
         """
         Perform alignment on audio and supervisions.
@@ -116,7 +117,7 @@ class Lattice1Aligner(object):
         """
         # Step 2: Create lattice graph
         if verbose:
-            safe_print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
+            safe_print(colorful.cyan("🔗 Step 2: Creating lattice graph from caption"))
         try:
             supervisions, lattice_id, lattice_graph, diff_detokenize = self.tokenizer.tokenize(
                 supervisions,
@@ -124,6 +125,7 @@ class Lattice1Aligner(object):
                 boost=self.config.boost,
                 transition_penalty=self.config.transition_penalty,
                 metadata=metadata,
+                skip_duplicate_prompt=skip_duplicate_prompt,
             )
             if verbose:
                 safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))

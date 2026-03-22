@@ -263,6 +263,7 @@ class LatticeTokenizer:
         boost: float = 0.0,
         transition_penalty: Optional[float] = 0.0,
         metadata: Optional[dict] = None,
+        skip_duplicate_prompt: bool = False,
     ) -> Tuple[str, Dict[str, Any]]:
         client_info = self._get_client_info()
 
@@ -274,7 +275,7 @@ class LatticeTokenizer:
             from lattifai.alignment.text_align import detect_duplicate_blocks
 
             dup_blocks = detect_duplicate_blocks(supervisions)
-            if dup_blocks:
+            if dup_blocks and not skip_duplicate_prompt:
 
                 def _ts(s):
                     h, rem = divmod(s, 3600)
@@ -295,7 +296,6 @@ class LatticeTokenizer:
                             f"         [{second_ts}]: {second_text[:100]}..."
                         )
                     )
-                import select
                 import sys
 
                 safe_print(
@@ -307,14 +307,16 @@ class LatticeTokenizer:
                     flush=True,
                 )
                 if sys.stdin.isatty():
+                    import select
+
                     try:
                         ready, _, _ = select.select([sys.stdin], [], [], 10.0)
                         answer = sys.stdin.readline().strip().lower() if ready else ""
                     except (EOFError, KeyboardInterrupt):
                         answer = ""
-                    print()  # newline after prompt
                     if answer in ("n", "no"):
                         raise Exception("Aborted: please fix duplicate blocks in the subtitle file and retry.")
+                    print()  # newline after prompt
                 else:
                     print()  # newline for non-interactive
 
@@ -411,7 +413,7 @@ class LatticeTokenizer:
         # Add emission confidence scores for segments and word-level alignments
         _add_confidence_scores(alignments, emission_stats, frame_shift, offset)
 
-        if isinstance(supervisions[0], Supervision):
+        if isinstance(supervisions[0], Supervision) and not diff_detokenize:
             alignments = _update_alignments_speaker(supervisions, alignments)
         else:
             # NOTE: Text Diff Alignment >> speaker has been handled in the backend service

@@ -129,6 +129,61 @@ class TestDetectDuplicateBlocks:
         dups = detect_duplicate_blocks(sups, min_match_words=8, ngram=6)
         assert len(dups) >= 1
 
+    def test_intra_segment_parallel_structure_not_detected(self):
+        """Parallel structure within a single supervision should NOT be flagged.
+
+        Example: "接受文本、音频和图像的任意组合作为输入，并生成文本、音频和图像的任意组合的输出"
+        contains "文本、音频和图像的任意组合" twice but it's rhetorical parallelism, not a duplicate block.
+        """
+        sups = [
+            _sup(0, 5, "这是开头的一段话用来填充"),
+            _sup(
+                5,
+                10,
+                "这使得GPT-4o能够接受文本、音频和图像的任意组合作为输入，并生成文本、音频和图像的任意组合的输出。",
+            ),
+            _sup(15, 5, "是兼具了听觉视觉的多模态模型"),
+        ]
+        dups = detect_duplicate_blocks(sups, min_match_words=10)
+        assert len(dups) == 0
+
+    def test_intra_segment_parallel_at_different_timestamps(self):
+        """Same parallel structure in two separate supervisions at different times should NOT be flagged
+        when both are intra-segment matches and the time gap exceeds max_time_gap."""
+        sups = [
+            _sup(0, 5, "这是开头"),
+            _sup(
+                5,
+                20,
+                "这使得GPT-4o能够接受文本、音频和图像的任意组合作为输入，并生成文本、音频和图像的任意组合的输出。",
+            ),
+            _sup(25, 5, "过渡内容在这里"),
+            # Same sentence repeated by speaker referencing earlier content, 12 minutes later
+            _sup(
+                750,
+                15,
+                "我们视频之前也有说到，这使得GPT-4o能够接受文本、音频和图像的任意组合作为输入，并生成文本、音频和图像的任意组合的输出。",
+            ),
+            _sup(765, 5, "这是结尾"),
+        ]
+        dups = detect_duplicate_blocks(sups, min_match_words=10, max_time_gap=300)
+        assert len(dups) == 0
+
+    def test_true_duplicate_still_detected_with_parallel_structure(self):
+        """A genuine nearby duplicate should still be detected even if it contains parallel structure."""
+        text = "这使得GPT-4o能够接受文本、音频和图像的任意组合作为输入，并生成文本、音频和图像的任意组合的输出。"
+        sups = [
+            _sup(0, 5, "这是开头"),
+            _sup(5, 10, text),
+            _sup(15, 3, "过渡文字"),
+            _sup(18, 10, text),  # genuine duplicate nearby
+            _sup(28, 5, "这是结尾"),
+        ]
+        dups = detect_duplicate_blocks(sups, min_match_words=10)
+        assert len(dups) >= 1
+        # The detected block should span different supervisions
+        assert dups[0].first != dups[0].second
+
 
 # ---------------------------------------------------------------------------
 # deduplicate_supervisions

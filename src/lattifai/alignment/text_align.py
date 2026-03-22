@@ -535,6 +535,10 @@ def detect_duplicate_blocks(
 
         seg_a = (word_to_seg[pa], word_to_seg[min(pa + mlen - 1, len(word_to_seg) - 1)])
         seg_b = (word_to_seg[pb], word_to_seg[min(pb + mlen - 1, len(word_to_seg) - 1)])
+        # Skip intra-segment matches (e.g., parallel structures like
+        # "接受X作为输入，并生成X的输出" where X repeats within the same supervision)
+        if seg_a == seg_b:
+            continue
         results.append(DuplicateBlock(first=seg_a, second=seg_b, matched_words=mlen, time_gap=tgap))
 
     return sorted(results, key=lambda x: x.first[0])

@@ -1,5 +1,6 @@
 """LattifAI client implementation with config-driven architecture."""
 
+import functools
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -323,7 +324,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             input_media,
             caption.alignments,
             diarization=caption.diarization,
-            alignment_fn=(self.aligner.alignment, self.aligner.emission),
+            alignment_fn=(
+                functools.partial(self.aligner.alignment, skip_duplicate_prompt=True),
+                self.aligner.emission,
+            ),
             transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
             separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
             output_path=output_caption_path,
