@@ -343,6 +343,14 @@ YouTube URL → Downloader → Media File + Auto Caption
 - Error handling: Custom exceptions in `errors.py`, raise specific errors with context
 - **Multilingual**: All text processing (tokenization, splitting, duplicate detection, normalization) must handle mixed-language content (CJK, Latin, accented characters, etc.). Never assume input is English-only.
 
+## Common Pitfalls
+
+- **`nemo_run.Config` subclasses**: Do NOT use mutable defaults (list, dict). Use `field(default_factory=...)` instead.
+- **`lattifai-captions`**: This is a separate package (not in this repo). Import as `from lattifai_captions import ...`. Do not confuse with `src/lattifai/caption/` which is the local caption module.
+- **Tests requiring API keys**: Alignment tests need `LATTIFAI_API_KEY`, transcription tests need `GEMINI_API_KEY`. Tests will skip or fail without them.
+- **W503 is globally ignored**: Do not add per-file W503 ignores in `.flake8` — it is already in the top-level `ignore` list.
+- **`youtube/client.py` is 78KB**: This file is very large. Read only the specific function you need, not the whole file.
+
 ## Language Guidelines
 
 - **Code Modification Explanations**: All explanations regarding code modifications must be in English.
