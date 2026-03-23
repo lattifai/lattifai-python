@@ -1642,37 +1642,47 @@ class YouTubeDownloader:
         # Extract video ID
         video_id = self.extract_video_id(url)
 
-        # Priority 1: Check for external transcript URL in video description
-        # This provides higher-quality human-edited transcripts (e.g., Lex Fridman, Dwarkesh)
+        # --- Phase 1: External transcript (high-quality, with speaker labels) ---
+        # Always attempt; result is stored for later return but does NOT skip YT download.
+        external_transcript_path = None
         try:
-            # Quick check: if .transcript.md already exists, use it directly
             transcript_md = target_dir / f"{video_id}.transcript.md"
             if transcript_md.exists() and not force_overwrite:
-                self.logger.info(f"✅ Using existing external transcript: {transcript_md}")
-                return str(transcript_md)
-
-            info = await self.get_video_info(url)
-            description = info.get("description", "")
-
-            transcript_url = self._extract_transcript_url_from_description(description)
-            if transcript_url:
-                self.logger.info(f"🔗 Found transcript URL in description: {transcript_url}")
-                ext_path = await self._download_external_transcript(
-                    transcript_url, output_dir, video_id, youtube_url=url, video_info=info
-                )
-                if ext_path:
-                    return ext_path
+                self.logger.info(f"✅ Found existing external transcript: {transcript_md}")
+                external_transcript_path = str(transcript_md)
+            else:
+                info = await self.get_video_info(url)
+                description = info.get("description", "")
+                transcript_url = self._extract_transcript_url_from_description(description)
+                if transcript_url:
+                    self.logger.info(f"🔗 Found transcript URL in description: {transcript_url}")
+                    ext_path = await self._download_external_transcript(
+                        transcript_url, output_dir, video_id, youtube_url=url, video_info=info
+                    )
+                    if ext_path:
+                        external_transcript_path = ext_path
         except Exception as e:
             self.logger.debug(f"External transcript check skipped: {e}")
 
-        # Priority 2: Check for existing caption files (vtt, srt, etc.)
+        # --- Phase 2: YouTube captions (accurate timestamps) ---
+        # Always download YT captions so both sources are available on disk.
+        yt_caption_exists = False
         if not force_overwrite:
             existing_files = FileExistenceManager.check_existing_files(
                 video_id, str(target_dir), caption_formats=CAPTION_FORMATS
             )
+            if existing_files["caption"]:
+                yt_caption_exists = True
+                self.logger.info(f"🔍 Found existing YT caption: {existing_files['caption'][0]}")
 
-            # Handle existing caption files
-            if existing_files["caption"] and not force_overwrite:
+        # If external transcript exists and YT captions already on disk, return transcript
+        if external_transcript_path and yt_caption_exists:
+            self.logger.info(f"✅ Both sources available. Using external transcript: {external_transcript_path}")
+            return external_transcript_path
+
+        # If YT captions exist but no external transcript, use YT captions
+        if yt_caption_exists and not external_transcript_path:
+            if not force_overwrite:
                 if FileExistenceManager.is_interactive_mode():
                     user_choice = FileExistenceManager.prompt_user_confirmation(
                         {"caption": existing_files["caption"]}, "caption download", transcriber_name=transcriber_name
@@ -1681,23 +1691,19 @@ class YouTubeDownloader:
                     if user_choice == "cancel":
                         raise RuntimeError("Caption download cancelled by user")
                     elif user_choice == "overwrite":
-                        # Continue with download
-                        pass
+                        pass  # Continue with download below
                     elif user_choice == TRANSCRIBE_CHOICE:
                         return TRANSCRIBE_CHOICE
                     elif user_choice in existing_files["caption"]:
-                        # User selected a specific file
                         caption_file = Path(user_choice)
                         self.logger.info(f"✅ Using selected caption file: {caption_file}")
                         return str(caption_file)
                     else:
-                        # Fallback: use first file
                         caption_file = Path(existing_files["caption"][0])
                         self.logger.info(f"✅ Using existing caption file: {caption_file}")
                         return str(caption_file)
                 else:
                     caption_file = Path(existing_files["caption"][0])
-                    self.logger.info(f"🔍 Found existing caption: {caption_file}")
                     return str(caption_file)
 
         self.logger.info(f"📥 Downloading caption for: {url}")
@@ -1749,7 +1755,7 @@ class YouTubeDownloader:
         except Exception as e:
             self.logger.error(f"Failed to download transcript: {str(e)}")
 
-        # Find the downloaded transcript file
+        # Find the downloaded YT caption files
         caption_patterns = [
             f"{video_id}.*vtt",
             f"{video_id}.*srt",
@@ -1763,17 +1769,24 @@ class YouTubeDownloader:
         for pattern in caption_patterns:
             _caption_files = list(target_dir.glob(pattern))
             for caption_file in _caption_files:
-                self.logger.info(f"📥 Downloaded caption: {caption_file}")
+                self.logger.info(f"📥 YT caption on disk: {caption_file}")
             caption_files.extend(_caption_files)
 
-        # If only one caption file, return it directly
+        # --- Phase 3: Choose best source ---
+        # External transcript (speaker labels + metadata) is preferred over YT captions
+        if external_transcript_path:
+            if caption_files:
+                self.logger.info(f"✅ Both sources available: external transcript + {len(caption_files)} YT caption(s)")
+            self.logger.info(f"✅ Using external transcript: {external_transcript_path}")
+            return external_transcript_path
+
+        # No external transcript — fall back to YT captions
         if len(caption_files) == 1:
-            self.logger.info(f"✅ Using caption: {caption_files[0]}")
+            self.logger.info(f"✅ Using YT caption: {caption_files[0]}")
             return str(caption_files[0])
 
-        # Multiple caption files found, let user choose
-        if FileExistenceManager.is_interactive_mode():
-            self.logger.info(f"📋 Found {len(caption_files)} caption files")
+        if caption_files and FileExistenceManager.is_interactive_mode():
+            self.logger.info(f"📋 Found {len(caption_files)} YT caption files")
             caption_choice = FileExistenceManager.prompt_file_selection(
                 file_type="caption",
                 files=[str(f) for f in caption_files],
@@ -1788,16 +1801,11 @@ class YouTubeDownloader:
             elif caption_choice:
                 self.logger.info(f"✅ Selected caption: {caption_choice}")
                 return caption_choice
-            elif caption_files:
-                # Fallback to first file
+            else:
                 self.logger.info(f"✅ Using first caption: {caption_files[0]}")
                 return str(caption_files[0])
-            else:
-                self.logger.warning("No caption files available after download")
-                return None
         elif caption_files:
-            # Non-interactive mode: use first file
-            self.logger.info(f"✅ Using first caption: {caption_files[0]}")
+            self.logger.info(f"✅ Using first YT caption: {caption_files[0]}")
             return str(caption_files[0])
         else:
             self.logger.warning("No caption files available after download")
