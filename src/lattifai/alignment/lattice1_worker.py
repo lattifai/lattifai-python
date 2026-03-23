@@ -199,19 +199,19 @@ class Lattice1Worker:
             )
 
             # Streaming mode — flush every N chunks for memory/quality tradeoff.
-            # flush=0: never flush (O(total) memory, globally optimal)
-            # flush=N: flush every N chunks (higher N = better quality, more memory)
-            # flush="auto": auto-decide based on duration and chunk size
-            flush_cfg = getattr(self.alignment_config, "flush", "auto") if self.alignment_config else "auto"
+            # flush_interval=0: never flush (O(total) memory, globally optimal)
+            # flush_interval=N: flush every N chunks (higher N = better quality, more memory)
+            # flush_interval="auto": auto-decide based on duration and chunk size
+            flush_cfg = getattr(self.alignment_config, "flush_interval", "auto") if self.alignment_config else "auto"
             has_flush = hasattr(intersecter, "decode_and_flush")
             if isinstance(flush_cfg, int):
                 flush_interval = flush_cfg if has_flush else 0
             elif flush_cfg == "auto":
-                _MIN_DURATION = 3600  # 1 hour
-                _MIN_CHUNK_SECS = 30  # chunk must be large enough for ShortestPath
+                _MIN_DURATION = 2400  # 40 minutes
+                _MIN_CHUNK_SECS = 300  # chunk must be large enough for ShortestPath
                 if has_flush and audio.duration > _MIN_DURATION and audio.streaming_chunk_secs >= _MIN_CHUNK_SECS:
                     # Auto: ~10 min worth of chunks per flush cycle
-                    flush_interval = max(1, int(600 / audio.streaming_chunk_secs))
+                    flush_interval = max(1, int(1200 / audio.streaming_chunk_secs))
                 else:
                     flush_interval = 0
             else:
