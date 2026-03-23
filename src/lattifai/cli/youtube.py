@@ -138,6 +138,63 @@ def youtube(
     )
 
 
+@run.cli.entrypoint(name="run", namespace="youtube")
+def youtube_run(
+    yt_url: Optional[str] = None,
+    media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
+    client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
+    alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
+    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
+    transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
+    diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
+    event: Annotated[Optional[EventConfig], run.Config[EventConfig]] = None,
+    use_transcription: bool = False,
+):
+    """
+    Download media and captions from YouTube, then align.
+
+    Full workflow:
+    1. Downloads audio/video from YouTube
+    2. Downloads YT captions AND external transcript (if available)
+    3. Performs forced alignment with captions
+
+    This is identical to ``lai alignment youtube`` but accessible as
+    ``lai youtube run`` for discoverability.
+
+    Args:
+        yt_url: YouTube video URL
+        media: Media configuration (output_dir, output_format, quality, etc.)
+        client: API client configuration
+        alignment: Alignment model configuration
+        caption: Caption I/O configuration
+        transcription: Transcription configuration (for Gemini fallback)
+        diarization: Speaker diarization configuration
+        event: Audio event detection configuration
+        use_transcription: Skip YT captions, transcribe directly
+
+    Examples:
+        lai youtube run "https://www.youtube.com/watch?v=VIDEO_ID"
+
+        lai youtube run "https://www.youtube.com/watch?v=VIDEO_ID" \\
+            media.output_dir=./output caption.output_format=srt
+
+        lai youtube run "https://www.youtube.com/watch?v=VIDEO_ID" \\
+            diarization.enabled=true diarization.infer_speakers=true
+    """
+    # Delegate to the existing youtube() function
+    return youtube(
+        yt_url=yt_url,
+        media=media,
+        client=client,
+        alignment=alignment,
+        caption=caption,
+        transcription=transcription,
+        diarization=diarization,
+        event=event,
+        use_transcription=use_transcription,
+    )
+
+
 @run.cli.entrypoint(name="transcript", namespace="youtube")
 def transcript(
     yt_url: Optional[str] = None,

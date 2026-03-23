@@ -11,7 +11,7 @@ from lattifai.cli.diarization import diarize
 from lattifai.cli.serve import serve
 from lattifai.cli.transcribe import transcribe, transcribe_align
 from lattifai.cli.translate import translate
-from lattifai.cli.youtube import transcript, youtube
+from lattifai.cli.youtube import transcript, youtube, youtube_run
 
 __all__ = [
     "align",
@@ -24,4 +24,5 @@ __all__ = [
     "transcript",
     "translate",
     "youtube",
+    "youtube_run",
 ]
