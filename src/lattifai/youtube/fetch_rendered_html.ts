@@ -8,7 +8,7 @@
  * Called from Python via subprocess for SPA/CSR pages where plain HTTP returns an empty shell.
  *
  * CDP core (CdpConnection, Chrome launcher, page-load helpers) is adapted from
- * baoyu-url-to-markdown (https://github.com/nicepkg/baoyu-skills) — MIT License.
+ * baoyu-url-to-markdown (https://github.com/JimLiu/baoyu-skills) — MIT License.
  */
 
 import {
@@ -21,8 +21,8 @@ import {
   autoScroll,
   evaluateScript,
   killChrome,
-} from "/Users/feiteng/.claude/skills/baoyu-url-to-markdown/scripts/cdp.js";
-import { CDP_CONNECT_TIMEOUT_MS } from "/Users/feiteng/.claude/skills/baoyu-url-to-markdown/scripts/constants.js";
+} from "./scripts/cdp.js";
+import { CDP_CONNECT_TIMEOUT_MS } from "./scripts/constants.js";
 
 const url = process.argv[2];
 const timeoutMs = parseInt(process.argv[3] || "30000");

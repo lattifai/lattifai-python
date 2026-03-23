@@ -19,6 +19,8 @@ def diarize(
     input_media: Optional[str] = None,
     input_caption: Optional[str] = None,
     output_caption: Optional[str] = None,
+    infer_speakers: bool = False,
+    speaker_context: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
     client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
@@ -51,6 +53,10 @@ def diarize(
         caption_config.set_output_path(output_caption)
 
     diarization_config.enabled = True
+    if infer_speakers:
+        diarization_config.infer_speakers = True
+    if speaker_context:
+        diarization_config.speaker_context = speaker_context
 
     client_instance = LattifAI(
         client_config=client,

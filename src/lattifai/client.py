@@ -34,6 +34,34 @@ if TYPE_CHECKING:
     from lattifai.event import LattifAIEventDetector  # noqa: F401
 
 
+def _build_speaker_context(metadata: dict) -> Optional[str]:
+    """Build speaker context string from video metadata for LLM inference.
+
+    Extracts the most useful signals: channel name (host), description first
+    paragraph (guest introductions), and video title.
+    """
+    parts = []
+
+    title = metadata.get("title")
+    if title:
+        parts.append(f"Title: {title}")
+
+    uploader = metadata.get("uploader")
+    if uploader:
+        parts.append(f"Channel/Host: {uploader}")
+
+    description = metadata.get("description", "")
+    if description:
+        # First paragraph is usually the guest introduction
+        first_para = description.split("\n\n")[0].strip()
+        # Take first 500 chars to avoid bloating the prompt
+        if len(first_para) > 500:
+            first_para = first_para[:500] + "..."
+        parts.append(f"Description: {first_para}")
+
+    return "\n".join(parts) if parts else None
+
+
 class LattifAI(LattifAIClientMixin, SyncAPIClient):
     __doc__ = LattifAIClientMixin._CLASS_DOC.format(
         sync_or_async="Synchronous",
@@ -313,6 +341,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         if not self.diarizer:
             raise RuntimeError("Diarizer not initialized. Set diarization_config.enabled=True")
 
+        # Auto-build speaker_context from caption metadata if not explicitly set
+        if self.diarization_config.infer_speakers and not self.diarization_config.speaker_context and caption.metadata:
+            self.diarization_config.speaker_context = _build_speaker_context(caption.metadata)
+
         # Perform diarization and assign speaker labels to caption alignments
         if output_caption_path:
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
@@ -384,6 +416,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_caption_path = self._generate_output_caption_path(output_caption_path, media_file, output_dir)
 
         # Step 4: Perform alignment
+        # Metadata flows from frontmatter (read into caption.metadata) + video_url fallback
         safe_print(colorful.cyan("🔗 Performing forced alignment..."))
 
         caption: Caption = self.alignment(

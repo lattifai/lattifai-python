@@ -51,7 +51,7 @@ class DiarizationConfig:
     置信度门控：speaker 被标注的片段与 diarization tier 重叠的最小总时长（秒）。
 
     When input captions carry speaker labels — from Gemini transcription, original
-    subtitle metadata, or any other source — we check how much of each labeled
+    caption metadata, or any other source — we check how much of each labeled
     speaker's audio overlaps with each diarization tier (SPEAKER_00, SPEAKER_01, ...).
     If the total overlap with the best-matching tier is below this threshold, the
     evidence is too weak to rename the tier — it stays as-is (e.g. "SPEAKER_01").
@@ -78,6 +78,19 @@ class DiarizationConfig:
 
     See min_claim_duration tip for how to disable renaming entirely.
     """
+
+    infer_speakers: bool = False
+    """Use LLM to infer real speaker names from transcript content.
+    When enabled, speakers still labeled as SPEAKER_XX after acoustic diarization
+    will be identified via LLM analysis of their speech content.
+    Requires GEMINI_API_KEY environment variable."""
+
+    speaker_context: Optional[str] = None
+    """Optional context hint for LLM speaker name inference,
+    e.g. "podcast interview, host is Zhang San, guest is Li Si"."""
+
+    infer_model: Optional[str] = None
+    """Model name for speaker name inference LLM. Defaults to gemini-2.5-flash."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""

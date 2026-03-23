@@ -71,6 +71,18 @@ class LattifAIDiarizer:
             segmentation_step=self.config.segmentation_step,
         )
 
+    def _build_speaker_infer_fn(self):
+        """Build LLM speaker name inference callback from config, or None if disabled."""
+        if not self.config.infer_speakers:
+            return None
+
+        from lattifai.diarization.speaker import SpeakerNameInferrer
+        from lattifai.llm import create_client
+
+        model = self.config.infer_model or "gemini-2.5-flash"
+        llm_client = create_client("gemini", model=model)
+        return SpeakerNameInferrer(llm_client=llm_client, model=model)
+
     def diarize_with_alignments(
         self,
         input_media: AudioData,
@@ -100,4 +112,6 @@ class LattifAIDiarizer:
             debug=self.config.debug,
             min_claim_duration=self.config.min_claim_duration,
             min_claim_count=self.config.min_claim_count,
+            speaker_name_infer_fn=self._build_speaker_infer_fn(),
+            speaker_context=self.config.speaker_context,
         )

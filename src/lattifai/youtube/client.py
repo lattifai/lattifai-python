@@ -1088,6 +1088,7 @@ class YouTubeDownloader:
         output_dir: str,
         video_id: str,
         youtube_url: Optional[str] = None,
+        video_info: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Download and parse a transcript from an external URL.
 
@@ -1146,7 +1147,33 @@ class YouTubeDownloader:
                 self.logger.warning("Failed to extract transcript content from page")
                 return None
 
-            output_path.write_text(transcript_text, encoding="utf-8")
+            # Prepend YAML frontmatter with video metadata if available
+            frontmatter = ""
+            if video_info:
+                fm_fields = []
+                for key in ["title", "duration", "upload_date"]:
+                    if video_info.get(key):
+                        fm_fields.append(f"{key}: {video_info[key]}")
+                if video_info.get("uploader"):
+                    fm_fields.append(f"channel: {video_info['uploader']}")
+                if youtube_url:
+                    fm_fields.append(f'url: "{youtube_url}"')
+                fm_fields.append(f"transcript_source: {transcript_url}")
+                desc = video_info.get("description", "")
+                if desc:
+                    # Truncate description before boilerplate sections
+                    for marker in ["*SPONSORS:", "*CONTACT ", "*EPISODE LINKS:", "*PODCAST LINKS:", "*SOCIAL LINKS:"]:
+                        pos = desc.find(marker)
+                        if pos > 0:
+                            desc = desc[:pos].rstrip()
+                            break
+                    desc = desc.replace("\n\n", "\n")
+                    fm_fields.append("description: |")
+                    for line in desc.split("\n"):
+                        fm_fields.append(f"  {line}")
+                frontmatter = "---\n" + "\n".join(fm_fields) + "\n---\n\n"
+
+            output_path.write_text(frontmatter + transcript_text, encoding="utf-8")
             self.logger.info(f"✅ Saved external transcript: {output_path} ({len(transcript_text)} chars)")
             return str(output_path)
 
@@ -1626,11 +1653,12 @@ class YouTubeDownloader:
 
             info = await self.get_video_info(url)
             description = info.get("description", "")
+
             transcript_url = self._extract_transcript_url_from_description(description)
             if transcript_url:
                 self.logger.info(f"🔗 Found transcript URL in description: {transcript_url}")
                 ext_path = await self._download_external_transcript(
-                    transcript_url, output_dir, video_id, youtube_url=url
+                    transcript_url, output_dir, video_id, youtube_url=url, video_info=info
                 )
                 if ext_path:
                     return ext_path
