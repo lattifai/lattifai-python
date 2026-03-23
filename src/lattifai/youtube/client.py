@@ -1092,8 +1092,12 @@ class YouTubeDownloader:
         """Download and parse a transcript from an external URL.
 
         Fetches the webpage, extracts text content with speaker labels and timestamps.
-        Saves as {video_id}.transcript.md in podcast-transcript format compatible
-        with lattifai-captions PodcastTranscriptReader.
+        Saves as {video_id}.transcript.md in markdown transcript format compatible
+        with lattifai-captions MarkdownReader.
+
+        Uses urllib first (fast, no dependencies). If the result looks like a
+        JS-rendered SPA (very little text content), falls back to headless Chrome
+        ``--dump-dom`` which executes JavaScript before returning the DOM.
 
         Returns:
             Path to saved transcript file, or None on failure
@@ -1126,8 +1130,18 @@ class YouTubeDownloader:
 
             html = await loop.run_in_executor(None, _fetch)
 
-            # Parse HTML to extract transcript in podcast-transcript markdown format
+            # Parse HTML to extract transcript in markdown format
             transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
+
+            # Detect SPA: if parsed text is too short but HTML is large, content is JS-rendered
+            if (not transcript_text or len(transcript_text) < 200) and len(html) > 2000:
+                spa_indicators = ['<div id="root"></div>', '<div id="app"></div>', "noscript>You need to enable"]
+                if any(indicator in html for indicator in spa_indicators):
+                    self.logger.info("🔄 SPA detected, falling back to headless Chrome...")
+                    html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url)
+                    if html:
+                        transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
+
             if not transcript_text:
                 self.logger.warning("Failed to extract transcript content from page")
                 return None
@@ -1141,18 +1155,89 @@ class YouTubeDownloader:
             return None
 
     @staticmethod
-    def _parse_transcript_html(html: str, youtube_url: Optional[str] = None) -> Optional[str]:
-        """Parse transcript HTML into podcast-transcript Markdown format.
+    def _find_chrome() -> Optional[str]:
+        """Find Chrome/Chromium executable on the system."""
+        import shutil
 
-        Output is compatible with lattifai-captions PodcastTranscriptReader:
+        candidates = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "google-chrome",
+            "google-chrome-stable",
+            "chromium",
+            "chromium-browser",
+        ]
+        # Allow override via environment variable
+        env_path = os.environ.get("CHROME_PATH") or os.environ.get("URL_CHROME_PATH")
+        if env_path:
+            candidates.insert(0, env_path)
+
+        for candidate in candidates:
+            if os.path.isfile(candidate) or shutil.which(candidate):
+                return candidate
+        return None
+
+    @staticmethod
+    def _fetch_with_headless_chrome(url: str, timeout: int = 45) -> Optional[str]:
+        """Fetch rendered page content using headless Chrome via CDP.
+
+        Zero-dependency fallback for SPA/CSR sites. Uses a lightweight TypeScript
+        script (fetch_rendered_html.ts) that launches system Chrome in headless mode,
+        waits for JS execution and network idle, then returns the rendered DOM.
+
+        Requires: system Chrome + bun (``npx -y bun``).
+        """
+        import shutil
+        import subprocess
+
+        logger = logging.getLogger(__name__)
+
+        # Locate the CDP fetch script (shipped alongside this module)
+        script = Path(__file__).parent / "fetch_rendered_html.ts"
+        if not script.exists():
+            logger.warning(f"CDP fetch script not found at {script}")
+            return None
+
+        # Check bun availability
+        if not shutil.which("bun") and not shutil.which("npx"):
+            logger.warning("Neither bun nor npx found. Cannot run headless Chrome CDP script.")
+            return None
+
+        runner = ["bun"] if shutil.which("bun") else ["npx", "-y", "bun"]
+
+        try:
+            result = subprocess.run(
+                [*runner, str(script), url, str(timeout * 1000)],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 10,  # subprocess timeout slightly longer than script timeout
+            )
+            html = result.stdout
+            if result.stderr:
+                logger.debug(f"CDP fetch: {result.stderr.strip()}")
+            if html and len(html) > 500:
+                return html
+            logger.warning(f"CDP fetch returned insufficient content ({len(html) if html else 0} bytes)")
+            return None
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Headless Chrome CDP timed out after {timeout}s for {url}")
+            return None
+        except Exception as e:
+            logger.warning(f"Headless Chrome CDP failed: {e}")
+            return None
+
+    @staticmethod
+    def _parse_transcript_html(html: str, youtube_url: Optional[str] = None) -> Optional[str]:
+        """Parse transcript HTML into markdown transcript format.
+
+        Output is compatible with lattifai-captions MarkdownReader:
+
+            **Speaker Name:** Transcript text... [HH:MM:SS]
+
+        Also supports the legacy podcast-transcript format:
 
             Speaker Name
             [(HH:MM:SS)](youtube_url&t=N)
-            Transcript text...
-
-        For pages without timestamps (Substack/Dwarkesh), outputs dialogue format:
-
-            Speaker Name
             Transcript text...
         """
         try:
@@ -1197,12 +1282,55 @@ class YouTubeDownloader:
                     self._flush()
                     return "\n".join(self.lines)
 
-            parser = TranscriptParser()
-            parser.feed(html)
-            text = parser.get_text()
+            # If input is not HTML (e.g. markdown from url-to-markdown), use as-is
+            if "<body" not in html.lower() and "<html" not in html.lower():
+                text = html
+            else:
+                parser = TranscriptParser()
+                parser.feed(html)
+                text = parser.get_text()
             lines = text.split("\n")
 
-            base_yt = youtube_url.split("?")[0] if youtube_url else None
+            # Patterns that indicate post-transcript UI noise (footer, social, nav).
+            # Must be precise to avoid matching spoken dialogue (e.g. "Subscribe to our YouTube...").
+            _ui_noise_re = re.compile(
+                r"^(\d+\s*Likes?\s*(∙|·)?\s*\d*\s*Restacks?"  # "36 Likes ∙ 7 Restacks"
+                r"|Discussion about this"
+                r"|Comments?\s*Restacks?"  # "Comments Restacks" nav
+                r"|Ready for more\?"
+                r"|Share$|Reply$|Like$|Subscribe$"  # standalone button labels
+                r"|©\s*\d{4}|Privacy\s*∙\s*Terms|Start your Substack|Get the app$"
+                r"|Show Topics$|See all$|Sign in$"
+                r"|Click on any sentence in the transcript"
+                r"|\d{1,2}月\d{1,2}日$"  # Chinese date (comment timestamps)
+                r"|OK: \d+ bytes)"  # CDP stderr leak
+            )
+
+            # Patterns to truncate from the end of the last segment's text content
+            _inline_noise_re = re.compile(
+                r"\s*(?:"
+                r"There aren't comments yet.*"
+                r"|Click on any sentence in the transcript.*"
+                r"|DO NOT SELL OR SHARE MY PERSONAL INFORMATION.*"
+                r"|What is this\?.*Report Ad.*"
+                r"|OK: \d+ bytes.*"
+                r")$"
+            )
+
+            def _clean_trailing_noise(md_text: str) -> str:
+                """Remove UI noise lines and inline noise from parsed transcript."""
+                out_lines = md_text.rstrip().split("\n")
+                # Remove trailing noise lines
+                while out_lines:
+                    last = out_lines[-1].strip()
+                    if not last or _ui_noise_re.match(last):
+                        out_lines.pop()
+                    else:
+                        break
+                # Also truncate inline noise from the last text line
+                if out_lines:
+                    out_lines[-1] = _inline_noise_re.sub("", out_lines[-1])
+                return "\n".join(out_lines) + "\n"
 
             def _hms_to_secs(hms: str) -> int:
                 parts = hms.split(":")
@@ -1212,12 +1340,26 @@ class YouTubeDownloader:
                     return int(parts[0]) * 60 + int(parts[1])
                 return int(parts[0])
 
-            # Strategy 1: timestamped lines "Speaker Name (HH:MM:SS) text"
-            # Convert to podcast-transcript format:
-            #   Speaker Name
-            #   [(HH:MM:SS)](youtube_url&t=N)
-            #   text
-            ts_pattern = re.compile(r"^(.+?)\s+\((\d{1,2}:\d{2}:\d{2})\)\s*(.*)")
+            def _format_segments(segments: list) -> str:
+                """Format segments into markdown transcript format: **Speaker:** text [HH:MM:SS]"""
+                md_lines = []
+                for seg in segments:
+                    speaker = seg.get("speaker") or ""
+                    text = seg.get("text", "").strip()
+                    hms = seg.get("hms")
+                    # Skip empty speaker or "Unknown"
+                    prefix = f"**{speaker}:** " if speaker and speaker != "Unknown" else ""
+                    suffix = f" [{hms}]" if hms else ""
+                    md_lines.append(f"{prefix}{text}{suffix}")
+                    md_lines.append("")
+                return _clean_trailing_noise("\n".join(md_lines))
+
+            # Strategy 1: timestamped lines with speaker names
+            # Supports: "Speaker (HH:MM:SS) text"       — lexfridman.com
+            #           "Speaker [HH:MM:SS]: text"      — latent.space / Substack
+            # Convert to markdown format:
+            #   **Speaker Name:** text [HH:MM:SS]
+            ts_pattern = re.compile(r"^(.+?)\s+[\(\[](\d{1,2}:\d{2}:\d{2})[\)\]]:?\s*(.*)")
             ts_segments = []
             in_transcript = False
             current_seg = None
@@ -1230,7 +1372,17 @@ class YouTubeDownloader:
                         ts_segments.append(current_seg)
                     current_seg = {"speaker": m.group(1), "hms": m.group(2), "text": m.group(3).strip()}
                 elif in_transcript and current_seg:
+                    # Skip navigation / UI noise lines
                     if re.match(r"^(Skip to|Go back|Watch the|Useful links|Table of Contents)", line):
+                        continue
+                    # Stop appending when we hit post-transcript UI elements
+                    if re.match(
+                        r"^(\d+\s*Likes?|Discussion|Comments|Restacks?|Subscribe|Ready for"
+                        r"|Share|Reply|Like$|©|Privacy|Terms|Start your|Substack"
+                        r"|Show Topics|See all|\d{1,2}月\d{1,2}日)",
+                        line,
+                    ):
+                        in_transcript = False
                         continue
                     if len(line) > 10:
                         current_seg["text"] += " " + line.strip()
@@ -1239,19 +1391,153 @@ class YouTubeDownloader:
                 ts_segments.append(current_seg)
 
             if ts_segments:
-                md_lines = []
-                for seg in ts_segments:
-                    md_lines.append(seg["speaker"])
-                    secs = _hms_to_secs(seg["hms"])
-                    if base_yt:
-                        md_lines.append(f"[({seg['hms']})]({base_yt}?t={secs})")
-                    else:
-                        md_lines.append(f"[({seg['hms']})](#{secs})")
-                    md_lines.append(seg["text"])
-                    md_lines.append("")
-                return "\n".join(md_lines)
+                return _format_segments(ts_segments)
 
-            # Strategy 2: dialogue lines "Speaker Name: text" (Substack/Dwarkesh style)
+            # Split text into blocks for block-based strategies
+            blocks = [b.strip() for b in re.split(r"\n\n+", text) if b.strip()]
+
+            # Strategy 2a: Dwarkesh/Substack article transcript (most specific — check first)
+            # Looks for "## Transcript" section with "**Speaker**" labels and
+            # "### HH:MM:SS - Topic" chapter headers.
+            # Within each chapter, interpolates timestamps proportionally by text length.
+            if any(b == "## Transcript" or b.startswith("## Transcript\n") for b in blocks):
+                tx_start = next(
+                    (i for i, b in enumerate(blocks) if b == "## Transcript" or b.startswith("## Transcript\n")),
+                    None,
+                )
+                if tx_start is not None:
+                    # Match "**Speaker**" with optional trailing timestamp like "**Speaker** 1:20:33"
+                    bold_speaker = re.compile(r"^\*\*([^*]+)\*\*(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$")
+                    chapter_ts = re.compile(r"^###?\s+(\d{1,2}:\d{2}:\d{2})\s*[-–—]?\s*(.*)")
+                    art_segments = []
+                    current_speaker = "Unknown"
+                    current_hms = "0:00:00"
+
+                    for bi2 in range(tx_start + 1, len(blocks)):
+                        b = blocks[bi2]
+                        ch_m = chapter_ts.match(b)
+                        if ch_m:
+                            current_hms = ch_m.group(1)
+                            continue
+                        sp_m = bold_speaker.match(b)
+                        if sp_m:
+                            current_speaker = sp_m.group(1)
+                            continue
+                        if len(b) < 15:
+                            continue
+                        if b.startswith("[") and b.endswith(")") and len(b) < 200:
+                            continue
+                        # Stop at post-transcript comment/discussion sections
+                        if re.match(
+                            r"^(####?\s+Discussion|CommentsRestacks"
+                            r"|\d+\s*Likes?\s*(∙|·|\[)"
+                            r"|Like\s*(\(\d+\))?\s*Reply)",
+                            b,
+                        ):
+                            break
+                        # Skip markdown headers that aren't chapter timestamps
+                        if b.startswith("#") and not chapter_ts.match(b):
+                            continue
+                        # Stop at post-transcript UI elements
+                        if _ui_noise_re.match(b):
+                            break
+                        art_segments.append({"speaker": current_speaker, "hms": current_hms, "text": b})
+
+                    if len(art_segments) >= 5:
+                        # Interpolate timestamps within each chapter based on text length.
+                        # Group consecutive segments by chapter timestamp, then distribute
+                        # time proportionally so each segment gets a unique start time.
+                        chapter_boundaries = []
+                        for idx, seg in enumerate(art_segments):
+                            if idx == 0 or seg["hms"] != art_segments[idx - 1]["hms"]:
+                                chapter_boundaries.append(idx)
+
+                        # Estimate chars-per-second from known chapters for last chapter extrapolation
+                        _total_known_chars = 0
+                        _total_known_secs = 0
+                        if len(chapter_boundaries) >= 2:
+                            first_secs = _hms_to_secs(art_segments[chapter_boundaries[0]]["hms"])
+                            last_known_secs = _hms_to_secs(art_segments[chapter_boundaries[-1]]["hms"])
+                            _total_known_secs = last_known_secs - first_secs
+                            for ci2 in range(len(chapter_boundaries) - 1):
+                                s2 = chapter_boundaries[ci2]
+                                e2 = chapter_boundaries[ci2 + 1]
+                                _total_known_chars += sum(len(seg["text"]) for seg in art_segments[s2:e2])
+
+                        for ci, ch_start_idx in enumerate(chapter_boundaries):
+                            ch_end_idx = (
+                                chapter_boundaries[ci + 1] if ci + 1 < len(chapter_boundaries) else len(art_segments)
+                            )
+                            ch_start_secs = _hms_to_secs(art_segments[ch_start_idx]["hms"])
+                            if ci + 1 < len(chapter_boundaries):
+                                ch_end_secs = _hms_to_secs(art_segments[chapter_boundaries[ci + 1]]["hms"])
+                            else:
+                                # Last chapter: estimate duration from chars/sec ratio of known chapters
+                                last_ch_chars = sum(len(seg["text"]) for seg in art_segments[ch_start_idx:])
+                                if _total_known_chars > 0 and _total_known_secs > 0:
+                                    cps = _total_known_chars / _total_known_secs
+                                    ch_end_secs = ch_start_secs + last_ch_chars / cps
+                                else:
+                                    ch_end_secs = ch_start_secs + 600
+                            ch_duration = ch_end_secs - ch_start_secs
+                            ch_segs = art_segments[ch_start_idx:ch_end_idx]
+                            total_chars = sum(len(s["text"]) for s in ch_segs)
+                            if total_chars == 0:
+                                total_chars = 1
+                            elapsed = 0.0
+                            for seg in ch_segs:
+                                seg_secs = ch_start_secs + elapsed
+                                h = int(seg_secs // 3600)
+                                m = int((seg_secs % 3600) // 60)
+                                s = int(seg_secs % 60)
+                                seg["hms"] = f"{h:02d}:{m:02d}:{s:02d}"
+                                elapsed += (len(seg["text"]) / total_chars) * ch_duration
+
+                        return _format_segments(art_segments)
+
+            # Strategy 2b: block-based format (Rescript, podcast apps)
+            # Supports two block orderings:
+            #   A) Speaker → HH:MM:SS → text  (Rescript)
+            #   B) M:SS → SPEAKER N → text    (Dwarkesh audio player preview)
+            block_segments = []
+            bi = 0
+            while bi < len(blocks) - 2:
+                b0, b1, b2 = blocks[bi], blocks[bi + 1], blocks[bi + 2]
+                # Order A: [speaker, timestamp, text]
+                ts_a = re.match(r"^(\d{1,2}:\d{2}:\d{2})$", b1)
+                if (
+                    ts_a
+                    and len(b0) < 80
+                    and not b0.startswith(("#", "[", "!", "http", "---"))
+                    and not re.match(r"^\d", b0)
+                ):
+                    block_segments.append({"speaker": b0, "hms": ts_a.group(1), "text": b2})
+                    bi += 3
+                    continue
+                # Order B: Dwarkesh/Substack — timestamps + optional speaker labels
+                # Format: "M:SS\n\n[SPEAKER N]\n\ntext" or "M:SS\n\ntext" (same speaker)
+                ts_b = re.match(r"^(\d{1,2}:\d{2}(?::\d{2})?)$", b0)
+                if ts_b:
+                    hms = ts_b.group(1)
+                    if hms.count(":") == 1:
+                        hms = "0:" + hms  # M:SS → 0:MM:SS
+                    # Check if b1 is a speaker label
+                    if re.match(r"^(SPEAKER\s*\d+)$", b1) and bi + 2 < len(blocks):
+                        block_segments.append({"speaker": b1, "hms": hms, "text": b2})
+                        bi += 3
+                        continue
+                    # No speaker label → text directly after timestamp, reuse last speaker
+                    elif len(b1) > 20 and not re.match(r"^\d{1,2}:\d{2}", b1):
+                        last_speaker = block_segments[-1]["speaker"] if block_segments else "Unknown"
+                        block_segments.append({"speaker": last_speaker, "hms": hms, "text": b1})
+                        bi += 2
+                        continue
+                bi += 1
+
+            if len(block_segments) >= 3:
+                return _format_segments(block_segments)
+
+            # Strategy 3: dialogue lines "Speaker Name: text" (Substack/Dwarkesh style)
             dialogue_pattern = re.compile(
                 r"^([A-Z][a-zA-Z\u00C0-\u024F'.\-]+(?: [A-Z][a-zA-Z\u00C0-\u024F'.\-]+){0,3}):\s+(.+)"
             )
@@ -1261,13 +1547,38 @@ class YouTubeDownloader:
                 if m:
                     dialogue_segments.append({"speaker": m.group(1), "text": m.group(2).strip()})
 
-            if len(dialogue_segments) >= 3:
-                md_lines = []
-                for seg in dialogue_segments:
-                    md_lines.append(seg["speaker"])
-                    md_lines.append(seg["text"])
-                    md_lines.append("")
-                return "\n".join(md_lines)
+            # Require ≥10 segments with ≥2 distinct speakers to avoid false positives
+            # from navigation text like "Site Name: Subtitle"
+            dialogue_speakers = {s["speaker"] for s in dialogue_segments}
+            if len(dialogue_segments) >= 10 and len(dialogue_speakers) >= 2:
+                return _format_segments(dialogue_segments)
+
+            # Strategy 4: "Starting point is HH:MM:SS" blocks (podscripts.co)
+            # In markdown: timestamp and text on separate lines
+            # In HTML:     timestamp and text may be on the same line
+            sp_pattern = re.compile(r"^Starting point is (\d{1,2}:\d{2}:\d{2})\s*(.*)")
+            sp_segments = []
+            current_sp = None
+            for line in lines:
+                m = sp_pattern.match(line)
+                if m:
+                    if current_sp:
+                        sp_segments.append(current_sp)
+                    inline_text = m.group(2).strip()
+                    current_sp = {"hms": m.group(1), "lines": [inline_text] if inline_text else []}
+                elif current_sp and line.strip():
+                    current_sp["lines"].append(line.strip())
+            if current_sp:
+                sp_segments.append(current_sp)
+
+            if len(sp_segments) >= 3:
+                formatted = []
+                for seg in sp_segments:
+                    seg_text = " ".join(seg["lines"])
+                    if not seg_text:
+                        continue
+                    formatted.append({"speaker": "Unknown", "hms": seg["hms"], "text": seg_text})
+                return _format_segments(formatted)
 
             # Fallback: return all body text if no structured transcript found
             return text if len(text) > 200 else None

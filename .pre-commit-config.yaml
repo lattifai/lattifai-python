@@ -27,11 +27,8 @@ repos:
       - id: check-executables-have-shebangs
         exclude: ^app/
       - id: end-of-file-fixer
-        exclude: ^(tests/data/.*\.TextGrid|app|.*\.vtt/)$  # don't run on TextGrid files or app/
-        exclude: ^app/
-        exclude: ^tests/data/
+        exclude: ^(app/|tests/data/)
       - id: mixed-line-ending
-        exclude: ^app/
+        exclude: ^(app/|tests/data/)
       - id: trailing-whitespace
-        exclude: ^app/
-        exclude: ^tests/data/
+        exclude: ^(app/|tests/data/)

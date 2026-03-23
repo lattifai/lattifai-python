@@ -439,3 +439,134 @@ def quality(
     )
     timestamp = TimestampQuality(start=(supervision[0], transcript[0]), end=(supervision[1], transcript[1]))
     return _quality, timestamp
+
+
+# ---------------------------------------------------------------------------
+# Nearby duplicate block detection
+# ---------------------------------------------------------------------------
+
+DuplicateBlock = namedtuple("DuplicateBlock", ["first", "second", "matched_words", "time_gap"])
+
+
+def detect_duplicate_blocks(
+    supervisions: List[Supervision],
+    ngram: int = 8,
+    min_match_words: int = 10,
+    max_word_gap: int = 300,
+    max_time_gap: float = 300.0,
+) -> List[DuplicateBlock]:
+    """Detect nearby duplicate text blocks caused by editing errors.
+
+    Concatenates all supervision text into a word stream, then uses N-gram
+    fingerprinting to find repeated subsequences that are close in both word
+    distance and timestamp.
+
+    Args:
+        supervisions: List of Supervision segments.
+        ngram: N-gram size for fingerprinting.
+        min_match_words: Minimum number of consecutive matching words.
+        max_word_gap: Maximum word-level distance between two blocks.
+        max_time_gap: Maximum time distance (seconds) between two blocks.
+
+    Returns:
+        List of DuplicateBlock(first=(seg_start, seg_end),
+                               second=(seg_start, seg_end),
+                               matched_words, time_gap).
+    """
+    if len(supervisions) < 2:
+        return []
+
+    # Build word stream with segment index mapping (multilingual-aware)
+    from .tokenizer import tokenize_multilingual_text
+
+    words: List[str] = []
+    word_to_seg: List[int] = []
+    for seg_idx, sup in enumerate(supervisions):
+        tokens = tokenize_multilingual_text(sup.text.lower(), keep_spaces=False)
+        for w in tokens:
+            words.append(w)
+            word_to_seg.append(seg_idx)
+
+    if len(words) < ngram * 2:
+        return []
+
+    # Build N-gram fingerprint index
+    fp_map: Dict[tuple, List[int]] = defaultdict(list)
+    for i in range(len(words) - ngram):
+        fp_map[tuple(words[i : i + ngram])].append(i)
+
+    # Find nearby matching pairs
+    seen: set = set()
+    candidates = []
+    for positions in fp_map.values():
+        if len(positions) < 2:
+            continue
+        for a in range(len(positions)):
+            for b in range(a + 1, len(positions)):
+                pos_a, pos_b = positions[a], positions[b]
+                if pos_b - pos_a > max_word_gap:
+                    continue
+                if abs(supervisions[word_to_seg[pos_b]].start - supervisions[word_to_seg[pos_a]].start) > max_time_gap:
+                    continue
+                key = (pos_a // 10, pos_b // 10)
+                if key in seen:
+                    continue
+                seen.add(key)
+
+                # Extend match forward (exact word match)
+                match_len = ngram
+                limit = min(len(words) - pos_a, len(words) - pos_b)
+                while match_len < limit and words[pos_a + match_len] == words[pos_b + match_len]:
+                    match_len += 1
+
+                if match_len >= min_match_words:
+                    time_gap = abs(supervisions[word_to_seg[pos_b]].start - supervisions[word_to_seg[pos_a]].start)
+                    candidates.append((pos_a, pos_b, match_len, time_gap))
+
+    # Keep longest non-overlapping blocks
+    candidates.sort(key=lambda x: -x[2])
+    results: List[DuplicateBlock] = []
+    used: set = set()
+    for pa, pb, mlen, tgap in candidates:
+        if any(i in used for i in range(pa, pa + mlen)) or any(i in used for i in range(pb, pb + mlen)):
+            continue
+        used.update(range(pa, pa + mlen))
+        used.update(range(pb, pb + mlen))
+
+        seg_a = (word_to_seg[pa], word_to_seg[min(pa + mlen - 1, len(word_to_seg) - 1)])
+        seg_b = (word_to_seg[pb], word_to_seg[min(pb + mlen - 1, len(word_to_seg) - 1)])
+        results.append(DuplicateBlock(first=seg_a, second=seg_b, matched_words=mlen, time_gap=tgap))
+
+    return sorted(results, key=lambda x: x.first[0])
+
+
+def deduplicate_supervisions(
+    supervisions: List[Supervision],
+) -> Tuple[List[Supervision], List[DuplicateBlock]]:
+    """Detect and remove nearby duplicate blocks from supervisions.
+
+    For each duplicate pair, removes the block whose segments span a shorter
+    time range (likely the compressed/edited copy).
+
+    Returns:
+        Tuple of (cleaned_supervisions, detected_duplicates).
+    """
+    duplicates = detect_duplicate_blocks(supervisions)
+
+    if not duplicates:
+        return supervisions, duplicates
+
+    # Collect segment indices to remove (shorter-duration copy)
+    remove_indices: set = set()
+    for dup in duplicates:
+        a_start, a_end = dup.first
+        b_start, b_end = dup.second
+        a_duration = supervisions[a_end].end - supervisions[a_start].start
+        b_duration = supervisions[b_end].end - supervisions[b_start].start
+        if b_duration < a_duration:
+            remove_indices.update(range(b_start, b_end + 1))
+        else:
+            remove_indices.update(range(a_start, a_end + 1))
+
+    cleaned = [sup for i, sup in enumerate(supervisions) if i not in remove_indices]
+    return cleaned, duplicates

@@ -131,12 +131,12 @@ class TestExtractTranscriptUrlFromDescription:
 
 
 class TestParseTranscriptHtml:
-    """Test _parse_transcript_html static method — outputs podcast-transcript Markdown"""
+    """Test _parse_transcript_html static method — outputs markdown transcript format"""
 
     YT_URL = "https://www.youtube.com/watch?v=TEST123"
 
-    def test_timestamped_to_podcast_markdown(self):
-        """Lex Fridman style → podcast-transcript format with YouTube links"""
+    def test_timestamped_to_markdown(self):
+        """Lex Fridman style → markdown format: **Speaker:** text [HH:MM:SS]"""
         html = """
         <html><body>
         <div class="entry-content">
@@ -148,15 +148,15 @@ class TestParseTranscriptHtml:
         """
         text = YouTubeDownloader._parse_transcript_html(html, youtube_url=self.YT_URL)
         assert text is not None
-        # Should produce podcast-transcript blocks
-        assert "Lex Fridman\n" in text
-        assert "[(00:00:00)](https://www.youtube.com/watch?t=0)" in text
+        # Should produce markdown format: **Speaker:** text [HH:MM:SS]
+        assert "**Lex Fridman:**" in text
         assert "Welcome to the show." in text
-        assert "Guest\n" in text
-        assert "[(00:00:05)](https://www.youtube.com/watch?t=5)" in text
+        assert "[00:00:00]" in text
+        assert "**Guest:**" in text
+        assert "[00:00:05]" in text
 
     def test_timestamped_without_youtube_url(self):
-        """Timestamped format without youtube_url uses anchor links"""
+        """Timestamped format without youtube_url still includes timestamp"""
         html = """
         <html><body>
         <p>Speaker (00:01:30) Some text here.</p>
@@ -164,7 +164,8 @@ class TestParseTranscriptHtml:
         """
         text = YouTubeDownloader._parse_transcript_html(html)
         assert text is not None
-        assert "[(00:01:30)](#90)" in text
+        assert "**Speaker:**" in text
+        assert "[00:01:30]" in text
 
     def test_skips_script_and_style(self):
         """Script and style tags should be excluded"""
@@ -197,7 +198,7 @@ class TestParseTranscriptHtml:
         assert "Content" in text
 
     def test_substack_dialogue_to_markdown(self):
-        """Substack/Dwarkesh style → speaker + text blocks (no timestamps)"""
+        """Substack/Dwarkesh style → markdown format (no timestamps, >=10 segments needed)"""
         html = """
         <html><body>
         <nav><a href="/">Home</a></nav>
@@ -210,6 +211,13 @@ class TestParseTranscriptHtml:
         <p><strong>Dario Amodei:</strong> Yes, and I think it is important to be specific about this.</p>
         <p><strong>Dwarkesh Patel:</strong> That is a huge claim. What gives you confidence?</p>
         <p><strong>Dario Amodei:</strong> The key insight is that AI systems are getting better at reasoning.</p>
+        <p><strong>Dwarkesh Patel:</strong> Can you give a concrete example of that?</p>
+        <p><strong>Dario Amodei:</strong> Sure, look at how models handle multi-step problems now.</p>
+        <p><strong>Dwarkesh Patel:</strong> And how does that compare to a year ago?</p>
+        <p><strong>Dario Amodei:</strong> The improvement has been dramatic in both speed and accuracy.</p>
+        <p><strong>Dwarkesh Patel:</strong> What about the safety implications of these advances?</p>
+        <p><strong>Dario Amodei:</strong> Safety is core to everything we do at Anthropic.</p>
+        <p><strong>Dwarkesh Patel:</strong> Thanks for sharing your perspective on all of this.</p>
         <h2>Links</h2>
         <p>Subscribe to the podcast</p>
         <footer><p>Copyright 2025</p></footer>
@@ -217,9 +225,9 @@ class TestParseTranscriptHtml:
         """
         text = YouTubeDownloader._parse_transcript_html(html)
         assert text is not None
-        # Each segment: Speaker\nText\n(blank line)
-        assert "Dwarkesh Patel\n" in text
-        assert "Dario Amodei\n" in text
+        # Each segment: **Speaker:** text
+        assert "**Dwarkesh Patel:**" in text
+        assert "**Dario Amodei:**" in text
         assert "So you have been saying AI could transform science." in text
         # Should not contain non-transcript content
         assert "Subscribe" not in text
@@ -228,20 +236,28 @@ class TestParseTranscriptHtml:
         assert "Jun 26" not in text
 
     def test_substack_mixed_content_filters_correctly(self):
-        """Dialogue extraction should ignore non-dialogue lines"""
+        """Dialogue extraction should ignore non-dialogue lines (>=10 segments needed)"""
         html = """
         <html><body>
         <p>Episode 42 of the podcast.</p>
         <p><strong>Host Name:</strong> Welcome to the show. Today we have a special guest.</p>
         <p><strong>Guest Person:</strong> Thanks for having me on the program.</p>
         <p><strong>Host Name:</strong> Let us dive right into the topic of AI safety.</p>
+        <p><strong>Guest Person:</strong> AI safety is incredibly important for the future.</p>
+        <p><strong>Host Name:</strong> Can you elaborate on the specific risks you see?</p>
+        <p><strong>Guest Person:</strong> The main risk is misalignment between goals and actions.</p>
+        <p><strong>Host Name:</strong> And how do we address that in practice?</p>
+        <p><strong>Guest Person:</strong> Through careful training and evaluation procedures.</p>
+        <p><strong>Host Name:</strong> What about the role of regulation in all of this?</p>
+        <p><strong>Guest Person:</strong> Regulation needs to be thoughtful and well-informed.</p>
+        <p><strong>Host Name:</strong> Thank you for sharing your insights with us today.</p>
         <p>Thanks for listening!</p>
         </body></html>
         """
         text = YouTubeDownloader._parse_transcript_html(html)
         assert text is not None
-        assert "Host Name\n" in text
-        assert "Guest Person\n" in text
+        assert "**Host Name:**" in text
+        assert "**Guest Person:**" in text
         assert "Episode 42" not in text
         assert "Thanks for listening" not in text
 

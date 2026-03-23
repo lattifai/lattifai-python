@@ -43,7 +43,7 @@ dependencies = [
     "lattifai-captions[splitting]>=0.2.2",
     "g2p-phonemizer>=0.4.0",
     "error-align-fix>=0.1.4",
-    "k2py==0.2.5",
+    "k2py==0.2.6",
     "onnxruntime",
     "soundfile",
     "av",
