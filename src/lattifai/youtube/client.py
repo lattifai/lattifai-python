@@ -1144,8 +1144,19 @@ class YouTubeDownloader:
             try:
                 html = await loop.run_in_executor(None, _fetch)
             except Exception as e:
-                self.logger.info(f"🔄 urllib failed ({e}), falling back to headless Chrome...")
+                self.logger.info(f"🔄 urllib failed ({e}), trying fallbacks...")
+                # Fallback 1: headless Chrome
                 html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url)
+                # Fallback 2: Jina Reader API (renders JS, returns markdown)
+                if not html:
+                    self.logger.info("🔄 Chrome failed, trying Jina Reader API...")
+                    jina_md = await loop.run_in_executor(None, self._fetch_with_jina_reader, transcript_url)
+                    if jina_md:
+                        # Jina returns markdown directly, use as transcript text
+                        frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+                        output_path.write_text(frontmatter + jina_md, encoding="utf-8")
+                        self.logger.info(f"✅ Saved transcript via Jina Reader: {output_path} ({len(jina_md)} chars)")
+                        return str(output_path)
 
             if not html:
                 self.logger.warning("Failed to fetch transcript page")
@@ -1164,6 +1175,14 @@ class YouTubeDownloader:
                         transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
 
             if not transcript_text:
+                # Last resort: Jina Reader API
+                self.logger.info("🔄 HTML parsing failed, trying Jina Reader API...")
+                jina_md = await loop.run_in_executor(None, self._fetch_with_jina_reader, transcript_url)
+                if jina_md:
+                    frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+                    output_path.write_text(frontmatter + jina_md, encoding="utf-8")
+                    self.logger.info(f"✅ Saved transcript via Jina Reader: {output_path} ({len(jina_md)} chars)")
+                    return str(output_path)
                 self.logger.warning("Failed to extract transcript content from page")
                 return None
 
@@ -1349,6 +1368,43 @@ class YouTubeDownloader:
         elif len(parts) == 2:
             return int(parts[0]) * 60 + int(parts[1])
         return float(parts[0])
+
+    @staticmethod
+    @staticmethod
+    def _fetch_with_jina_reader(url: str, timeout: int = 30) -> Optional[str]:
+        """Fetch page content via Jina Reader API (r.jina.ai).
+
+        Jina Reader renders JS-heavy pages server-side and returns clean markdown.
+        Useful as a fallback when both urllib and headless Chrome fail.
+        """
+        import urllib.request
+
+        logger = logging.getLogger(__name__)
+        jina_url = f"https://r.jina.ai/{url}"
+        try:
+            req = urllib.request.Request(
+                jina_url,
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                content = resp.read().decode("utf-8")
+            if content and len(content) > 500:
+                # Strip Jina metadata header (Title:, URL Source:, etc.)
+                lines = content.split("\n")
+                body_start = 0
+                for i, line in enumerate(lines):
+                    if line.startswith("Markdown Content:"):
+                        body_start = i + 1
+                        break
+                if body_start:
+                    content = "\n".join(lines[body_start:]).strip()
+                logger.info(f"✅ Jina Reader returned {len(content)} chars")
+                return content
+            logger.warning(f"Jina Reader returned insufficient content ({len(content) if content else 0} chars)")
+            return None
+        except Exception as e:
+            logger.warning(f"Jina Reader failed: {e}")
+            return None
 
     @staticmethod
     def _find_chrome() -> Optional[str]:

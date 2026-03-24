@@ -95,6 +95,7 @@ def convert(
     input_path: Pathlike,
     output_path: Pathlike,
     reference: Optional[Pathlike] = None,
+    input_format: Optional[str] = None,
     include_speaker_in_text: bool = False,
     normalize_text: bool = False,
     word_level: bool = False,
@@ -118,6 +119,8 @@ def convert(
         input_path: Path to input caption file (supports SRT, VTT, JSON, TextGrid formats)
         output_path: Path to output caption file (format determined by file extension)
         reference: Optional reference caption for timestamp alignment.
+        input_format: Explicitly specify input format (e.g., 'markdown', 'srt').
+            If None (default), auto-detect from file extension/content.
             When provided, timestamps are matched from the reference via text similarity.
             Input keeps its text and speaker labels; only timestamps are updated.
         include_speaker_in_text: Preserve speaker labels in caption text content.
@@ -158,7 +161,7 @@ def convert(
     karaoke_config = KaraokeConfig(enabled=True) if karaoke else None
 
     try:
-        caption = Caption.read(input_path, normalize_text=normalize_text)
+        caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
     except Exception:
         caption = Caption()
 
