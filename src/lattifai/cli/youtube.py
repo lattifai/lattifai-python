@@ -249,7 +249,27 @@ def youtube_download(
             if transcript_file:
                 safe_print(colorful.green(f"  ✅ Transcript: {transcript_file}"))
         else:
-            safe_print(colorful.yellow(f"  ⚠️ No transcript URL found in description for: {url}"))
+            # Fallback: try podscripts.co
+            safe_print(colorful.cyan("  🔍 No transcript in description, trying podscripts.co..."))
+            podscripts_url = asyncio.get_event_loop().run_until_complete(
+                downloader._find_podscripts_url(info.get("title", ""), info.get("uploader", ""))
+            )
+            if podscripts_url:
+                safe_print(colorful.cyan(f"  🔗 Found: {podscripts_url}"))
+                transcript_file = asyncio.get_event_loop().run_until_complete(
+                    downloader._download_external_transcript(
+                        podscripts_url,
+                        output_dir,
+                        video_id,
+                        youtube_url=url,
+                        video_info=info,
+                        force_overwrite=media_config.force_overwrite,
+                    )
+                )
+                if transcript_file:
+                    safe_print(colorful.green(f"  ✅ Transcript: {transcript_file}"))
+            else:
+                safe_print(colorful.yellow(f"  ⚠️ No transcript found for: {url}"))
 
     # 4. Save video metadata as YAML frontmatter markdown
     if not only or only == "meta":

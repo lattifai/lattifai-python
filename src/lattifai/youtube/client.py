@@ -1082,6 +1082,86 @@ class YouTubeDownloader:
 
         return None
 
+    async def _find_podscripts_url(self, video_title: str, channel_name: str) -> Optional[str]:
+        """Search podscripts.co for a transcript matching the video title.
+
+        Podscripts.co hosts third-party transcripts for popular podcasts.
+        This method searches the podcast's episode listing page and fuzzy-matches
+        the video title to find the correct episode URL.
+        """
+        import urllib.request
+
+        if not video_title:
+            return None
+
+        # Map known channels to podscripts slugs
+        _CHANNEL_SLUGS = {
+            "No Priors: AI, Machine Learning, Tech, & Startups": "no-priors-artificial-intelligence-technology-startups",
+            "No Priors": "no-priors-artificial-intelligence-technology-startups",
+            "Machine Learning Street Talk": "machine-learning-street-talk",
+            "Latent Space": "latent-space-the-ai-engineer-podcast",
+            "Dwarkesh Patel": "the-dwarkesh-patel-podcast",
+            "Lex Fridman": "lex-fridman-podcast",
+        }
+
+        slug = _CHANNEL_SLUGS.get(channel_name)
+        if not slug:
+            # Try to find slug by normalizing channel name
+            normalized = channel_name.lower().replace(" ", "-").replace(".", "")
+            slug = normalized
+
+        listing_url = f"https://podscripts.co/podcasts/{slug}"
+        self.logger.info(f"🔍 Searching podscripts.co: {listing_url}")
+
+        try:
+            loop = asyncio.get_event_loop()
+
+            def _fetch_listing():
+                req = urllib.request.Request(
+                    listing_url,
+                    headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+                )
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    return resp.read().decode("utf-8")
+
+            html = await loop.run_in_executor(None, _fetch_listing)
+
+            # Extract all episode links
+            episode_links = re.findall(rf'href="(/podcasts/{re.escape(slug)}/[^"]+)"', html)
+            episode_links = list(set(episode_links))  # deduplicate
+
+            if not episode_links:
+                return None
+
+            # Fuzzy match: extract keywords from video title and find best match
+            title_words = set(
+                w.lower() for w in re.findall(r"[a-zA-Z]+", video_title) if len(w) > 3  # skip short words
+            )
+
+            best_match = None
+            best_score = 0
+            for link in episode_links:
+                # Extract slug words from URL
+                slug_part = link.split("/")[-1]
+                slug_words = set(slug_part.replace("-", " ").split())
+                # Score by word overlap
+                score = len(title_words & slug_words)
+                if score > best_score:
+                    best_score = score
+                    best_match = link
+
+            if best_match and best_score >= 2:
+                full_url = f"https://podscripts.co{best_match}"
+                self.logger.info(f"✅ Matched podscripts episode (score={best_score}): {full_url}")
+                return full_url
+
+            self.logger.info(f"No matching episode found on podscripts.co (best score={best_score})")
+            return None
+
+        except Exception as e:
+            self.logger.debug(f"podscripts.co search failed: {e}")
+            return None
+
     async def _download_external_transcript(
         self,
         transcript_url: str,
