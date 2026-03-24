@@ -141,7 +141,7 @@ def youtube(
 @run.cli.entrypoint(name="download", namespace="youtube")
 def youtube_download(
     yt_url: Optional[str] = None,
-    only: Optional[Literal["media", "caption", "transcript"]] = None,
+    only: Optional[Literal["media", "caption", "transcript", "meta"]] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
 ):
     """
@@ -158,7 +158,7 @@ def youtube_download(
 
     Args:
         yt_url: YouTube video URL
-        only: Download only a specific part: "media", "caption", or "transcript".
+        only: Download only a specific part: "media", "caption", "transcript", or "meta".
             If None (default), download all.
         media: Media configuration (output_dir, output_format, quality)
         caption: Caption configuration (output_format)
@@ -188,8 +188,8 @@ def youtube_download(
     downloader = YouTubeDownloader()
     video_id = downloader.extract_video_id(url)
 
-    if only and only not in ("media", "caption", "transcript"):
-        raise ValueError(f"Invalid only={only!r}. Must be 'media', 'caption', or 'transcript'.")
+    if only and only not in ("media", "caption", "transcript", "meta"):
+        raise ValueError(f"Invalid only={only!r}. Must be 'media', 'caption', 'transcript', or 'meta'.")
 
     safe_print(colorful.cyan(f"📥 Downloading YouTube video: {video_id}"))
 
@@ -238,43 +238,49 @@ def youtube_download(
             safe_print(colorful.cyan(f"  🔗 Found: {transcript_url}"))
             transcript_file = asyncio.get_event_loop().run_until_complete(
                 downloader._download_external_transcript(
-                    transcript_url, output_dir, video_id, youtube_url=url, video_info=info
+                    transcript_url,
+                    output_dir,
+                    video_id,
+                    youtube_url=url,
+                    video_info=info,
+                    force_overwrite=media_config.force_overwrite,
                 )
             )
             if transcript_file:
                 safe_print(colorful.green(f"  ✅ Transcript: {transcript_file}"))
         else:
-            safe_print(colorful.yellow("  ⚠️ No transcript URL found in description"))
+            safe_print(colorful.yellow(f"  ⚠️ No transcript URL found in description for: {url}"))
 
     # 4. Save video metadata as YAML frontmatter markdown
-    from pathlib import Path
+    if not only or only == "meta":
+        from pathlib import Path
 
-    meta_path = Path(output_dir) / f"{video_id}.meta.md"
+        meta_path = Path(output_dir) / f"{video_id}.meta.md"
 
-    # Format duration as HH:MM:SS
-    duration = info.get("duration", 0)
-    hours, remainder = divmod(int(duration), 3600)
-    minutes, seconds = divmod(remainder, 60)
-    duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
+        # Format duration as HH:MM:SS
+        duration = info.get("duration", 0)
+        hours, remainder = divmod(int(duration), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
 
-    lines = ["---"]
-    lines.append(f"title: \"{info.get('title', '')}\"")
-    lines.append(f"channel: \"{info.get('uploader', '')}\"")
-    lines.append(f"url: \"{info.get('webpage_url', '')}\"")
-    lines.append(f'duration: "{duration_str}"')
-    lines.append(f"upload_date: \"{info.get('upload_date', '')}\"")
-    lines.append(f"view_count: {info.get('view_count', 0)}")
-    lines.append(f"thumbnail: \"{info.get('thumbnail', '')}\"")
-    lines.append("---")
-    lines.append("")
+        meta_lines = ["---"]
+        meta_lines.append(f"title: \"{info.get('title', '')}\"")
+        meta_lines.append(f"channel: \"{info.get('uploader', '')}\"")
+        meta_lines.append(f"url: \"{info.get('webpage_url', '')}\"")
+        meta_lines.append(f'duration: "{duration_str}"')
+        meta_lines.append(f"upload_date: \"{info.get('upload_date', '')}\"")
+        meta_lines.append(f"view_count: {info.get('view_count', 0)}")
+        meta_lines.append(f"thumbnail: \"{info.get('thumbnail', '')}\"")
+        meta_lines.append("---")
+        meta_lines.append("")
 
-    description = info.get("description", "")
-    if description:
-        lines.append(description)
-        lines.append("")
+        description = info.get("description", "")
+        if description:
+            meta_lines.append(description)
+            meta_lines.append("")
 
-    meta_path.write_text("\n".join(lines), encoding="utf-8")
-    safe_print(colorful.green(f"  ✅ Metadata: {meta_path}"))
+        meta_path.write_text("\n".join(meta_lines), encoding="utf-8")
+        safe_print(colorful.green(f"  ✅ Metadata: {meta_path}"))
 
     safe_print(colorful.green(f"\n✅ All files saved to: {output_dir}"))
     return media_file or caption_file or transcript_file

@@ -1059,7 +1059,7 @@ class YouTubeDownloader:
             return None
 
         # Keywords that indicate a transcript or show notes URL
-        _LABEL_KEYWORDS = r"transcript|show\s*notes"
+        _LABEL_KEYWORDS = r"transcript|show\s*notes|rescript"
 
         lines = description.split("\n")
         for i, line in enumerate(lines):
@@ -1089,6 +1089,7 @@ class YouTubeDownloader:
         video_id: str,
         youtube_url: Optional[str] = None,
         video_info: Optional[Dict[str, Any]] = None,
+        force_overwrite: bool = False,
     ) -> Optional[str]:
         """Download and parse a transcript from an external URL.
 
@@ -1106,8 +1107,8 @@ class YouTubeDownloader:
         output_path = Path(output_dir).expanduser() / f"{video_id}.transcript.md"
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Skip if already downloaded
-        if output_path.exists():
+        # Skip if already downloaded (unless force_overwrite)
+        if output_path.exists() and not force_overwrite:
             self.logger.info(f"✅ Using existing external transcript: {output_path}")
             return str(output_path)
 
@@ -1115,6 +1116,16 @@ class YouTubeDownloader:
 
         try:
             loop = asyncio.get_event_loop()
+
+            # Rescript API shortcut: SPA site with a JSON API
+            rescript_match = re.match(r"https://app\.rescript\.info/public/share/(.+)", transcript_url)
+            if rescript_match:
+                transcript_text = await self._fetch_rescript_transcript(transcript_url, loop)
+                if transcript_text:
+                    frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+                    output_path.write_text(frontmatter + transcript_text, encoding="utf-8")
+                    self.logger.info(f"✅ Saved Rescript transcript: {output_path} ({len(transcript_text)} chars)")
+                    return str(output_path)
 
             def _fetch():
                 import urllib.request
@@ -1129,7 +1140,16 @@ class YouTubeDownloader:
                 with opener.open(req, timeout=30) as resp:
                     return resp.read().decode("utf-8")
 
-            html = await loop.run_in_executor(None, _fetch)
+            html = None
+            try:
+                html = await loop.run_in_executor(None, _fetch)
+            except Exception as e:
+                self.logger.info(f"🔄 urllib failed ({e}), falling back to headless Chrome...")
+                html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url)
+
+            if not html:
+                self.logger.warning("Failed to fetch transcript page")
+                return None
 
             # Parse HTML to extract transcript in markdown format
             transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
@@ -1147,32 +1167,7 @@ class YouTubeDownloader:
                 self.logger.warning("Failed to extract transcript content from page")
                 return None
 
-            # Prepend YAML frontmatter with video metadata if available
-            frontmatter = ""
-            if video_info:
-                fm_fields = []
-                for key in ["title", "duration", "upload_date"]:
-                    if video_info.get(key):
-                        fm_fields.append(f"{key}: {video_info[key]}")
-                if video_info.get("uploader"):
-                    fm_fields.append(f"channel: {video_info['uploader']}")
-                if youtube_url:
-                    fm_fields.append(f'url: "{youtube_url}"')
-                fm_fields.append(f"transcript_source: {transcript_url}")
-                desc = video_info.get("description", "")
-                if desc:
-                    # Truncate description before boilerplate sections
-                    for marker in ["*SPONSORS:", "*CONTACT ", "*EPISODE LINKS:", "*PODCAST LINKS:", "*SOCIAL LINKS:"]:
-                        pos = desc.find(marker)
-                        if pos > 0:
-                            desc = desc[:pos].rstrip()
-                            break
-                    desc = desc.replace("\n\n", "\n")
-                    fm_fields.append("description: |")
-                    for line in desc.split("\n"):
-                        fm_fields.append(f"  {line}")
-                frontmatter = "---\n" + "\n".join(fm_fields) + "\n---\n\n"
-
+            frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
             output_path.write_text(frontmatter + transcript_text, encoding="utf-8")
             self.logger.info(f"✅ Saved external transcript: {output_path} ({len(transcript_text)} chars)")
             return str(output_path)
@@ -1180,6 +1175,180 @@ class YouTubeDownloader:
         except Exception as e:
             self.logger.warning(f"Failed to download external transcript: {e}")
             return None
+
+    @staticmethod
+    @staticmethod
+    def _build_transcript_frontmatter(
+        video_info: Optional[Dict[str, Any]],
+        youtube_url: Optional[str],
+        transcript_url: str,
+    ) -> str:
+        """Build YAML frontmatter string for transcript files."""
+        if not video_info:
+            return ""
+        fm_fields = []
+        for key in ["title", "duration", "upload_date"]:
+            if video_info.get(key):
+                fm_fields.append(f"{key}: {video_info[key]}")
+        if video_info.get("uploader"):
+            fm_fields.append(f"channel: {video_info['uploader']}")
+        if youtube_url:
+            fm_fields.append(f'url: "{youtube_url}"')
+        fm_fields.append(f"transcript_source: {transcript_url}")
+        desc = video_info.get("description", "")
+        if desc:
+            for marker in ["*SPONSORS:", "*CONTACT ", "*EPISODE LINKS:", "*PODCAST LINKS:", "*SOCIAL LINKS:"]:
+                pos = desc.find(marker)
+                if pos > 0:
+                    desc = desc[:pos].rstrip()
+                    break
+            desc = desc.replace("\n\n", "\n")
+            fm_fields.append("description: |")
+            for line in desc.split("\n"):
+                fm_fields.append(f"  {line}")
+        return "---\n" + "\n".join(fm_fields) + "\n---\n\n"
+
+    async def _fetch_rescript_transcript(self, transcript_url: str, loop) -> Optional[str]:
+        """Fetch transcript from Rescript API (SPA with JSON backend).
+
+        Rescript (app.rescript.info) stores transcripts as JSON accessible via
+        /api/public/share/{share_id}. The response contains `final_transcript`
+        with speaker labels and timestamps.
+        """
+        import json
+        import urllib.request
+
+        api_url = transcript_url.replace("/public/share/", "/api/public/share/")
+        self.logger.info(f"🔗 Fetching Rescript API: {api_url}")
+
+        def _fetch_api():
+            req = urllib.request.Request(
+                api_url,
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        try:
+            data = await loop.run_in_executor(None, _fetch_api)
+        except Exception as e:
+            self.logger.warning(f"Rescript API failed: {e}")
+            return None
+
+        session = data.get("session", {})
+        transcript = session.get("final_transcript") or session.get("transcript", "")
+        if not transcript:
+            self.logger.warning("Rescript API returned no transcript content")
+            return None
+
+        # Parse Rescript format: "Speaker [HH:MM:SS]:\n  text\n\n  [HH:MM:SS]\n\n  text continued"
+        # into markdown format: **Speaker:** text [HH:MM:SS]
+        lines = transcript.split("\n")
+        segments = []
+        current_speaker = ""
+        current_hms = ""
+        current_text = []
+
+        speaker_pattern = re.compile(r"^(.+?)\s*\[(\d{1,2}:\d{2}:\d{2})\]\s*:?\s*$")
+        ts_pattern = re.compile(r"^\s*\[(\d{1,2}:\d{2}:\d{2})\]\s*$")
+
+        for line in lines:
+            sp_m = speaker_pattern.match(line)
+            ts_m = ts_pattern.match(line)
+            if sp_m:
+                # Save previous segment
+                if current_text:
+                    text = " ".join(current_text).strip()
+                    if text:
+                        segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+                current_speaker = sp_m.group(1).strip()
+                current_hms = sp_m.group(2)
+                current_text = []
+            elif ts_m:
+                # Mid-segment timestamp: save current text as segment, start new one
+                if current_text:
+                    text = " ".join(current_text).strip()
+                    if text:
+                        segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+                current_hms = ts_m.group(1)
+                current_text = []
+            else:
+                stripped = line.strip()
+                if stripped:
+                    current_text.append(stripped)
+
+        # Don't forget the last segment
+        if current_text:
+            text = " ".join(current_text).strip()
+            if text:
+                segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+
+        if not segments:
+            return transcript  # Return raw text as fallback
+
+        # Extract chapters from _narrativeData (title + time range)
+        narrative = session.get("_narrativeData") or {}
+        chapters = []
+        for title, chapter_data in narrative.items():
+            if not isinstance(chapter_data, dict):
+                continue
+            spans = chapter_data.get("spans", [])
+            if spans:
+                # Use the earliest span start as chapter start time
+                start_sec = min(s.get("start", 0) for s in spans if isinstance(s, dict))
+                chapters.append({"title": title, "start": start_sec})
+        chapters.sort(key=lambda c: c["start"])
+
+        # Build TOC if chapters exist
+        toc_lines = []
+        if chapters:
+
+            def _secs_to_hms(secs):
+                h, r = divmod(int(secs), 3600)
+                m, s = divmod(r, 60)
+                return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+            toc_lines.append("## Table of Contents")
+            for ch in chapters:
+                toc_lines.append(f"- {_secs_to_hms(ch['start'])} – {ch['title']}")
+            toc_lines.append("")
+
+        # Convert chapter start times to HH:MM:SS for insertion into transcript
+        chapter_by_hms = {}
+        if chapters:
+            for ch in chapters:
+                # Find the segment whose timestamp is closest to (but >= ) chapter start
+                chapter_by_hms[ch["title"]] = ch["start"]
+
+        # Format as markdown, inserting chapter headings at the right positions
+        md_lines = list(toc_lines)
+        chapter_idx = 0
+        for seg in segments:
+            # Insert chapter heading before this segment if its time matches
+            seg_secs = self._hms_to_secs(seg["hms"]) if seg["hms"] else 0
+            while chapter_idx < len(chapters) and chapters[chapter_idx]["start"] <= seg_secs:
+                md_lines.append(f"## {chapters[chapter_idx]['title']}")
+                md_lines.append("")
+                chapter_idx += 1
+
+            speaker = seg["speaker"]
+            prefix = f"**{speaker}:** " if speaker else ""
+            suffix = f" [{seg['hms']}]" if seg["hms"] else ""
+            md_lines.append(f"{prefix}{seg['text']}{suffix}")
+            md_lines.append("")
+
+        self.logger.info(f"✅ Parsed {len(segments)} segments, {len(chapters)} chapters from Rescript API")
+        return "\n".join(md_lines)
+
+    @staticmethod
+    def _hms_to_secs(hms: str) -> float:
+        """Convert HH:MM:SS or MM:SS to seconds."""
+        parts = hms.split(":")
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        elif len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        return float(parts[0])
 
     @staticmethod
     def _find_chrome() -> Optional[str]:
