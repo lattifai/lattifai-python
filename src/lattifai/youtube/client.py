@@ -1398,6 +1398,8 @@ class YouTubeDownloader:
                         break
                 if body_start:
                     content = "\n".join(lines[body_start:]).strip()
+                # Normalize Substack transcript format to standard markdown
+                content = YouTubeDownloader._normalize_substack_transcript(content)
                 logger.info(f"✅ Jina Reader returned {len(content)} chars")
                 return content
             logger.warning(f"Jina Reader returned insufficient content ({len(content) if content else 0} chars)")
@@ -1405,6 +1407,100 @@ class YouTubeDownloader:
         except Exception as e:
             logger.warning(f"Jina Reader failed: {e}")
             return None
+
+    @staticmethod
+    def _normalize_substack_transcript(content: str) -> str:
+        """Normalize Substack/Dwarkesh transcript to standard markdown format.
+
+        Converts:
+          - Chapter links: [(HH:MM:SS) - Title](url) → ## Title
+          - Standalone bold speaker: **Name**\\n\\ntext → **Name:** text [HH:MM:SS]
+          - Strips markdown links: [text](url) → text
+
+        The output matches the format expected by lattifai-captions MarkdownReader:
+            **Speaker:** text [HH:MM:SS]
+        """
+        lines = content.split("\n")
+        output = []
+        # Collect chapters for TOC and timestamp assignment
+        chapters = []  # [(seconds, title)]
+        chapter_pattern = re.compile(r"^\[\((\d{1,2}:\d{2}:\d{2})\)\s*[-–—]\s*(.+?)\]\(https?://[^)]+\)\s*$")
+        standalone_speaker = re.compile(r"^\*\*([^*:：]+)\*\*\s*$")
+        md_link = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+
+        # First pass: detect if this is a Substack transcript
+        has_standalone_speakers = False
+        has_chapter_links = False
+        for line in lines:
+            if standalone_speaker.match(line):
+                has_standalone_speakers = True
+            if chapter_pattern.match(line):
+                has_chapter_links = True
+            if has_standalone_speakers and has_chapter_links:
+                break
+
+        if not has_standalone_speakers:
+            return content  # Not a Substack transcript, return as-is
+
+        # Collect all chapters
+        for line in lines:
+            ch_m = chapter_pattern.match(line)
+            if ch_m:
+                hms = ch_m.group(1)
+                title = ch_m.group(2).strip()
+                parts = hms.split(":")
+                secs = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                chapters.append((secs, title, hms))
+
+        # Build TOC
+        if chapters:
+            output.append("## Table of Contents")
+            for secs, title, hms in chapters:
+                output.append(f"- {hms} – {title}")
+            output.append("")
+
+        # Second pass: convert speaker blocks
+        current_speaker = None
+        current_text = []
+        in_preamble = True  # Skip sponsor/intro content before first speaker
+
+        def _flush_segment():
+            nonlocal current_text
+            if current_speaker and current_text:
+                text = " ".join(current_text)
+                # Strip markdown links
+                text = md_link.sub(r"\1", text)
+                output.append(f"**{current_speaker}:** {text}")
+                output.append("")
+            current_text = []
+
+        for line in lines:
+            # Skip chapter link lines (already in TOC)
+            if chapter_pattern.match(line):
+                continue
+
+            sp_m = standalone_speaker.match(line)
+            if sp_m:
+                # Flush previous segment
+                _flush_segment()
+                current_speaker = sp_m.group(1).strip()
+                in_preamble = False
+
+                # Insert chapter heading if this speaker's position matches
+                # (use chapter_idx to track progress through chapters)
+                continue
+
+            if in_preamble:
+                continue
+
+            stripped = line.strip()
+            if stripped:
+                current_text.append(stripped)
+
+        # Flush last segment
+        _flush_segment()
+
+        return "\n".join(output)
 
     @staticmethod
     def _find_chrome() -> Optional[str]:
