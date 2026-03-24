@@ -1283,13 +1283,13 @@ class YouTubeDownloader:
                         self.in_body = True
                     elif tag in ("script", "style", "nav", "header", "footer", "noscript"):
                         self.skip_depth += 1
-                    elif tag in ("p", "br", "h1", "h2", "h3", "h4", "h5", "h6"):
+                    elif tag in ("p", "br", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
                         self._flush()
 
                 def handle_endtag(self, tag):
                     if tag in ("script", "style", "nav", "header", "footer", "noscript"):
                         self.skip_depth = max(0, self.skip_depth - 1)
-                    elif tag in ("p", "div", "h1", "h2", "h3", "h4", "h5", "h6"):
+                    elif tag in ("p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
                         self._flush()
 
                 def handle_data(self, data):
@@ -1371,6 +1371,11 @@ class YouTubeDownloader:
                 """Format segments into markdown transcript format: **Speaker:** text [HH:MM:SS]"""
                 md_lines = []
                 for seg in segments:
+                    # Chapter heading marker
+                    if "_chapter" in seg:
+                        md_lines.append(f"## {seg['_chapter']}")
+                        md_lines.append("")
+                        continue
                     speaker = seg.get("speaker") or ""
                     text = seg.get("text", "").strip()
                     hms = seg.get("hms")
@@ -1387,14 +1392,31 @@ class YouTubeDownloader:
             # Convert to markdown format:
             #   **Speaker Name:** text [HH:MM:SS]
             ts_pattern = re.compile(r"^(.+?)\s+[\(\[](\d{1,2}:\d{2}:\d{2})[\)\]]:?\s*(.*)")
+            # Chapter line: "0:00 – Topic" or "1:30:00 - Topic"
+            chapter_pattern = re.compile(r"^(\d{1,2}:\d{2}(?::\d{2})?)\s*[–—-]\s*(.+)")
             ts_segments = []
             in_transcript = False
             current_seg = None
+
+            # Collect pre-transcript content: intro text and table of contents
+            preamble_lines = []
+            chapters = []
+            in_toc = False
+            # UI noise lines to skip entirely
+            _preamble_skip_re = re.compile(
+                r"^(Skip to|Go back to|Watch the full|Useful links"
+                r"|Please note that the transcript"
+                r"|Here are some useful links)"
+            )
+
+            # Set of chapter titles collected from TOC (populated in first pass below)
+            chapter_titles = set()
 
             for line in lines:
                 m = ts_pattern.match(line)
                 if m:
                     in_transcript = True
+                    in_toc = False
                     if current_seg:
                         ts_segments.append(current_seg)
                     current_seg = {"speaker": m.group(1), "hms": m.group(2), "text": m.group(3).strip()}
@@ -1411,14 +1433,58 @@ class YouTubeDownloader:
                     ):
                         in_transcript = False
                         continue
-                    if len(line) > 10:
+                    # Detect chapter heading lines (match TOC titles or standalone short lines
+                    # that don't look like transcript text)
+                    stripped = line.strip()
+                    if stripped and stripped in chapter_titles:
+                        ts_segments.append(current_seg)
+                        ts_segments.append({"_chapter": stripped})
+                        current_seg = None
+                        continue
+                    if current_seg and len(line) > 10:
                         current_seg["text"] += " " + line.strip()
+                elif not in_transcript:
+                    # Pre-transcript: collect intro and chapters
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    if stripped.lower().startswith("table of contents") or stripped.lower().startswith("here are the"):
+                        in_toc = True
+                        continue
+                    if in_toc:
+                        ch_m = chapter_pattern.match(stripped)
+                        if ch_m:
+                            chapter_title = ch_m.group(2).strip()
+                            chapters.append(f"- {ch_m.group(1)} – {chapter_title}")
+                            chapter_titles.add(chapter_title)
+                            continue
+                        # Exit TOC only after we've seen at least one chapter entry
+                        if chapters:
+                            in_toc = False
+                        else:
+                            # Still in TOC preamble (e.g. "Here are the loose chapters...")
+                            continue
+                    if _preamble_skip_re.match(stripped):
+                        continue
+                    # Chapter title appearing before first transcript segment
+                    if stripped in chapter_titles:
+                        ts_segments.append({"_chapter": stripped})
+                        continue
+                    # Keep meaningful intro lines (description, episode info)
+                    if len(stripped) > 20:
+                        preamble_lines.append(stripped)
 
             if current_seg:
                 ts_segments.append(current_seg)
 
             if ts_segments:
-                return _format_segments(ts_segments)
+                header_parts = []
+                if preamble_lines:
+                    header_parts.append("\n".join(preamble_lines))
+                if chapters:
+                    header_parts.append("## Table of Contents\n" + "\n".join(chapters))
+                header = "\n\n".join(header_parts) + "\n\n" if header_parts else ""
+                return header + _format_segments(ts_segments)
 
             # Split text into blocks for block-based strategies
             blocks = [b.strip() for b in re.split(r"\n\n+", text) if b.strip()]

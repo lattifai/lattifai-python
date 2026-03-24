@@ -1,6 +1,6 @@
 """YouTube workflow CLI entry point with nemo_run."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 import nemo_run as run
 from typing_extensions import Annotated
@@ -17,7 +17,7 @@ from lattifai.config import (
 )
 
 
-@run.cli.entrypoint(name="youtube", namespace="alignment")
+@run.cli.entrypoint(name="alignment", namespace="youtube")
 def youtube(
     yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
@@ -41,7 +41,7 @@ def youtube(
     2. Optionally transcribes audio with Gemini OR downloads YouTube captions
     3. Performs forced alignment with the provided or generated captions
 
-    Shortcut: invoking ``lai-youtube`` is equivalent to running ``lai alignment youtube``.
+    Shortcut: invoking ``lai-youtube`` is equivalent to running ``lai youtube alignment``.
 
     Args:
         yt_url: YouTube video URL (can be provided as positional argument)
@@ -67,22 +67,22 @@ def youtube(
 
     Examples:
         # Download from YouTube and align (positional argument)
-        lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID"
+        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID"
 
         # With custom output directory and format
-        lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID" \\
+        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID" \\
             media.output_dir=/tmp/youtube \\
             media.output_format=mp3
 
         # Full configuration with smart splitting and word-level alignment
-        lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID" \\
+        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID" \\
             caption.output_path=aligned.srt \\
             caption.split_sentence=true \\
             caption.word_level=true \\
             alignment.device=cuda
 
         # Use Gemini transcription (requires API key)
-        lai alignment youtube "https://www.youtube.com/watch?v=VIDEO_ID" \\
+        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID" \\
             transcription.gemini_api_key=YOUR_KEY \\
             transcription.model_name=gemini-2.0-flash
 
@@ -138,142 +138,146 @@ def youtube(
     )
 
 
-@run.cli.entrypoint(name="run", namespace="youtube")
-def youtube_run(
+@run.cli.entrypoint(name="download", namespace="youtube")
+def youtube_download(
     yt_url: Optional[str] = None,
-    media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
-    client: Annotated[Optional[ClientConfig], run.Config[ClientConfig]] = None,
-    alignment: Annotated[Optional[AlignmentConfig], run.Config[AlignmentConfig]] = None,
-    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
-    transcription: Annotated[Optional[TranscriptionConfig], run.Config[TranscriptionConfig]] = None,
-    diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
-    event: Annotated[Optional[EventConfig], run.Config[EventConfig]] = None,
-    use_transcription: bool = False,
-):
-    """
-    Download media and captions from YouTube, then align.
-
-    Full workflow:
-    1. Downloads audio/video from YouTube
-    2. Downloads YT captions AND external transcript (if available)
-    3. Performs forced alignment with captions
-
-    This is identical to ``lai alignment youtube`` but accessible as
-    ``lai youtube run`` for discoverability.
-
-    Args:
-        yt_url: YouTube video URL
-        media: Media configuration (output_dir, output_format, quality, etc.)
-        client: API client configuration
-        alignment: Alignment model configuration
-        caption: Caption I/O configuration
-        transcription: Transcription configuration (for Gemini fallback)
-        diarization: Speaker diarization configuration
-        event: Audio event detection configuration
-        use_transcription: Skip YT captions, transcribe directly
-
-    Examples:
-        lai youtube run "https://www.youtube.com/watch?v=VIDEO_ID"
-
-        lai youtube run "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            media.output_dir=./output caption.output_format=srt
-
-        lai youtube run "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            diarization.enabled=true diarization.infer_speakers=true
-    """
-    # Delegate to the existing youtube() function
-    return youtube(
-        yt_url=yt_url,
-        media=media,
-        client=client,
-        alignment=alignment,
-        caption=caption,
-        transcription=transcription,
-        diarization=diarization,
-        event=event,
-        use_transcription=use_transcription,
-    )
-
-
-@run.cli.entrypoint(name="transcript", namespace="youtube")
-def transcript(
-    yt_url: Optional[str] = None,
+    only: Optional[Literal["media", "caption", "transcript"]] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
 ):
     """
-    Download external transcript from a YouTube video's description.
+    Download media, captions, and metadata from YouTube (no alignment).
 
-    Extracts transcript/show-notes URLs from the video description and downloads
-    the content as a Markdown transcript file (.transcript.md).
+    Downloads:
+    1. Audio/video file
+    2. YouTube captions (.vtt/.srt)
+    3. External transcript (.transcript.md) if URL found in description
+    4. Video metadata embedded in transcript frontmatter
 
-    Supported description patterns:
-        *Transcript:*                         (Lex Fridman)
-        https://lexfridman.com/guest-transcript
-
-        * Transcript: https://dwarkesh.com/p/guest   (Dwarkesh Patel)
-
-        Substack Article w/Show Notes: https://...    (Latent Space)
+    All files are saved to the output directory. Use ``lai youtube alignment``
+    to also perform forced alignment after downloading.
 
     Args:
         yt_url: YouTube video URL
-        media: Media configuration. Uses media.output_dir for save location.
+        only: Download only a specific part: "media", "caption", or "transcript".
+            If None (default), download all.
+        media: Media configuration (output_dir, output_format, quality)
+        caption: Caption configuration (output_format)
 
     Examples:
-        lai youtube transcript "https://www.youtube.com/watch?v=VIDEO_ID"
+        lai youtube download "https://www.youtube.com/watch?v=VIDEO_ID"
 
-        lai youtube transcript "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            media.output_dir=./transcripts
+        lai youtube download "https://www.youtube.com/watch?v=VIDEO_ID" \\
+            media.output_dir=./downloads media.output_format=mp3
     """
     import asyncio
 
+    import colorful
+
+    from lattifai.utils import safe_print
     from lattifai.youtube.client import YouTubeDownloader
 
     media_config = media or MediaConfig()
 
+    if yt_url and media_config.input_path:
+        raise ValueError("Cannot specify both positional yt_url and media.input_path.")
     if not yt_url and not media_config.input_path:
         raise ValueError("YouTube URL is required.")
     url = yt_url or media_config.input_path
 
     output_dir = media_config.output_dir or "."
+    downloader = YouTubeDownloader()
+    video_id = downloader.extract_video_id(url)
 
-    from lattifai.utils import safe_print
+    if only and only not in ("media", "caption", "transcript"):
+        raise ValueError(f"Invalid only={only!r}. Must be 'media', 'caption', or 'transcript'.")
 
-    try:
-        import colorful
-    except ImportError:
-        colorful = None
+    safe_print(colorful.cyan(f"📥 Downloading YouTube video: {video_id}"))
 
-    async def _run():
-        downloader = YouTubeDownloader()
-        video_id = downloader.extract_video_id(url)
+    # Fetch video info once (used by transcript download and metadata save)
+    info = asyncio.get_event_loop().run_until_complete(downloader.get_video_info(url))
 
-        info = await downloader.get_video_info(url)
-        description = info.get("description", "")
-        title = info.get("title", "")
+    media_file = None
+    caption_file = None
+    transcript_file = None
 
-        transcript_url = downloader._extract_transcript_url_from_description(description)
-        if not transcript_url:
-            msg = f"❌ No transcript URL found in description for: {title}"
-            safe_print(colorful.red(msg) if colorful else msg)
-            return None
-
-        safe_print(
-            colorful.cyan(f"🔗 Found transcript URL: {transcript_url}")
-            if colorful
-            else f"🔗 Found transcript URL: {transcript_url}"
-        )
-
-        result = await downloader._download_external_transcript(transcript_url, output_dir, video_id, youtube_url=url)
-
-        if result:
-            safe_print(colorful.green(f"✅ Saved: {result}") if colorful else f"✅ Saved: {result}")
-        else:
-            safe_print(
-                colorful.red("❌ Failed to download transcript") if colorful else "❌ Failed to download transcript"
+    # 1. Download media
+    if not only or only == "media":
+        safe_print(colorful.cyan("🎵 Downloading media..."))
+        media_format = media_config.normalize_format() if media_config.output_format else None
+        media_file = asyncio.get_event_loop().run_until_complete(
+            downloader.download_media(
+                url,
+                output_dir=output_dir,
+                media_format=media_format,
+                quality=media_config.quality,
+                audio_track_id=media_config.audio_track_id,
             )
-        return result
+        )
+        if media_file:
+            safe_print(colorful.green(f"  ✅ Media: {media_file}"))
 
-    return asyncio.run(_run())
+    # 2. Download captions (includes external transcript internally)
+    if not only or only == "caption":
+        safe_print(colorful.cyan("📝 Downloading captions..."))
+        caption_file = asyncio.get_event_loop().run_until_complete(
+            downloader.download_captions(
+                url,
+                output_dir=output_dir,
+                force_overwrite=media_config.force_overwrite,
+            )
+        )
+        if caption_file:
+            safe_print(colorful.green(f"  ✅ Caption: {caption_file}"))
+
+    # 3. Download only external transcript from video description
+    if only == "transcript":
+        safe_print(colorful.cyan("📄 Downloading external transcript..."))
+        description = info.get("description", "")
+        transcript_url = downloader._extract_transcript_url_from_description(description)
+        if transcript_url:
+            safe_print(colorful.cyan(f"  🔗 Found: {transcript_url}"))
+            transcript_file = asyncio.get_event_loop().run_until_complete(
+                downloader._download_external_transcript(
+                    transcript_url, output_dir, video_id, youtube_url=url, video_info=info
+                )
+            )
+            if transcript_file:
+                safe_print(colorful.green(f"  ✅ Transcript: {transcript_file}"))
+        else:
+            safe_print(colorful.yellow("  ⚠️ No transcript URL found in description"))
+
+    # 4. Save video metadata as YAML frontmatter markdown
+    from pathlib import Path
+
+    meta_path = Path(output_dir) / f"{video_id}.meta.md"
+
+    # Format duration as HH:MM:SS
+    duration = info.get("duration", 0)
+    hours, remainder = divmod(int(duration), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    duration_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes:02d}:{seconds:02d}"
+
+    lines = ["---"]
+    lines.append(f"title: \"{info.get('title', '')}\"")
+    lines.append(f"channel: \"{info.get('uploader', '')}\"")
+    lines.append(f"url: \"{info.get('webpage_url', '')}\"")
+    lines.append(f'duration: "{duration_str}"')
+    lines.append(f"upload_date: \"{info.get('upload_date', '')}\"")
+    lines.append(f"view_count: {info.get('view_count', 0)}")
+    lines.append(f"thumbnail: \"{info.get('thumbnail', '')}\"")
+    lines.append("---")
+    lines.append("")
+
+    description = info.get("description", "")
+    if description:
+        lines.append(description)
+        lines.append("")
+
+    meta_path.write_text("\n".join(lines), encoding="utf-8")
+    safe_print(colorful.green(f"  ✅ Metadata: {meta_path}"))
+
+    safe_print(colorful.green(f"\n✅ All files saved to: {output_dir}"))
+    return media_file or caption_file or transcript_file
 
 
 def main():
