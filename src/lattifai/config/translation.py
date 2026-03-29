@@ -87,12 +87,33 @@ class TranslationConfig:
         if self.api_key is None:
             if self.provider == "gemini":
                 self.api_key = os.environ.get("GEMINI_API_KEY")
+                if not self.api_key:
+                    try:
+                        from lattifai.cli.config import get_config_value
+
+                        self.api_key = get_config_value("gemini_api_key")
+                    except ImportError:
+                        pass
             elif self.provider == "openai":
                 self.api_key = os.environ.get("OPENAI_API_KEY")
+                if not self.api_key:
+                    try:
+                        from lattifai.cli.config import get_config_value
+
+                        self.api_key = get_config_value("openai_api_key")
+                    except ImportError:
+                        pass
 
         if self.provider == "openai":
             if self.api_base_url is None:
                 self.api_base_url = os.environ.get("OPENAI_API_BASE_URL") or os.environ.get("OPENAI_API_BASE")
+                if not self.api_base_url:
+                    try:
+                        from lattifai.cli.config import get_config_value
+
+                        self.api_base_url = get_config_value("openai_api_base_url")
+                    except ImportError:
+                        pass
             if self.model_name == "gemini-3-flash-preview":
                 env_model = os.environ.get("OPENAI_MODEL")
                 if env_model:

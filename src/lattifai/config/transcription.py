@@ -147,9 +147,17 @@ class TranscriptionConfig:
         # Try to find and load .env file from current directory or parent directories
         load_dotenv(find_dotenv(usecwd=True))
 
-        # Auto-load Gemini API key from environment if not provided
+        # Auto-load Gemini API key: env var > config.toml
         if self.gemini_api_key is None:
-            self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+            env_val = os.environ.get("GEMINI_API_KEY")
+            if not env_val:
+                try:
+                    from lattifai.cli.config import get_config_value
+
+                    env_val = get_config_value("gemini_api_key")
+                except ImportError:
+                    pass
+            self.gemini_api_key = env_val
 
         # Validate max_retries
         if self.max_retries < 0:

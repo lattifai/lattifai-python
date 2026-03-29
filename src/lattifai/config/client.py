@@ -47,9 +47,17 @@ class ClientConfig:
         # Try to find and load .env file from current directory or parent directories
         load_dotenv(find_dotenv(usecwd=True))
 
-        # Auto-load API key from environment if not provided
+        # Auto-load API key: env var > config.toml > .env (already loaded above)
         if self.api_key is None:
-            object.__setattr__(self, "api_key", os.environ.get("LATTIFAI_API_KEY"))
+            env_val = os.environ.get("LATTIFAI_API_KEY")
+            if not env_val:
+                try:
+                    from lattifai.cli.config import get_config_value
+
+                    env_val = get_config_value("lattifai_api_key")
+                except ImportError:
+                    pass
+            object.__setattr__(self, "api_key", env_val)
 
         # Auto-load client version from package if not provided
         if self.client_version is None:

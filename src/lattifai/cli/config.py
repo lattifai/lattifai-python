@@ -21,9 +21,6 @@ KEY_MAP = {
     "gemini_api_key": "GEMINI_API_KEY",
     "openai_api_key": "OPENAI_API_KEY",
     "openai_api_base_url": "OPENAI_API_BASE_URL",
-    "device": "LATTIFAI_DEVICE",
-    "default_language": "LATTIFAI_DEFAULT_LANGUAGE",
-    "output_format": "LATTIFAI_OUTPUT_FORMAT",
 }
 
 # Keys that should be masked in display
@@ -47,6 +44,18 @@ def _load_config() -> dict:
         import tomli as tomllib  # type: ignore[no-redef]
     with open(CONFIG_FILE, "rb") as f:
         return tomllib.load(f)
+
+
+def get_config_value(key: str) -> Optional[str]:
+    """Get a value from ~/.lattifai/config.toml by user-facing key name.
+
+    This is the public API for other config modules to read persisted values.
+    Returns None if the key is not set in the config file.
+    """
+    config = _load_config()
+    if key in config:
+        return str(config[key])
+    return None
 
 
 def _save_config(data: dict) -> None:
