@@ -18,8 +18,9 @@ def align_timestamps_from_ref(
 ) -> List:
     """Align timestamps of supervisions using a reference caption as timing source.
 
-    Matches each input supervision to reference supervisions by text similarity
-    (first N normalized words), then assigns the reference timestamp.
+    Matches each input supervision to reference supervisions by text similarity,
+    using both word-level keys (Latin scripts) and character-level keys (CJK).
+    Searches sequentially through the reference stream to handle repeated text.
     Preserves original text and speaker labels from input; only timestamps change.
 
     Args:
@@ -29,53 +30,98 @@ def align_timestamps_from_ref(
     Returns:
         Updated supervisions with reference-aligned timestamps.
     """
+    if not supervisions or not ref_supervisions:
+        return supervisions
 
     def _normalize(text: str) -> str:
         text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)  # strip md links
         text = re.sub(r"[^\w\s]", "", text.lower())
         return " ".join(text.split())
 
-    # Build normalized text stream from reference
-    ref_entries = [(s.start, _normalize(s.text)) for s in ref_supervisions]
-    ref_stream = " ".join(norm for _, norm in ref_entries)
+    # Build normalized text stream from reference, skipping empty entries
+    ref_entries = []
+    for s in ref_supervisions:
+        norm = _normalize(s.text)
+        if norm:
+            ref_entries.append((s.start, s.start + s.duration, norm))
+
+    if not ref_entries:
+        return supervisions
+
+    ref_stream = " ".join(norm for _, _, norm in ref_entries)
+    ref_end_time = max(end for _, end, _ in ref_entries if end > 0) if ref_entries else 0.0
 
     # Build character-offset to timestamp mapping
     char_offsets = []
     pos = 0
-    for start, norm in ref_entries:
+    for start, _end, norm in ref_entries:
         char_offsets.append((pos, start))
         pos += len(norm) + 1  # +1 for space separator
 
-    def _find_time(text: str) -> Optional[float]:
-        norm = _normalize(text)
-        words = norm.split()
-        for n in [8, 5, 3]:
-            if len(words) < n:
-                continue
-            key = " ".join(words[:n])
-            idx = ref_stream.find(key)
-            if idx >= 0:
-                # Binary search for the timestamp at this position
-                lo, hi = 0, len(char_offsets) - 1
-                while lo < hi:
-                    mid = (lo + hi + 1) // 2
-                    if char_offsets[mid][0] <= idx:
-                        lo = mid
-                    else:
-                        hi = mid - 1
-                return char_offsets[lo][1]
-        return None
+    def _lookup_timestamp(char_idx: int) -> float:
+        """Binary search for the timestamp at a character position."""
+        lo, hi = 0, len(char_offsets) - 1
+        while lo < hi:
+            mid = (lo + hi + 1) // 2
+            if char_offsets[mid][0] <= char_idx:
+                lo = mid
+            else:
+                hi = mid - 1
+        return char_offsets[lo][1]
 
-    # Align each supervision
+    def _make_keys(norm_text: str) -> List[str]:
+        """Generate match keys of decreasing specificity.
+
+        Word-based keys work well for Latin scripts (space-separated words).
+        Character-based keys handle CJK and serve as fallback for Latin.
+        """
+        keys = []
+        words = norm_text.split()
+
+        # Word-based keys (Latin scripts)
+        for n in [8, 5, 3]:
+            if len(words) >= n:
+                keys.append(" ".join(words[:n]))
+
+        # Character-based keys (CJK + universal fallback)
+        for n in [20, 12, 6]:
+            if len(norm_text) >= n:
+                key = norm_text[:n]
+                if key not in keys:
+                    keys.append(key)
+
+        return keys
+
+    def _find_time(text: str, search_from: int) -> tuple:
+        """Find timestamp for text, searching forward from given position.
+
+        Returns (timestamp, matched_char_position) or (None, search_from).
+        """
+        norm = _normalize(text)
+        if not norm:
+            return None, search_from
+
+        keys = _make_keys(norm)
+        for key in keys:
+            idx = ref_stream.find(key, search_from)
+            if idx >= 0:
+                return _lookup_timestamp(idx), idx
+
+        return None, search_from
+
+    # Align each supervision with sequential search
     matched = 0
     prev_start = 0.0
+    search_pos = 0
     results = []
     for sup in supervisions:
-        found = _find_time(sup.text)
-        if found is not None and found >= prev_start:
+        found, match_pos = _find_time(sup.text, search_pos)
+        if found is not None:
             sup.start = found
+            search_pos = match_pos + 1  # advance past this match
             matched += 1
         else:
+            # Fallback: keep original timestamp but ensure monotonicity
             sup.start = max(sup.start, prev_start)
         prev_start = sup.start
         results.append(sup)
@@ -84,7 +130,8 @@ def align_timestamps_from_ref(
     for i in range(len(results) - 1):
         results[i].duration = max(results[i + 1].start - results[i].start, 0.0)
     if results:
-        results[-1].duration = 30.0
+        last_dur = ref_end_time - results[-1].start
+        results[-1].duration = max(last_dur, 0.1) if last_dur > 0 else max(results[-1].duration, 0.1)
 
     safe_print(f"   Aligned {matched}/{len(results)} segments from reference")
     return results
