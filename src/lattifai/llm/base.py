@@ -103,6 +103,26 @@ def _run_async(coro):
         return asyncio.run(coro)
 
 
+def _repair_json(text: str) -> str:
+    """Attempt to repair common JSON errors from LLM output.
+
+    Handles:
+    - Trailing commas before ] or }
+    - Missing commas between array elements (}{)
+    - Truncated arrays (missing closing ])
+    """
+    # Trailing commas: ,] or ,}
+    text = re.sub(r",\s*([}\]])", r"\1", text)
+    # Missing commas between objects: }{ or }\n{
+    text = re.sub(r"}\s*{", "},{", text)
+    # Truncated array: ensure closing ]
+    if text.lstrip().startswith("[") and not text.rstrip().endswith("]"):
+        last_brace = text.rfind("}")
+        if last_brace > 0:
+            text = text[: last_brace + 1] + "]"
+    return text
+
+
 def parse_json_response(text: str) -> Any:
     """Parse JSON from LLM response, handling markdown code blocks and thinking tokens."""
     text = text.strip()
@@ -121,4 +141,14 @@ def parse_json_response(text: str) -> Any:
         json_match = re.search(r"(\{[^{}]*\}|\[.*\])", text, re.DOTALL)
         if json_match:
             text = json_match.group(1)
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        repaired = _repair_json(text)
+        try:
+            result = json.loads(repaired)
+            logger.warning("JSON repaired successfully (fixed formatting errors from LLM output)")
+            return result
+        except json.JSONDecodeError:
+            pass
+        raise

@@ -1,17 +1,24 @@
 """Unified LLM client abstraction for LattifAI.
 
-Provides a consistent interface across Gemini, OpenAI, vLLM, and other providers.
+All text/JSON generation goes through OpenAI-compatible protocol.
+Gemini models use Google's OpenAI-compatible endpoint; GeminiClient
+is reserved for multimodal use (transcription with audio/video).
 
 Usage:
     from lattifai.llm import create_client
 
-    # Gemini
+    # Gemini (via OpenAI-compatible endpoint)
     client = create_client("gemini", api_key="...", model="gemini-3-flash-preview")
     result = await client.generate_json("Return a JSON array of colors")
 
-    # OpenAI / vLLM
+    # OpenAI / vLLM / SGLang / Ollama
     client = create_client("openai", api_key="...", model="gpt-4o")
     client = create_client("openai", base_url="http://localhost:8000/v1", model="Qwen3-ASR")
+
+    # For multimodal (audio/video) — use GeminiClient directly
+    from lattifai.llm import GeminiClient
+    client = GeminiClient(api_key="...", model="gemini-2.5-flash")
+    response = await client.generate_content(parts, config=config)
 """
 
 import os
@@ -20,6 +27,9 @@ from typing import Optional
 from lattifai.llm.base import BaseLLMClient, parse_json_response
 from lattifai.llm.gemini import GeminiClient
 from lattifai.llm.openai_compat import OpenAIClient
+
+# Gemini OpenAI-compatible endpoint
+GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 __all__ = [
     "BaseLLMClient",
@@ -40,21 +50,25 @@ def create_client(
 ) -> BaseLLMClient:
     """Create an LLM client for the given provider.
 
+    Both 'gemini' and 'openai' providers return an OpenAIClient.
+    Gemini models are accessed via Google's OpenAI-compatible endpoint.
+
     Args:
         provider: Provider name ('gemini' or 'openai').
         api_key: API key. Falls back to GEMINI_API_KEY or OPENAI_API_KEY env var.
         model: Default model name.
-        base_url: Base URL for OpenAI-compatible APIs (vLLM, SGLang, etc.).
+        base_url: Base URL override for OpenAI-compatible APIs.
         **kwargs: Extra provider-specific arguments.
 
     Returns:
-        Configured BaseLLMClient instance.
+        Configured OpenAIClient instance.
     """
     provider = provider.lower()
 
     if provider == "gemini":
         api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        return GeminiClient(api_key=api_key, model=model, **kwargs)
+        base_url = base_url or GEMINI_OPENAI_BASE_URL
+        return OpenAIClient(api_key=api_key, model=model, base_url=base_url, **kwargs)
     elif provider == "openai":
         api_key = api_key or os.environ.get("OPENAI_API_KEY")
         return OpenAIClient(api_key=api_key, model=model, base_url=base_url, **kwargs)
