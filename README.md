@@ -67,6 +67,8 @@ client = LattifAI(alignment_config=AlignmentConfig(model_hub="modelscope"))
 
 ## Installation
 
+> **Requires Python 3.10 – 3.14**
+
 ### Using uv (Recommended)
 
 [uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip).
@@ -115,8 +117,9 @@ extra-index-url = https://lattifai.github.io/pypi/simple/
 | (base) | Forced alignment, Gemini transcription, YouTube, captions |
 | `transcription` | Local ASR models (Parakeet, SenseVoice, Fun-ASR) |
 | `diarization` | Speaker diarization (NeMo, pyannote) |
+| `translation` | LLM-powered caption translation (OpenAI-compatible) |
 | `event` | Audio event detection |
-| `all` | Base + transcription + diarization + event |
+| `all` | Base + transcription + diarization + translation + event |
 
 **Note:** Base installation includes alignment, Gemini transcription, and YouTube. Use `[all]` for local ASR models and all optional features.
 
@@ -188,6 +191,9 @@ caption = client.alignment(
 | `lai caption convert` | Convert caption formats | `lai caption convert input.srt output.vtt` |
 | `lai caption shift` | Shift timestamps | `lai caption shift input.srt output.srt 2.0` |
 | `lai serve run` | Start local web UI playground | `lai serve run` |
+| `lai doctor` | Run environment diagnostics | `lai doctor` |
+| `lai update` | Update to latest version | `lai update` or `lai update --force` |
+| `lai config` | Manage API keys & settings | `lai config set lattifai_api_key lf_xxx` |
 
 ### Common Options
 
@@ -485,11 +491,43 @@ for segment in caption.supervisions:
     print(f"[{segment.speaker}] {segment.text}")
 ```
 
+**LLM Speaker Name Inference:**
+
+When speakers remain as `SPEAKER_XX` after acoustic diarization, enable LLM inference to identify real names from dialogue content:
+
+```python
+DiarizationConfig(
+    enabled=True,
+    infer_speakers=True,              # Use LLM to infer speaker names
+    speaker_context="podcast, host is Alice, guest is Bob",  # Optional hint
+    infer_model="gemini-2.5-flash",   # LLM model (default)
+)
+```
+
+**DiarizationConfig Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `False` | Enable speaker diarization |
+| `device` | `auto` | `cpu`, `cuda`, `mps`, or `auto` |
+| `num_speakers` | — | Exact number of speakers (overrides min/max) |
+| `min_speakers` | — | Minimum speakers to detect |
+| `max_speakers` | — | Maximum speakers to detect |
+| `infer_speakers` | `False` | Use LLM to infer real names from dialogue |
+| `speaker_context` | — | Context hint for LLM inference |
+| `infer_model` | `gemini-2.5-flash` | Model for speaker name inference |
+
 **CLI:**
 ```bash
 lai alignment align audio.wav subtitle.srt output.srt \
     diarization.enabled=true \
     diarization.device=cuda
+
+# With LLM speaker name inference
+lai alignment align audio.wav subtitle.srt output.srt \
+    diarization.enabled=true \
+    diarization.infer_speakers=true \
+    diarization.speaker_context="interview with Dr. Smith"
 ```
 
 ### Data Flow
@@ -611,7 +649,7 @@ WEBVTT
 **Writing**: Use `word_level=True` with `karaoke_config` to output YouTube VTT style:
 
 ```python
-from lattifai.caption import Caption
+from lattifai.data import Caption
 from lattifai.caption.config import KaraokeConfig
 
 caption = Caption.read("input.vtt")
