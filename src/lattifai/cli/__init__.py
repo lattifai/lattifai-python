@@ -10,7 +10,7 @@ from lattifai.cli.caption import convert, diff
 from lattifai.cli.diarization import diarize
 from lattifai.cli.serve import serve
 from lattifai.cli.transcribe import transcribe, transcribe_align
-from lattifai.cli.translate import translate
+from lattifai.cli.translate import translate, translate_youtube
 from lattifai.cli.youtube import youtube, youtube_download
 
 # doctor and update are registered as direct Typer commands via _main.py,
@@ -25,6 +25,7 @@ __all__ = [
     "transcribe",
     "transcribe_align",
     "translate",
+    "translate_youtube",
     "youtube",
     "youtube_download",
 ]

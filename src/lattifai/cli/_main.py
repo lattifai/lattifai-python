@@ -9,7 +9,10 @@ from nemo_run.cli.api import create_cli
 
 
 def _register_direct_commands(app: typer.Typer) -> None:
-    """Add doctor and update as top-level commands (no namespace group)."""
+    """Add doctor, update, and config as top-level commands (no namespace group)."""
+    from lattifai.cli.config import app as config_app
+
+    app.add_typer(config_app, name="config")
 
     @app.command("doctor", help="Run environment diagnostics for LattifAI.")
     def _doctor():
