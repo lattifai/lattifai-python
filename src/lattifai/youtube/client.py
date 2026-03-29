@@ -2195,16 +2195,11 @@ class YouTubeDownloader:
                 sa_segments = []
                 current_speaker = None
                 current_hms = "0:00:00"
-                # Find transcript start (after "Transcript" heading or first chapter)
+                # Find transcript start: last "Transcript" heading before actual dialogue
                 tx_start = 0
                 for bi3, b in enumerate(blocks):
-                    if b == "Transcript" and bi3 > 5:
-                        # Take the second "Transcript" if preceded by TOC-like content
+                    if b == "Transcript":
                         tx_start = bi3 + 1
-                    ch_m3 = chapter_pattern.match(b)
-                    if ch_m3 and bi3 > tx_start:
-                        tx_start = bi3
-                        break
 
                 for bi3 in range(tx_start, len(blocks)):
                     b = blocks[bi3]

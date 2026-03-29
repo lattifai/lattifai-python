@@ -270,3 +270,138 @@ class TestParseTranscriptHtml:
         """HTML without body tag"""
         text = YouTubeDownloader._parse_transcript_html("<html><head></head></html>")
         assert text is None
+
+    def test_standalone_speaker_names(self):
+        """Strategy 3b: standalone speaker names on their own block (Dwarkesh article format)"""
+        # Build a transcript with 2 speakers appearing ≥3 times each, with chapter headings
+        blocks = [
+            "Some intro",
+            "Transcript",
+            "00:00:00 – Opening",
+        ]
+        # Add enough speaker+text blocks to trigger Strategy 3b (≥10 segments)
+        for i in range(6):
+            blocks.append("Alice Smith")
+            blocks.append(f"This is what Alice says in segment {i}. She talks about many interesting things.")
+            blocks.append("Bob Jones")
+            blocks.append(f"And Bob responds with his thoughts on segment {i}. He has a different perspective.")
+
+        text = "\n\n".join(blocks)
+        transcript = YouTubeDownloader._parse_transcript_html(text)
+        assert transcript is not None
+        assert "**Alice Smith:**" in transcript
+        assert "**Bob Jones:**" in transcript
+        assert "## Opening" in transcript
+        assert "[00:00:00]" in transcript
+        # Should have ≥12 speaker segments
+        import re
+
+        speaker_lines = [l for l in transcript.split("\n") if l.startswith("**")]
+        assert len(speaker_lines) >= 12
+
+    def test_standalone_speaker_skips_short_blocks(self):
+        """Strategy 3b skips blocks shorter than 20 chars as noise"""
+        blocks = ["Transcript"]
+        for i in range(6):
+            blocks.append("Speaker One")
+            blocks.append(f"A full paragraph of meaningful dialogue content number {i}.")
+            blocks.append("103")  # UI noise (like count)
+            blocks.append("Speaker Two")
+            blocks.append(f"Another paragraph of response content for segment {i} here.")
+
+        text = "\n\n".join(blocks)
+        transcript = YouTubeDownloader._parse_transcript_html(text)
+        assert transcript is not None
+        assert "103" not in transcript
+
+    def test_standalone_speaker_needs_minimum_occurrences(self):
+        """Strategy 3b requires ≥3 occurrences and ≥2 distinct speakers"""
+        # Only 1 occurrence of each — should NOT trigger Strategy 3b
+        blocks = [
+            "Transcript",
+            "Alice",
+            "Hello there, this is a sufficiently long paragraph for testing.",
+            "Bob",
+            "Hi Alice, nice to meet you today for this conversation.",
+        ]
+        text = "\n\n".join(blocks)
+        transcript = YouTubeDownloader._parse_transcript_html(text)
+        # Should fallback to raw text, not produce **Alice:** format
+        assert transcript is None or "**Alice:**" not in transcript
+
+
+class TestIsHijackedPage:
+    """Test _is_hijacked_page static method"""
+
+    def test_normal_html(self):
+        assert not YouTubeDownloader._is_hijacked_page("<html><body><p>Hello</p></body></html>")
+
+    def test_ssl_error_page(self):
+        html = "<html><body>" + "x" * 100 + "<h1>NET::ERR_CERT_COMMON_NAME_INVALID</h1></body></html>"
+        assert YouTubeDownloader._is_hijacked_page(html)
+
+    def test_chinese_privacy_warning(self):
+        html = "<html><body>" + "x" * 100 + "您的连接不是私密连接</body></html>"
+        assert YouTubeDownloader._is_hijacked_page(html)
+
+    def test_pem_certificate(self):
+        html = "x" * 100 + "-----BEGIN CERTIFICATE-----\nMIIBxx..."
+        assert YouTubeDownloader._is_hijacked_page(html)
+
+    def test_empty_html(self):
+        assert not YouTubeDownloader._is_hijacked_page("")
+        assert not YouTubeDownloader._is_hijacked_page(None)
+
+
+class TestIsHostReachable:
+    """Test _is_host_reachable static method"""
+
+    def test_reachable_host(self):
+        assert YouTubeDownloader._is_host_reachable("google.com", timeout=5)
+
+    def test_unreachable_host(self):
+        # RFC 5737 TEST-NET: guaranteed non-routable
+        assert not YouTubeDownloader._is_host_reachable("192.0.2.1", timeout=1)
+
+    def test_invalid_host(self):
+        assert not YouTubeDownloader._is_host_reachable("this.host.definitely.does.not.exist.invalid", timeout=1)
+
+
+class TestRepairJson:
+    """Test _repair_json and parse_json_response from llm.base"""
+
+    def test_trailing_comma(self):
+        from lattifai.llm.base import parse_json_response
+
+        result = parse_json_response('[{"a": 1}, {"b": 2},]')
+        assert result == [{"a": 1}, {"b": 2}]
+
+    def test_missing_comma_between_objects(self):
+        from lattifai.llm.base import parse_json_response
+
+        result = parse_json_response('[{"a": 1} {"b": 2}]')
+        assert result == [{"a": 1}, {"b": 2}]
+
+    def test_truncated_array(self):
+        from lattifai.llm.base import parse_json_response
+
+        result = parse_json_response('[{"a": 1}, {"b": 2}')
+        assert result == [{"a": 1}, {"b": 2}]
+
+    def test_valid_json_untouched(self):
+        from lattifai.llm.base import parse_json_response
+
+        result = parse_json_response('[{"a": 1}, {"b": 2}]')
+        assert result == [{"a": 1}, {"b": 2}]
+
+    def test_code_fence_stripped(self):
+        from lattifai.llm.base import parse_json_response
+
+        result = parse_json_response('```json\n[{"a": 1}]\n```')
+        assert result == [{"a": 1}]
+
+    def test_thinking_tokens_stripped(self):
+        from lattifai.llm.base import parse_json_response
+
+        result = parse_json_response('<think>reasoning</think>[{"a": 1}]')
+        assert result == [{"a": 1}]
