@@ -135,6 +135,7 @@ include-package-data = true
 [tool.setuptools.package-data]
 "lattifai.transcription.prompts" = ["**/*.txt", "**/*.md"]
 "lattifai.data.resamplers" = ["*.onnx"]
+"lattifai.data.selftest" = ["*.wav", "*.vtt", "*.srt"]
 "lattifai.translation" = ["**/*.yaml", "**/*.md"]
 "lattifai.cli" = ["serve.html"]
 

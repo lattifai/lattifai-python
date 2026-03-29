@@ -18,7 +18,7 @@ def _register_direct_commands(app: typer.Typer) -> None:
     def _doctor():
         from lattifai.cli.doctor import doctor
 
-        doctor()
+        raise SystemExit(doctor())
 
     @app.command("update", help="Update LattifAI CLI to the latest version.")
     def _update(
@@ -26,7 +26,7 @@ def _register_direct_commands(app: typer.Typer) -> None:
     ):
         from lattifai.cli.update import update
 
-        update(force=force)
+        raise SystemExit(update(force=force))
 
 
 def main():

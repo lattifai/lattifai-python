@@ -1,7 +1,9 @@
 """Implementation of 'lai doctor' for LattifAI CLI – environment diagnostics."""
 
 import importlib.metadata
+import importlib.util
 import os
+import platform
 import sys
 from pathlib import Path
 
@@ -33,7 +35,23 @@ def _check_package_version() -> tuple[str, str, str]:
                 return ("Package version", f"[{T.RICH_WARN}]{current} -> {latest} available[/{T.RICH_WARN}]", "WARN")
     except Exception:
         pass
-    return ("Package version", f"[{T.RICH_OK}]{current}[/{T.RICH_OK}] (PyPI check failed)", "OK")
+    return ("Package version", f"[{T.RICH_WARN}]{current} (PyPI check failed)[/{T.RICH_WARN}]", "WARN")
+
+
+def _check_os() -> tuple[str, str, str]:
+    """Check operating system information."""
+    system = platform.system()
+    machine = platform.machine()
+    if system == "Darwin":
+        mac_ver = platform.mac_ver()[0]
+        label = f"macOS {mac_ver} ({machine})"
+    elif system == "Linux":
+        label = f"Linux {platform.release()} ({machine})"
+    elif system == "Windows":
+        label = f"Windows {platform.version()} ({machine})"
+    else:
+        label = f"{system} {platform.release()} ({machine})"
+    return ("OS", f"[{T.RICH_OK}]{label}[/{T.RICH_OK}]", "OK")
 
 
 def _check_python_version() -> tuple[str, str, str]:
@@ -47,25 +65,47 @@ def _check_python_version() -> tuple[str, str, str]:
 
 def _check_gpu() -> tuple[str, str, str]:
     """Check GPU / hardware acceleration."""
+    accel = []
+
+    # ONNX Runtime providers
     try:
         import onnxruntime as ort
 
         providers = ort.get_available_providers()
         if "CUDAExecutionProvider" in providers:
-            return ("GPU acceleration", f"[{T.RICH_OK}]CUDA[/{T.RICH_OK}]", "OK")
+            accel.append("CUDA")
         if "CoreMLExecutionProvider" in providers:
-            return ("GPU acceleration", f"[{T.RICH_OK}]CoreML[/{T.RICH_OK}]", "OK")
-        return ("GPU acceleration", f"[{T.RICH_WARN}]CPU only[/{T.RICH_WARN}]", "WARN")
+            accel.append("CoreML")
     except ImportError:
+        pass
+
+    # PyTorch MPS (Apple Silicon GPU)
+    try:
+        import torch
+
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            accel.append("MPS")
+    except ImportError:
+        pass
+
+    # MLX (Apple ML framework)
+    if importlib.util.find_spec("mlx") is not None:
+        accel.append("MLX")
+
+    if accel:
+        label = ", ".join(accel)
+        return ("GPU acceleration", f"[{T.RICH_OK}]{label}[/{T.RICH_OK}]", "OK")
+    if importlib.util.find_spec("onnxruntime") is None:
         return ("GPU acceleration", f"[{T.RICH_ERR}]onnxruntime not installed[/{T.RICH_ERR}]", "FAIL")
+    return ("GPU acceleration", f"[{T.RICH_WARN}]CPU only[/{T.RICH_WARN}]", "WARN")
 
 
 def _check_model_cache() -> tuple[str, str, str]:
     """Check Lattice-1 model cache status."""
-    from lattifai.utils import REQUIRED_MODEL_VERSIONS, _is_cache_valid
-
     try:
         from huggingface_hub.constants import HF_HUB_CACHE
+
+        from lattifai.utils import REQUIRED_MODEL_VERSIONS, _is_cache_valid
 
         model_id = "LattifAI/Lattice-1"
         cache_dir = Path(HF_HUB_CACHE) / f'models--{model_id.replace("/", "--")}'
@@ -96,23 +136,85 @@ def _check_api_key() -> tuple[str, str, str]:
     """Check LATTIFAI_API_KEY environment variable."""
     key = os.environ.get("LATTIFAI_API_KEY", "")
     if key:
-        masked = key[:4] + "..." + key[-4:] if len(key) > 8 else "***"
+        masked = f"...{key[-4:]}" if len(key) > 4 else "***"
         return ("API key", f"[{T.RICH_OK}]Set ({masked})[/{T.RICH_OK}]", "OK")
     return ("API key", f"[{T.RICH_WARN}]LATTIFAI_API_KEY not set[/{T.RICH_WARN}]", "WARN")
 
 
 def _check_dependencies() -> tuple[str, str, str]:
     """Check critical dependencies are importable."""
-    deps = {"k2py": "k2", "lhotse": "lhotse", "onnxruntime": "onnxruntime", "lattifai-core": "lattifai_core"}
+    deps = {"k2py": "k2py", "lhotse": "lhotse", "onnxruntime": "onnxruntime", "lattifai-core": "lattifai_core"}
     missing = []
-    for pkg_name, import_name in deps.items():
-        try:
-            __import__(import_name)
-        except ImportError:
+    for pkg_name, module_name in deps.items():
+        if importlib.util.find_spec(module_name) is None:
             missing.append(pkg_name)
     if not missing:
         return ("Dependencies", f"[{T.RICH_OK}]All critical deps installed[/{T.RICH_OK}]", "OK")
     return ("Dependencies", f"[{T.RICH_ERR}]Missing: {', '.join(missing)}[/{T.RICH_ERR}]", "FAIL")
+
+
+def _check_selftest() -> tuple[str, str, str]:
+    """Verify bundled test data and core caption pipeline."""
+    import importlib.resources
+    import tempfile
+
+    data_pkg = "lattifai.data.selftest"
+    passed = []
+    errors = []
+
+    # 1) Check bundled files exist
+    try:
+        files_ref = importlib.resources.files(data_pkg)
+        wav_path = files_ref / "test.wav"
+        vtt_path = files_ref / "test.vtt"
+        srt_path = files_ref / "test.srt"
+        for name, ref in [("test.wav", wav_path), ("test.vtt", vtt_path), ("test.srt", srt_path)]:
+            # Materialize to a real path to verify it's bundled
+            with importlib.resources.as_file(ref) as p:
+                if not p.exists() or p.stat().st_size == 0:
+                    errors.append(f"{name} missing")
+        if not errors:
+            passed.append("data")
+    except Exception as exc:
+        errors.append(f"data: {exc}")
+
+    # 2) Caption read/write roundtrip (VTT → SRT → VTT)
+    try:
+        from lattifai.data.caption import Caption
+
+        with importlib.resources.as_file(files_ref / "test.vtt") as vtt_file:
+            cap = Caption.read(str(vtt_file))
+        if not cap.supervisions or len(cap.supervisions) == 0:
+            errors.append("VTT parse empty")
+        else:
+            with tempfile.NamedTemporaryFile(suffix=".srt", delete=True) as tmp:
+                cap.write(tmp.name)
+                cap2 = Caption.read(tmp.name)
+                if len(cap2.supervisions) != len(cap.supervisions):
+                    errors.append("roundtrip mismatch")
+                else:
+                    passed.append("caption")
+    except Exception as exc:
+        errors.append(f"caption: {exc}")
+
+    # 3) Audio loading
+    try:
+        from lattifai.audio2 import AudioLoader
+
+        loader = AudioLoader()
+        with importlib.resources.as_file(files_ref / "test.wav") as wav_file:
+            audio = loader._load_audio(str(wav_file), sampling_rate=16000, channel_selector=None)
+        if audio is None or len(audio) == 0:
+            errors.append("audio empty")
+        else:
+            passed.append("audio")
+    except Exception as exc:
+        errors.append(f"audio: {exc}")
+
+    if errors:
+        return ("Self-test", f"[{T.RICH_ERR}]FAIL: {'; '.join(errors)}[/{T.RICH_ERR}]", "FAIL")
+    label = ", ".join(passed)
+    return ("Self-test", f"[{T.RICH_OK}]OK ({label})[/{T.RICH_OK}]", "OK")
 
 
 STATUS_ICONS = {
@@ -122,21 +224,26 @@ STATUS_ICONS = {
 }
 
 CHECKS = [
+    _check_os,
     _check_package_version,
     _check_python_version,
     _check_gpu,
     _check_model_cache,
     _check_api_key,
     _check_dependencies,
+    _check_selftest,
 ]
 
 
-def doctor():
+def doctor() -> int:
     """
     Run environment diagnostics for LattifAI.
 
     Checks package version, Python version, GPU acceleration,
     model cache, API key, and critical dependencies.
+
+    Returns:
+        Exit code: 0 if all OK/WARN, 1 if any FAIL.
     """
     console.print()
     console.print(f"[{T.RICH_HEADER}]LattifAI Doctor[/{T.RICH_HEADER}]")
@@ -150,7 +257,12 @@ def doctor():
     ok_count = warn_count = fail_count = 0
 
     for check_fn in CHECKS:
-        name, detail, status = check_fn()
+        try:
+            name, detail, status = check_fn()
+        except Exception as exc:
+            name = check_fn.__doc__.split(".")[0].strip() if check_fn.__doc__ else check_fn.__name__
+            detail = f"[{T.RICH_ERR}]Unexpected error: {exc}[/{T.RICH_ERR}]"
+            status = "FAIL"
         icon = STATUS_ICONS.get(status, "?")
         table.add_row(icon, name, detail)
         if status == "OK":
@@ -174,7 +286,9 @@ def doctor():
         console.print(f"[{T.RICH_OK}]All checks passed![/{T.RICH_OK}]")
     console.print()
 
+    return 1 if fail_count else 0
+
 
 def main():
     """Main entry point for lai-doctor script."""
-    doctor()
+    sys.exit(doctor())
