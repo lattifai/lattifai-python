@@ -37,8 +37,8 @@ if TYPE_CHECKING:
 def _build_speaker_context(metadata: dict) -> Optional[str]:
     """Build speaker context string from video metadata for LLM inference.
 
-    Extracts the most useful signals: channel name (host), description first
-    paragraph (guest introductions), and video title.
+    Extracts title, channel, and the most speaker-relevant portions of the
+    description (intro paragraph + any structured host/guest blocks).
     """
     parts = []
 
@@ -46,20 +46,67 @@ def _build_speaker_context(metadata: dict) -> Optional[str]:
     if title:
         parts.append(f"Title: {title}")
 
-    uploader = metadata.get("uploader")
+    uploader = metadata.get("uploader") or metadata.get("channel")
     if uploader:
         parts.append(f"Channel/Host: {uploader}")
 
     description = metadata.get("description", "")
     if description:
-        # First paragraph is usually the guest introduction
-        first_para = description.split("\n\n")[0].strip()
-        # Take first 500 chars to avoid bloating the prompt
-        if len(first_para) > 500:
-            first_para = first_para[:500] + "..."
-        parts.append(f"Description: {first_para}")
+        parts.append(f"Description:\n{_extract_speaker_description(description)}")
 
     return "\n".join(parts) if parts else None
+
+
+def _extract_speaker_description(description: str, budget: int = 1500) -> str:
+    """Extract speaker-relevant lines from a video description.
+
+    Keeps the intro paragraph and any lines containing speaker/host/guest
+    signals, discarding timestamps-only blocks, links, and boilerplate.
+    """
+    import re
+
+    # Patterns that signal speaker information
+    _SPEAKER_PATTERNS = re.compile(
+        r"(?:host|guest|嘉宾|主播|主持|interviewer|panelist|speaker|featuring|"
+        r"joined\s+by|co-host|with\s+\w+\s+(and|&)|【|嘉宾|主讲|对谈)",
+        re.IGNORECASE,
+    )
+    # Lines that are just timestamps or links — low value
+    _SKIP_LINE = re.compile(
+        r"^(\d{1,2}:\d{2}(?::\d{2})?\s*[-–—]\s*|https?://|http://|Sign up|Subscribe|"
+        r"Follow us|#\w|DISCLAIMER|CONTACT:|Email\s)",
+        re.IGNORECASE,
+    )
+
+    paragraphs = description.split("\n\n")
+    kept = []
+    total = 0
+
+    # Always keep first paragraph (intro)
+    if paragraphs:
+        intro = paragraphs[0].strip()
+        if len(intro) > 600:
+            intro = intro[:600] + "..."
+        kept.append(intro)
+        total += len(intro)
+
+    # Scan remaining paragraphs for speaker signals
+    for para in paragraphs[1:]:
+        para = para.strip()
+        if not para:
+            continue
+        # Keep paragraphs with speaker patterns
+        if _SPEAKER_PATTERNS.search(para):
+            # Filter out pure-link / pure-timestamp lines within the paragraph
+            lines = [ln for ln in para.split("\n") if ln.strip() and not _SKIP_LINE.match(ln.strip())]
+            if lines:
+                block = "\n".join(lines)
+                if total + len(block) > budget:
+                    break
+                kept.append(block)
+                total += len(block)
+
+    return "\n\n".join(kept)
 
 
 class LattifAI(LattifAIClientMixin, SyncAPIClient):
