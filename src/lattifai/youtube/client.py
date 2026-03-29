@@ -2177,6 +2177,25 @@ class YouTubeDownloader:
         if source_lang:
             self.logger.info(f"🎯 Targeting specific caption track: {source_lang}")
 
+        # Auto-detect original language from video info when source_lang is not specified
+        if not source_lang:
+            try:
+                info = await self.get_video_info(url)
+                # Prefer manually created subtitles keys as the most reliable signal
+                manual_subs = info.get("subtitles", {})
+                video_lang = info.get("language")
+
+                if manual_subs:
+                    # Use all manually created subtitle languages
+                    sub_langs = list(manual_subs.keys())
+                    source_lang = ",".join(sub_langs)
+                    self.logger.info(f"🌐 Auto-detected manual caption languages: {sub_langs}")
+                elif video_lang:
+                    source_lang = video_lang
+                    self.logger.info(f"🌐 Auto-detected video language: {source_lang}")
+            except Exception as e:
+                self.logger.debug(f"Language auto-detection skipped: {e}")
+
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
         # Configure yt-dlp options for caption download
@@ -2190,9 +2209,9 @@ class YouTubeDownloader:
             "no_warnings": True,
         }
 
-        # Add caption language selection if specified
+        # Add caption language selection if specified (or auto-detected)
         if source_lang:
-            opts["subtitleslangs"] = [f"{source_lang}*"]
+            opts["subtitleslangs"] = [f"{lang}*" for lang in source_lang.split(",")]
 
         try:
             # Run in thread pool to avoid blocking

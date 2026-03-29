@@ -143,6 +143,7 @@ def youtube_download(
     yt_url: Optional[str] = None,
     only: Optional[Literal["media", "caption", "transcript", "meta"]] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
+    source_lang: Optional[str] = None,
 ):
     """
     Download media, captions, and metadata from YouTube (no alignment).
@@ -161,7 +162,8 @@ def youtube_download(
         only: Download only a specific part: "media", "caption", "transcript", or "meta".
             If None (default), download all.
         media: Media configuration (output_dir, output_format, quality)
-        caption: Caption configuration (output_format)
+        source_lang: Caption language to download (e.g., 'zh-Hans', 'en', 'zh-CN').
+            If None (default), auto-detects from video metadata.
 
     Examples:
         lai youtube download "https://www.youtube.com/watch?v=VIDEO_ID"
@@ -224,6 +226,7 @@ def youtube_download(
                 url,
                 output_dir=output_dir,
                 force_overwrite=media_config.force_overwrite,
+                source_lang=source_lang,
             )
         )
         if caption_file:
