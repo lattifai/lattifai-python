@@ -4,7 +4,6 @@ import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
-import colorful
 import numpy as np
 
 from lattifai.caption import SentenceSplitter, Supervision
@@ -15,6 +14,7 @@ from lattifai.errors import (
     ModelLoadError,
     QuotaExceededError,
 )
+from lattifai.theme import theme
 from lattifai.utils import safe_print
 
 from .punctuation import PUNCTUATION, PUNCTUATION_SPACE
@@ -282,7 +282,7 @@ class LatticeTokenizer:
                     m, sec = divmod(rem, 60)
                     return f"{int(h):02d}:{int(m):02d}:{sec:06.3f}"
 
-                safe_print(colorful.yellow(f"⚠️  Detected {len(dup_blocks)} duplicate text block(s):"))
+                safe_print(theme.warn(f"⚠️  Detected {len(dup_blocks)} duplicate text block(s):"))
                 for dup in dup_blocks:
                     first_start, first_end = dup.first
                     second_start, second_end = dup.second
@@ -291,7 +291,7 @@ class LatticeTokenizer:
                     first_ts = f"{_ts(supervisions[first_start].start)}-{_ts(supervisions[first_end].end)}"
                     second_ts = f"{_ts(supervisions[second_start].start)}-{_ts(supervisions[second_end].end)}"
                     safe_print(
-                        colorful.yellow(
+                        theme.warn(
                             f"         [{first_ts}]: {first_text[:100]}...\n"
                             f"         [{second_ts}]: {second_text[:100]}..."
                         )
@@ -299,7 +299,7 @@ class LatticeTokenizer:
                 import sys
 
                 safe_print(
-                    colorful.cyan(
+                    theme.step(
                         "   Auto-optimization handles duplicates with high accuracy (recommended).\n"
                         "   Continue with alignment? [Y/n] (auto-yes in 10s) "
                     ),
@@ -413,7 +413,7 @@ class LatticeTokenizer:
             word_ratio = sum(len(s.get("alignment", {}).get("word", [])) for s in alignments) / len(alignments)
             if word_ratio < 0.5:
                 safe_print(
-                    colorful.yellow(
+                    theme.warn(
                         f"⚠️  Low word-level alignment ratio ({word_ratio:.2%} of segments have word alignments). "
                     )
                 )

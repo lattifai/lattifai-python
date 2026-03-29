@@ -7,8 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-import colorful
-
+from lattifai.theme import theme
 from lattifai.utils import safe_print
 
 try:
@@ -110,7 +109,7 @@ class FileExistenceManager:
             return "proceed"  # No existing files, proceed normally
 
         # Header with warning color
-        safe_print(f'\n{colorful.bold_yellow("⚠️  Existing files found:")}')
+        safe_print(f'\n{theme.warn("⚠️  Existing files found:")}')
 
         # Collect file paths for options
         file_paths = []
@@ -124,10 +123,10 @@ class FileExistenceManager:
         for file_path in sorted(file_paths):
             # Determine emoji based on file type
             if has_media and file_path in existing_files["media"]:
-                display_text = f'{colorful.green("•")} 🎬 Media file: {file_path}'
+                display_text = f'{theme.ok("•")} 🎬 Media file: {file_path}'
                 shift_length = len("Media file:")
             else:
-                display_text = f'{colorful.green("•")} 📝 Caption file: {file_path}'
+                display_text = f'{theme.ok("•")} 📝 Caption file: {file_path}'
                 shift_length = len("Caption file:")
             options.append((display_text, file_path))
 
@@ -136,7 +135,7 @@ class FileExistenceManager:
         if transcriber_name:
             options.append(
                 (
-                    f'{colorful.green("•")} 🔄 {" " * shift_length} {overwrite_text}',
+                    f'{theme.ok("•")} 🔄 {" " * shift_length} {overwrite_text}',
                     overwrite_op,
                 )
             )
@@ -145,10 +144,10 @@ class FileExistenceManager:
         options.extend(
             [
                 (
-                    f'{colorful.green("•")} 🔄 {" " * shift_length} {overwrite_text}',
+                    f'{theme.ok("•")} 🔄 {" " * shift_length} {overwrite_text}',
                     overwrite_op,
                 ),
-                (f'{colorful.green("•")} ❌ {" " * shift_length} Cancel operation', "cancel"),
+                (f'{theme.ok("•")} ❌ {" " * shift_length} Cancel operation', "cancel"),
             ]
         )
 
@@ -157,15 +156,15 @@ class FileExistenceManager:
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default=default_value)
 
         if choice == "overwrite":
-            safe_print(f'{colorful.yellow("🔄 Overwriting existing files")}')
+            safe_print(f'{theme.warn("🔄 Overwriting existing files")}')
         elif choice == TRANSCRIBE_CHOICE:
-            print(f'{colorful.magenta(f"✨ Will transcribe with {transcriber_name}")}')
+            print(f'{theme.accent(f"✨ Will transcribe with {transcriber_name}")}')
         elif choice == "cancel":
-            safe_print(f'{colorful.red("❌ Operation cancelled")}')
+            safe_print(f'{theme.err("❌ Operation cancelled")}')
         elif choice in file_paths:
-            safe_print(f'{colorful.green(f"✅ Using selected file: {choice}")}')
+            safe_print(f'{theme.ok(f"✅ Using selected file: {choice}")}')
         else:
-            safe_print(f'{colorful.green("✅ Using existing files")}')
+            safe_print(f'{theme.ok("✅ Using existing files")}')
 
         return choice
 
@@ -188,10 +187,10 @@ class FileExistenceManager:
         _, label = FileExistenceManager.FILE_TYPE_INFO.get(file_type, ("📄", file_type.capitalize()))
 
         # Header with warning color
-        safe_print(f'\n{colorful.bold_yellow(f"⚠️  Existing {label} files found:")}')
+        safe_print(f'\n{theme.warn(f"⚠️  Existing {label} files found:")}')
 
         for file_path in sorted(files):
-            print(f'   {colorful.green("•")} {file_path}')
+            print(f'   {theme.ok("•")} {file_path}')
 
         prompt_message = f"What would you like to do with {label} files?"
         options = [
@@ -202,11 +201,11 @@ class FileExistenceManager:
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default="use")
 
         if choice == "use":
-            safe_print(f'{colorful.green(f"✅ Using existing {label} files")}')
+            safe_print(f'{theme.ok(f"✅ Using existing {label} files")}')
         elif choice == "overwrite":
-            safe_print(f'{colorful.yellow(f"🔄 Overwriting {label} files")}')
+            safe_print(f'{theme.warn(f"🔄 Overwriting {label} files")}')
         elif choice == "cancel":
-            safe_print(f'{colorful.red("❌ Operation cancelled")}')
+            safe_print(f'{theme.err("❌ Operation cancelled")}')
 
         return choice
 
@@ -244,36 +243,36 @@ class FileExistenceManager:
             )
 
         # Multiple files: let user choose which one
-        safe_print(f'\n{colorful.bold_yellow(f"⚠️  Multiple {file_type} files found:")}')
+        safe_print(f'\n{theme.warn(f"⚠️  Multiple {file_type} files found:")}')
 
         # Create options with full file paths
         options = []
         for i, file_path in enumerate(sorted(files), 1):
             # Display full path for clarity
-            options.append((f"{colorful.cyan(file_path)}", file_path))
+            options.append((f"{theme.step(file_path)}", file_path))
 
         # Add transcription or overwrite option
         if transcriber_name:
             transcribe_text = f"✨ Transcribe with {transcriber_name}"
-            options.append((colorful.magenta(transcribe_text), TRANSCRIBE_CHOICE))
+            options.append((theme.accent(transcribe_text), TRANSCRIBE_CHOICE))
         else:
             overwrite_text = f"Overwrite (re-{operation} or download)"
-            options.append((colorful.yellow(overwrite_text), "overwrite"))
-        options.append((colorful.red("Cancel operation"), "cancel"))
+            options.append((theme.warn(overwrite_text), "overwrite"))
+        options.append((theme.err("Cancel operation"), "cancel"))
 
-        prompt_message = colorful.bold_black_on_cyan(f"Select which {file_type} to use:")
+        prompt_message = theme.menu_active(f"Select which {file_type} to use:")
         choice = FileExistenceManager._prompt_user_choice(prompt_message, options, default=files[0])
 
         if choice == "cancel":
-            safe_print(f'{colorful.red("❌ Operation cancelled")}')
+            safe_print(f'{theme.err("❌ Operation cancelled")}')
         elif choice == "overwrite":
             overwrite_msg = f"🔄 Overwriting all {file_type} files"
-            print(f"{colorful.yellow(overwrite_msg)}")
+            print(f"{theme.warn(overwrite_msg)}")
         elif choice == TRANSCRIBE_CHOICE:
             transcribe_msg = f"✨ Will transcribe with {transcriber_name}"
-            print(f"{colorful.magenta(transcribe_msg)}")
+            print(f"{theme.accent(transcribe_msg)}")
         else:
-            safe_print(f'{colorful.green(f"✅ Using: {choice}")}')
+            safe_print(f'{theme.ok(f"✅ Using: {choice}")}')
 
         return choice
 
@@ -492,7 +491,7 @@ class FileExistenceManager:
         selected_index: int,
         operation: str,
     ) -> None:
-        prompt = colorful.bold_black_on_cyan("Select how to handle existing files")
+        prompt = theme.menu_active("Select how to handle existing files")
         print(prompt)
 
         for idx, file_type in enumerate(file_types):
@@ -501,14 +500,14 @@ class FileExistenceManager:
             count_suffix = f' ({count} file{"s" if count != 1 else ""})'
             state_plain = "Use existing" if states[file_type] == "use" else f"Overwrite ({operation})"
             if idx == selected_index:
-                prefix = colorful.bold_white(">")
-                line = colorful.bold_black_on_cyan(f"{label}: {state_plain}{count_suffix}")
+                prefix = theme.menu_cursor(">")
+                line = theme.menu_active(f"{label}: {state_plain}{count_suffix}")
             else:
                 prefix = " "
                 if states[file_type] == "use":
-                    state_text = colorful.green("Use existing")
+                    state_text = theme.ok("Use existing")
                 else:
-                    state_text = colorful.yellow(f"Overwrite ({operation})")
+                    state_text = theme.warn(f"Overwrite ({operation})")
                 line = f"{label}: {state_text}{count_suffix}"
             print(f"{prefix} {line}")
 
@@ -516,24 +515,24 @@ class FileExistenceManager:
         cancel_index = len(file_types) + 1
 
         if selected_index == confirm_index:
-            confirm_line = colorful.bold_black_on_cyan("Confirm selections")
-            confirm_prefix = colorful.bold_white(">")
+            confirm_line = theme.menu_active("Confirm selections")
+            confirm_prefix = theme.menu_cursor(">")
         else:
-            confirm_line = colorful.bold_green("Confirm selections")
+            confirm_line = theme.menu_confirm("Confirm selections")
             confirm_prefix = " "
         print(f"{confirm_prefix} {confirm_line}")
 
         if selected_index == cancel_index:
-            cancel_line = colorful.bold_black_on_cyan("Cancel operation")
-            cancel_prefix = colorful.bold_white(">")
+            cancel_line = theme.menu_active("Cancel operation")
+            cancel_prefix = theme.menu_cursor(">")
         else:
-            cancel_line = colorful.bold_red("Cancel operation")
+            cancel_line = theme.menu_cancel("Cancel operation")
             cancel_prefix = " "
         print(f"{cancel_prefix} {cancel_line}")
 
         print(
             "Use "
-            + colorful.bold_black_on_cyan("↑/↓")
+            + theme.menu_active("↑/↓")
             + " to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort."
         )
 
@@ -552,7 +551,7 @@ class FileExistenceManager:
         sys.stdout.write(clear_line)
         sys.stdout.flush()
 
-        prompt = colorful.bold_black_on_cyan("Select how to handle existing files")
+        prompt = theme.menu_active("Select how to handle existing files")
         print(prompt)
 
         for idx, file_type in enumerate(file_types):
@@ -562,14 +561,14 @@ class FileExistenceManager:
             count_suffix = f' ({count} file{"s" if count != 1 else ""})'
             state_plain = "Use existing" if states[file_type] == "use" else f"Overwrite ({operation})"
             if idx == selected_index:
-                prefix = colorful.bold_white(">")
-                line = colorful.bold_black_on_cyan(f"{label}: {state_plain}{count_suffix}")
+                prefix = theme.menu_cursor(">")
+                line = theme.menu_active(f"{label}: {state_plain}{count_suffix}")
             else:
                 prefix = " "
                 if states[file_type] == "use":
-                    state_text = colorful.green("Use existing")
+                    state_text = theme.ok("Use existing")
                 else:
-                    state_text = colorful.yellow(f"Overwrite ({operation})")
+                    state_text = theme.warn(f"Overwrite ({operation})")
                 line = f"{label}: {state_text}{count_suffix}"
             print(f"{prefix} {line}")
 
@@ -577,26 +576,26 @@ class FileExistenceManager:
         confirm_index = len(file_types)
         cancel_index = len(file_types) + 1
         if selected_index == confirm_index:
-            confirm_line = colorful.bold_black_on_cyan("Confirm selections")
-            confirm_prefix = colorful.bold_white(">")
+            confirm_line = theme.menu_active("Confirm selections")
+            confirm_prefix = theme.menu_cursor(">")
         else:
-            confirm_line = colorful.bold_green("Confirm selections")
+            confirm_line = theme.menu_confirm("Confirm selections")
             confirm_prefix = " "
         print(f"{confirm_prefix} {confirm_line}")
 
         sys.stdout.write(clear_line)
         if selected_index == cancel_index:
-            cancel_line = colorful.bold_black_on_cyan("Cancel operation")
-            cancel_prefix = colorful.bold_white(">")
+            cancel_line = theme.menu_active("Cancel operation")
+            cancel_prefix = theme.menu_cursor(">")
         else:
-            cancel_line = colorful.bold_red("Cancel operation")
+            cancel_line = theme.menu_cancel("Cancel operation")
             cancel_prefix = " "
         print(f"{cancel_prefix} {cancel_line}")
 
         sys.stdout.write(clear_line)
         print(
             "Use "
-            + colorful.bold_black_on_cyan("↑/↓")
+            + theme.menu_active("↑/↓")
             + " to navigate. Enter/Space toggles an item. Confirm to proceed or cancel to abort."
         )
         sys.stdout.flush()
@@ -711,13 +710,13 @@ class FileExistenceManager:
         print(prompt)
         for idx, (label, _) in enumerate(options):
             if idx == selected_index:
-                prefix = colorful.bold_white(">")
-                suffix = colorful.bold_black_on_cyan(str(label))
+                prefix = theme.menu_cursor(">")
+                suffix = theme.menu_active(str(label))
             else:
                 prefix = " "
                 suffix = label
             print(f"{prefix} {suffix}")
-        print("Use " + colorful.bold_black_on_cyan("↑/↓") + " to move, Enter to confirm, or press a number to choose.")
+        print("Use " + theme.menu_active("↑/↓") + " to move, Enter to confirm, or press a number to choose.")
 
     @staticmethod
     def _refresh_menu(
@@ -736,14 +735,14 @@ class FileExistenceManager:
         for idx, (label, _) in enumerate(options):
             sys.stdout.write(clear_line)
             if idx == selected_index:
-                prefix = colorful.bold_white(">")
-                suffix = colorful.bold_black_on_cyan(str(label))
+                prefix = theme.menu_cursor(">")
+                suffix = theme.menu_active(str(label))
             else:
                 prefix = " "
                 suffix = label
             print(f"{prefix} {suffix}")
         sys.stdout.write(clear_line)
-        print("Use " + colorful.bold_black_on_cyan("↑/↓") + " to move, Enter to confirm, or press a number to choose.")
+        print("Use " + theme.menu_active("↑/↓") + " to move, Enter to confirm, or press a number to choose.")
         sys.stdout.flush()
 
     @staticmethod

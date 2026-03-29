@@ -173,8 +173,7 @@ def youtube_download(
     """
     import asyncio
 
-    import colorful
-
+    from lattifai.theme import theme
     from lattifai.utils import safe_print
     from lattifai.youtube.client import YouTubeDownloader
 
@@ -193,7 +192,7 @@ def youtube_download(
     if only and only not in ("media", "caption", "transcript", "meta"):
         raise ValueError(f"Invalid only={only!r}. Must be 'media', 'caption', 'transcript', or 'meta'.")
 
-    safe_print(colorful.cyan(f"📥 Downloading YouTube video: {video_id}"))
+    safe_print(theme.step(f"📥 Downloading YouTube video: {video_id}"))
 
     # Fetch video info once (used by transcript download and metadata save)
     info = asyncio.get_event_loop().run_until_complete(downloader.get_video_info(url))
@@ -204,7 +203,7 @@ def youtube_download(
 
     # 1. Download media
     if not only or only == "media":
-        safe_print(colorful.cyan("🎵 Downloading media..."))
+        safe_print(theme.step("🎵 Downloading media..."))
         media_format = media_config.normalize_format() if media_config.output_format else None
         media_file = asyncio.get_event_loop().run_until_complete(
             downloader.download_media(
@@ -216,11 +215,11 @@ def youtube_download(
             )
         )
         if media_file:
-            safe_print(colorful.green(f"  ✅ Media: {media_file}"))
+            safe_print(theme.ok(f"  ✅ Media: {media_file}"))
 
     # 2. Download captions (includes external transcript internally)
     if not only or only == "caption":
-        safe_print(colorful.cyan("📝 Downloading captions..."))
+        safe_print(theme.step("📝 Downloading captions..."))
         caption_file = asyncio.get_event_loop().run_until_complete(
             downloader.download_captions(
                 url,
@@ -230,15 +229,15 @@ def youtube_download(
             )
         )
         if caption_file:
-            safe_print(colorful.green(f"  ✅ Caption: {caption_file}"))
+            safe_print(theme.ok(f"  ✅ Caption: {caption_file}"))
 
     # 3. Download only external transcript from video description
     if only == "transcript":
-        safe_print(colorful.cyan("📄 Downloading external transcript..."))
+        safe_print(theme.step("📄 Downloading external transcript..."))
         description = info.get("description", "")
         transcript_url = downloader._extract_transcript_url_from_description(description)
         if transcript_url:
-            safe_print(colorful.cyan(f"  🔗 Found: {transcript_url}"))
+            safe_print(theme.step(f"  🔗 Found: {transcript_url}"))
             transcript_file = asyncio.get_event_loop().run_until_complete(
                 downloader._download_external_transcript(
                     transcript_url,
@@ -250,15 +249,15 @@ def youtube_download(
                 )
             )
             if transcript_file:
-                safe_print(colorful.green(f"  ✅ Transcript: {transcript_file}"))
+                safe_print(theme.ok(f"  ✅ Transcript: {transcript_file}"))
         else:
             # Fallback: try podscripts.co
-            safe_print(colorful.cyan("  🔍 No transcript in description, trying podscripts.co..."))
+            safe_print(theme.step("  🔍 No transcript in description, trying podscripts.co..."))
             podscripts_url = asyncio.get_event_loop().run_until_complete(
                 downloader._find_podscripts_url(info.get("title", ""), info.get("uploader", ""))
             )
             if podscripts_url:
-                safe_print(colorful.cyan(f"  🔗 Found: {podscripts_url}"))
+                safe_print(theme.step(f"  🔗 Found: {podscripts_url}"))
                 transcript_file = asyncio.get_event_loop().run_until_complete(
                     downloader._download_external_transcript(
                         podscripts_url,
@@ -270,9 +269,9 @@ def youtube_download(
                     )
                 )
                 if transcript_file:
-                    safe_print(colorful.green(f"  ✅ Transcript: {transcript_file}"))
+                    safe_print(theme.ok(f"  ✅ Transcript: {transcript_file}"))
             else:
-                safe_print(colorful.yellow(f"  ⚠️ No transcript found for: {url}"))
+                safe_print(theme.warn(f"  ⚠️ No transcript found for: {url}"))
 
     # 4. Save video metadata as YAML frontmatter markdown
     if not only or only == "meta":
@@ -303,9 +302,9 @@ def youtube_download(
             meta_lines.append("")
 
         meta_path.write_text("\n".join(meta_lines), encoding="utf-8")
-        safe_print(colorful.green(f"  ✅ Metadata: {meta_path}"))
+        safe_print(theme.ok(f"  ✅ Metadata: {meta_path}"))
 
-    safe_print(colorful.green(f"\n✅ All files saved to: {output_dir}"))
+    safe_print(theme.ok(f"\n✅ All files saved to: {output_dir}"))
     return media_file or caption_file or transcript_file
 
 

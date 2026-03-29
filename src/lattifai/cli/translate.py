@@ -80,8 +80,7 @@ def translate(
     import asyncio
     from pathlib import Path
 
-    import colorful
-
+    from lattifai.theme import theme
     from lattifai.translation import create_translator
     from lattifai.translation.prompts import get_language_name
     from lattifai.utils import safe_print
@@ -100,7 +99,7 @@ def translate(
     # Load caption
     from lattifai.caption import Caption, MarkdownReader
 
-    safe_print(colorful.cyan(f"Loading: {input_path}"))
+    safe_print(theme.step(f"Loading: {input_path}"))
 
     if input_path.suffix.lower() == ".md":
         supervisions = MarkdownReader.extract_for_alignment(str(input_path))
@@ -131,7 +130,7 @@ def translate(
     lang_name = get_language_name(translation_config.target_lang)
     mode = translation_config.mode
     safe_print(
-        colorful.cyan(
+        theme.step(
             f"Translating {len(cap.supervisions)} segments to {lang_name} " f"[mode={mode}, provider={translator.name}]"
         )
     )
@@ -143,7 +142,7 @@ def translate(
 
     # Progressive upgrade: normal -> refined without retranslating draft
     if _should_continue_with_refined(translation_config):
-        safe_print(colorful.cyan("Continuing with refined review pass..."))
+        safe_print(theme.step("Continuing with refined review pass..."))
         asyncio.run(
             translator.refine_existing_draft(
                 cap.supervisions,
@@ -162,7 +161,7 @@ def translate(
     else:
         cap.write(str(output_path), translation_first=caption_config.translation_first)
 
-    safe_print(colorful.green(f"Translation saved: {output_path}"))
+    safe_print(theme.ok(f"Translation saved: {output_path}"))
 
     return cap
 

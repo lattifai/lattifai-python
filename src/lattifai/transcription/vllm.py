@@ -242,13 +242,10 @@ class VLLMTranscriber(BaseTranscriber):
 
         if resp.status_code == 400 and "verbose_json" in resp.text:
             # Model doesn't support verbose_json — remember and retry with json
-            import colorful
-
+            from lattifai.theme import theme
             from lattifai.utils import safe_print
 
-            safe_print(
-                colorful.yellow(f"⚠️  verbose_json not supported by {self.config.model_name}, falling back to json")
-            )
+            safe_print(theme.warn(f"⚠️  verbose_json not supported by {self.config.model_name}, falling back to json"))
             self._supports_verbose_json = False
             data.pop("timestamp_granularities[]", None)
             data["response_format"] = "json"

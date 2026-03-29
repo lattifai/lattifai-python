@@ -3,12 +3,12 @@
 from pathlib import Path
 from typing import Optional
 
-import colorful
 import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.client import LattifAI
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, MediaConfig
+from lattifai.theme import theme
 from lattifai.utils import safe_print
 
 __all__ = ["diarize"]
@@ -65,14 +65,14 @@ def diarize(
         diarization_config=diarization_config,
     )
 
-    safe_print(colorful.cyan("🎧 Loading media for diarization..."))
+    safe_print(theme.step("🎧 Loading media for diarization..."))
     media_audio = client_instance.audio_loader(
         media_config.input_path,
         channel_selector=media_config.channel_selector,
         streaming_chunk_secs=media_config.streaming_chunk_secs,
     )
 
-    safe_print(colorful.cyan("📖 Loading caption segments..."))
+    safe_print(theme.step("📖 Loading caption segments..."))
     caption_obj = client_instance._read_caption(
         caption_config.input_path,
         input_caption_format=None if caption_config.input_format == "auto" else caption_config.input_format,
@@ -98,7 +98,7 @@ def diarize(
         caption_config.set_output_path(default_output)
         output_path = caption_config.output_path
 
-    safe_print(colorful.cyan("🗣️ Performing speaker diarization..."))
+    safe_print(theme.step("🗣️ Performing speaker diarization..."))
     diarized_caption = client_instance.speaker_diarization(
         input_media=media_audio,
         caption=caption_obj,

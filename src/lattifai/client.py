@@ -5,7 +5,6 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
-import colorful
 from lattifai_core.client import SyncAPIClient
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
@@ -27,6 +26,7 @@ from lattifai.errors import (
     LatticeEncodingError,
 )
 from lattifai.mixin import LattifAIClientMixin
+from lattifai.theme import theme
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
@@ -214,7 +214,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             alignment_strategy = self.aligner.config.strategy
 
             if alignment_strategy != "entire" or caption.transcription:
-                safe_print(colorful.cyan(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
+                safe_print(theme.step(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.supervisions and alignment_strategy == "transcription":
                     from lattifai.alignment.text_align import align_supervisions_and_transcription
@@ -277,9 +277,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 supervisions, alignments = [], []
                 for i, (start, end, _supervisions, skipalign) in enumerate(segments, 1):
                     safe_print(
-                        colorful.green(
-                            f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s"
-                        )
+                        theme.ok(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
                     )
                     if skipalign:
                         supervisions.extend(_supervisions)
@@ -341,7 +339,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Step 5: Speaker diarization
         if self.diarization_config.enabled and self.diarizer:
-            safe_print(colorful.cyan("🗣️  Performing speaker diarization..."))
+            safe_print(theme.step("🗣️  Performing speaker diarization..."))
             caption = self.speaker_diarization(
                 input_media=media_audio,
                 caption=caption,
@@ -350,7 +348,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Step 6: Event detection
         if self.event_config.enabled and self.event_detector:
-            safe_print(colorful.cyan("🔊 Performing audio event detection..."))
+            safe_print(theme.step("🔊 Performing audio event detection..."))
             caption = self.event_detector.detect_and_update_caption(caption, media_audio)
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
@@ -395,7 +393,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         if output_caption_path:
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if diarization_file.exists():
-                safe_print(colorful.cyan(f"Reading existing speaker diarization from {diarization_file}"))
+                safe_print(theme.step(f"Reading existing speaker diarization from {diarization_file}"))
                 caption.read_diarization(diarization_file)
 
         diarization, alignments = self.diarizer.diarize_with_alignments(
@@ -439,7 +437,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_dir = self._prepare_youtube_output_dir(output_dir)
         media_format = self._determine_media_format(media_format)
 
-        safe_print(colorful.cyan(f"🎬 Starting YouTube workflow for: {url}"))
+        safe_print(theme.step(f"🎬 Starting YouTube workflow for: {url}"))
 
         # Step 1: Download media
         media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite, audio_track_id, quality)
@@ -464,7 +462,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Step 4: Perform alignment
         # Metadata flows from frontmatter (read into caption.metadata) + video_url fallback
-        safe_print(colorful.cyan("🔗 Performing forced alignment..."))
+        safe_print(theme.step("🔗 Performing forced alignment..."))
 
         caption: Caption = self.alignment(
             input_media=media_audio,

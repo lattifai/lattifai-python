@@ -181,9 +181,9 @@ def _resolve_model_path(model_name_or_path: str, model_hub: str = "huggingface")
             except Exception as e:  # pragma: no cover - bubble up for caller context
                 raise ModelLoadError(model_name_or_path, original_error=e)
         except Exception as e:  # pragma: no cover - unexpected download issue
-            import colorful
+            from lattifai.theme import theme
 
-            print(colorful.red | f"Error downloading from Hugging Face Hub: {e}. Trying ModelScope...")
+            print(theme.err(f"Error downloading from Hugging Face Hub: {e}. Trying ModelScope..."))
             from modelscope.hub.snapshot_download import snapshot_download as ms_snapshot
 
             downloaded_path = ms_snapshot(model_name_or_path)

@@ -4,13 +4,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-import colorful
 import numpy as np
 import onnxruntime as ort
 from tqdm import tqdm
 
 from lattifai.audio2 import AudioData
 from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
+from lattifai.theme import theme
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
@@ -307,14 +307,14 @@ class Lattice1Worker:
         if not self.timings:
             return
 
-        safe_print(colorful.bold(colorful.cyan("\n⏱️  Alignment Profiling")))
-        safe_print(colorful.gray("─" * 44))
+        safe_print(theme.step("\n⏱️  Alignment Profiling"))
+        safe_print(theme.dim("─" * 44))
         safe_print(
-            f"{colorful.bold('Phase'.ljust(21))} "
-            f"{colorful.bold('Time'.ljust(12))} "
-            f"{colorful.bold('Percent'.rjust(8))}"
+            f"{theme.label('Phase'.ljust(21))} "
+            f"{theme.label('Time'.ljust(12))} "
+            f"{theme.label('Percent'.rjust(8))}"
         )
-        safe_print(colorful.gray("─" * 44))
+        safe_print(theme.dim("─" * 44))
 
         total_time = sum(self.timings.values())
 
@@ -326,16 +326,13 @@ class Lattice1Worker:
             # Name: Cyan, Time: Yellow, Percent: Gray
             safe_print(
                 f"{name:<20} "
-                f"{colorful.yellow(f'{duration:7.4f}s'.ljust(12))} "
-                f"{colorful.gray(f'{percentage:.2f}%'.rjust(8))}"
+                f"{theme.warn(f'{duration:7.4f}s'.ljust(12))} "
+                f"{theme.dim(f'{percentage:.2f}%'.rjust(8))}"
             )
 
-        safe_print(colorful.gray("─" * 44))
+        safe_print(theme.dim("─" * 44))
         # Pad "Total Time" before coloring to ensure correct alignment (ANSI codes don't count for width)
-        safe_print(
-            f"{colorful.bold('Total Time'.ljust(20))} "
-            f"{colorful.bold(colorful.yellow(f'{total_time:7.4f}s'.ljust(12)))}\n"
-        )
+        safe_print(f"{theme.label('Total Time'.ljust(20))} " f"{theme.value(f'{total_time:7.4f}s'.ljust(12))}\n")
 
 
 def _load_worker(model_path: str, device: str, config: Optional[Any] = None) -> Lattice1Worker:

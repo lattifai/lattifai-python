@@ -5,11 +5,10 @@ import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Awaitable, Optional, Union
 
-import colorful
-
 from lattifai.audio2 import AudioData
 from lattifai.data import Caption
 from lattifai.errors import CaptionProcessingError
+from lattifai.theme import theme
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
@@ -301,7 +300,7 @@ class LattifAIClientMixin:
 
         try:
             if verbose:
-                safe_print(colorful.cyan(f"📖 Step 1: Reading caption file from {input_caption}"))
+                safe_print(theme.step(f"📖 Step 1: Reading caption file from {input_caption}"))
             caption = Caption.read(
                 input_caption,
                 format=input_caption_format,
@@ -310,12 +309,12 @@ class LattifAIClientMixin:
             diarization_file = Path(str(input_caption)).with_suffix(".Diarization")
             if diarization_file.exists():
                 if verbose:
-                    safe_print(colorful.cyan(f"📖 Step1b: Reading speaker diarization from {diarization_file}"))
+                    safe_print(theme.step(f"📖 Step1b: Reading speaker diarization from {diarization_file}"))
                 caption.read_diarization(diarization_file)
             event_file = Path(str(input_caption)).with_suffix(".LED")
             if event_file.exists():
                 if verbose:
-                    safe_print(colorful.cyan(f"📖 Step1c: Reading audio events from {event_file}"))
+                    safe_print(theme.step(f"📖 Step1c: Reading audio events from {event_file}"))
                 from lattifai_core.event import LEDOutput
 
                 caption.event = LEDOutput.read(event_file)
@@ -336,20 +335,20 @@ class LattifAIClientMixin:
                     for s in contaminated[:3]:
                         samples.extend(w for w in s.text.split() if _TIMESTAMP_RE.fullmatch(w))
                     safe_print(
-                        colorful.red(
+                        theme.err(
                             f"\n⚠️  WARNING: {len(contaminated)}/{total} caption segments contain "
                             f"unparsed timestamps (e.g. {samples[:3]}).\n"
                             f"   This usually means the caption file was not parsed correctly.\n"
                             f"   File: {input_caption}\n"
                         )
-                        + colorful.yellow(
+                        + theme.warn(
                             "   If you believe this is a parsing bug, please report it at:\n"
                             "   https://github.com/LattifAI/captions/issues\n"
                             "   (include the caption file so we can reproduce the issue)\n"
                         )
                     )
                     try:
-                        answer = input(colorful.yellow("   Continue anyway? [y/N] ")).strip().lower()
+                        answer = input(theme.warn("   Continue anyway? [y/N] ")).strip().lower()
                     except (EOFError, KeyboardInterrupt):
                         answer = ""
                     if answer not in ("y", "yes"):
@@ -360,7 +359,7 @@ class LattifAIClientMixin:
                         )
 
             if verbose:
-                safe_print(colorful.green(f"         ✓ Parsed {len(caption)} caption segments"))
+                safe_print(theme.ok(f"         ✓ Parsed {len(caption)} caption segments"))
             return caption
         except CaptionProcessingError:
             raise
@@ -399,10 +398,10 @@ class LattifAIClientMixin:
             )
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if not diarization_file.exists() and caption.diarization:
-                safe_print(colorful.green(f"    Writing speaker diarization to: {diarization_file}"))
+                safe_print(theme.ok(f"    Writing speaker diarization to: {diarization_file}"))
                 caption.write_diarization(diarization_file)
 
-            safe_print(colorful.green(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
+            safe_print(theme.ok(f"🎉🎉🎉🎉🎉 Caption file written to: {output_caption_path}"))
             return result
         except Exception as e:
             raise CaptionProcessingError(
@@ -421,11 +420,11 @@ class LattifAIClientMixin:
         quality: str = "best",
     ) -> str:
         """Download media from YouTube (async implementation)."""
-        safe_print(colorful.cyan("📥 Downloading media from YouTube..."))
+        safe_print(theme.step("📥 Downloading media from YouTube..."))
         if audio_track_id:
-            safe_print(colorful.cyan(f"    Audio track: {audio_track_id}"))
+            safe_print(theme.step(f"    Audio track: {audio_track_id}"))
         if quality != "best":
-            safe_print(colorful.cyan(f"    Quality: {quality}"))
+            safe_print(theme.step(f"    Quality: {quality}"))
         media_file = await self.downloader.download_media(
             url=url,
             output_dir=str(output_dir),
@@ -434,7 +433,7 @@ class LattifAIClientMixin:
             audio_track_id=audio_track_id,
             quality=quality,
         )
-        safe_print(colorful.green(f"    ✓ Media downloaded: {media_file}"))
+        safe_print(theme.ok(f"    ✓ Media downloaded: {media_file}"))
         return media_file
 
     def _download_media_sync(
@@ -484,17 +483,17 @@ class LattifAIClientMixin:
                 # Generate transcript file path
                 transcript_file = output_dir / f"{Path(str(media_file)).stem}_{self.transcriber.file_name}"
                 if transcript_file.exists():
-                    safe_print(colorful.cyan(f"     Using existing transcript file: {transcript_file}"))
+                    safe_print(theme.step(f"     Using existing transcript file: {transcript_file}"))
                     transcription = self._read_caption(transcript_file, normalize_text=False)
                     return transcription
 
-            safe_print(colorful.cyan(f"🎤 Transcribing({self.transcriber.name}) media: {str(media_file)} ..."))
+            safe_print(theme.step(f"🎤 Transcribing({self.transcriber.name}) media: {str(media_file)} ..."))
             transcription = await self.transcriber.transcribe_file(media_file, language=source_lang)
-            safe_print(colorful.green("         ✓ Transcription completed."))
+            safe_print(theme.ok("         ✓ Transcription completed."))
 
             if "gemini" in self.transcriber.name.lower():
-                safe_print(colorful.yellow("🔍 Gemini raw output:"))
-                safe_print(colorful.yellow(f"{transcription[:1000]}..."))  # Print first 1000 chars
+                safe_print(theme.warn("🔍 Gemini raw output:"))
+                safe_print(theme.warn(f"{transcription[:1000]}..."))  # Print first 1000 chars
 
                 # write to temp file and use Caption read
                 # On Windows, we need to close the file before writing to it
@@ -519,15 +518,15 @@ class LattifAIClientMixin:
                     if tmp_path.exists():
                         tmp_path.unlink()
             else:
-                safe_print(colorful.yellow(f"🔍 {self.transcriber.name} raw output:"))
+                safe_print(theme.warn(f"🔍 {self.transcriber.name} raw output:"))
                 if isinstance(transcription, Caption):
-                    safe_print(colorful.yellow(f"Caption with {len(transcription.transcription)} segments"))
+                    safe_print(theme.warn(f"Caption with {len(transcription.transcription)} segments"))
                     if transcription.transcription:
-                        safe_print(colorful.yellow(f"First segment: {transcription.transcription[0].text}"))
+                        safe_print(theme.warn(f"First segment: {transcription.transcription[0].text}"))
 
             if output_dir:
                 await asyncio.to_thread(self.transcriber.write, transcription, transcript_file, encoding="utf-8")
-                safe_print(colorful.green(f"         ✓ Transcription saved to: {transcript_file}"))
+                safe_print(theme.ok(f"         ✓ Transcription saved to: {transcript_file}"))
 
             return transcription
 
@@ -571,10 +570,10 @@ class LattifAIClientMixin:
             if self.caption_config.input_path:
                 caption_path = Path(self.caption_config.input_path)
                 if caption_path.exists():
-                    safe_print(colorful.green(f"📄 Using provided caption file: {caption_path}"))
+                    safe_print(theme.ok(f"📄 Using provided caption file: {caption_path}"))
                     return str(caption_path)
                 else:
-                    safe_print(colorful.red(f"Provided caption path does not exist: {caption_path}, use transcription"))
+                    safe_print(theme.err(f"Provided caption path does not exist: {caption_path}, use transcription"))
                     use_transcription = True
                     transcript_file = caption_path
                     caption_path.parent.mkdir(parents=True, exist_ok=True)
@@ -611,7 +610,7 @@ class LattifAIClientMixin:
 
                     # elif choice == "overwrite": continue to transcribe below
 
-                safe_print(colorful.cyan(f"🎤 Transcribing media with {transcriber_name}..."))
+                safe_print(theme.step(f"🎤 Transcribing media with {transcriber_name}..."))
                 if self.transcriber.supports_url:
                     transcription = await self.transcriber.transcribe(url, language=source_lang)
                 else:
@@ -623,7 +622,7 @@ class LattifAIClientMixin:
                     caption_file = transcription
                 else:
                     caption_file = str(transcript_file)
-                safe_print(colorful.green(f"         ✓ Transcription completed: {caption_file}"))
+                safe_print(theme.ok(f"         ✓ Transcription completed: {caption_file}"))
             else:
                 # Download YouTube captions
                 caption_file = await self.downloader.download_captions(
