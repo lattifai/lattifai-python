@@ -1252,11 +1252,18 @@ class YouTubeDownloader:
                     self.logger.info(f"✅ Saved transcript via Jina Reader: {output_path} ({len(jina_md)} chars)")
                     return str(output_path)
 
+            # Fallback 3: Safari (macOS only — Safari may route through per-app VPN)
+            if not html:
+                import platform
+
+                if platform.system() == "Darwin":
+                    self.logger.info("🔄 Trying Safari (may use system VPN)...")
+                    html = await loop.run_in_executor(None, self._fetch_with_safari, transcript_url)
+
             if not html:
                 if not reachable:
                     self.logger.warning(
-                        f"Host {host} is unreachable and Jina Reader also failed. "
-                        "Try setting HTTPS_PROXY or use a VPN."
+                        f"Host {host} is unreachable and all fallbacks failed. " "Try setting HTTPS_PROXY or use a VPN."
                     )
                 else:
                     self.logger.warning("Failed to fetch transcript page")
@@ -1293,6 +1300,66 @@ class YouTubeDownloader:
 
         except Exception as e:
             self.logger.warning(f"Failed to download external transcript: {e}")
+            return None
+
+    @staticmethod
+    def _fetch_with_safari(url: str, timeout: int = 120, min_content_length: int = 500) -> Optional[str]:
+        """Fetch rendered page content using Safari via AppleScript (macOS only).
+
+        Safari may route traffic through per-app VPN or system proxy configurations
+        that are not available to command-line tools. This makes it a useful fallback
+        when direct connections and headless Chrome fail.
+
+        Requires: macOS + Safari + "Allow JavaScript from Apple Events" enabled
+        in Safari Settings → Advanced (or Develop menu on older macOS).
+        """
+        import subprocess
+
+        logger = logging.getLogger(__name__)
+
+        script = f"""
+        tell application "Safari"
+            make new document with properties {{URL:"{url}"}}
+            repeat {timeout // 3} times
+                delay 3
+                try
+                    set textLen to (do JavaScript "document.body.innerText.length" in document 1) as integer
+                    if textLen > {min_content_length} then exit repeat
+                end try
+            end repeat
+            set pageHTML to (do JavaScript "document.documentElement.outerHTML" in document 1)
+            close document 1
+            return pageHTML
+        end tell
+        """
+
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 30,
+            )
+            html = result.stdout
+            if result.returncode != 0:
+                logger.warning(f"Safari AppleScript error: {result.stderr.strip()}")
+                return None
+            if html and len(html) > min_content_length:
+                logger.info(f"✅ Safari returned {len(html)} chars")
+                return html
+            logger.warning(f"Safari returned insufficient content ({len(html) if html else 0} chars)")
+            return None
+        except subprocess.TimeoutExpired:
+            # Try to close the tab we opened
+            subprocess.run(
+                ["osascript", "-e", 'tell application "Safari" to close document 1'],
+                capture_output=True,
+                timeout=5,
+            )
+            logger.warning(f"Safari timed out after {timeout}s for {url}")
+            return None
+        except Exception as e:
+            logger.warning(f"Safari fetch failed: {e}")
             return None
 
     @staticmethod
