@@ -1820,7 +1820,7 @@ class YouTubeDownloader:
                     if tag in ("script", "style", "nav", "header", "footer", "noscript"):
                         self.skip_depth = max(0, self.skip_depth - 1)
                     elif tag in ("p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
-                        self._flush()
+                        self._flush(block_break=(tag in ("p", "div")))
 
                 def handle_data(self, data):
                     if self.in_body and self.skip_depth == 0:
@@ -1828,12 +1828,14 @@ class YouTubeDownloader:
                         if text:
                             self.current_text.append(text)
 
-                def _flush(self):
+                def _flush(self, block_break=False):
                     if self.current_text:
                         line = " ".join(self.current_text).strip()
                         if line:
                             self.lines.append(line)
                         self.current_text = []
+                    if block_break and self.lines and self.lines[-1] != "":
+                        self.lines.append("")  # blank line → block separator
 
                 def get_text(self):
                     self._flush()
@@ -2175,6 +2177,61 @@ class YouTubeDownloader:
             dialogue_speakers = {s["speaker"] for s in dialogue_segments}
             if len(dialogue_segments) >= 10 and len(dialogue_speakers) >= 2:
                 return _format_segments(dialogue_segments)
+
+            # Strategy 3b: standalone speaker names on their own block
+            # Dwarkesh article format:
+            #   00:00:00 – Chapter title      ← chapter heading
+            #   Speaker Name                  ← standalone block
+            #   Paragraph of dialogue...      ← next block(s) until next speaker
+            # First pass: identify recurring standalone name blocks as speakers
+            standalone_name = re.compile(r"^[A-Z][a-zA-Z\u00C0-\u024F'\-]+(?: [A-Z][a-zA-Z\u00C0-\u024F'\-]+){0,3}$")
+            name_counts = {}
+            for b in blocks:
+                if standalone_name.match(b) and len(b) < 30:
+                    name_counts[b] = name_counts.get(b, 0) + 1
+            # Speakers must appear ≥3 times and there must be ≥2 distinct speakers
+            speaker_names = {n for n, c in name_counts.items() if c >= 3}
+            if len(speaker_names) >= 2:
+                sa_segments = []
+                current_speaker = None
+                current_hms = "0:00:00"
+                # Find transcript start (after "Transcript" heading or first chapter)
+                tx_start = 0
+                for bi3, b in enumerate(blocks):
+                    if b == "Transcript" and bi3 > 5:
+                        # Take the second "Transcript" if preceded by TOC-like content
+                        tx_start = bi3 + 1
+                    ch_m3 = chapter_pattern.match(b)
+                    if ch_m3 and bi3 > tx_start:
+                        tx_start = bi3
+                        break
+
+                for bi3 in range(tx_start, len(blocks)):
+                    b = blocks[bi3]
+                    # Chapter heading
+                    ch_m3 = chapter_pattern.match(b)
+                    if ch_m3:
+                        current_hms = ch_m3.group(1)
+                        if ch_m3.group(1).count(":") == 1:
+                            current_hms = "0:" + current_hms
+                        sa_segments.append({"_chapter": ch_m3.group(2).strip()})
+                        continue
+                    # Speaker name
+                    if b in speaker_names:
+                        current_speaker = b
+                        continue
+                    # UI noise — stop
+                    if _ui_noise_re.match(b):
+                        break
+                    # Skip short noise blocks
+                    if len(b) < 20:
+                        continue
+                    # Dialogue paragraph
+                    if current_speaker:
+                        sa_segments.append({"speaker": current_speaker, "hms": current_hms, "text": b})
+
+                if len(sa_segments) >= 10:
+                    return _format_segments(sa_segments)
 
             # Strategy 4: "Starting point is HH:MM:SS" blocks (podscripts.co)
             # In markdown: timestamp and text on separate lines
