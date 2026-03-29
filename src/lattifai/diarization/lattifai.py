@@ -77,11 +77,9 @@ class LattifAIDiarizer:
             return None
 
         from lattifai.diarization.speaker import SpeakerNameInferrer
-        from lattifai.llm import create_client
 
-        model = self.config.infer_model or "gemini-2.5-flash"
-        llm_client = create_client("gemini", model=model)
-        return SpeakerNameInferrer(llm_client=llm_client, model=model)
+        llm_client = self.config.llm.create_client()
+        return SpeakerNameInferrer(llm_client=llm_client, model=self.config.llm.model)
 
     def diarize_with_alignments(
         self,

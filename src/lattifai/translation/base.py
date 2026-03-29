@@ -40,11 +40,11 @@ class BaseTranslator:
     @property
     def name(self) -> str:
         """Human-readable name of the translator."""
-        return f"{self.client.provider_name}:{self.config.model_name}"
+        return f"{self.client.provider_name}:{self.config.llm.model}"
 
     async def _call_llm(self, prompt: str) -> str:
         """Send a prompt to the LLM and return raw JSON text response."""
-        result = await self.client.generate_json(prompt, model=self.config.model_name)
+        result = await self.client.generate_json(prompt, model=self.config.llm.model)
         # generate_json returns parsed object; re-serialize for backward compat
         return json.dumps(result, ensure_ascii=False)
 

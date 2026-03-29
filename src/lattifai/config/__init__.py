@@ -21,6 +21,7 @@ from .caption import CaptionConfig
 from .client import ClientConfig
 from .diarization import DiarizationConfig
 from .event import EventConfig
+from .llm import LLMConfig
 from .media import AUDIO_FORMATS, MEDIA_FORMATS, VIDEO_FORMATS, MediaConfig
 from .transcription import TranscriptionConfig
 from .translation import TranslationConfig
@@ -42,6 +43,7 @@ __all__ = [
     "CAPTION_FORMATS",
     "TranscriptionConfig",
     "DiarizationConfig",
+    "LLMConfig",
     "MediaConfig",
     "AUDIO_FORMATS",
     "VIDEO_FORMATS",

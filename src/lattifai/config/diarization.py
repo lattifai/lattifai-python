@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Optional
 
+from lattifai.config.llm import LLMConfig
+
 from ..utils import _select_device
 
 if TYPE_CHECKING:
@@ -82,15 +84,14 @@ class DiarizationConfig:
     infer_speakers: bool = False
     """Use LLM to infer real speaker names from transcript content.
     When enabled, speakers still labeled as SPEAKER_XX after acoustic diarization
-    will be identified via LLM analysis of their speech content.
-    Requires GEMINI_API_KEY environment variable."""
+    will be identified via LLM analysis of their speech content."""
+
+    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model="gemini-2.5-flash"))
+    """LLM provider configuration for speaker name inference."""
 
     speaker_context: Optional[str] = None
     """Optional context hint for LLM speaker name inference,
     e.g. "podcast interview, host is Zhang San, guest is Li Si"."""
-
-    infer_model: Optional[str] = None
-    """Model name for speaker name inference LLM. Defaults to gemini-2.5-flash."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""

@@ -77,9 +77,9 @@ def translate(
 
         # Using OpenAI-compatible API
         lai translate caption input.srt output.srt \\
-            translation.provider=openai \\
-            translation.api_base_url=http://localhost:8000/v1 \\
-            translation.model_name=qwen3
+            translation.llm.provider=openai \\
+            translation.llm.api_base_url=http://localhost:8000/v1 \\
+            translation.llm.model=qwen3
 
         # With custom glossary
         lai translate caption input.srt output.srt \\
@@ -231,8 +231,8 @@ def translate_youtube(
         # Using OpenAI-compatible API for translation
         lai translate youtube "VIDEO_ID" \\
             translation.target_lang=ko \\
-            translation.provider=openai \\
-            translation.api_base_url=http://localhost:8000/v1
+            translation.llm.provider=openai \\
+            translation.llm.api_base_url=http://localhost:8000/v1
     """
     import asyncio
     from pathlib import Path
@@ -288,7 +288,7 @@ def translate_youtube(
     safe_print(
         theme.step(
             f"🌐 Translating {len(cap.supervisions)} segments to {lang_name} "
-            f"[mode={translation_config.mode}, provider={translation_config.provider}]"
+            f"[mode={translation_config.mode}, provider={translation_config.llm.provider}]"
         )
     )
 

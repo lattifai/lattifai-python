@@ -62,8 +62,6 @@ def test_refined_mode_saves_full_artifact_set(tmp_path):
     ]
     client = FakeLLMClient(responses)
     config = TranslationConfig(
-        provider="gemini",
-        api_key="test-key",
         mode="refined",
         bilingual=True,
         save_artifacts=True,
@@ -106,8 +104,6 @@ def test_normal_mode_can_upgrade_to_refined_without_retranslation():
     ]
     client = FakeLLMClient(responses)
     config = TranslationConfig(
-        provider="gemini",
-        api_key="test-key",
         mode="normal",
         bilingual=True,
         ask_refine_after_normal=False,
@@ -135,8 +131,6 @@ def test_refined_mode_accepts_legacy_review_array_schema():
     ]
     client = FakeLLMClient(responses)
     config = TranslationConfig(
-        provider="gemini",
-        api_key="test-key",
         mode="refined",
         bilingual=True,
         ask_refine_after_normal=False,

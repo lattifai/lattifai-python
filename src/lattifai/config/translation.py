@@ -1,8 +1,9 @@
 """Translation service configuration for LattifAI."""
 
-import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, Optional
+
+from lattifai.config.llm import LLMConfig
 
 
 @dataclass
@@ -13,17 +14,8 @@ class TranslationConfig:
     Settings for caption translation using various LLM providers.
     """
 
-    model_name: str = "gemini-3-flash-preview"
-    """Model name for translation."""
-
-    provider: Literal["gemini", "openai"] = "gemini"
-    """LLM provider: 'gemini' (Google GenAI) or 'openai' (OpenAI-compatible)."""
-
-    api_key: Optional[str] = None
-    """API key. If None, reads from GEMINI_API_KEY or OPENAI_API_KEY environment variable."""
-
-    api_base_url: Optional[str] = None
-    """Base URL for OpenAI-compatible API (e.g. http://localhost:8000/v1)."""
+    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model="gemini-3-flash-preview"))
+    """LLM provider configuration (provider, model, api_key, api_base_url)."""
 
     target_lang: str = "zh"
     """Target language code (BCP 47 / ISO 639-1).
@@ -79,46 +71,7 @@ class TranslationConfig:
     """Enable verbose logging."""
 
     def __post_init__(self):
-        """Validate and auto-populate configuration."""
-        from dotenv import find_dotenv, load_dotenv
-
-        load_dotenv(find_dotenv(usecwd=True))
-
-        if self.api_key is None:
-            if self.provider == "gemini":
-                self.api_key = os.environ.get("GEMINI_API_KEY")
-                if not self.api_key:
-                    try:
-                        from lattifai.cli.config import get_config_value
-
-                        self.api_key = get_config_value("gemini_api_key")
-                    except ImportError:
-                        pass
-            elif self.provider == "openai":
-                self.api_key = os.environ.get("OPENAI_API_KEY")
-                if not self.api_key:
-                    try:
-                        from lattifai.cli.config import get_config_value
-
-                        self.api_key = get_config_value("openai_api_key")
-                    except ImportError:
-                        pass
-
-        if self.provider == "openai":
-            if self.api_base_url is None:
-                self.api_base_url = os.environ.get("OPENAI_API_BASE_URL") or os.environ.get("OPENAI_API_BASE")
-                if not self.api_base_url:
-                    try:
-                        from lattifai.cli.config import get_config_value
-
-                        self.api_base_url = get_config_value("openai_api_base_url")
-                    except ImportError:
-                        pass
-            if self.model_name == "gemini-3-flash-preview":
-                env_model = os.environ.get("OPENAI_MODEL")
-                if env_model:
-                    self.model_name = env_model
-
+        """Validate configuration."""
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         if self.context_lines < 0:
