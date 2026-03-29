@@ -1,6 +1,7 @@
 """LattifAI client implementation with config-driven architecture."""
 
 import functools
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -33,6 +34,18 @@ if TYPE_CHECKING:
     from lattifai.diarization import LattifAIDiarizer  # noqa: F401
     from lattifai.event import LattifAIEventDetector  # noqa: F401
 
+# Patterns for _extract_speaker_description (module-level for compile-once)
+_SPEAKER_PATTERNS = re.compile(
+    r"(?:host|guest|嘉宾|主播|主持|interviewer|panelist|speaker|featuring|"
+    r"joined\s+by|co-host|with\s+\w+\s+(and|&)|【|嘉宾|主讲|对谈)",
+    re.IGNORECASE,
+)
+_SKIP_LINE = re.compile(
+    r"^(\d{1,2}:\d{2}(?::\d{2})?\s*[-–—]\s*|https?://|http://|Sign up|Subscribe|"
+    r"Follow us|#\w|DISCLAIMER|CONTACT:|Email\s)",
+    re.IGNORECASE,
+)
+
 
 def _build_speaker_context(metadata: dict) -> Optional[str]:
     """Build speaker context string from video metadata for LLM inference.
@@ -63,21 +76,6 @@ def _extract_speaker_description(description: str, budget: int = 1500) -> str:
     Keeps the intro paragraph and any lines containing speaker/host/guest
     signals, discarding timestamps-only blocks, links, and boilerplate.
     """
-    import re
-
-    # Patterns that signal speaker information
-    _SPEAKER_PATTERNS = re.compile(
-        r"(?:host|guest|嘉宾|主播|主持|interviewer|panelist|speaker|featuring|"
-        r"joined\s+by|co-host|with\s+\w+\s+(and|&)|【|嘉宾|主讲|对谈)",
-        re.IGNORECASE,
-    )
-    # Lines that are just timestamps or links — low value
-    _SKIP_LINE = re.compile(
-        r"^(\d{1,2}:\d{2}(?::\d{2})?\s*[-–—]\s*|https?://|http://|Sign up|Subscribe|"
-        r"Follow us|#\w|DISCLAIMER|CONTACT:|Email\s)",
-        re.IGNORECASE,
-    )
-
     paragraphs = description.split("\n\n")
     kept = []
     total = 0
@@ -388,9 +386,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         if not self.diarizer:
             raise RuntimeError("Diarizer not initialized. Set diarization_config.enabled=True")
 
-        # Auto-build speaker_context from caption metadata if not explicitly set
-        if self.diarization_config.infer_speakers and not self.diarization_config.speaker_context and caption.metadata:
-            self.diarization_config.speaker_context = _build_speaker_context(caption.metadata)
+        # Build per-call speaker context (do NOT mutate shared config)
+        speaker_context = self.diarization_config.speaker_context
+        if self.diarization_config.infer_speakers and not speaker_context and caption.metadata:
+            speaker_context = _build_speaker_context(caption.metadata)
 
         # Perform diarization and assign speaker labels to caption alignments
         if output_caption_path:
@@ -410,6 +409,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
             separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
             output_path=output_caption_path,
+            speaker_context=speaker_context,
         )
         caption.alignments = alignments
         caption.diarization = diarization
