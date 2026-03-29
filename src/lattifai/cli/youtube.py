@@ -302,6 +302,9 @@ def youtube_download(
             )
             if transcript_file:
                 safe_print(theme.ok(f"  ✅ Transcript: {transcript_file}"))
+            else:
+                safe_print(theme.err(f"  ✗ Failed to download transcript from {transcript_url}"))
+                safe_print(theme.warn("    Host may be blocked. Try: export HTTPS_PROXY=http://your-proxy:port"))
         else:
             # Fallback: try podscripts.co
             safe_print(theme.step("  🔍 No transcript in description, trying podscripts.co..."))
@@ -322,6 +325,9 @@ def youtube_download(
                 )
                 if transcript_file:
                     safe_print(theme.ok(f"  ✅ Transcript: {transcript_file}"))
+                else:
+                    safe_print(theme.err(f"  ✗ Failed to download transcript from {podscripts_url}"))
+                    safe_print(theme.warn("    Host may be blocked. Try: export HTTPS_PROXY=http://your-proxy:port"))
             else:
                 safe_print(theme.warn(f"  ⚠️ No transcript found for: {url}"))
 

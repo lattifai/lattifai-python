@@ -1210,39 +1210,56 @@ class YouTubeDownloader:
                     self.logger.info(f"✅ Saved Rescript transcript: {output_path} ({len(transcript_text)} chars)")
                     return str(output_path)
 
-            def _fetch():
-                import urllib.request
+            # Quick reachability check — avoid wasting 100s+ on unreachable hosts
+            from urllib.parse import urlparse
 
-                # Build opener with proxy support from environment variables
-                proxy_handler = urllib.request.ProxyHandler()  # reads HTTP_PROXY/HTTPS_PROXY from env
-                opener = urllib.request.build_opener(proxy_handler)
-                req = urllib.request.Request(
-                    transcript_url,
-                    headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
-                )
-                with opener.open(req, timeout=30) as resp:
-                    return resp.read().decode("utf-8")
+            host = urlparse(transcript_url).hostname
+            reachable = await loop.run_in_executor(None, self._is_host_reachable, host)
 
             html = None
-            try:
-                html = await loop.run_in_executor(None, _fetch)
-            except Exception as e:
-                self.logger.info(f"🔄 urllib failed ({e}), trying fallbacks...")
-                # Fallback 1: headless Chrome
-                html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url)
-                # Fallback 2: Jina Reader API (renders JS, returns markdown)
-                if not html:
-                    self.logger.info("🔄 Chrome failed, trying Jina Reader API...")
-                    jina_md = await loop.run_in_executor(None, self._fetch_with_jina_reader, transcript_url)
-                    if jina_md:
-                        # Jina returns markdown directly, use as transcript text
-                        frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
-                        output_path.write_text(frontmatter + jina_md, encoding="utf-8")
-                        self.logger.info(f"✅ Saved transcript via Jina Reader: {output_path} ({len(jina_md)} chars)")
-                        return str(output_path)
+            if reachable:
+                # Direct fetch with proxy support from environment
+                def _fetch():
+                    import urllib.request
+
+                    proxy_handler = urllib.request.ProxyHandler()
+                    opener = urllib.request.build_opener(proxy_handler)
+                    req = urllib.request.Request(
+                        transcript_url,
+                        headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+                    )
+                    with opener.open(req, timeout=15) as resp:
+                        return resp.read().decode("utf-8")
+
+                try:
+                    html = await loop.run_in_executor(None, _fetch)
+                except Exception as e:
+                    self.logger.info(f"🔄 urllib failed ({e}), trying fallbacks...")
+            else:
+                self.logger.info(f"🔄 Host {host} unreachable, skipping direct fetch")
+
+            # Fallback 1: headless Chrome (only if host is reachable — Chrome also connects directly)
+            if not html and reachable:
+                html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url, 20)
+
+            # Fallback 2: Jina Reader API (server-side fetch, bypasses local network blocks)
+            if not html:
+                self.logger.info("🔄 Trying Jina Reader API (server-side fetch)...")
+                jina_md = await loop.run_in_executor(None, self._fetch_with_jina_reader, transcript_url, 15)
+                if jina_md:
+                    frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+                    output_path.write_text(frontmatter + jina_md, encoding="utf-8")
+                    self.logger.info(f"✅ Saved transcript via Jina Reader: {output_path} ({len(jina_md)} chars)")
+                    return str(output_path)
 
             if not html:
-                self.logger.warning("Failed to fetch transcript page")
+                if not reachable:
+                    self.logger.warning(
+                        f"Host {host} is unreachable and Jina Reader also failed. "
+                        "Try setting HTTPS_PROXY or use a VPN."
+                    )
+                else:
+                    self.logger.warning("Failed to fetch transcript page")
                 return None
 
             # Parse HTML to extract transcript in markdown format
@@ -1279,6 +1296,16 @@ class YouTubeDownloader:
             return None
 
     @staticmethod
+    def _is_host_reachable(host: str, port: int = 443, timeout: float = 3.0) -> bool:
+        """Quick TCP connect check to determine if a host is reachable."""
+        import socket
+
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except (socket.timeout, OSError):
+            return False
+
     @staticmethod
     def _build_transcript_frontmatter(
         video_info: Optional[Dict[str, Any]],
@@ -1453,8 +1480,7 @@ class YouTubeDownloader:
         return float(parts[0])
 
     @staticmethod
-    @staticmethod
-    def _fetch_with_jina_reader(url: str, timeout: int = 30) -> Optional[str]:
+    def _fetch_with_jina_reader(url: str, timeout: int = 15) -> Optional[str]:
         """Fetch page content via Jina Reader API (r.jina.ai).
 
         Jina Reader renders JS-heavy pages server-side and returns clean markdown.
