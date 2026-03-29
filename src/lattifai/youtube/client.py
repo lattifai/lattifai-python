@@ -1269,6 +1269,15 @@ class YouTubeDownloader:
                     self.logger.warning("Failed to fetch transcript page")
                 return None
 
+            # Detect SSL hijack / DNS poisoning (e.g. GFW returning a fake certificate page)
+            if self._is_hijacked_page(html):
+                self.logger.warning("🔄 SSL hijack detected (DNS poisoning), discarding fetched HTML")
+                html = None
+
+            if not html:
+                self.logger.warning("Failed to fetch transcript page")
+                return None
+
             # Parse HTML to extract transcript in markdown format
             transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
 
@@ -1361,6 +1370,21 @@ class YouTubeDownloader:
         except Exception as e:
             logger.warning(f"Safari fetch failed: {e}")
             return None
+
+    @staticmethod
+    def _is_hijacked_page(html: str) -> bool:
+        """Detect SSL hijack / DNS poisoning pages (e.g. GFW certificate errors)."""
+        if not html or len(html) < 100:
+            return False
+        indicators = [
+            "ERR_CERT_COMMON_NAME_INVALID",
+            "NET::ERR_CERT",
+            "您的连接不是私密连接",
+            "Your connection is not private",
+            "-----BEGIN CERTIFICATE-----",
+            "PEM encoded chain",
+        ]
+        return any(indicator in html for indicator in indicators)
 
     @staticmethod
     def _is_host_reachable(host: str, port: int = 443, timeout: float = 3.0) -> bool:
