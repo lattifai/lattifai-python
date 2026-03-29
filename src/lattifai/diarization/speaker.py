@@ -224,33 +224,94 @@ class SpeakerNameInferrer:
         prompt = self._build_prompt(speaker_texts, context, candidates, dialogue_turns)
 
         if self.voting_rounds <= 1:
-            return self._single_inference(prompt, speaker_texts)
-
-        # Multi-pass voting: run N times, take majority per speaker
-        from collections import Counter
-
-        vote_counts: Dict[str, Counter] = {speaker: Counter() for speaker in speaker_texts}
-
-        for _ in range(self.voting_rounds):
             result = self._single_inference(prompt, speaker_texts)
-            for speaker_label, predicted_name in result.items():
-                vote_counts[speaker_label][predicted_name] += 1
+        else:
+            # Multi-pass voting: run N times, take majority per speaker
+            from collections import Counter
 
-        # Pick the most common prediction per speaker
-        final_mapping = {}
-        for speaker_label, counter in vote_counts.items():
-            if counter:
-                winner, count = counter.most_common(1)[0]
-                final_mapping[speaker_label] = winner
-                if count < self.voting_rounds:
-                    logger.debug(
-                        "  %s: majority=%r (%d/%d votes)",
-                        speaker_label,
-                        winner,
-                        count,
-                        self.voting_rounds,
-                    )
-        return final_mapping
+            vote_counts: Dict[str, Counter] = {speaker: Counter() for speaker in speaker_texts}
+
+            for _ in range(self.voting_rounds):
+                round_result = self._single_inference(prompt, speaker_texts)
+                for speaker_label, predicted_name in round_result.items():
+                    vote_counts[speaker_label][predicted_name] += 1
+
+            # Pick the most common prediction per speaker
+            result = {}
+            for speaker_label, counter in vote_counts.items():
+                if counter:
+                    winner, count = counter.most_common(1)[0]
+                    result[speaker_label] = winner
+                    if count < self.voting_rounds:
+                        logger.debug(
+                            "  %s: majority=%r (%d/%d votes)",
+                            speaker_label,
+                            winner,
+                            count,
+                            self.voting_rounds,
+                        )
+
+        # Post-LLM correction: relabel audience members in talk/presentation format
+        # Use dialogue_turns for true segment counts (unaffected by sampling),
+        # falling back to speaker_texts counts when dialogue_turns unavailable.
+        true_segment_counts = self._compute_segment_counts(speaker_texts, dialogue_turns)
+        result = self._correct_talk_format_labels(true_segment_counts, result)
+        return result
+
+    @staticmethod
+    def _compute_segment_counts(
+        speaker_texts: Dict[str, List[str]],
+        dialogue_turns: Optional[List[tuple]] = None,
+    ) -> Dict[str, int]:
+        """Compute per-speaker segment counts from the best available source.
+
+        ``dialogue_turns`` reflects the true distribution (before sampling),
+        while ``speaker_texts`` may be truncated by the sampling strategy
+        (first 5 + top 15), which flattens the dominant speaker's count.
+        """
+        if dialogue_turns:
+            from collections import Counter
+
+            return dict(Counter(speaker for speaker, _ in dialogue_turns))
+        return {speaker: len(texts) for speaker, texts in speaker_texts.items()}
+
+    @staticmethod
+    def _correct_talk_format_labels(segment_counts: Dict[str, int], result: Dict[str, str]) -> Dict[str, str]:
+        """Post-LLM correction: relabel audience in presentation/talk format.
+
+        When one speaker dominates (>75% segments) and 3+ speakers exist, this
+        is likely a talk/presentation. Non-dominant speakers with generic labels
+        like "Host" or "Guest" are relabeled as "Audience" — they are audience
+        members asking questions, not hosts or guests.
+
+        Only relabels speakers with <10% of total segments to avoid misclassifying
+        moderators who may legitimately have 10-20% of the conversation.
+        """
+        total_segments = sum(segment_counts.values())
+        if total_segments == 0 or len(segment_counts) < 3:
+            return result
+
+        dominant_speaker = max(segment_counts, key=segment_counts.get)
+        dominant_ratio = segment_counts[dominant_speaker] / total_segments
+        if dominant_ratio < 0.75:
+            return result
+
+        # Talk format confirmed: correct generic labels for minor speakers
+        generic_labels = {"host", "guest", "moderator", "interviewer", "co-host"}
+        corrected = dict(result)
+        for speaker, name in corrected.items():
+            if speaker == dominant_speaker:
+                continue
+            speaker_ratio = segment_counts.get(speaker, 0) / total_segments
+            if speaker_ratio < 0.10 and name.lower().strip() in generic_labels:
+                corrected[speaker] = "Audience"
+                logger.debug(
+                    "Talk format correction: %s %r -> 'Audience' (%.1f%% of segments)",
+                    speaker,
+                    name,
+                    speaker_ratio * 100,
+                )
+        return corrected
 
     def _single_inference(self, prompt: str, speaker_texts: Dict[str, List[str]]) -> Dict[str, str]:
         """Run a single LLM inference and validate the result."""
@@ -305,17 +366,66 @@ class SpeakerNameInferrer:
                 parts.append(f"**{speaker_label}:** {display}")
             parts.append("")
 
+        # Content format analysis: detect presentation/talk vs interview
+        # Use dialogue_turns for true counts (pre-sampling), fall back to speaker_texts
+        segment_counts = self._compute_segment_counts(speaker_texts, dialogue_turns)
+        total_segments = sum(segment_counts.values())
+        is_talk_format = False
+        dominant_speaker = None
+        if total_segments > 0 and len(speaker_texts) >= 3:
+            dominant_speaker = max(segment_counts, key=segment_counts.get)
+            dominant_ratio = segment_counts[dominant_speaker] / total_segments
+            if dominant_ratio > 0.75:
+                is_talk_format = True
+                minor_speakers = [s for s in segment_counts if s != dominant_speaker]
+                parts.append("## Content Format Analysis\n")
+                parts.append("**FORMAT: PRESENTATION / TALK** (not a standard interview)\n")
+                parts.append(
+                    f"- {dominant_speaker} is the **presenter/speaker** "
+                    f"({dominant_ratio:.0%} of all segments, "
+                    f"{segment_counts[dominant_speaker]}/{total_segments})"
+                )
+                for minor in minor_speakers:
+                    minor_count = segment_counts[minor]
+                    minor_pct = minor_count / total_segments * 100
+                    parts.append(
+                        f"- {minor} has only {minor_count} segment(s) "
+                        f"({minor_pct:.1f}%) → **audience member / questioner**"
+                    )
+                parts.append(
+                    "\n**IMPORTANT**: There is NO host in this content. "
+                    f"{dominant_speaker} is the presenter. "
+                    "ALL other speakers are audience members asking questions. "
+                    'Label them as "Audience" or "Questioner", '
+                    'NEVER as "Host" or "Guest".\n'
+                )
+
         parts.append("## Transcript Samples by Speaker\n")
 
         for speaker, texts in sorted(speaker_texts.items()):
             average_length = sum(len(t) for t in texts) // max(len(texts), 1)
-            parts.append(f"### {speaker} ({len(texts)} samples, avg {average_length} chars)\n")
+            # Add role hint for talk format
+            if is_talk_format and speaker == dominant_speaker:
+                role_hint = " [PRESENTER]"
+            elif is_talk_format:
+                role_hint = " [AUDIENCE]"
+            else:
+                role_hint = ""
+            parts.append(f"### {speaker} ({len(texts)} samples, avg {average_length} chars){role_hint}\n")
             for i, text in enumerate(texts, 1):
                 display = text[:200] + "..." if len(text) > 200 else text
                 parts.append(f"{i}. {display}")
             parts.append("")
 
-        if candidates:
+        if is_talk_format:
+            parts.append(
+                "Based on the above, return a JSON object mapping ALL speaker labels "
+                "to their real names. The presenter's name should come from metadata or "
+                "self-introduction. ALL other speakers are audience members — "
+                'label them as "Audience" or "Questioner". '
+                'Do NOT use "Host" or "Guest".'
+            )
+        elif candidates:
             parts.append(
                 "Based on the above, return a JSON object mapping ALL speaker labels "
                 "to their real names from the candidate list. "
