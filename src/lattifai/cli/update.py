@@ -3,7 +3,6 @@
 import subprocess
 import sys
 
-import nemo_run as run
 import pkg_resources
 import requests
 from packaging import version as v_parse
@@ -88,7 +87,6 @@ class AutoUpdater:
             console.print(f"🔴 Health check encountered an error: {str(e)}")
 
 
-@run.cli.entrypoint(name="run", namespace="update")
 def update(force: bool = False):
     """
     Update LattifAI CLI and core components to the latest version.

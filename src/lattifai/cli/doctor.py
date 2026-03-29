@@ -5,7 +5,6 @@ import os
 import sys
 from pathlib import Path
 
-import nemo_run as run
 import requests
 from rich.console import Console
 from rich.table import Table
@@ -132,7 +131,6 @@ CHECKS = [
 ]
 
 
-@run.cli.entrypoint(name="run", namespace="doctor")
 def doctor():
     """
     Run environment diagnostics for LattifAI.
