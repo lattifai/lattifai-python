@@ -89,10 +89,6 @@ class DiarizationConfig:
     llm: LLMConfig = field(default_factory=lambda: LLMConfig(model="gemini-2.5-flash"))
     """LLM provider configuration for speaker name inference."""
 
-    speaker_context: Optional[str] = None
-    """Optional context hint for LLM speaker name inference,
-    e.g. "podcast interview, host is Zhang San, guest is Li Si"."""
-
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 

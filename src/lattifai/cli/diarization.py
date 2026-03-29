@@ -55,8 +55,6 @@ def diarize(
     diarization_config.enabled = True
     if infer_speakers:
         diarization_config.infer_speakers = True
-    if speaker_context:
-        diarization_config.speaker_context = speaker_context
 
     client_instance = LattifAI(
         client_config=client,
@@ -103,6 +101,7 @@ def diarize(
         input_media=media_audio,
         caption=caption_obj,
         output_caption_path=output_path,
+        speaker_context=speaker_context,
     )
 
     return diarized_caption

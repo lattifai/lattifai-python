@@ -379,6 +379,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         input_media: AudioData,
         caption: Caption,
         output_caption_path: Optional[Pathlike] = None,
+        speaker_context: Optional[str] = None,
     ) -> Caption:
         """
         Perform speaker diarization on aligned caption.
@@ -387,6 +388,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             input_media: AudioData object
             caption: Caption object with aligned segments
             output_caption_path: Optional path to write diarized caption
+            speaker_context: Per-call speaker context hint for LLM inference.
+                When None and infer_speakers is enabled, auto-builds from
+                caption.metadata if available.
 
         Returns:
             Caption object with speaker labels assigned
@@ -397,10 +401,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         if not self.diarizer:
             raise RuntimeError("Diarizer not initialized. Set diarization_config.enabled=True")
 
-        # Build per-call speaker context (do NOT mutate shared config)
-        speaker_context = self.diarization_config.speaker_context
-        if self.diarization_config.infer_speakers and not speaker_context and caption.metadata:
-            speaker_context = _build_speaker_context(caption.metadata)
+        # Merge per-call context with metadata auto-detect
+        if self.diarization_config.infer_speakers and caption.metadata:
+            meta_context = _build_speaker_context(caption.metadata)
+            if meta_context:
+                speaker_context = f"{speaker_context}\n{meta_context}" if speaker_context else meta_context
 
         # Perform diarization and assign speaker labels to caption alignments
         if output_caption_path:
