@@ -138,6 +138,58 @@ def youtube(
     )
 
 
+def _build_meta_speaker_context(video_info: dict) -> Optional[str]:
+    """Build a speaker-context string from yt-dlp video_info for candidate extraction.
+
+    Combines title, channel/uploader, and the speaker-relevant portion of
+    the description into the same format that _build_speaker_context() uses,
+    so extract_candidate_names() can parse it.
+    """
+    parts = []
+
+    title = video_info.get("title")
+    if title:
+        parts.append(f"Title: {title}")
+
+    uploader = video_info.get("uploader") or video_info.get("channel")
+    if uploader:
+        parts.append(f"Channel/Host: {uploader}")
+
+    description = video_info.get("description", "")
+    if description:
+        # Keep first paragraph (intro often mentions speakers) + speaker signal blocks
+        paragraphs = description.split("\n\n")
+        kept = []
+        total_length = 0
+        budget = 1500
+
+        if paragraphs:
+            intro = paragraphs[0].strip()[:600]
+            kept.append(intro)
+            total_length += len(intro)
+
+        import re
+
+        speaker_signal_pattern = re.compile(
+            r"(?:host|guest|interview|joined\s+by|co-host|with\s+\w+\s+(?:and|&)|【|嘉宾|主讲|对谈)",
+            re.IGNORECASE,
+        )
+        for paragraph in paragraphs[1:]:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+            if speaker_signal_pattern.search(paragraph):
+                if total_length + len(paragraph) > budget:
+                    break
+                kept.append(paragraph)
+                total_length += len(paragraph)
+
+        if kept:
+            parts.append(f"Description:\n{'  '.join(kept)}")
+
+    return "\n".join(parts) if parts else None
+
+
 @run.cli.entrypoint(name="download", namespace="youtube")
 def youtube_download(
     yt_url: Optional[str] = None,
@@ -293,10 +345,33 @@ def youtube_download(
         meta_lines.append(f"upload_date: \"{info.get('upload_date', '')}\"")
         meta_lines.append(f"view_count: {info.get('view_count', 0)}")
         meta_lines.append(f"thumbnail: \"{info.get('thumbnail', '')}\"")
+
+        # Extract speakers from description and title for structured metadata
+        description = info.get("description", "")
+        speaker_context = _build_meta_speaker_context(info)
+        if speaker_context:
+            from lattifai.diarization.speaker import extract_candidate_names
+
+            candidates = extract_candidate_names(speaker_context)
+            if candidates:
+                meta_lines.append("speakers:")
+                for role in ("host", "guest"):
+                    for name in candidates.get(role, []):
+                        meta_lines.append(f'  - name: "{name}"')
+                        meta_lines.append(f"    role: {role}")
+
+        # Save chapters from YouTube if available
+        chapters = info.get("chapters") or []
+        if chapters:
+            meta_lines.append("chapters:")
+            for chapter in chapters:
+                chapter_title = chapter.get("title", "").replace('"', '\\"')
+                meta_lines.append(f'  - title: "{chapter_title}"')
+                meta_lines.append(f"    start: {chapter.get('start_time', 0)}")
+
         meta_lines.append("---")
         meta_lines.append("")
 
-        description = info.get("description", "")
         if description:
             meta_lines.append(description)
             meta_lines.append("")

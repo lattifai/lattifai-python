@@ -24,16 +24,22 @@ infer the real name of each speaker.
 1. **Candidate names from metadata**: If a "Candidate Names" section is
    provided, you MUST assign those names to the matching SPEAKER labels.
    The host/interviewer asks shorter questions; the guest gives longer answers.
-2. **Self-introductions**: "I'm Zhang San", "My name is...", "大家好我是..."
-3. **How others address them**: "So Zhang San, what do you think?"
-4. **Role signals**: The speaker who asks questions is typically the host;
+2. **Conversation flow**: If a "Conversation Excerpt" is provided, analyze
+   turn-taking patterns and how speakers address each other by name.
+3. **Self-introductions**: "I'm Zhang San", "My name is...", "大家好我是..."
+4. **How others address them**: "So Zhang San, what do you think?"
+5. **Role signals**: The speaker who asks questions is typically the host;
    the one who gives longer, detailed answers is the guest.
 
 ## Rules
 
 - You MUST use real names from metadata/candidates instead of "Host"/"Guest"
 - Map EVERY speaker label to a candidate name when candidates are provided
-- Only fall back to "Host"/"Guest" if NO candidate names are available
+- **Always use the person's full legal name**, not nicknames or aliases
+  (e.g. use "Shawn Wang" not "Swyx", use "张伟" not "小张")
+- For anonymous speakers (e.g. audience Q&A), use descriptive labels like
+  "Audience" or "Questioner", not "Host"/"Guest"
+- Only fall back to "Host"/"Guest" if NO name can be determined at all
 - Return valid JSON: {"SPEAKER_00": "Real Name", "SPEAKER_01": "Guest Name"}
 """
 
@@ -44,6 +50,34 @@ _TITLE_ONLY_RE = re.compile(
     r"Director|Founder|President|Chairman|Advisor)",
     re.IGNORECASE,
 )
+
+
+# Words that never start a person name — articles, pronouns, conjunctions, common verbs
+_NON_NAME_STARTERS = frozenset(
+    "the a an we he she it they this that how what why when where who which "
+    "is are was were will can do does did not no and or but if so".split()
+)
+
+
+def _looks_like_person_name(text: str) -> bool:
+    """Heuristic: does *text* look like a Western or CJK person name?
+
+    Accepts: "Jeff Dean", "Blaise Agüera y Arcas", "张三", "Shawn Wang (Swyx)"
+    Rejects: "We are near the end of the exponential", "AI-Powered Future"
+    """
+    # CJK names: 2-4 characters
+    if re.fullmatch(r"[\u4e00-\u9fff]{2,4}", text):
+        return True
+    # Western names: 2-6 words, first word capitalized, no sentence starters
+    words = text.split()
+    if len(words) < 2 or len(words) > 6:
+        return False
+    if words[0].lower() in _NON_NAME_STARTERS:
+        return False
+    # First significant word must start with uppercase
+    if not words[0][0].isupper():
+        return False
+    return True
 
 
 def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
@@ -79,20 +113,38 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
     m = re.search(r"Channel/Host:\s*(.+?)(?:\n|$)", context)
     if m:
         channel = m.group(1).strip()
-        if not re.search(r"(?:podcast|show|radio|channel|播客|节目|频道|Priors|Space|MLST)", channel, re.IGNORECASE):
+        if not re.search(
+            r"(?:podcast|show|radio|channel|talk|street|播客|节目|频道|Priors|Space|MLST)", channel, re.IGNORECASE
+        ):
             _add("host", channel)
 
-    # 2. Title pattern: "Guest Name — topic" or "Guest Name: topic"
+    # 2. Title pattern: "Guest Name — topic" or "topic — Guest Name"
     m = re.search(r"Title:\s*(.+?)(?:\n|$)", context)
     if m:
         title = m.group(1).strip()
         # Strip leading episode numbers
         title = re.sub(r"^(?:#?\d+\.?\s*|E\d+[｜|]?\s*)", "", title)
-        tm = re.match(r"^(.+?)\s*[—–|]\s*", title)
-        if tm:
-            name_part = tm.group(1).strip()
-            if not re.match(r"^\d", name_part):
-                _add("guest", name_part)
+        # 2a. Name BEFORE separator: "Guest Name — topic"
+        found_leading_name = False
+        leading_match = re.match(r"^(.+?)\s*[—–|]\s*", title)
+        if leading_match:
+            leading_name = leading_match.group(1).strip()
+            if not re.match(r"^\d", leading_name) and _looks_like_person_name(leading_name):
+                _add("guest", leading_name)
+                found_leading_name = True
+        # 2b. Name AFTER last separator: "topic — Guest Name" or "topic - Guest Name"
+        #     Only if 2a did not already find a valid name (avoid double extraction)
+        #     Matches em-dash, en-dash, and spaced-hyphen (" - ") but NOT inline hyphens ("AI-powered")
+        if not found_leading_name:
+            trailing_name_match = re.search(r"(?:[—–]|\s-\s)\s*([^—–|]+)$", title)
+            if trailing_name_match:
+                trailing_text = trailing_name_match.group(1).strip()
+                # Strip common podcast/episode suffixes
+                trailing_text = re.sub(
+                    r"\s*(?:Podcast|Episode|EP|节目|播客)\s*#?\d*$", "", trailing_text, flags=re.IGNORECASE
+                ).strip()
+                if trailing_text and _looks_like_person_name(trailing_text):
+                    _add("guest", trailing_text)
 
     # 3. Chinese structured blocks: 【主播】Name / 【嘉宾】Name
     #    Handles both single-line (【主播】张三) and multi-line (【主播】\n张三) formats.
@@ -127,34 +179,81 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
 
 
 class SpeakerNameInferrer:
-    """Infer real speaker names from diarized transcript text via LLM."""
+    """Infer real speaker names from diarized transcript text via LLM.
+
+    Supports two complementary input modes:
+    - ``speaker_texts``: grouped text samples per speaker (legacy)
+    - ``dialogue_turns``: ordered (speaker, text) pairs preserving conversation flow
+
+    When ``dialogue_turns`` is provided, the prompt includes a conversation excerpt
+    that reveals turn-taking patterns and cross-speaker references (e.g. "So Jeff,
+    what do you think?"), which significantly improves identification accuracy.
+
+    Multi-pass voting (``voting_rounds > 1``) runs inference multiple times and
+    picks the majority answer per speaker to reduce temperature-induced randomness.
+    """
 
     def __init__(
         self,
         llm_client: BaseLLMClient,
         model: Optional[str] = None,
+        voting_rounds: int = 1,
     ):
         self.llm = llm_client
         self.model = model
+        self.voting_rounds = max(1, voting_rounds)
 
     def __call__(
         self,
         speaker_texts: Dict[str, List[str]],
         context: Optional[str] = None,
+        dialogue_turns: Optional[List[tuple]] = None,
     ) -> Dict[str, str]:
-        """Infer speaker names from text samples.
+        """Infer speaker names from text samples and/or dialogue turns.
 
         Args:
             speaker_texts: Text samples grouped by speaker label.
             context: Optional user-provided context about the content.
+            dialogue_turns: Optional ordered list of (speaker_label, text) pairs
+                representing the actual conversation flow.
 
         Returns:
             Mapping from speaker label to inferred real name.
         """
-        # Pre-extract candidates for validation and prompt construction
         candidates = extract_candidate_names(context)
-        prompt = self._build_prompt(speaker_texts, context, candidates)
+        prompt = self._build_prompt(speaker_texts, context, candidates, dialogue_turns)
 
+        if self.voting_rounds <= 1:
+            return self._single_inference(prompt, speaker_texts)
+
+        # Multi-pass voting: run N times, take majority per speaker
+        from collections import Counter
+
+        vote_counts: Dict[str, Counter] = {speaker: Counter() for speaker in speaker_texts}
+
+        for _ in range(self.voting_rounds):
+            result = self._single_inference(prompt, speaker_texts)
+            for speaker_label, predicted_name in result.items():
+                vote_counts[speaker_label][predicted_name] += 1
+
+        # Pick the most common prediction per speaker
+        final_mapping = {}
+        for speaker_label, counter in vote_counts.items():
+            if counter:
+                winner, count = counter.most_common(1)[0]
+                final_mapping[speaker_label] = winner
+                if count < self.voting_rounds:
+                    logger.debug(
+                        "  %s: majority=%r (%d/%d votes)",
+                        speaker_label,
+                        winner,
+                        count,
+                        self.voting_rounds,
+                    )
+        return final_mapping
+
+    def _single_inference(self, prompt: str, speaker_texts: Dict[str, List[str]]) -> Dict[str, str]:
+        """Run a single LLM inference and validate the result."""
         try:
             result = self.llm.generate_json_sync(
                 prompt,
@@ -170,23 +269,10 @@ class SpeakerNameInferrer:
             logger.warning(f"LLM returned non-dict: {type(result)}")
             return {}
 
-        # Validate: only keep entries mapping existing speaker labels to non-empty strings
         validated = {}
-        for k, v in result.items():
-            if k in speaker_texts and isinstance(v, str) and v.strip():
-                validated[k] = v.strip()
-
-        # When candidates exist, restrict LLM output to candidate names only
-        # to prevent prompt-injection via metadata from corrupting speaker labels
-        if candidates:
-            all_candidates = set()
-            for names in candidates.values():
-                all_candidates.update(names)
-            for k, v in list(validated.items()):
-                if v not in all_candidates:
-                    logger.warning("LLM returned name %r for %s not in candidate list; dropping", v, k)
-                    del validated[k]
-
+        for speaker_label, name in result.items():
+            if speaker_label in speaker_texts and isinstance(name, str) and name.strip():
+                validated[speaker_label] = name.strip()
         return validated
 
     def _build_prompt(
@@ -194,6 +280,7 @@ class SpeakerNameInferrer:
         speaker_texts: Dict[str, List[str]],
         context: Optional[str],
         candidates: Optional[Dict[str, List[str]]] = None,
+        dialogue_turns: Optional[List[tuple]] = None,
     ) -> str:
         parts = []
 
@@ -209,12 +296,20 @@ class SpeakerNameInferrer:
                 parts.append(f"- Guest(s): {', '.join(candidates['guest'])}")
             parts.append("")
 
+        # Dialogue turns: show conversation flow for turn-taking and cross-references
+        if dialogue_turns:
+            parts.append("## Conversation Excerpt (first 30 turns)\n")
+            parts.append("Pay attention to how speakers address each other by name.\n")
+            for speaker_label, text in dialogue_turns[:30]:
+                display = text[:150] + "..." if len(text) > 150 else text
+                parts.append(f"**{speaker_label}:** {display}")
+            parts.append("")
+
         parts.append("## Transcript Samples by Speaker\n")
 
         for speaker, texts in sorted(speaker_texts.items()):
-            # Compute avg length to help LLM distinguish host (short) vs guest (long)
-            avg_len = sum(len(t) for t in texts) // max(len(texts), 1)
-            parts.append(f"### {speaker} ({len(texts)} samples, avg {avg_len} chars)\n")
+            average_length = sum(len(t) for t in texts) // max(len(texts), 1)
+            parts.append(f"### {speaker} ({len(texts)} samples, avg {average_length} chars)\n")
             for i, text in enumerate(texts, 1):
                 display = text[:200] + "..." if len(text) > 200 else text
                 parts.append(f"{i}. {display}")

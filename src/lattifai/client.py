@@ -50,18 +50,31 @@ _SKIP_LINE = re.compile(
 def _build_speaker_context(metadata: dict) -> Optional[str]:
     """Build speaker context string from video metadata for LLM inference.
 
-    Extracts title, channel, and the most speaker-relevant portions of the
-    description (intro paragraph + any structured host/guest blocks).
+    If structured ``speakers`` are present (from enhanced meta.md), includes
+    them directly. Otherwise falls back to extracting from title, channel,
+    and description text.
     """
     parts = []
+
+    # Structured speakers field (from enhanced meta.md download pipeline)
+    speakers = metadata.get("speakers")
+    if speakers and isinstance(speakers, list):
+        host_names = [s["name"] for s in speakers if s.get("role") == "host" and s.get("name")]
+        guest_names = [s["name"] for s in speakers if s.get("role") == "guest" and s.get("name")]
+        if host_names:
+            parts.append(f"Channel/Host: {', '.join(host_names)}")
+        if guest_names:
+            parts.append(f"Guests: {', '.join(guest_names)}")
 
     title = metadata.get("title")
     if title:
         parts.append(f"Title: {title}")
 
-    uploader = metadata.get("uploader") or metadata.get("channel")
-    if uploader:
-        parts.append(f"Channel/Host: {uploader}")
+    if not speakers:
+        # Fallback: extract from channel and description when no structured speakers
+        uploader = metadata.get("uploader") or metadata.get("channel")
+        if uploader:
+            parts.append(f"Channel/Host: {uploader}")
 
     description = metadata.get("description", "")
     if description:

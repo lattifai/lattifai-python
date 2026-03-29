@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import re
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
@@ -103,8 +104,10 @@ def _run_async(coro):
 
 
 def parse_json_response(text: str) -> Any:
-    """Parse JSON from LLM response, handling markdown code blocks."""
+    """Parse JSON from LLM response, handling markdown code blocks and thinking tokens."""
     text = text.strip()
+    # Strip thinking tokens from reasoning models (e.g. Qwen3/3.5, DeepSeek-R1)
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
     if text.startswith("```"):
         # Strip markdown code fence
         lines = text.split("\n")
@@ -113,4 +116,9 @@ def parse_json_response(text: str) -> Any:
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         text = "\n".join(lines)
+    # Fallback: extract first JSON object if surrounded by non-JSON text
+    if not text.startswith(("{", "[")):
+        json_match = re.search(r"(\{[^{}]*\}|\[.*\])", text, re.DOTALL)
+        if json_match:
+            text = json_match.group(1)
     return json.loads(text)

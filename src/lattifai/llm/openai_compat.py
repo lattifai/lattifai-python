@@ -74,7 +74,13 @@ class OpenAIClient(BaseLLMClient):
         system: Optional[str] = None,
         temperature: Optional[float] = None,
     ) -> Any:
-        response = await self._call(prompt, model=model, system=system, temperature=temperature, json_mode=True)
+        # Try json_mode first; fall back to plain text for thinking models
+        # (Qwen3/3.5, DeepSeek-R1) that don't support response_format=json_object
+        try:
+            response = await self._call(prompt, model=model, system=system, temperature=temperature, json_mode=True)
+        except Exception:
+            logger.debug("json_mode not supported, retrying without response_format constraint")
+            response = await self._call(prompt, model=model, system=system, temperature=temperature, json_mode=False)
         content = response.choices[0].message.content
         if not content:
             raise RuntimeError("Empty response from OpenAI-compatible API")

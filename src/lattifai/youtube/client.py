@@ -755,6 +755,9 @@ class YouTubeDownloader:
                 "description": metadata.get("description", ""),
                 "thumbnail": metadata.get("thumbnail", ""),
                 "webpage_url": metadata.get("webpage_url", url),
+                "chapters": metadata.get("chapters") or [],
+                "categories": metadata.get("categories") or [],
+                "channel": metadata.get("channel", ""),
             }
 
             self.logger.info(f'✅ Video info extracted: {info["title"]}')

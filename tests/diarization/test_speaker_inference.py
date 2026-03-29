@@ -81,6 +81,12 @@ class TestExtractCandidateNames:
         result = extract_candidate_names(ctx)
         assert "host" not in result
 
+    def test_channel_rejected_talk_show(self):
+        """Show names containing 'talk' or 'street' should be rejected."""
+        ctx = "Channel/Host: Machine Learning Street Talk\n"
+        result = extract_candidate_names(ctx)
+        assert "host" not in result
+
     def test_title_guest_dash(self):
         ctx = "Title: Li Si — Deep Learning Advances\n"
         result = extract_candidate_names(ctx)
@@ -220,21 +226,14 @@ class TestSpeakerNameInferrer:
         result = inferrer(speaker_texts)
         assert result == {}
 
-    def test_candidate_validation_drops_non_candidates(self, speaker_texts):
-        """Issue 1: When candidates exist, LLM names must come from the candidate list."""
+    def test_llm_output_trusted_without_candidate_filtering(self, speaker_texts):
+        """LLM output is trusted — no candidate-based filtering applied."""
         context = "Channel/Host: Alice\nTitle: Bob Smith — Topic\n"
-        llm = FakeLLMClient([{"SPEAKER_00": "Alice", "SPEAKER_01": "INJECTED_NAME"}])
+        llm = FakeLLMClient([{"SPEAKER_00": "Alice", "SPEAKER_01": "Charlie"}])
         inferrer = SpeakerNameInferrer(llm_client=llm)
         result = inferrer(speaker_texts, context=context)
-        assert result.get("SPEAKER_00") == "Alice"
-        assert "SPEAKER_01" not in result  # INJECTED_NAME not in candidates
-
-    def test_candidate_validation_allows_valid(self, speaker_texts):
-        context = "Channel/Host: Alice\nTitle: Bob Smith — Topic\n"
-        llm = FakeLLMClient([{"SPEAKER_00": "Alice", "SPEAKER_01": "Bob Smith"}])
-        inferrer = SpeakerNameInferrer(llm_client=llm)
-        result = inferrer(speaker_texts, context=context)
-        assert result == {"SPEAKER_00": "Alice", "SPEAKER_01": "Bob Smith"}
+        # "Charlie" is not a candidate but should still be kept
+        assert result == {"SPEAKER_00": "Alice", "SPEAKER_01": "Charlie"}
 
     def test_no_candidates_allows_any_name(self, speaker_texts):
         """Without candidates, any valid name should pass through."""
@@ -309,5 +308,21 @@ class TestBuildSpeakerContext:
         from lattifai.client import _build_speaker_context
 
         meta = {"title": "Ep", "channel": "Fallback Channel"}
-        ctx = _build_speaker_context(meta)
-        assert "Channel/Host: Fallback Channel" in ctx
+        context = _build_speaker_context(meta)
+        assert "Channel/Host: Fallback Channel" in context
+
+    def test_structured_speakers_field(self):
+        """When structured speakers are present, use them directly."""
+        from lattifai.client import _build_speaker_context
+
+        meta = {
+            "title": "Jensen Huang Interview",
+            "speakers": [
+                {"name": "Sarah Guo", "role": "host"},
+                {"name": "Elad Gil", "role": "host"},
+                {"name": "Jensen Huang", "role": "guest"},
+            ],
+        }
+        context = _build_speaker_context(meta)
+        assert "Channel/Host: Sarah Guo, Elad Gil" in context
+        assert "Guests: Jensen Huang" in context
