@@ -688,16 +688,25 @@ class YouTubeDownloader:
         Returns:
             yt-dlp format selector string
         """
+        # Extract primary audio selector (before '/' fallbacks) to avoid
+        # audio-only fallbacks leaking into the video format selector.
+        primary_audio = audio_format_selector.split("/")[0]
+
         # Normalize quality for video context
         quality_lower = self._normalize_video_quality(quality)
 
         if quality_lower.isdigit():
             height = int(quality_lower)
             self.logger.info(f"🎬 Video quality: {height}p")
-            return f"bestvideo[height<={height}]+{audio_format_selector}/best[height<={height}]/best"
+            return (
+                f"bestvideo[height<={height}]+{primary_audio}"
+                f"/bestvideo[height<={height}]+bestaudio"
+                f"/best[height<={height}]"
+                f"/best"
+            )
 
-        # "best" or fallback
-        return f"bestvideo*+{audio_format_selector}/best"
+        # "best" or fallback — every alternative includes video
+        return f"bestvideo*+{primary_audio}/bestvideo*+bestaudio/best"
 
     @staticmethod
     def extract_video_id(url: str) -> str:

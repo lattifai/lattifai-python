@@ -21,6 +21,8 @@ KEY_MAP = {
     "gemini_api_key": "GEMINI_API_KEY",
     "openai_api_key": "OPENAI_API_KEY",
     "openai_api_base_url": "OPENAI_API_BASE_URL",
+    "default_audio_format": "LATTIFAI_DEFAULT_AUDIO_FORMAT",
+    "default_video_format": "LATTIFAI_DEFAULT_VIDEO_FORMAT",
 }
 
 # Keys that should be masked in display
@@ -136,6 +138,18 @@ def set_value(key: str, value: str):
         console.print(f"[{T.RICH_ERR}]Unknown key: {key}[/{T.RICH_ERR}]")
         console.print(f"Valid keys: {valid}")
         raise typer.Exit(1)
+
+    # Validate format keys before persisting
+    if key in ("default_audio_format", "default_video_format"):
+        from lattifai.config.media import AUDIO_FORMATS, VIDEO_FORMATS
+
+        normalized = value.strip().lower()
+        valid_formats = AUDIO_FORMATS if key == "default_audio_format" else VIDEO_FORMATS
+        if normalized not in valid_formats:
+            console.print(f"[{T.RICH_ERR}]Unsupported format: {value}[/{T.RICH_ERR}]")
+            console.print(f"Supported: {', '.join(valid_formats)}")
+            raise typer.Exit(1)
+        value = normalized
 
     config = _load_config()
     config[key] = value

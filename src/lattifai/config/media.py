@@ -114,6 +114,7 @@ class MediaConfig:
     def __post_init__(self) -> None:
         """Validate configuration and normalize paths/formats."""
         self._setup_output_directory()
+        self._apply_user_defaults()
         self._validate_default_formats()
         self._normalize_media_format()
         self._process_input_path()
@@ -132,6 +133,31 @@ class MediaConfig:
                 raise ValueError(
                     f"streaming_chunk_secs must be between 1 and 1800 seconds (1 second to 30 minutes), got {self.streaming_chunk_secs}. Recommended: 60 seconds or larger."
                 )
+
+    def _apply_user_defaults(self) -> None:
+        """Override default_audio_format / default_video_format from env or config.toml.
+
+        Precedence: env var > config.toml > dataclass default.
+        Only applies when the field still holds its original default value.
+        """
+        import os
+
+        for field_name, env_key in (
+            ("default_audio_format", "LATTIFAI_DEFAULT_AUDIO_FORMAT"),
+            ("default_video_format", "LATTIFAI_DEFAULT_VIDEO_FORMAT"),
+        ):
+            env_val = os.environ.get(env_key)
+            if env_val:
+                setattr(self, field_name, env_val.strip().lower())
+                continue
+            try:
+                from lattifai.cli.config import get_config_value
+
+                config_val = get_config_value(field_name)
+                if config_val:
+                    setattr(self, field_name, config_val.strip().lower())
+            except (ImportError, OSError):
+                pass
 
     def _validate_default_formats(self) -> None:
         """Validate default audio and video formats."""
@@ -185,7 +211,7 @@ class MediaConfig:
     def normalize_format(self, media_format: Optional[str] = None, *, prefer_audio: Optional[bool] = None) -> str:
         """Resolve a media format (handling the special "auto" value)."""
         prefer_audio = self.prefer_audio if prefer_audio is None else prefer_audio
-        candidate = (media_format or self.media_format or "auto").lower()
+        candidate = (media_format or self.output_format or self.media_format or "auto").lower()
         if candidate == "auto":
             candidate = self.default_audio_format if prefer_audio else self.default_video_format
         return self._normalize_format(candidate)

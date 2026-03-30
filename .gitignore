@@ -95,3 +95,5 @@ tests/data/SA1.LattifAI.srt
 .claude/worktrees/
 scripts/
 debug/
+debug
+url-to-markdown/
