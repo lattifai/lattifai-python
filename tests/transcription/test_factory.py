@@ -18,12 +18,13 @@ def test_create_gemini_transcriber_explicit():
 
 
 def test_create_gemini_transcriber_preview():
-    """Test creating Gemini transcriber with preview model."""
+    """Test creating Gemini transcriber with preview model (auto-upgraded)."""
     config = TranscriptionConfig(model_name="gemini-3-pro-preview", gemini_api_key="test_key")
     transcriber = create_transcriber(config)
 
     assert isinstance(transcriber, GeminiTranscriber)
-    assert transcriber.config.model_name == "gemini-3-pro-preview"
+    # gemini-3-pro-preview is deprecated and auto-switches to gemini-3.1-pro-preview
+    assert transcriber.config.model_name == "gemini-3.1-pro-preview"
 
 
 def test_create_lattifai_transcriber_nvidia():

@@ -291,9 +291,13 @@ class BaseTranslator:
         shared_prompt: Optional[str] = None,
     ) -> list:
         """Translate all texts in batches with concurrency control."""
+        from tqdm import tqdm
+
         batch_size = config.batch_size
         context_lines = config.context_lines
+        total_batches = (len(texts) - 1) // batch_size + 1
         semaphore = asyncio.Semaphore(config.max_concurrent)
+        pbar = tqdm(total=len(texts), desc="Translating", unit="seg")
 
         async def _process_batch(start_idx: int) -> tuple[int, list]:
             async with semaphore:
@@ -303,7 +307,6 @@ class BaseTranslator:
                 ctx_after = texts[batch_end : batch_end + context_lines] if batch_end < len(texts) else None
 
                 if config.verbose:
-                    total_batches = (len(texts) - 1) // batch_size + 1
                     batch_num = start_idx // batch_size + 1
                     logger.info("Translating batch %d/%d (%d segments)...", batch_num, total_batches, len(batch))
 
@@ -318,10 +321,15 @@ class BaseTranslator:
                     context_after=ctx_after,
                     shared_prompt=shared_prompt,
                 )
+                pbar.update(len(batch))
                 return start_idx, result
 
-        tasks = [_process_batch(i) for i in range(0, len(texts), batch_size)]
-        batch_results = await asyncio.gather(*tasks)
+        try:
+            tasks = [_process_batch(i) for i in range(0, len(texts), batch_size)]
+            batch_results = await asyncio.gather(*tasks)
+        finally:
+            pbar.close()
+
         batch_results.sort(key=lambda item: item[0])
 
         results = []

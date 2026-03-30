@@ -290,40 +290,47 @@ Translate caption files to any target language using LLM providers (Gemini, Open
 
 Three translation modes with increasing quality:
 
-| Mode | Description | Use Case |
-|------|-------------|----------|
-| `quick` | Direct batch translation, no analysis | Quick gist, informal review |
-| `normal` | Analyze content first (terminology, style), then translate | Default — good balance of speed and quality |
-| `refined` | Analyze → translate → review → revise | Publication-quality, professional subtitles |
+| Mode | Pipeline | LLM Calls | Use Case |
+|------|----------|-----------|----------|
+| `quick` | Translate | ~1x | Quick draft, informal review |
+| `normal` | Analyze → Translate | ~2x | Default — terminology-consistent, context-aware |
+| `refined` | Analyze → Translate → Review → Revise | ~3x | Publication-quality professional subtitles |
+
+**What each stage does:**
+
+- **Analyze** (`normal`/`refined`): Scans source text to identify domain, terminology, speaker style, and tone. Extracts a glossary of key terms with recommended translations, ensuring consistency across all segments (e.g., "forced alignment" → "强制对齐" everywhere).
+- **Translate**: Batch-translates segments with context windows (surrounding lines for coherence). In `quick` mode, uses only the raw text. In `normal`/`refined`, the translation prompt includes the analysis results and glossary.
+- **Review** (`refined` only): A separate reviewer pass compares each translation against the original, checking for mistranslations, omissions, tone shifts, and glossary violations. Outputs per-segment critiques.
+- **Revise** (`refined` only): Applies reviewer feedback to produce a polished final version. All intermediate artifacts (analysis, prompts, drafts, critiques, revisions) can be saved with `save_artifacts=true`.
 
 ```bash
 # Basic (default: normal mode, bilingual, target=zh)
-lai translate run input.srt output.srt
+lai translate caption input.srt output.srt
 
 # Quick mode to English
-lai translate run input.srt output.srt \
+lai translate caption input.srt output.srt \
     translation.target_lang=en \
     translation.mode=quick
 
 # Refined mode with artifacts saved
-lai translate run input.srt output.srt \
+lai translate caption input.srt output.srt \
     translation.target_lang=ja \
     translation.mode=refined \
     translation.save_artifacts=true
 
 # Bilingual output with translation on top
-lai translate run input.srt output.srt \
+lai translate caption input.srt output.srt \
     translation.target_lang=zh \
     caption.translation_first=true
 
 # OpenAI-compatible API (local or third-party)
-lai translate run input.srt output.srt \
-    translation.provider=openai \
-    translation.api_base_url=http://localhost:8000/v1 \
-    translation.model_name=qwen3
+lai translate caption input.srt output.srt \
+    translation.llm.provider=openai \
+    translation.llm.api_base_url=http://localhost:8000/v1 \
+    translation.llm.model=qwen3
 
 # With custom glossary
-lai translate run input.srt output.srt \
+lai translate caption input.srt output.srt \
     translation.glossary_file=glossary.yaml
 ```
 
@@ -337,12 +344,13 @@ lai translate run input.srt output.srt \
 | `mode` | `normal` | Translation mode: `quick`, `normal`, `refined` |
 | `bilingual` | `true` | Output bilingual captions (original + translation) |
 | `style` | `technical` | Style hint: `storytelling`, `formal`, `casual`, `technical` |
-| `model_name` | `gemini-3-flash-preview` | LLM model name |
-| `provider` | `gemini` | LLM provider: `gemini` or `openai` |
+| `llm.model` | `gemini-3-flash-preview` | LLM model name |
+| `llm.provider` | `gemini` | LLM provider: `gemini` or `openai` |
+| `llm.api_base_url` | — | Base URL for OpenAI-compatible endpoint (vLLM, SGLang, Ollama) |
 | `batch_size` | `30` | Segments per API call |
 | `max_concurrent` | `5` | Max concurrent batch requests |
 | `glossary_file` | — | Path to custom glossary (YAML or Markdown) |
-| `save_artifacts` | `false` | Save intermediate files (analysis, prompts) |
+| `save_artifacts` | `false` | Save intermediate files (analysis, prompts, critiques, revisions) |
 
 #### Translation Language Support
 

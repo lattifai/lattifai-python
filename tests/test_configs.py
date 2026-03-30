@@ -246,7 +246,7 @@ class TestDiarizationConfig:
         assert config.model_name == "pyannote/speaker-diarization-community-1"
         assert config.verbose is False
         assert config.debug is False
-        assert config.min_claim_duration == 2.0
+        assert config.min_claim_duration == 0.5
         assert config.min_claim_count == 1
 
     def test_custom_values(self):

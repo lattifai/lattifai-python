@@ -1,16 +1,18 @@
 """Local web UI server for trying LattifAI features."""
 
-import cgi
+import io
 import json
 import mimetypes
+import re
 import shutil
 import traceback
 import webbrowser
+from dataclasses import dataclass
 from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import cast
+from typing import BinaryIO, cast
 from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
@@ -21,10 +23,109 @@ from lattifai.cli.transcribe import transcribe as transcribe_run
 from lattifai.cli.translate import translate as translate_run
 from lattifai.client import LattifAI
 from lattifai.config import AlignmentConfig, CaptionConfig, EventConfig, TranscriptionConfig
+from lattifai.config.llm import LLMConfig
 from lattifai.config.translation import TranslationConfig
 
 HTML_FILE = Path(__file__).with_name("serve.html")
 DEFAULT_WORKDIR = Path.cwd() / ".lattifai-serve"
+
+
+# ---------------------------------------------------------------------------
+# Minimal multipart/form-data parser (replaces deprecated FormData)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class FormField:
+    """A single field parsed from multipart/form-data."""
+
+    name: str
+    value: bytes = b""
+    filename: str | None = None
+    content_type: str | None = None
+
+    @property
+    def file(self) -> BinaryIO:
+        return io.BytesIO(self.value)
+
+
+class FormData:
+    """Lightweight multipart/form-data parser for the local serve UI.
+
+    Only supports the subset needed by ServeHandler: text fields and single
+    file uploads.  Replaces ``FormData`` which is deprecated since
+    Python 3.11 and removed in Python 3.13.
+    """
+
+    def __init__(self, fp: BinaryIO, content_type: str, content_length: int):
+        self._fields: dict[str, list[FormField]] = {}
+        self._parse(fp, content_type, content_length)
+
+    # -- public interface identical to what ServeHandler uses ----------------
+
+    def getfirst(self, name: str) -> str | None:
+        fields = self._fields.get(name)
+        if not fields:
+            return None
+        return fields[0].value.decode("utf-8", errors="replace")
+
+    def __contains__(self, name: str) -> bool:
+        return name in self._fields
+
+    def __getitem__(self, name: str) -> "FormField | list[FormField]":
+        fields = self._fields[name]
+        return fields[0] if len(fields) == 1 else fields
+
+    # -- internal -----------------------------------------------------------
+
+    def _parse(self, fp: BinaryIO, content_type: str, content_length: int) -> None:
+        match = re.search(r"boundary=([^\s;]+)", content_type)
+        if not match:
+            raise ValueError("Missing boundary in Content-Type")
+
+        boundary = match.group(1).encode("ascii")
+        raw = fp.read(content_length)
+
+        delimiter = b"--" + boundary
+        parts = raw.split(delimiter)
+        # First part is empty (before first boundary), last is "--\r\n"
+        for part in parts[1:]:
+            if part.startswith(b"--"):
+                break  # closing boundary
+            self._parse_part(part)
+
+    def _parse_part(self, raw: bytes) -> None:
+        # Each part: \r\n<headers>\r\n\r\n<body>\r\n
+        raw = raw.lstrip(b"\r\n")
+        sep = raw.find(b"\r\n\r\n")
+        if sep == -1:
+            return
+        header_block = raw[:sep].decode("utf-8", errors="replace")
+        body = raw[sep + 4 :]
+        if body.endswith(b"\r\n"):
+            body = body[:-2]
+
+        # Parse Content-Disposition
+        name = None
+        filename = None
+        ct = None
+        for line in header_block.split("\r\n"):
+            lower = line.lower()
+            if lower.startswith("content-disposition:"):
+                m = re.search(r'name="([^"]*)"', line)
+                if m:
+                    name = m.group(1)
+                m = re.search(r'filename="([^"]*)"', line)
+                if m:
+                    filename = m.group(1)
+            elif lower.startswith("content-type:"):
+                ct = line.split(":", 1)[1].strip()
+
+        if name is None:
+            return
+        ff = FormField(name=name, value=body, filename=filename, content_type=ct)
+        self._fields.setdefault(name, []).append(ff)
+
 
 OUTPUT_SUFFIX = {
     "srt": ".srt",
@@ -178,30 +279,21 @@ class ServeHandler(BaseHTTPRequestHandler):
         with target.open("rb") as file_obj:
             shutil.copyfileobj(file_obj, self.wfile)
 
-    def _load_form_data(self) -> cgi.FieldStorage:
+    def _load_form_data(self) -> FormData:
         content_type = self.headers.get("Content-Type", "")
         if "multipart/form-data" not in content_type:
             raise ValueError("Request content type must be multipart/form-data")
 
-        environ = {
-            "REQUEST_METHOD": "POST",
-            "CONTENT_TYPE": content_type,
-            "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
-        }
-        return cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ=environ,
-            keep_blank_values=True,
-        )
+        content_length = int(self.headers.get("Content-Length", "0"))
+        return FormData(fp=self.rfile, content_type=content_type, content_length=content_length)
 
-    def _field_value(self, form: cgi.FieldStorage, name: str, default: str | None = None) -> str | None:
+    def _field_value(self, form: FormData, name: str, default: str | None = None) -> str | None:
         value = form.getfirst(name)
         if value is None:
             return default
         return str(value)
 
-    def _save_uploaded_file(self, form: cgi.FieldStorage, field_name: str, run_dir: Path, fallback: str) -> Path:
+    def _save_uploaded_file(self, form: FormData, field_name: str, run_dir: Path, fallback: str) -> Path:
         if field_name not in form:
             raise ValueError(f"Missing required file field: {field_name}")
 
@@ -229,7 +321,7 @@ class ServeHandler(BaseHTTPRequestHandler):
         run_dir.mkdir(parents=True, exist_ok=True)
         return run_dir
 
-    def _run_align(self, form: cgi.FieldStorage, run_dir: Path) -> Path:
+    def _run_align(self, form: FormData, run_dir: Path) -> Path:
         media_file = self._save_uploaded_file(form, "media_file", run_dir, "media.bin")
         caption_file = self._save_uploaded_file(form, "caption_file", run_dir, "caption.srt")
 
@@ -252,7 +344,7 @@ class ServeHandler(BaseHTTPRequestHandler):
         )
         return output_path
 
-    def _run_transcribe(self, form: cgi.FieldStorage, run_dir: Path) -> Path:
+    def _run_transcribe(self, form: FormData, run_dir: Path) -> Path:
         media_file = self._save_uploaded_file(form, "media_file", run_dir, "media.bin")
 
         output_suffix = normalize_output_suffix(self._field_value(form, "output_format"), default=".srt")
@@ -279,7 +371,7 @@ class ServeHandler(BaseHTTPRequestHandler):
         )
         return output_path
 
-    def _run_convert(self, form: cgi.FieldStorage, run_dir: Path) -> Path:
+    def _run_convert(self, form: FormData, run_dir: Path) -> Path:
         caption_file = self._save_uploaded_file(form, "caption_file", run_dir, "caption.srt")
 
         output_suffix = normalize_output_suffix(self._field_value(form, "output_format"), default=".vtt")
@@ -302,7 +394,7 @@ class ServeHandler(BaseHTTPRequestHandler):
         )
         return output_path
 
-    def _run_translate(self, form: cgi.FieldStorage, run_dir: Path) -> Path:
+    def _run_translate(self, form: FormData, run_dir: Path) -> Path:
         caption_file = self._save_uploaded_file(form, "caption_file", run_dir, "caption.srt")
 
         provider = (self._field_value(form, "provider", "gemini") or "gemini").strip().lower()
@@ -326,11 +418,9 @@ class ServeHandler(BaseHTTPRequestHandler):
         api_base_url = (self._field_value(form, "api_base_url") or "").strip() or None
         bilingual = parse_bool(self._field_value(form, "bilingual"), default=False)
 
+        llm_config = LLMConfig(provider=provider, model=model_name, api_key=api_key, api_base_url=api_base_url)
         translation_config = TranslationConfig(
-            provider=provider,
-            model_name=model_name,
-            api_key=api_key,
-            api_base_url=api_base_url,
+            llm=llm_config,
             target_lang=target_lang,
             mode=mode,
             bilingual=bilingual,

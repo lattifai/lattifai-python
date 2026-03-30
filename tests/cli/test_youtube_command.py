@@ -14,7 +14,7 @@ LATTIFAI_TESTS_CLI_DRYRUN = bool(os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "fa
 
 def run_youtube_command(args, env=None):
     """Helper function to run the youtube command and return result"""
-    cmd = ["lai", "alignment", "youtube", "-Y"]
+    cmd = ["lai", "youtube", "alignment", "-Y"]
 
     if LATTIFAI_TESTS_CLI_DRYRUN:
         cmd.append("--dryrun")

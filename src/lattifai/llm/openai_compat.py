@@ -29,6 +29,9 @@ class OpenAIClient(BaseLLMClient):
 
     @property
     def provider_name(self) -> str:
+        model = self._default_model or ""
+        if model.startswith("gemini"):
+            return "gemini"
         return "openai"
 
     def _get_client(self):
