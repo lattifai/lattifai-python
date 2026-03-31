@@ -223,7 +223,7 @@ LattifAI supports a wide range of ASR models — from cloud APIs to local infere
 | [SenseVoice](https://huggingface.co/iic/SenseVoiceSmall) | Local | zh, en, ja, ko, yue | `[transcription]` |
 | [Fun-ASR-Nano](https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512) | Local | 31 (incl. zh dialects) | `[transcription]` |
 | [Fun-ASR-MLT-Nano](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Local | 31 (incl. zh dialects) | `[transcription]` |
-| [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | vLLM/SGLang | zh, en, ja, ko, yue | — |
+| [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | Local / vLLM/SGLang | 52 (30 lang + 22 zh dialects) | `[transcription]` |
 | [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) | vLLM/SGLang | 99 | — |
 | [Voxtral](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | vLLM/SGLang | 13 (European) | — |
 | [Voxtral Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | vLLM (realtime) | 13 (European) | — |
@@ -239,6 +239,7 @@ transcription.model_name=gemini-2.5-pro
 transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
 transcription.model_name=iic/SenseVoiceSmall
 transcription.model_name=FunAudioLLM/Fun-ASR-MLT-Nano-2512
+transcription.model_name=Qwen/Qwen3-ASR-1.7B
 
 # vLLM/SGLang-served models (requires a running vLLM server)
 transcription.model_name=Qwen/Qwen3-ASR-1.7B \

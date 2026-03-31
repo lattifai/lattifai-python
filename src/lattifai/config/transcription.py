@@ -22,6 +22,8 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "iic/SenseVoiceSmall",
     "FunAudioLLM/Fun-ASR-Nano-2512",
     "FunAudioLLM/Fun-ASR-MLT-Nano-2512",
+    "Qwen/Qwen3-ASR-0.6B",
+    "Qwen/Qwen3-ASR-1.7B",
     # Any model served via vLLM/SGLang with api_base_url is also supported
     # (Whisper, Qwen3-ASR, GLM-ASR, VibeVoice, Voxtral, etc.)
 ]

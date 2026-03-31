@@ -85,5 +85,23 @@ def test_create_transcriber_supports_url_flag():
     assert lattifai.supports_url is False
 
 
+def test_create_qwen_transcriber():
+    """Test creating LattifAI transcriber with Qwen3-ASR-1.7B."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-1.7B")
+    transcriber = create_transcriber(config)
+
+    assert isinstance(transcriber, LattifAITranscriber)
+    assert transcriber.config.model_name == "Qwen/Qwen3-ASR-1.7B"
+
+
+def test_create_qwen_transcriber_0_6b():
+    """Test creating LattifAI transcriber with Qwen3-ASR-0.6B."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-0.6B")
+    transcriber = create_transcriber(config)
+
+    assert isinstance(transcriber, LattifAITranscriber)
+    assert transcriber.config.model_name == "Qwen/Qwen3-ASR-0.6B"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

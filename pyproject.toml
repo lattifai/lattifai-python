@@ -71,6 +71,7 @@ transcription = [
     "funasr>=1.3.0",
     "zhconv",
     "openai-whisper",
+    "qwen-asr>=0.0.6",
 ]
 # Development
 dev = [

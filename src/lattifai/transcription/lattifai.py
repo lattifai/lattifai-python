@@ -85,7 +85,7 @@ class LattifAITranscriber(BaseTranscriber):
     LattifAI local transcription with config-driven architecture.
 
     Uses TranscriptionConfig for all behavioral settings.
-    Loads NeMo ASR models or OmniSenseVoice locally
+    Loads NeMo ASR models, OmniSenseVoice, FunASR, or Qwen3-ASR locally.
     """
 
     file_suffix = ".ass"
@@ -149,6 +149,20 @@ class LattifAITranscriber(BaseTranscriber):
 
             hub = self.config.model_hub  # "huggingface" or "modelscope"
             return AutoModel(model=model_name, trust_remote_code=True, device=str(device), hub=hub, disable_update=True)
+
+        elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
+            from qwen_asr import Qwen3ASRModel
+
+            # Map LattifAI device to qwen_asr device_map
+            device_str = str(device)
+            device_map = "cuda:0" if device_str == "cuda" else device_str
+
+            # bfloat16 for CUDA, float32 for CPU/MPS
+            dtype = torch.bfloat16 if "cuda" in device_map else torch.float32
+
+            model = Qwen3ASRModel.from_pretrained(model_name, dtype=dtype, device_map=device_map, max_new_tokens=256)
+            logger.info("Loaded %s on %s", model_name, device_map)
+            return model
 
         else:
             raise ValueError(f"Unsupported model_name: {model_name}")
@@ -245,6 +259,31 @@ class LattifAITranscriber(BaseTranscriber):
                     )
                     text = res[0]["text"] if res else ""
                     hypotheses.append(Supervision(text=text, duration=dur))
+
+            elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
+                # Qwen3-ASR: native batch inference via qwen_asr package
+                if isinstance(audio, np.ndarray):
+                    audio_inputs = [audio]
+                elif isinstance(audio, list):
+                    audio_inputs = audio
+                else:
+                    audio_inputs = [audio]
+
+                lang_list = [language] * len(audio_inputs) if language else [None] * len(audio_inputs)
+
+                results = asr_model.transcribe(audio=audio_inputs, language=lang_list)
+
+                hypotheses = []
+                for i, r in enumerate(results):
+                    inp = audio_inputs[i]
+                    dur = inp.shape[-1] / _ASR_SAMPLE_RATE if isinstance(inp, np.ndarray) else 0.0
+                    hypotheses.append(
+                        Supervision(
+                            text=r.text,
+                            duration=dur,
+                            language=getattr(r, "language", language),
+                        )
+                    )
 
             else:
                 raise ValueError(f"Unsupported model_name: {model_name}")
