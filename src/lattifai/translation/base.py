@@ -133,12 +133,14 @@ class BaseTranslator:
                 self._save_artifact(cfg, "01-analysis.md", self._format_analysis_markdown(analysis))
             self._save_artifact(cfg, "02-prompt.md", shared_prompt)
 
+        checkpoint_path = self._checkpoint_path(cfg)
         translated = await self._translate_all_batches(
             texts=texts,
             config=cfg,
             analysis=analysis,
             glossary=merged_glossary,
             shared_prompt=shared_prompt,
+            checkpoint_path=checkpoint_path,
         )
 
         draft_plain = self._extract_plain_translations(translated, cfg.bilingual)
@@ -289,15 +291,42 @@ class BaseTranslator:
         analysis: Optional[dict] = None,
         glossary: Optional[dict[str, str]] = None,
         shared_prompt: Optional[str] = None,
+        checkpoint_path: Optional[Path] = None,
     ) -> list:
-        """Translate all texts in batches with concurrency control."""
+        """Translate all texts in batches with concurrency control.
+
+        Supports checkpoint/resume: completed batches are saved to a checkpoint
+        file after each batch. On restart, already-completed batches are skipped.
+        The checkpoint is removed after all batches complete successfully.
+        """
         from tqdm import tqdm
 
         batch_size = config.batch_size
         context_lines = config.context_lines
-        total_batches = (len(texts) - 1) // batch_size + 1
+        batch_starts = list(range(0, len(texts), batch_size))
+        total_batches = len(batch_starts)
         semaphore = asyncio.Semaphore(config.max_concurrent)
-        pbar = tqdm(total=len(texts), desc="Translating", unit="seg")
+
+        # Load checkpoint: {str(start_idx): [results]}
+        completed: dict[int, list] = {}
+        if checkpoint_path and checkpoint_path.exists():
+            try:
+                raw = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+                completed = {int(k): v for k, v in raw.items()}
+                cached_segs = sum(len(v) for v in completed.values())
+                logger.info(
+                    "Resuming from checkpoint: %d/%d batches (%d segments)", len(completed), total_batches, cached_segs
+                )
+            except Exception:
+                logger.warning("Corrupt checkpoint, starting fresh")
+                completed = {}
+
+        remaining = [s for s in batch_starts if s not in completed]
+        cached_segs = sum(len(v) for v in completed.values())
+        pbar = tqdm(total=len(texts), initial=cached_segs, desc="Translating", unit="seg")
+
+        max_retries = 5
+        lock = asyncio.Lock()
 
         async def _process_batch(start_idx: int) -> tuple[int, list]:
             async with semaphore:
@@ -310,32 +339,80 @@ class BaseTranslator:
                     batch_num = start_idx // batch_size + 1
                     logger.info("Translating batch %d/%d (%d segments)...", batch_num, total_batches, len(batch))
 
-                result = await self.translate_batch(
-                    texts=batch,
-                    target_lang=config.target_lang,
-                    bilingual=config.bilingual,
-                    style=config.style,
-                    analysis=analysis,
-                    glossary=glossary,
-                    context_before=ctx_before,
-                    context_after=ctx_after,
-                    shared_prompt=shared_prompt,
-                )
-                pbar.update(len(batch))
-                return start_idx, result
+                for attempt in range(max_retries):
+                    try:
+                        result = await self.translate_batch(
+                            texts=batch,
+                            target_lang=config.target_lang,
+                            bilingual=config.bilingual,
+                            style=config.style,
+                            analysis=analysis,
+                            glossary=glossary,
+                            context_before=ctx_before,
+                            context_after=ctx_after,
+                            shared_prompt=shared_prompt,
+                        )
+                        pbar.update(len(batch))
+                        # Save to checkpoint immediately
+                        async with lock:
+                            completed[start_idx] = result
+                            self._write_checkpoint(checkpoint_path, completed)
+                        return start_idx, result
+                    except Exception as e:
+                        err_str = str(e)
+                        is_retryable = any(code in err_str for code in ("429", "503", "500", "UNAVAILABLE"))
+                        if not is_retryable or attempt == max_retries - 1:
+                            raise
+                        wait = 2 ** (attempt + 1)
+                        logger.warning(
+                            "Batch %d: %s — retrying in %ds (%d/%d)",
+                            start_idx,
+                            err_str[:80],
+                            wait,
+                            attempt + 1,
+                            max_retries,
+                        )
+                        await asyncio.sleep(wait)
 
         try:
-            tasks = [_process_batch(i) for i in range(0, len(texts), batch_size)]
-            batch_results = await asyncio.gather(*tasks)
+            tasks = [_process_batch(i) for i in remaining]
+            new_results = await asyncio.gather(*tasks)
+            for start_idx, result in new_results:
+                completed[start_idx] = result
+        except Exception:
+            # Save whatever we have so far
+            self._write_checkpoint(checkpoint_path, completed)
+            cached_segs = sum(len(v) for v in completed.values())
+            if checkpoint_path:
+                logger.error(
+                    "Translation interrupted — checkpoint saved: %s (%d/%d segments)",
+                    checkpoint_path,
+                    cached_segs,
+                    len(texts),
+                )
+            raise
         finally:
             pbar.close()
 
-        batch_results.sort(key=lambda item: item[0])
+        # All batches done — remove checkpoint
+        if checkpoint_path and checkpoint_path.exists():
+            checkpoint_path.unlink()
 
+        # Assemble results in order
         results = []
-        for _, batch_result in batch_results:
-            results.extend(batch_result)
+        for start_idx in batch_starts:
+            results.extend(completed[start_idx])
         return results
+
+    @staticmethod
+    def _write_checkpoint(path: Optional[Path], data: dict[int, list]) -> None:
+        """Write checkpoint file atomically."""
+        if not path:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({str(k): v for k, v in data.items()}, ensure_ascii=False), encoding="utf-8")
+        tmp.rename(path)
 
     @staticmethod
     def _extract_glossary_terms(analysis: Optional[dict]) -> Optional[dict[str, str]]:
@@ -495,6 +572,12 @@ class BaseTranslator:
             lines.append(f"- Note: {critique or 'No issue found.'}")
             lines.append("")
         return "\n".join(lines).strip() + "\n"
+
+    @staticmethod
+    def _checkpoint_path(config: TranslationConfig) -> Path:
+        """Derive checkpoint file path from config."""
+        base = Path(config.artifacts_dir) if config.artifacts_dir else Path(".")
+        return base / ".translation_checkpoint.json"
 
     @staticmethod
     def _save_artifact(config: TranslationConfig, filename: str, data) -> None:
