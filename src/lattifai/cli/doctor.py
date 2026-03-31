@@ -33,8 +33,12 @@ def _check_package_version() -> tuple[str, str, str]:
                 return ("Package version", f"[{T.RICH_OK}]{current} (latest)[/{T.RICH_OK}]", "OK")
             else:
                 return ("Package version", f"[{T.RICH_WARN}]{current} -> {latest} available[/{T.RICH_WARN}]", "WARN")
-    except Exception:
-        pass
+    except requests.RequestException as exc:
+        return ("Package version", f"[{T.RICH_WARN}]{current} (network: {exc})[/{T.RICH_WARN}]", "WARN")
+    except (KeyError, ValueError) as exc:
+        return ("Package version", f"[{T.RICH_WARN}]{current} (parse error: {exc})[/{T.RICH_WARN}]", "WARN")
+    except ImportError:
+        return ("Package version", f"[{T.RICH_WARN}]{current} (packaging not installed)[/{T.RICH_WARN}]", "WARN")
     return ("Package version", f"[{T.RICH_WARN}]{current} (PyPI check failed)[/{T.RICH_WARN}]", "WARN")
 
 
@@ -130,6 +134,8 @@ def _check_model_cache() -> tuple[str, str, str]:
             )
     except ImportError:
         return ("Model cache", f"[{T.RICH_ERR}]huggingface_hub not installed[/{T.RICH_ERR}]", "FAIL")
+    except OSError as exc:
+        return ("Model cache", f"[{T.RICH_ERR}]Cache unreadable: {exc}[/{T.RICH_ERR}]", "FAIL")
 
 
 def _check_api_key() -> tuple[str, str, str]:
@@ -161,6 +167,7 @@ def _check_selftest() -> tuple[str, str, str]:
     data_pkg = "lattifai.data.selftest"
     passed = []
     errors = []
+    files_ref = None
 
     # 1) Check bundled files exist
     try:
@@ -177,6 +184,12 @@ def _check_selftest() -> tuple[str, str, str]:
             passed.append("data")
     except Exception as exc:
         errors.append(f"data: {exc}")
+
+    # Short-circuit if resource package lookup failed — later phases need files_ref
+    if files_ref is None:
+        if errors:
+            return ("Self-test", f"[{T.RICH_ERR}]FAIL: {'; '.join(errors)}[/{T.RICH_ERR}]", "FAIL")
+        return ("Self-test", f"[{T.RICH_ERR}]FAIL: bundled data unavailable[/{T.RICH_ERR}]", "FAIL")
 
     # 2) Caption read/write roundtrip (VTT → SRT → VTT)
     try:
@@ -197,7 +210,7 @@ def _check_selftest() -> tuple[str, str, str]:
     except Exception as exc:
         errors.append(f"caption: {exc}")
 
-    # 3) Audio loading
+    # 3) Audio loading (uses private _load_audio — no public API exists yet)
     try:
         from lattifai.audio2 import AudioLoader
 
@@ -234,6 +247,16 @@ CHECKS = [
     _check_selftest,
 ]
 
+_CHECK_HINTS = {
+    "_check_package_version": "Run 'lai update' to upgrade.",
+    "_check_python_version": "Install Python 3.10–3.14.",
+    "_check_gpu": "Install onnxruntime with GPU support.",
+    "_check_model_cache": "Run an alignment to auto-download the model.",
+    "_check_api_key": "Set LATTIFAI_API_KEY in your environment.",
+    "_check_dependencies": "Run 'pip install lattifai[all]' to install missing deps.",
+    "_check_selftest": "Try reinstalling: pip install --force-reinstall lattifai",
+}
+
 
 def doctor() -> int:
     """
@@ -261,7 +284,9 @@ def doctor() -> int:
             name, detail, status = check_fn()
         except Exception as exc:
             name = check_fn.__doc__.split(".")[0].strip() if check_fn.__doc__ else check_fn.__name__
-            detail = f"[{T.RICH_ERR}]Unexpected error: {exc}[/{T.RICH_ERR}]"
+            hint = _CHECK_HINTS.get(check_fn.__name__, "")
+            hint_suffix = f" — {hint}" if hint else ""
+            detail = f"[{T.RICH_ERR}]Unexpected error: {exc}{hint_suffix}[/{T.RICH_ERR}]"
             status = "FAIL"
         icon = STATUS_ICONS.get(status, "?")
         table.add_row(icon, name, detail)
