@@ -223,10 +223,16 @@ class LattifAITranscriber(BaseTranscriber):
                 hypotheses = self._to_supervisions(audio, hypotheses, return_hypotheses)
 
             elif model_name == "iic/SenseVoiceSmall":
+                # OmniSenseVoice accepts np.ndarray, str, or Path — unwrap AudioData/Tensor
+                if isinstance(audio, AudioData):
+                    audio = audio.ndarray
                 if isinstance(audio, torch.Tensor):
                     audio = audio.cpu().numpy()
                 elif isinstance(audio, list):
-                    audio = [a.cpu().numpy() if isinstance(a, torch.Tensor) else a for a in audio]
+                    audio = [
+                        a.ndarray if isinstance(a, AudioData) else a.cpu().numpy() if isinstance(a, torch.Tensor) else a
+                        for a in audio
+                    ]
                 hypotheses = asr_model.transcribe(
                     audio,
                     batch_size=batch_size,
