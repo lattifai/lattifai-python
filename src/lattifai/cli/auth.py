@@ -538,7 +538,7 @@ def trial(
             exp = _dt.fromisoformat(expires_at.replace("Z", "+00:00"))
             if exp > _dt.now(timezone.utc):
                 console.print(f"[{T.RICH_OK}]You already have an active trial (expires {expires_at}).[/{T.RICH_OK}]")
-                console.print(f"[{T.RICH_DIM}]Run lai auth logout first to get a new trial.[/{T.RICH_DIM}]")
+                console.print(f"[{T.RICH_WARN}]Run 'lai auth logout' first to get a new trial.[/{T.RICH_WARN}]")
                 return
         except (ValueError, TypeError):
             pass
