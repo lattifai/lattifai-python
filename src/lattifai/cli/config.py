@@ -26,7 +26,16 @@ KEY_MAP = {
 }
 
 SECTION_KEY_MAP = {
-    "auth": {"lattifai_api_key", "api_key_id", "user_email", "key_name", "logged_in_at"},
+    "auth": {
+        "lattifai_api_key",
+        "api_key_id",
+        "user_email",
+        "key_name",
+        "logged_in_at",
+        "is_trial",
+        "expires_at",
+        "credits",
+    },
     "api": {"gemini_api_key", "openai_api_key", "openai_api_base_url"},
     "defaults": {"default_audio_format", "default_video_format"},
 }

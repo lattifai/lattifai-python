@@ -91,13 +91,45 @@ def _load_dotenv_value(key: str) -> Optional[str]:
     return str(value) if value else None
 
 
-def _resolve_api_key() -> Optional[str]:
-    """Resolve API key with the same precedence as the client config."""
-    return (
-        os.environ.get("LATTIFAI_API_KEY")
-        or _load_dotenv_value("LATTIFAI_API_KEY")
-        or get_auth_value("lattifai_api_key")
+_dotenv_checked = False
+
+
+def _migrate_dotenv_to_config() -> None:
+    """One-time migration: copy LATTIFAI_API_KEY from .env into config.toml.
+
+    Only runs once per process; subsequent calls are no-ops.
+    """
+    global _dotenv_checked  # noqa: PLW0603
+    if _dotenv_checked:
+        return
+    _dotenv_checked = True
+
+    dotenv_key = _load_dotenv_value("LATTIFAI_API_KEY")
+    if not dotenv_key:
+        return
+    if get_auth_value("lattifai_api_key"):
+        console.print(
+            f"[{T.RICH_WARN}]Ignoring LATTIFAI_API_KEY in .env — "
+            f"using session from config.toml. "
+            f"Remove the key from .env to silence this warning.[/{T.RICH_WARN}]"
+        )
+        return
+    set_auth_value("lattifai_api_key", dotenv_key)
+    console.print(
+        f"[{T.RICH_WARN}]Migrated LATTIFAI_API_KEY from .env to config.toml. "
+        f"You can now remove it from .env.[/{T.RICH_WARN}]"
     )
+
+
+def _resolve_api_key() -> Optional[str]:
+    """Resolve API key: explicit env var > config.toml session.
+
+    On first call, migrates .env key to config.toml if no session exists.
+    """
+    if key := os.environ.get("LATTIFAI_API_KEY"):
+        return key
+    _migrate_dotenv_to_config()
+    return get_auth_value("lattifai_api_key")
 
 
 def _auth_headers(api_key: str) -> dict[str, str]:
@@ -141,17 +173,63 @@ def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
     set_auth_value("logged_in_at", _utc_now_iso())
 
 
-def _print_whoami_table(whoami_data: dict[str, Any], api_key: str) -> None:
-    """Render whoami output using Rich."""
-    table = Table(show_header=False, box=None, pad_edge=False)
-    table.add_column("Field", style=T.RICH_LABEL, min_width=14)
-    table.add_column("Value")
-    table.add_row("User", whoami_data.get("user_email") or f"[{T.RICH_DIM}]unknown[/{T.RICH_DIM}]")
-    table.add_row("Key", whoami_data.get("key_name") or f"...{api_key[-4:]}")
-    table.add_row("Created", str(whoami_data.get("created_at", "")))
+def _format_time(iso_str: Optional[str], *, future: bool = False) -> str:
+    """Format an ISO-8601 timestamp into local time with relative offset.
 
+    Args:
+        iso_str: ISO-8601 timestamp (UTC). None or empty returns "".
+        future: If True, show "in Xh" instead of "Xh ago" (for expiry times).
+    """
+    if not iso_str:
+        return ""
+    try:
+        clean = iso_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(clean)
+        now = datetime.now(timezone.utc)
+        local_dt = dt.astimezone()  # convert to local timezone
+
+        delta = dt - now if future else now - dt
+        secs = int(delta.total_seconds())
+
+        if secs < 0:
+            age = "expired" if future else "in the future"
+        elif secs < 60:
+            age = "just now" if not future else "< 1m"
+        elif secs < 3600:
+            age = f"{secs // 60}m {'left' if future else 'ago'}"
+        elif secs < 86400:
+            age = f"{secs // 3600}h {(secs % 3600) // 60}m {'left' if future else 'ago'}"
+        else:
+            age = f"{secs // 86400}d {'left' if future else 'ago'}"
+
+        return f"{local_dt.strftime('%Y-%m-%d %H:%M')} ({age})"
+    except (ValueError, TypeError):
+        return iso_str
+
+
+def _print_session(whoami_data: dict[str, Any], api_key: str, *, is_trial: bool = False) -> None:
+    """Render session info using Rich."""
+    table = Table(show_header=False, box=None, pad_edge=False)
+    table.add_column("Field", style=T.RICH_LABEL, min_width=10)
+    table.add_column("Value")
+
+    table.add_row("Account", whoami_data.get("user_email") or f"[{T.RICH_DIM}]anonymous[/{T.RICH_DIM}]")
+    table.add_row("Device", whoami_data.get("key_name") or f"...{api_key[-4:]}")
+    table.add_row("Since", _format_time(whoami_data.get("created_at")))
+
+    if is_trial:
+        expires = whoami_data.get("expires_at")
+        credits = whoami_data.get("credits", whoami_data.get("alignment_limit"))
+        if credits is not None:
+            h, m = divmod(int(credits), 60)
+            label = f"{h} hours {m} minutes" if h and m else f"{h} hours" if h else f"{m} minutes"
+            table.add_row("Credits", label)
+        if expires:
+            table.add_row("Expires", _format_time(expires, future=True))
+
+    session_type = "Trial" if is_trial else "Session"
     console.print()
-    console.print(f"[{T.RICH_HEADER}]LattifAI Session[/{T.RICH_HEADER}]")
+    console.print(f"[{T.RICH_HEADER}]LattifAI {session_type}[/{T.RICH_HEADER}]")
     console.print(table)
     console.print()
 
@@ -300,7 +378,7 @@ def login(
 
         _persist_auth(manual_api_key, whoami_data)
         console.print(f"[{T.RICH_OK}]Login successful.[/{T.RICH_OK}]")
-        _print_whoami_table(whoami_data, manual_api_key)
+        _print_session(whoami_data, manual_api_key)
         return
 
     state = secrets.token_urlsafe(32)
@@ -313,7 +391,7 @@ def login(
         console.print(f"[{T.RICH_ERR}]{exc}[/{T.RICH_ERR}]")
         raise typer.Exit(1) from exc
 
-    auth_url = f"{resolved_site_url}/en/cli-auth?" + urlencode(
+    auth_url = f"{resolved_site_url}/cli-auth?" + urlencode(
         {"state": state, "port": callback_server.port, "device_name": device_name}
     )
 
@@ -358,7 +436,7 @@ def login(
 
     _persist_auth(issued_api_key, whoami_data)
     console.print(f"[{T.RICH_OK}]Login successful.[/{T.RICH_OK}]")
-    _print_whoami_table(whoami_data, issued_api_key)
+    _print_session(whoami_data, issued_api_key)
 
 
 def logout(
@@ -403,7 +481,7 @@ def whoami(
     resolved_api_url = _resolve_api_url(api_url)
     api_key = _resolve_api_key()
     if not api_key:
-        console.print(f"[{T.RICH_WARN}]No API key found in env, .env, or config.toml [auth].[/{T.RICH_WARN}]")
+        console.print(f"[{T.RICH_WARN}]Not logged in. Run 'lai auth login' or set LATTIFAI_API_KEY.[/{T.RICH_WARN}]")
         raise typer.Exit(1)
 
     try:
@@ -412,4 +490,103 @@ def whoami(
         console.print(f"[{T.RICH_ERR}]Failed to fetch session info: {exc}[/{T.RICH_ERR}]")
         raise typer.Exit(1) from exc
 
-    _print_whoami_table(whoami_data, api_key)
+    _print_session(whoami_data, api_key)
+
+
+def _get_device_id() -> str:
+    """Get hardware device ID via lattifai-auth, fallback to hostname."""
+    try:
+        from lattifai_auth import get_device_id
+
+        return get_device_id()
+    except ImportError:
+        # lattifai-auth not installed — fall back to hostname hash
+        import hashlib
+
+        hostname = socket.gethostname() or "unknown"
+        return hashlib.sha256(hostname.encode()).hexdigest()
+
+
+def _persist_trial_auth(data: dict[str, Any]) -> None:
+    """Persist trial auth metadata into config.toml."""
+    clear_auth()
+    set_auth_value("lattifai_api_key", data["api_key"])
+    set_auth_value("is_trial", True)
+    set_auth_value("expires_at", data["expires_at"])
+    set_auth_value("credits", data.get("credits", 120))
+    set_auth_value("logged_in_at", _utc_now_iso())
+
+
+def trial(
+    site_url: Optional[str] = typer.Option(
+        None,
+        "--site-url",
+        help="Web site URL. Env: LATTIFAI_SITE_URL.",
+    ),
+) -> None:
+    """Get a free trial API key — no sign-up required."""
+    resolved_site_url = _resolve_site_url(site_url)
+
+    # Check for existing valid trial — reuse if not expired (L3)
+    existing_key = get_auth_value("lattifai_api_key")
+    is_trial = get_auth_value("is_trial")
+    expires_at = get_auth_value("expires_at")
+    if existing_key and is_trial and expires_at:
+        try:
+            from datetime import datetime as _dt
+
+            exp = _dt.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if exp > _dt.now(timezone.utc):
+                console.print(f"[{T.RICH_OK}]You already have an active trial (expires {expires_at}).[/{T.RICH_OK}]")
+                console.print(f"[{T.RICH_DIM}]Run lai auth logout first to get a new trial.[/{T.RICH_DIM}]")
+                return
+        except (ValueError, TypeError):
+            pass
+
+    # Warn if logged in with a real account
+    if existing_key and not is_trial:
+        overwrite = typer.confirm("You have an active login session. Replace with trial?", default=False)
+        if not overwrite:
+            raise typer.Exit(0)
+
+    device_name = socket.gethostname() or "unknown-device"
+    device_id = _get_device_id()
+
+    try:
+        with console.status(
+            f"[{T.RICH_STEP}]Requesting trial key...[/{T.RICH_STEP}]",
+            spinner="dots",
+        ):
+            with httpx.Client(timeout=30.0) as client:
+                response = client.post(
+                    f"{resolved_site_url}/api/cli-auth/trial",
+                    json={"device_name": device_name, "device_id": device_id},
+                )
+    except httpx.HTTPError as exc:
+        console.print(f"[{T.RICH_ERR}]Failed to request trial key: {exc}[/{T.RICH_ERR}]")
+        raise typer.Exit(1) from exc
+
+    if response.status_code == 429:
+        detail = response.json().get("detail", "Trial limit exceeded.")
+        console.print(f"[{T.RICH_WARN}]{detail}[/{T.RICH_WARN}]")
+        raise typer.Exit(1)
+
+    if not response.is_success:
+        error = response.json().get("error", response.text)
+        console.print(f"[{T.RICH_ERR}]Trial request failed: {error}[/{T.RICH_ERR}]")
+        raise typer.Exit(1)
+
+    data = response.json()
+    _persist_trial_auth(data)
+
+    console.print(f"[{T.RICH_OK}]Trial activated![/{T.RICH_OK}]")
+    _print_session(data, data["api_key"], is_trial=True)
+
+    console.print(f"[{T.RICH_STEP}]Quick start:[/{T.RICH_STEP}]")
+    console.print(f"  [{T.RICH_DIM}]# Forced alignment (supports .json .srt .vtt .ass .tsv .TextGrid)[/{T.RICH_DIM}]")
+    console.print("  lai alignment align audio.wav caption.srt output.srt")
+    console.print()
+    console.print(f"  [{T.RICH_DIM}]# YouTube → aligned captions[/{T.RICH_DIM}]")
+    console.print("  lai youtube align https://youtu.be/VIDEO_ID -o output.vtt")
+    console.print()
+    console.print(f"[{T.RICH_DIM}]Upgrade to full access: lai auth login[/{T.RICH_DIM}]")
