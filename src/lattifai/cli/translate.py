@@ -40,16 +40,6 @@ def _should_continue_with_refined(translation_config: TranslationConfig) -> bool
     return answer in {"y", "yes"}
 
 
-def _load_caption_for_translation(input_path: Path):
-    """Load a caption or markdown transcript for translation."""
-    from lattifai.caption import Caption, MarkdownReader
-
-    if input_path.suffix.lower() == ".md":
-        supervisions = MarkdownReader.extract_for_alignment(str(input_path))
-        return Caption.from_supervisions(supervisions)
-    return Caption.read(str(input_path))
-
-
 def _resolve_translation_output_path(
     *,
     input_path: Optional[Path],
@@ -100,17 +90,6 @@ def _translate_caption_in_place(cap, translation_config: TranslationConfig):
                 source_texts=source_texts,
             )
         )
-
-
-def _write_translated_caption(cap, output_path: Path, caption_config: CaptionConfig) -> None:
-    """Write translated caption to markdown or caption format."""
-    from lattifai.caption import MarkdownWriter
-
-    ensure_parent_dir(output_path)
-    if output_path.suffix.lower() == ".md":
-        MarkdownWriter.write(cap.supervisions, str(output_path))
-    else:
-        cap.write(str(output_path), translation_first=caption_config.translation_first)
 
 
 @run.cli.entrypoint(name="caption", namespace="translate")
@@ -174,8 +153,10 @@ def translate(
     if not input_path.exists():
         raise ValueError(f"Input file not found: {input}")
 
+    from lattifai.caption import Caption
+
     safe_print(theme.step(f"Loading: {input_path}"))
-    cap = _load_caption_for_translation(input_path)
+    cap = Caption.read(str(input_path))
 
     if not cap.supervisions:
         raise ValueError(f"No caption segments found in: {input}")
@@ -191,7 +172,8 @@ def translate(
         translation_config.artifacts_dir = str(output_path.parent)
 
     _translate_caption_in_place(cap, translation_config)
-    _write_translated_caption(cap, output_path, caption_config)
+    ensure_parent_dir(output_path)
+    cap.write(str(output_path), translation_first=caption_config.translation_first)
 
     safe_print(theme.ok(f"Translation saved: {output_path}"))
 
@@ -291,7 +273,8 @@ def translate_youtube(
         source_path=cap.source_path,
         target_lang=translation_config.target_lang,
     )
-    _write_translated_caption(cap, output_path, caption_config)
+    ensure_parent_dir(output_path)
+    cap.write(str(output_path), translation_first=caption_config.translation_first)
 
     safe_print(theme.ok(f"🎉 Translation saved: {output_path}"))
     return cap
