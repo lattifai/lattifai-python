@@ -21,7 +21,7 @@ requires_api_key = pytest.mark.skipif(
 )
 
 
-def _check_word_margin_invariant(supervisions, start_margin=0.08, end_margin=0.20, tolerance=0.01):
+def _check_word_margin_invariant(supervisions, start_margin=0.10, end_margin=0.10, tolerance=0.01):
     """Assert word-level margin invariants on a list of supervisions.
 
     For each supervision that has word-level alignment:

@@ -370,8 +370,8 @@ class LatticeTokenizer:
         lattice_results: Tuple[np.ndarray, Any, Any, float, float],
         supervisions: Union[List[Supervision], TextAlignResult],
         return_details: bool = False,
-        start_margin: float = 0.08,
-        end_margin: float = 0.20,
+        start_margin: float = 0.10,
+        end_margin: float = 0.10,
         check_sanity: bool = True,
         diff_detokenize: bool = False,
     ) -> List[Supervision]:
