@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import typer
 from rich.console import Console
@@ -24,6 +24,14 @@ KEY_MAP = {
     "default_audio_format": "LATTIFAI_DEFAULT_AUDIO_FORMAT",
     "default_video_format": "LATTIFAI_DEFAULT_VIDEO_FORMAT",
 }
+
+SECTION_KEY_MAP = {
+    "auth": {"lattifai_api_key", "api_key_id", "user_email", "key_name", "logged_in_at"},
+    "api": {"gemini_api_key", "openai_api_key", "openai_api_base_url"},
+    "defaults": {"default_audio_format", "default_video_format"},
+}
+
+SECTION_ORDER = ["auth", "api", "defaults"]
 
 # Keys that should be masked in display
 SECRET_KEYS = {"lattifai_api_key", "gemini_api_key", "openai_api_key"}
@@ -48,29 +56,171 @@ def _load_config() -> dict:
         return tomllib.load(f)
 
 
+def _normalize_config(data: dict[str, Any]) -> dict[str, Any]:
+    """Normalize legacy flat config into a section-aware structure."""
+    normalized: dict[str, Any] = {}
+
+    for key, value in data.items():
+        if isinstance(value, dict):
+            normalized[key] = dict(value)
+            continue
+
+        section = _get_section_name(key)
+        if section:
+            normalized.setdefault(section, {})
+            normalized[section][key] = value
+        else:
+            normalized[key] = value
+
+    return normalized
+
+
+def _get_section_name(key: str) -> Optional[str]:
+    """Return the TOML section name for a known config key."""
+    for section, keys in SECTION_KEY_MAP.items():
+        if key in keys:
+            return section
+    return None
+
+
 def get_config_value(key: str) -> Optional[str]:
     """Get a value from ~/.lattifai/config.toml by user-facing key name.
 
     This is the public API for other config modules to read persisted values.
     Returns None if the key is not set in the config file.
     """
-    config = _load_config()
+    config = _normalize_config(_load_config())
     if key in config:
         return str(config[key])
+
+    section = _get_section_name(key)
+    if section:
+        section_data = config.get(section, {})
+        if key in section_data:
+            return str(section_data[key])
     return None
 
 
-def _save_config(data: dict) -> None:
-    """Save config to ~/.lattifai/config.toml."""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    lines = []
-    for key, value in sorted(data.items()):
-        # Quote string values for TOML
-        if isinstance(value, str):
-            lines.append(f'{key} = "{value}"')
+def _format_toml_value(value: Any) -> str:
+    """Serialize a Python value into a TOML literal.
+
+    Uses json.dumps for string escaping to correctly handle control characters
+    (newlines, tabs, etc.) which are compatible with basic TOML string syntax.
+    """
+    import json
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    return json.dumps(str(value))
+
+
+def _write_table(lines: list[str], prefix: str, data: dict[str, Any]) -> None:
+    """Write a TOML table recursively."""
+    scalar_items = []
+    nested_items = []
+
+    for key, value in data.items():
+        if isinstance(value, dict):
+            nested_items.append((key, value))
         else:
-            lines.append(f"{key} = {value}")
-    CONFIG_FILE.write_text("\n".join(lines) + "\n")
+            scalar_items.append((key, value))
+
+    if prefix:
+        lines.append(f"[{prefix}]")
+    for key, value in scalar_items:
+        lines.append(f"{key} = {_format_toml_value(value)}")
+    if prefix and (scalar_items or nested_items):
+        lines.append("")
+
+    for key, value in nested_items:
+        child_prefix = f"{prefix}.{key}" if prefix else key
+        _write_table(lines, child_prefix, value)
+
+
+def _ensure_config_permissions() -> None:
+    """Apply best-effort permissions for config dir and file."""
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(CONFIG_DIR, 0o700)
+    except OSError:
+        pass
+
+    if CONFIG_FILE.exists():
+        try:
+            os.chmod(CONFIG_FILE, 0o600)
+        except OSError:
+            pass
+
+
+def _save_config(data: dict[str, Any]) -> None:
+    """Save config to ~/.lattifai/config.toml."""
+    normalized = _normalize_config(data)
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(CONFIG_DIR, 0o700)
+    except OSError:
+        pass
+
+    lines: list[str] = []
+    root_scalars = {key: value for key, value in normalized.items() if not isinstance(value, dict)}
+    for key, value in sorted(root_scalars.items()):
+        lines.append(f"{key} = {_format_toml_value(value)}")
+
+    if root_scalars:
+        lines.append("")
+
+    for section in SECTION_ORDER:
+        section_data = normalized.get(section)
+        if isinstance(section_data, dict) and section_data:
+            _write_table(lines, section, section_data)
+
+    other_sections = {
+        key: value for key, value in normalized.items() if isinstance(value, dict) and key not in SECTION_ORDER
+    }
+    for section, value in sorted(other_sections.items()):
+        _write_table(lines, section, value)
+
+    content = "\n".join(line for line in lines).strip()
+    file_content = (content + "\n") if content else ""
+
+    # Fix TOCTOU: set umask before writing to ensure file is created with 600
+    old_umask = os.umask(0o077)
+    try:
+        CONFIG_FILE.write_text(file_content)
+    finally:
+        os.umask(old_umask)
+
+    # Belt-and-suspenders chmod for pre-existing files
+    try:
+        os.chmod(CONFIG_FILE, 0o600)
+    except OSError:
+        pass
+
+
+def get_auth_value(key: str) -> Optional[str]:
+    """Read a value from the [auth] section."""
+    config = _normalize_config(_load_config())
+    auth = config.get("auth", {})
+    if key in auth:
+        return str(auth[key])
+    return None
+
+
+def set_auth_value(key: str, value: Any) -> None:
+    """Write a value into the [auth] section."""
+    config = _normalize_config(_load_config())
+    auth = config.setdefault("auth", {})
+    auth[key] = value
+    _save_config(config)
+
+
+def clear_auth() -> None:
+    """Remove the entire [auth] section."""
+    config = _normalize_config(_load_config())
+    config.pop("auth", None)
+    _save_config(config)
 
 
 def _resolve_value(key: str) -> tuple[Optional[str], str]:
@@ -83,9 +233,15 @@ def _resolve_value(key: str) -> tuple[Optional[str], str]:
         return env_val, "environment"
 
     # Check config file
-    config = _load_config()
+    config = _normalize_config(_load_config())
     if key in config:
         return str(config[key]), "config file"
+
+    section = _get_section_name(key)
+    if section:
+        section_data = config.get(section, {})
+        if key in section_data:
+            return str(section_data[key]), "config file"
 
     # Check .env via dotenv
     try:
@@ -151,8 +307,13 @@ def set_value(key: str, value: str):
             raise typer.Exit(1)
         value = normalized
 
-    config = _load_config()
-    config[key] = value
+    config = _normalize_config(_load_config())
+    section = _get_section_name(key)
+    if section:
+        config.setdefault(section, {})
+        config[section][key] = value
+    else:
+        config[key] = value
     _save_config(config)
 
     display = _mask_value(value) if key in SECRET_KEYS else value

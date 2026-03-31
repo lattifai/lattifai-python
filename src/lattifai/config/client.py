@@ -41,20 +41,25 @@ class ClientConfig:
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
-        # Load environment variables from .env file
-        from dotenv import find_dotenv, load_dotenv
-
-        # Try to find and load .env file from current directory or parent directories
-        load_dotenv(find_dotenv(usecwd=True))
-
-        # Auto-load API key: env var > config.toml > .env (already loaded above)
+        # Auto-load API key: CLI arg > env var > .env > config.toml [auth]
         if self.api_key is None:
             env_val = os.environ.get("LATTIFAI_API_KEY")
             if not env_val:
                 try:
-                    from lattifai.cli.config import get_config_value
+                    from dotenv import dotenv_values, find_dotenv
 
-                    env_val = get_config_value("lattifai_api_key")
+                    dotenv_path = find_dotenv(usecwd=True)
+                    if dotenv_path:
+                        dotenv_value = dotenv_values(dotenv_path).get("LATTIFAI_API_KEY")
+                        env_val = str(dotenv_value) if dotenv_value else None
+                except ImportError:
+                    pass
+
+            if not env_val:
+                try:
+                    from lattifai.cli.config import get_auth_value
+
+                    env_val = get_auth_value("lattifai_api_key")
                 except ImportError:
                     pass
             object.__setattr__(self, "api_key", env_val)
