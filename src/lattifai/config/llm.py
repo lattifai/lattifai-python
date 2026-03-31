@@ -57,7 +57,15 @@ class LLMConfig:
         )
 
     def _resolve_api_key(self) -> Optional[str]:
-        """Resolve API key: env var > config.toml."""
+        """Resolve API key: env var > .env > config.toml."""
+        # Load .env so keys defined there become visible via os.environ
+        try:
+            from dotenv import find_dotenv, load_dotenv
+
+            load_dotenv(find_dotenv(usecwd=True))
+        except ImportError:
+            pass
+
         if self.provider == "gemini":
             env_key = os.environ.get("GEMINI_API_KEY")
             config_key = "gemini_api_key"
