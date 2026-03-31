@@ -196,7 +196,7 @@ def translate_youtube(
     """
     Download YouTube video, align captions, and translate in one step.
 
-    Combines the youtube alignment workflow with caption translation.
+    Combines the youtube align workflow with caption translation.
     Downloads media, transcribes/downloads captions, performs forced alignment,
     then translates the aligned captions to the target language.
 

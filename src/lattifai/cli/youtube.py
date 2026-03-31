@@ -17,7 +17,7 @@ from lattifai.config import (
 )
 
 
-@run.cli.entrypoint(name="alignment", namespace="youtube")
+@run.cli.entrypoint(name="align", namespace="youtube")
 def youtube(
     yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
@@ -41,7 +41,7 @@ def youtube(
     2. Optionally transcribes audio with Gemini OR downloads YouTube captions
     3. Performs forced alignment with the provided or generated captions
 
-    Shortcut: invoking ``lai-youtube`` is equivalent to running ``lai youtube alignment``.
+    Shortcut: invoking ``lai-youtube`` is equivalent to running ``lai youtube align``.
 
     Args:
         yt_url: YouTube video URL (can be provided as positional argument)
@@ -67,22 +67,22 @@ def youtube(
 
     Examples:
         # Download from YouTube and align (positional argument)
-        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID"
+        lai youtube align "https://www.youtube.com/watch?v=VIDEO_ID"
 
         # With custom output directory and format
-        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID" \\
+        lai youtube align "https://www.youtube.com/watch?v=VIDEO_ID" \\
             media.output_dir=/tmp/youtube \\
             media.output_format=mp3
 
         # Full configuration with smart splitting and word-level alignment
-        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID" \\
+        lai youtube align "https://www.youtube.com/watch?v=VIDEO_ID" \\
             caption.output_path=aligned.srt \\
             caption.split_sentence=true \\
             caption.word_level=true \\
             alignment.device=cuda
 
         # Use Gemini transcription (requires API key)
-        lai youtube alignment "https://www.youtube.com/watch?v=VIDEO_ID" \\
+        lai youtube align "https://www.youtube.com/watch?v=VIDEO_ID" \\
             transcription.gemini_api_key=YOUR_KEY \\
             transcription.model_name=gemini-2.0-flash
 
@@ -178,7 +178,7 @@ def youtube_download(
     3. External transcript (.transcript.md) if URL found in description
     4. Video metadata embedded in transcript frontmatter
 
-    All files are saved to the output directory. Use ``lai youtube alignment``
+    All files are saved to the output directory. Use ``lai youtube align``
     to also perform forced alignment after downloading.
 
     Args:
