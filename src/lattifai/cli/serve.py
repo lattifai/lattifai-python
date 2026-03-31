@@ -418,7 +418,7 @@ class ServeHandler(BaseHTTPRequestHandler):
         api_base_url = (self._field_value(form, "api_base_url") or "").strip() or None
         bilingual = parse_bool(self._field_value(form, "bilingual"), default=False)
 
-        llm_config = LLMConfig(provider=provider, model=model_name, api_key=api_key, api_base_url=api_base_url)
+        llm_config = LLMConfig(provider=provider, model_name=model_name, api_key=api_key, api_base_url=api_base_url)
         translation_config = TranslationConfig(
             llm=llm_config,
             target_lang=target_lang,

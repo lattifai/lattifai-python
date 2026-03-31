@@ -86,7 +86,7 @@ class DiarizationConfig:
     When enabled, speakers still labeled as SPEAKER_XX after acoustic diarization
     will be identified via LLM analysis of their speech content."""
 
-    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model="gemini-2.5-flash"))
+    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model_name="gemini-2.5-flash"))
     """LLM provider configuration for speaker name inference."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)

@@ -14,7 +14,7 @@ class TranslationConfig:
     Settings for caption translation using various LLM providers.
     """
 
-    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model="gemini-3-flash-preview"))
+    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model_name="gemini-3-flash-preview"))
     """LLM provider configuration (provider, model, api_key, api_base_url)."""
 
     target_lang: str = "zh"
