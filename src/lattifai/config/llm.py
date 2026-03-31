@@ -22,7 +22,7 @@ class LLMConfig:
     provider: Literal["gemini", "openai"] = "gemini"
     """LLM provider: 'gemini' or 'openai' (OpenAI-compatible)."""
 
-    model: str = "gemini-2.5-flash"
+    model_name: str = "gemini-2.5-flash"
     """Model name."""
 
     api_key: Optional[str] = None
@@ -39,11 +39,11 @@ class LLMConfig:
         if self.provider == "openai":
             if self.api_base_url is None:
                 self.api_base_url = self._resolve_base_url()
-            if self.model == "gemini-2.5-flash":
+            if self.model_name == "gemini-2.5-flash":
                 # User switched to openai but kept the gemini default model — try env override
                 env_model = os.environ.get("OPENAI_MODEL")
                 if env_model:
-                    self.model = env_model
+                    self.model_name = env_model
 
     def create_client(self) -> "BaseLLMClient":
         """Create an LLM client from this configuration."""
@@ -52,7 +52,7 @@ class LLMConfig:
         return create_client(
             self.provider,
             api_key=self.api_key,
-            model=self.model,
+            model=self.model_name,
             base_url=self.api_base_url,
         )
 

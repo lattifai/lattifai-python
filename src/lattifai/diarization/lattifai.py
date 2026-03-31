@@ -79,7 +79,7 @@ class LattifAIDiarizer:
         from lattifai.diarization.speaker import SpeakerNameInferrer
 
         llm_client = self.config.llm.create_client()
-        return SpeakerNameInferrer(llm_client=llm_client, model=self.config.llm.model)
+        return SpeakerNameInferrer(llm_client=llm_client, model=self.config.llm.model_name)
 
     def diarize_with_alignments(
         self,
