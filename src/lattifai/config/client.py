@@ -5,6 +5,30 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 
+def _deobfuscate_stored_key(raw: Optional[str]) -> Optional[str]:
+    """Deobfuscate a stored API key from config.toml.
+
+    Independent from cli/auth.py to avoid circular imports.
+    Returns plaintext keys unchanged. Raises RuntimeError for
+    unrecoverable v1: ciphertext (missing library or wrong device).
+    """
+    if not raw or not raw.startswith("v1:"):
+        return raw
+    try:
+        from lattifai_auth import deobfuscate_key
+
+        return deobfuscate_key(raw)
+    except ImportError:
+        raise RuntimeError(
+            "Stored LattifAI API key is obfuscated but lattifai-auth is not installed. "
+            "Run: pip install 'lattifai[auth]'  or: lai auth login"
+        )
+    except RuntimeError:
+        raise RuntimeError("Stored LattifAI API key is bound to a different device. " "Run: lai auth login")
+    except ValueError:
+        raise RuntimeError("Stored LattifAI API key is malformed or corrupted. " "Run: lai auth login")
+
+
 @dataclass
 class ClientConfig:
     """
@@ -59,7 +83,8 @@ class ClientConfig:
                 try:
                     from lattifai.cli.config import get_auth_value
 
-                    env_val = get_auth_value("lattifai_api_key")
+                    raw = get_auth_value("lattifai_api_key")
+                    env_val = _deobfuscate_stored_key(raw)
                 except ImportError:
                     pass
             object.__setattr__(self, "api_key", env_val)

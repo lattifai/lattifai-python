@@ -27,6 +27,92 @@ console = Console()
 DEFAULT_SITE_URL = "https://lattifai.com"
 DEFAULT_API_URL = "https://api.lattifai.com/v1"
 
+
+# ---------------------------------------------------------------------------
+# lattifai-auth helpers (optional dependency — graceful degradation)
+# ---------------------------------------------------------------------------
+
+
+def _safe_obfuscate(key: str) -> str:
+    """Obfuscate an API key for local storage.
+
+    Falls back to plaintext when lattifai-auth is not installed or fails.
+    """
+    if not key:
+        return key
+    try:
+        from lattifai_auth import obfuscate_key
+
+        return obfuscate_key(key)
+    except ImportError:
+        return key
+    except (RuntimeError, ValueError):
+        return key
+
+
+def _safe_deobfuscate(raw: Optional[str]) -> Optional[str]:
+    """Deobfuscate a stored API key.
+
+    Raises RuntimeError with actionable messages when:
+    - v1: ciphertext found but lattifai-auth is not installed
+    - v1: ciphertext cannot be decrypted on this device
+    """
+    if not raw:
+        return raw
+    if not raw.startswith("v1:"):
+        return raw  # plaintext — pass through
+    try:
+        from lattifai_auth import deobfuscate_key
+    except ImportError:
+        raise RuntimeError(
+            "Stored API key is obfuscated but lattifai-auth is not installed.\n"
+            "Install it:  pip install 'lattifai[auth]'\n"
+            "Or login again:  lai auth login"
+        )
+    try:
+        return deobfuscate_key(raw)
+    except RuntimeError:
+        raise RuntimeError("Stored API key is bound to a different device.\n" "Run:  lai auth login")
+    except ValueError:
+        raise RuntimeError("Stored API key is malformed or corrupted.\n" "Run:  lai auth login")
+
+
+def _has_lattifai_auth() -> bool:
+    """Check if lattifai-auth is installed."""
+    try:
+        import lattifai_auth  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
+def _hint_install_auth() -> None:
+    """Print a one-time hint to install lattifai[auth] for secure storage."""
+    if not _has_lattifai_auth():
+        console.print(
+            f"[{T.RICH_DIM}]Tip: pip install 'lattifai[auth]' to enable "
+            f"device-bound credential storage[/{T.RICH_DIM}]"
+        )
+
+
+def _get_device_id_with_source() -> tuple[str, str]:
+    """Get device ID and its source type.
+
+    Returns (device_id, "hardware") when lattifai-auth is installed,
+    or (sha256(hostname), "hostname_fallback") otherwise.
+    """
+    try:
+        from lattifai_auth import get_device_id
+
+        return get_device_id(), "hardware"
+    except ImportError:
+        import hashlib
+
+        hostname = socket.gethostname() or "unknown"
+        return hashlib.sha256(hostname.encode()).hexdigest(), "hostname_fallback"
+
+
 CALLBACK_HOST = "127.0.0.1"
 CALLBACK_PATH = "/callback"
 CALLBACK_TIMEOUT_SECS = 120.0
@@ -36,6 +122,7 @@ SUCCESS_HTML = """<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LattifAI Login</title>
     <style>
       body { font-family: sans-serif; margin: 40px; color: #111827; }
@@ -114,7 +201,7 @@ def _migrate_dotenv_to_config() -> None:
             f"Remove the key from .env to silence this warning.[/{T.RICH_WARN}]"
         )
         return
-    set_auth_value("lattifai_api_key", dotenv_key)
+    set_auth_value("lattifai_api_key", _safe_obfuscate(dotenv_key))
     console.print(
         f"[{T.RICH_WARN}]Migrated LATTIFAI_API_KEY from .env to config.toml. "
         f"You can now remove it from .env.[/{T.RICH_WARN}]"
@@ -125,16 +212,31 @@ def _resolve_api_key() -> Optional[str]:
     """Resolve API key: explicit env var > config.toml session.
 
     On first call, migrates .env key to config.toml if no session exists.
+    Deobfuscates stored keys when lattifai-auth is available.
     """
     if key := os.environ.get("LATTIFAI_API_KEY"):
         return key
     _migrate_dotenv_to_config()
-    return get_auth_value("lattifai_api_key")
+    return _safe_deobfuscate(get_auth_value("lattifai_api_key"))
 
 
 def _auth_headers(api_key: str) -> dict[str, str]:
-    """Build authorization headers."""
-    return {"Authorization": f"Bearer {api_key}"}
+    """Build authorization headers.
+
+    Includes X-Device-Auth signature when lattifai-auth is installed (P2).
+    Soft-fails silently during gray rollout — never blocks the request.
+    """
+    headers = {"Authorization": f"Bearer {api_key}"}
+    try:
+        from lattifai_auth import generate_auth_payload
+
+        headers["X-Device-Auth"] = generate_auth_payload(api_key)
+    except ImportError:
+        pass
+    except (RuntimeError, ValueError) as exc:
+        # Gray period: do not block request, but log for diagnostics
+        console.print(f"[{T.RICH_DIM}]Device auth header unavailable: {exc}[/{T.RICH_DIM}]")
+    return headers
 
 
 def _request_whoami(api_key: str, api_url: str) -> dict[str, Any]:
@@ -145,9 +247,21 @@ def _request_whoami(api_key: str, api_url: str) -> dict[str, Any]:
         return response.json()
 
 
-def _exchange_code(code: str, state: str, device_name: str, site_url: str) -> dict[str, Any]:
+def _exchange_code(
+    code: str,
+    state: str,
+    device_name: str,
+    site_url: str,
+    *,
+    device_id: Optional[str] = None,
+    device_id_source: Optional[str] = None,
+) -> dict[str, Any]:
     """Exchange an authorization code for an API key via the web site."""
-    payload = {"code": code, "state": state, "device_name": device_name}
+    payload: dict[str, Any] = {"code": code, "state": state, "device_name": device_name}
+    if device_id:
+        payload["device_id"] = device_id
+    if device_id_source:
+        payload["device_id_source"] = device_id_source
     with httpx.Client(timeout=30.0) as client:
         response = client.post(f"{site_url}/api/cli-auth/exchange", json=payload)
         response.raise_for_status()
@@ -165,7 +279,7 @@ def _revoke_session(api_key: str, api_url: str) -> dict[str, Any]:
 def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
     """Persist auth metadata into config.toml."""
     clear_auth()
-    set_auth_value("lattifai_api_key", api_key)
+    set_auth_value("lattifai_api_key", _safe_obfuscate(api_key))
     if whoami_data.get("user_email"):
         set_auth_value("user_email", whoami_data["user_email"])
     if whoami_data.get("key_name"):
@@ -379,10 +493,12 @@ def login(
         _persist_auth(manual_api_key, whoami_data)
         console.print(f"[{T.RICH_OK}]Login successful.[/{T.RICH_OK}]")
         _print_session(whoami_data, manual_api_key)
+        _hint_install_auth()
         return
 
     state = secrets.token_urlsafe(32)
     device_name = socket.gethostname() or "unknown-device"
+    device_id, device_id_source = _get_device_id_with_source()
     callback_server = LocalCallbackServer(state=state)
 
     try:
@@ -391,9 +507,13 @@ def login(
         console.print(f"[{T.RICH_ERR}]{exc}[/{T.RICH_ERR}]")
         raise typer.Exit(1) from exc
 
-    auth_url = f"{resolved_site_url}/cli-auth?" + urlencode(
-        {"state": state, "port": callback_server.port, "device_name": device_name}
-    )
+    auth_params: dict[str, Any] = {
+        "state": state,
+        "port": callback_server.port,
+        "device_name": device_name,
+        "device_id": device_id,
+    }
+    auth_url = f"{resolved_site_url}/cli-auth?" + urlencode(auth_params)
 
     console.print(f"[{T.RICH_STEP}]Opening browser for LattifAI login...[/{T.RICH_STEP}]")
     console.print(f"[underline cyan]{auth_url}[/underline cyan]")
@@ -411,7 +531,14 @@ def login(
             spinner="dots",
         ):
             code = callback_server.wait_for_code()
-        exchange_data = _exchange_code(code, state, device_name, resolved_site_url)
+        exchange_data = _exchange_code(
+            code,
+            state,
+            device_name,
+            resolved_site_url,
+            device_id=device_id,
+            device_id_source=device_id_source,
+        )
         issued_api_key = exchange_data.get("api_key")
         if not issued_api_key:
             raise RuntimeError("Code exchange response did not include an API key.")
@@ -437,6 +564,7 @@ def login(
     _persist_auth(issued_api_key, whoami_data)
     console.print(f"[{T.RICH_OK}]Login successful.[/{T.RICH_OK}]")
     _print_session(whoami_data, issued_api_key)
+    _hint_install_auth()
 
 
 def logout(
@@ -448,7 +576,19 @@ def logout(
 ) -> None:
     """Revoke the current session and clear local auth config."""
     resolved_api_url = _resolve_api_url(api_url)
-    api_key = get_auth_value("lattifai_api_key")
+    raw_key = get_auth_value("lattifai_api_key")
+    if not raw_key:
+        console.print(f"[{T.RICH_WARN}]No saved CLI session found.[/{T.RICH_WARN}]")
+        return
+
+    try:
+        api_key = _safe_deobfuscate(raw_key)
+    except RuntimeError as exc:
+        # Cannot recover key — still clear local auth so user can re-login
+        clear_auth()
+        console.print(f"[{T.RICH_WARN}]Local auth cleared, but remote revoke not attempted: {exc}[/{T.RICH_WARN}]")
+        raise typer.Exit(1)
+
     if not api_key:
         console.print(f"[{T.RICH_WARN}]No saved CLI session found.[/{T.RICH_WARN}]")
         return
@@ -479,7 +619,11 @@ def whoami(
 ) -> None:
     """Display current auth identity."""
     resolved_api_url = _resolve_api_url(api_url)
-    api_key = _resolve_api_key()
+    try:
+        api_key = _resolve_api_key()
+    except RuntimeError as exc:
+        console.print(f"[{T.RICH_ERR}]{exc}[/{T.RICH_ERR}]")
+        raise typer.Exit(1) from exc
     if not api_key:
         console.print(f"[{T.RICH_WARN}]Not logged in. Run 'lai auth login' or set LATTIFAI_API_KEY.[/{T.RICH_WARN}]")
         raise typer.Exit(1)
@@ -495,22 +639,14 @@ def whoami(
 
 def _get_device_id() -> str:
     """Get hardware device ID via lattifai-auth, fallback to hostname."""
-    try:
-        from lattifai_auth import get_device_id
-
-        return get_device_id()
-    except ImportError:
-        # lattifai-auth not installed — fall back to hostname hash
-        import hashlib
-
-        hostname = socket.gethostname() or "unknown"
-        return hashlib.sha256(hostname.encode()).hexdigest()
+    device_id, _ = _get_device_id_with_source()
+    return device_id
 
 
 def _persist_trial_auth(data: dict[str, Any]) -> None:
     """Persist trial auth metadata into config.toml."""
     clear_auth()
-    set_auth_value("lattifai_api_key", data["api_key"])
+    set_auth_value("lattifai_api_key", _safe_obfuscate(data["api_key"]))
     set_auth_value("is_trial", True)
     set_auth_value("expires_at", data["expires_at"])
     set_auth_value("credits", data.get("credits", 120))
@@ -528,7 +664,10 @@ def trial(
     resolved_site_url = _resolve_site_url(site_url)
 
     # Check for existing valid trial — reuse if not expired (L3)
-    existing_key = get_auth_value("lattifai_api_key")
+    try:
+        existing_key = _safe_deobfuscate(get_auth_value("lattifai_api_key"))
+    except RuntimeError:
+        existing_key = None  # cannot recover — treat as no existing key
     is_trial = get_auth_value("is_trial")
     expires_at = get_auth_value("expires_at")
     if existing_key and is_trial and expires_at:
@@ -550,7 +689,7 @@ def trial(
             raise typer.Exit(0)
 
     device_name = socket.gethostname() or "unknown-device"
-    device_id = _get_device_id()
+    device_id, device_id_source = _get_device_id_with_source()
 
     try:
         with console.status(
@@ -560,7 +699,11 @@ def trial(
             with httpx.Client(timeout=30.0) as client:
                 response = client.post(
                     f"{resolved_site_url}/api/cli-auth/trial",
-                    json={"device_name": device_name, "device_id": device_id},
+                    json={
+                        "device_name": device_name,
+                        "device_id": device_id,
+                        "device_id_source": device_id_source,
+                    },
                 )
     except httpx.HTTPError as exc:
         console.print(f"[{T.RICH_ERR}]Failed to request trial key: {exc}[/{T.RICH_ERR}]")
@@ -590,3 +733,4 @@ def trial(
     console.print("  lai youtube align https://youtu.be/VIDEO_ID -o output.vtt")
     console.print()
     console.print(f"[{T.RICH_DIM}]Upgrade to full access: lai auth login[/{T.RICH_DIM}]")
+    _hint_install_auth()
