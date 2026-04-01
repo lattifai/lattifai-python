@@ -1,6 +1,7 @@
 """LLM provider configuration for LattifAI.
 
-Shared by DiarizationConfig, TranslationConfig, and any future LLM consumer.
+Shared by TranslationConfig, DiarizationConfig, etc.
+Each caller passes section= to bind LLMConfig to its config.toml section.
 """
 
 import os
@@ -11,19 +12,34 @@ if TYPE_CHECKING:
     from lattifai.llm.base import BaseLLMClient
 
 
+def resolve_toml_value(section: str, key: str) -> Optional[str]:
+    """Read a value from config.toml [section].key.
+
+    Shared helper for all config classes that read from config.toml.
+    Returns None if not set or config system is unavailable.
+    """
+    try:
+        from lattifai.cli.config import get_config_value
+
+        return get_config_value(f"{section}.{key}")
+    except (ImportError, OSError):
+        return None
+
+
 @dataclass
 class LLMConfig:
     """LLM provider configuration.
 
-    Resolves API key and base URL from explicit values, environment variables,
-    or ~/.lattifai/config.toml — in that order.
+    Resolution order: explicit value > config.toml [section] > fallback.
+    Uses None as sentinel — only None triggers config.toml lookup.
+    Explicit values (including "gemini") are never overwritten.
     """
 
-    provider: Literal["gemini", "openai"] = "gemini"
-    """LLM provider: 'gemini' or 'openai' (OpenAI-compatible)."""
+    provider: Optional[Literal["gemini", "openai"]] = None
+    """LLM provider. None = resolve from config.toml, fallback to 'gemini'."""
 
-    model_name: str = "gemini-2.5-flash"
-    """Model name."""
+    model_name: Optional[str] = None
+    """Model name. None = resolve from config.toml -> fallback -> raise."""
 
     api_key: Optional[str] = None
     """API key. Falls back to GEMINI_API_KEY or OPENAI_API_KEY env var, then config.toml."""
@@ -31,19 +47,47 @@ class LLMConfig:
     api_base_url: Optional[str] = None
     """Base URL for OpenAI-compatible endpoint (vLLM, SGLang, Ollama, etc.)."""
 
+    section: str = ""
+    """TOML section name for config.toml resolution (e.g. "translation")."""
+
+    fallback_model: Optional[str] = None
+    """Fallback model when config.toml has no value. Set by consumer (e.g. TranslationConfig)."""
+
     def __post_init__(self) -> None:
-        """Resolve API key and base URL from environment / config.toml."""
+        """Resolve defaults from config.toml, then API key and base URL."""
+        # Step 1: fill None fields from config.toml [section]
+        if self.section:
+            if self.model_name is None:
+                self.model_name = resolve_toml_value(self.section, "model_name")
+            if self.provider is None:
+                saved = resolve_toml_value(self.section, "provider")
+                if saved and saved in ("gemini", "openai"):
+                    self.provider = saved  # type: ignore[assignment]
+
+        # Step 2: apply fallbacks
+        if self.model_name is None:
+            self.model_name = self.fallback_model
+
+        if self.provider is None:
+            self.provider = "gemini"
+
+        # Step 3: validate required fields
+        if not self.model_name:
+            if self.section:
+                raise ValueError(
+                    f"No model configured for [{self.section}].\n" f"  lai config set {self.section}.model_name <model>"
+                )
+            raise ValueError(
+                "No model_name provided for LLMConfig.\n"
+                "  Pass model_name= explicitly or set section= for config.toml lookup."
+            )
+
+        # Step 4: resolve API credentials
         if self.api_key is None:
             self.api_key = self._resolve_api_key()
 
-        if self.provider == "openai":
-            if self.api_base_url is None:
-                self.api_base_url = self._resolve_base_url()
-            if self.model_name == "gemini-2.5-flash":
-                # User switched to openai but kept the gemini default model — try env override
-                env_model = os.environ.get("OPENAI_MODEL")
-                if env_model:
-                    self.model_name = env_model
+        if self.provider == "openai" and self.api_base_url is None:
+            self.api_base_url = self._resolve_base_url()
 
     def create_client(self) -> "BaseLLMClient":
         """Create an LLM client from this configuration."""
@@ -58,7 +102,6 @@ class LLMConfig:
 
     def _resolve_api_key(self) -> Optional[str]:
         """Resolve API key: env var > .env > config.toml."""
-        # Load .env so keys defined there become visible via os.environ
         try:
             from dotenv import find_dotenv, load_dotenv
 

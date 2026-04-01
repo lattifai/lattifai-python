@@ -15,7 +15,7 @@ console = Console()
 CONFIG_DIR = Path.home() / ".lattifai"
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 
-# Mapping: user-facing key name (uppercase) -> environment variable name
+# Top-level keys: user-facing name (uppercase) -> environment variable name
 KEY_MAP = {
     "LATTIFAI_API_KEY": "LATTIFAI_API_KEY",
     "GEMINI_API_KEY": "GEMINI_API_KEY",
@@ -24,6 +24,19 @@ KEY_MAP = {
     "DEFAULT_AUDIO_FORMAT": "LATTIFAI_DEFAULT_AUDIO_FORMAT",
     "DEFAULT_VIDEO_FORMAT": "LATTIFAI_DEFAULT_VIDEO_FORMAT",
 }
+
+# Section-scoped keys: "section.key" format, stored as [section] key = value
+# Value is the env var name (or None if no env mapping).
+SECTION_KEYS = {
+    "transcription.model_name": None,
+    "translation.model_name": None,
+    "translation.provider": None,
+    "diarization.model_name": None,
+    "diarization.provider": None,
+}
+
+# All valid keys for CLI validation
+ALL_KEYS = set(KEY_MAP) | set(SECTION_KEYS)
 
 SECTION_KEY_MAP = {
     "auth": {
@@ -40,9 +53,9 @@ SECTION_KEY_MAP = {
     "defaults": {"DEFAULT_AUDIO_FORMAT", "DEFAULT_VIDEO_FORMAT"},
 }
 
-SECTION_ORDER = ["auth", "api", "defaults"]
+SECTION_ORDER = ["auth", "api", "defaults", "transcription", "translation"]
 
-# Keys that should be masked in display (uppercase, matching KEY_MAP)
+# Keys that should be masked in display
 SECRET_KEYS = {"LATTIFAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"}
 
 
@@ -92,19 +105,37 @@ def _get_section_name(key: str) -> Optional[str]:
     return None
 
 
+def _parse_dotted_key(key: str) -> tuple[Optional[str], str]:
+    """Parse 'section.key' into (section, key). Returns (None, key) for top-level."""
+    if "." in key:
+        section, _, subkey = key.partition(".")
+        return section, subkey
+    return None, key
+
+
 def get_config_value(key: str) -> Optional[str]:
     """Get a value from ~/.lattifai/config.toml by key name.
 
-    This is the public API for other config modules to read persisted values.
+    Supports both top-level keys ('GEMINI_API_KEY') and dotted keys ('transcription.model').
     Returns None if the key is not set in the config file.
     """
     config = _normalize_config(_load_config())
+
+    # Try dotted key first
+    section, subkey = _parse_dotted_key(key)
+    if section:
+        section_data = config.get(section, {})
+        if subkey in section_data:
+            return str(section_data[subkey])
+        return None
+
+    # Top-level or legacy section lookup
     if key in config:
         return str(config[key])
 
-    section = _get_section_name(key)
-    if section:
-        section_data = config.get(section, {})
+    legacy_section = _get_section_name(key)
+    if legacy_section:
+        section_data = config.get(legacy_section, {})
         if key in section_data:
             return str(section_data[key])
     return None
@@ -232,23 +263,53 @@ def clear_auth() -> None:
     _save_config(config)
 
 
+def _normalize_key(key: str) -> str:
+    """Normalize a user-provided key for lookup.
+
+    Top-level keys -> UPPERCASE. Dotted keys -> section lowercase, key lowercase.
+    """
+    section, subkey = _parse_dotted_key(key)
+    if section:
+        return f"{section.lower()}.{subkey.lower()}"
+    return key.upper()
+
+
 def _resolve_value(key: str) -> tuple[Optional[str], str]:
-    """Resolve a config value and its source. Returns (value, source)."""
+    """Resolve a config value and its source. Returns (value, source).
+
+    Supports top-level keys and dotted section keys (e.g. 'transcription.model').
+    """
+    section, subkey = _parse_dotted_key(key)
+
+    if section:
+        # Dotted key: check env var if mapped, then config file
+        env_name = SECTION_KEYS.get(key)
+        if env_name:
+            env_val = os.environ.get(env_name)
+            if env_val:
+                return env_val, "environment"
+
+        config = _normalize_config(_load_config())
+        section_data = config.get(section, {})
+        if subkey in section_data:
+            return str(section_data[subkey]), "config file"
+
+        return None, "not set"
+
+    # Top-level key
     env_name = KEY_MAP.get(key, key.upper())
 
-    # Check environment variable first
     env_val = os.environ.get(env_name)
     if env_val:
         return env_val, "environment"
 
-    # Check config file
     config = _normalize_config(_load_config())
     if key in config:
         return str(config[key]), "config file"
 
-    section = _get_section_name(key)
-    if section:
-        section_data = config.get(section, {})
+    legacy_section = _get_section_name(key)
+    if legacy_section:
+        section_data = config.get(legacy_section, {})
         if key in section_data:
             return str(section_data[key]), "config file"
 
@@ -272,10 +333,11 @@ app = typer.Typer(help="Manage LattifAI CLI configuration.")
 def show():
     """Show all configuration values and their sources."""
     table = Table(show_header=True, header_style=T.RICH_LABEL, show_lines=False, pad_edge=False)
-    table.add_column("Key", min_width=22)
+    table.add_column("Key", min_width=24)
     table.add_column("Value", min_width=30)
     table.add_column("Source", min_width=12)
 
+    # Top-level keys
     for key in KEY_MAP:
         value, source = _resolve_value(key)
         if value is None:
@@ -284,6 +346,17 @@ def show():
         else:
             display_value = _mask_value(value) if key in SECRET_KEYS else value
             display_val = f"[{T.RICH_OK}]{display_value}[/{T.RICH_OK}]"
+            display_src = source
+        table.add_row(key, display_val, display_src)
+
+    # Section-scoped keys
+    for key in SECTION_KEYS:
+        value, source = _resolve_value(key)
+        if value is None:
+            display_val = f"[{T.RICH_DIM}]not set[/{T.RICH_DIM}]"
+            display_src = f"[{T.RICH_DIM}]-[/{T.RICH_DIM}]"
+        else:
+            display_val = f"[{T.RICH_OK}]{value}[/{T.RICH_OK}]"
             display_src = source
         table.add_row(key, display_val, display_src)
 
@@ -297,52 +370,68 @@ def show():
 
 @app.command("set")
 def set_value(key: str, value: str):
-    """Set a configuration value."""
-    key = key.upper()
-    if key not in KEY_MAP:
-        valid = ", ".join(KEY_MAP.keys())
+    """Set a configuration value.
+
+    Use dotted keys for section values: transcription.model, translation.provider
+    """
+    normalized = _normalize_key(key)
+    if normalized not in ALL_KEYS:
+        valid_top = ", ".join(KEY_MAP.keys())
+        valid_section = ", ".join(SECTION_KEYS.keys())
         console.print(f"[{T.RICH_ERR}]Unknown key: {key}[/{T.RICH_ERR}]")
-        console.print(f"Valid keys: {valid}")
+        console.print(f"Top-level keys: {valid_top}")
+        console.print(f"Section keys:   {valid_section}")
         raise typer.Exit(1)
 
     # Validate format keys before persisting
-    if key in ("DEFAULT_AUDIO_FORMAT", "DEFAULT_VIDEO_FORMAT"):
+    if normalized in ("DEFAULT_AUDIO_FORMAT", "DEFAULT_VIDEO_FORMAT"):
         from lattifai.config.media import AUDIO_FORMATS, VIDEO_FORMATS
 
-        normalized = value.strip().lower()
-        valid_formats = AUDIO_FORMATS if key == "DEFAULT_AUDIO_FORMAT" else VIDEO_FORMATS
-        if normalized not in valid_formats:
+        fmt = value.strip().lower()
+        valid_formats = AUDIO_FORMATS if normalized == "DEFAULT_AUDIO_FORMAT" else VIDEO_FORMATS
+        if fmt not in valid_formats:
             console.print(f"[{T.RICH_ERR}]Unsupported format: {value}[/{T.RICH_ERR}]")
             console.print(f"Supported: {', '.join(valid_formats)}")
             raise typer.Exit(1)
-        value = normalized
+        value = fmt
 
     config = _normalize_config(_load_config())
-    section = _get_section_name(key)
+    section, subkey = _parse_dotted_key(normalized)
+
     if section:
         config.setdefault(section, {})
-        config[section][key] = value
+        config[section][subkey] = value
     else:
-        config[key] = value
+        legacy_section = _get_section_name(normalized)
+        if legacy_section:
+            config.setdefault(legacy_section, {})
+            config[legacy_section][normalized] = value
+        else:
+            config[normalized] = value
     _save_config(config)
 
-    display = _mask_value(value) if key in SECRET_KEYS else value
-    console.print(f"[{T.RICH_OK}]Set {key} = {display}[/{T.RICH_OK}]")
+    display = _mask_value(value) if normalized in SECRET_KEYS else value
+    console.print(f"[{T.RICH_OK}]Set {normalized} = {display}[/{T.RICH_OK}]")
 
 
 @app.command("get")
 def get_value(key: str):
-    """Get a configuration value."""
-    key = key.upper()
-    if key not in KEY_MAP:
-        valid = ", ".join(KEY_MAP.keys())
+    """Get a configuration value.
+
+    Use dotted keys for section values: transcription.model, translation.provider
+    """
+    normalized = _normalize_key(key)
+    if normalized not in ALL_KEYS:
+        valid_top = ", ".join(KEY_MAP.keys())
+        valid_section = ", ".join(SECTION_KEYS.keys())
         console.print(f"[{T.RICH_ERR}]Unknown key: {key}[/{T.RICH_ERR}]")
-        console.print(f"Valid keys: {valid}")
+        console.print(f"Top-level keys: {valid_top}")
+        console.print(f"Section keys:   {valid_section}")
         raise typer.Exit(1)
 
-    value, source = _resolve_value(key)
+    value, source = _resolve_value(normalized)
     if value is None:
-        console.print(f"[{T.RICH_WARN}]{key} is not set[/{T.RICH_WARN}]")
+        console.print(f"[{T.RICH_WARN}]{normalized} is not set[/{T.RICH_WARN}]")
     else:
-        display = _mask_value(value) if key in SECRET_KEYS else value
-        console.print(f"{key} = [{T.RICH_OK}]{display}[/{T.RICH_OK}] ({source})")
+        display = _mask_value(value) if normalized in SECRET_KEYS else value
+        console.print(f"{normalized} = [{T.RICH_OK}]{display}[/{T.RICH_OK}] ({source})")

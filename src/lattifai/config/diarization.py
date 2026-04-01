@@ -86,8 +86,9 @@ class DiarizationConfig:
     When enabled, speakers still labeled as SPEAKER_XX after acoustic diarization
     will be identified via LLM analysis of their speech content."""
 
-    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model_name="gemini-2.5-flash"))
-    """LLM provider configuration for speaker name inference."""
+    llm: Optional[LLMConfig] = None
+    """LLM provider configuration for speaker name inference.
+    Auto-created from config.toml [diarization] when infer_speakers=True."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
@@ -124,3 +125,7 @@ class DiarizationConfig:
             raise ValueError(
                 f"segmentation_step must be < 1.0 (ratio of window duration), got {self.segmentation_step}"
             )
+
+        # Auto-create LLM config only when speaker inference is enabled
+        if self.infer_speakers and self.llm is None:
+            self.llm = LLMConfig(section="diarization", fallback_model="gemini-3-flash-preview")

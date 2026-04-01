@@ -37,8 +37,9 @@ class TranscriptionConfig:
     Settings for audio/video transcription using various providers.
     """
 
-    model_name: str = "nvidia/parakeet-tdt-0.6b-v3"
-    """Model name for transcription. See SUPPORTED_TRANSCRIPTION_MODELS for built-in models.
+    model_name: Optional[str] = None
+    """Model name for transcription. None = resolve from config.toml, fallback to nvidia/parakeet-tdt-0.6b-v3.
+    See SUPPORTED_TRANSCRIPTION_MODELS for built-in models.
     Any model name is accepted when api_base_url is set (vLLM/SGLang)."""
 
     model_hub: Literal["huggingface", "modelscope"] = "huggingface"
@@ -124,6 +125,13 @@ class TranscriptionConfig:
 
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
+
+        # Resolve model: None -> config.toml -> built-in default
+        if self.model_name is None:
+            from lattifai.config.llm import resolve_toml_value
+
+            saved = resolve_toml_value("transcription", "model_name")
+            self.model_name = saved or "nvidia/parakeet-tdt-0.6b-v3"
 
         # Auto-switch deprecated models
         if self.model_name in self._DEPRECATED_MODELS:
