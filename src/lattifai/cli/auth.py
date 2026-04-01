@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import secrets
-import socket
 import threading
 import time
 import webbrowser
@@ -16,7 +15,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 import typer
-from lattifai_auth import deobfuscate_key, generate_auth_payload, get_device_id, obfuscate_key
+from lattifai_auth import deobfuscate_key, generate_auth_payload, get_device_info, obfuscate_key
 from rich.console import Console
 from rich.table import Table
 
@@ -58,11 +57,6 @@ def _deobfuscate(raw: Optional[str]) -> Optional[str]:
         raise RuntimeError("Stored API key is bound to a different device.\n" "Run:  lai auth login")
     except ValueError:
         raise RuntimeError("Stored API key is malformed or corrupted.\n" "Run:  lai auth login")
-
-
-def _get_device_id_with_source() -> tuple[str, str]:
-    """Get hardware device ID and its source type."""
-    return get_device_id(), "hardware"
 
 
 CALLBACK_HOST = "127.0.0.1"
@@ -151,14 +145,14 @@ def _migrate_dotenv_to_config() -> None:
     dotenv_key = _load_dotenv_value("LATTIFAI_API_KEY")
     if not dotenv_key:
         return
-    if get_auth_value("lattifai_api_key"):
+    if get_auth_value("LATTIFAI_API_KEY"):
         console.print(
             f"[{T.RICH_WARN}]Ignoring LATTIFAI_API_KEY in .env — "
             f"using session from config.toml. "
             f"Remove the key from .env to silence this warning.[/{T.RICH_WARN}]"
         )
         return
-    set_auth_value("lattifai_api_key", _obfuscate(dotenv_key))
+    set_auth_value("LATTIFAI_API_KEY", _obfuscate(dotenv_key))
     console.print(
         f"[{T.RICH_WARN}]Migrated LATTIFAI_API_KEY from .env to config.toml. "
         f"You can now remove it from .env.[/{T.RICH_WARN}]"
@@ -174,7 +168,7 @@ def _resolve_api_key() -> Optional[str]:
     if key := os.environ.get("LATTIFAI_API_KEY"):
         return key
     _migrate_dotenv_to_config()
-    return _deobfuscate(get_auth_value("lattifai_api_key"))
+    return _deobfuscate(get_auth_value("LATTIFAI_API_KEY"))
 
 
 def _auth_headers(api_key: str) -> dict[str, str]:
@@ -227,12 +221,12 @@ def _revoke_session(api_key: str, api_url: str) -> dict[str, Any]:
 def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
     """Persist auth metadata into config.toml."""
     clear_auth()
-    set_auth_value("lattifai_api_key", _obfuscate(api_key))
+    set_auth_value("LATTIFAI_API_KEY", _obfuscate(api_key))
     if whoami_data.get("user_email"):
-        set_auth_value("user_email", whoami_data["user_email"])
+        set_auth_value("USER_EMAIL", whoami_data["user_email"])
     if whoami_data.get("key_name"):
-        set_auth_value("key_name", whoami_data["key_name"])
-    set_auth_value("logged_in_at", _now_iso())
+        set_auth_value("KEY_NAME", whoami_data["key_name"])
+    set_auth_value("LOGGED_IN_AT", _now_iso())
 
 
 def _format_time(iso_str: Optional[str], *, future: bool = False) -> str:
@@ -445,8 +439,7 @@ def login(
         return
 
     state = secrets.token_urlsafe(32)
-    device_name = socket.gethostname() or "unknown-device"
-    device_id, device_id_source = _get_device_id_with_source()
+    device = get_device_info()
     callback_server = LocalCallbackServer(state=state)
 
     try:
@@ -458,8 +451,8 @@ def login(
     auth_params: dict[str, Any] = {
         "state": state,
         "port": callback_server.port,
-        "device_name": device_name,
-        "device_id": device_id,
+        "device_name": device["device_name"],
+        "device_id": device["device_id"],
     }
     auth_url = f"{resolved_site_url}/cli-auth?" + urlencode(auth_params)
 
@@ -482,10 +475,10 @@ def login(
         exchange_data = _exchange_code(
             code,
             state,
-            device_name,
+            device["device_name"],
             resolved_site_url,
-            device_id=device_id,
-            device_id_source=device_id_source,
+            device_id=device["device_id"],
+            device_id_source=device["device_id_source"],
         )
         issued_api_key = exchange_data.get("api_key")
         if not issued_api_key:
@@ -494,7 +487,7 @@ def login(
         # Use exchange response as primary auth data; whoami is optional verification
         whoami_data = {
             "user_email": exchange_data.get("user_email"),
-            "key_name": f"CLI: {device_name}",
+            "key_name": f"CLI: {device['device_name']}",
             "permissions": exchange_data.get("permissions", []),
             "created_at": _now_iso(),
         }
@@ -523,7 +516,7 @@ def logout(
 ) -> None:
     """Revoke the current session and clear local auth config."""
     resolved_api_url = _resolve_api_url(api_url)
-    raw_key = get_auth_value("lattifai_api_key")
+    raw_key = get_auth_value("LATTIFAI_API_KEY")
     if not raw_key:
         console.print(f"[{T.RICH_WARN}]No saved CLI session found.[/{T.RICH_WARN}]")
         return
@@ -584,20 +577,14 @@ def whoami(
     _print_session(whoami_data, api_key)
 
 
-def _get_device_id() -> str:
-    """Get hardware device ID via lattifai-auth, fallback to hostname."""
-    device_id, _ = _get_device_id_with_source()
-    return device_id
-
-
 def _persist_trial_auth(data: dict[str, Any]) -> None:
     """Persist trial auth metadata into config.toml."""
     clear_auth()
-    set_auth_value("lattifai_api_key", _obfuscate(data["api_key"]))
-    set_auth_value("is_trial", True)
-    set_auth_value("expires_at", data["expires_at"])
-    set_auth_value("credits", data.get("credits", 120))
-    set_auth_value("logged_in_at", _now_iso())
+    set_auth_value("LATTIFAI_API_KEY", _obfuscate(data["api_key"]))
+    set_auth_value("IS_TRIAL", True)
+    set_auth_value("EXPIRES_AT", data["expires_at"])
+    set_auth_value("CREDITS", data.get("credits", 120))
+    set_auth_value("LOGGED_IN_AT", _now_iso())
 
 
 def trial(
@@ -612,11 +599,11 @@ def trial(
 
     # Check for existing valid trial — reuse if not expired (L3)
     try:
-        existing_key = _deobfuscate(get_auth_value("lattifai_api_key"))
+        existing_key = _deobfuscate(get_auth_value("LATTIFAI_API_KEY"))
     except RuntimeError:
         existing_key = None  # cannot recover — treat as no existing key
-    is_trial = get_auth_value("is_trial")
-    expires_at = get_auth_value("expires_at")
+    is_trial = get_auth_value("IS_TRIAL")
+    expires_at = get_auth_value("EXPIRES_AT")
     if existing_key and is_trial and expires_at:
         try:
             from datetime import datetime as _dt
@@ -635,8 +622,7 @@ def trial(
         if not overwrite:
             raise typer.Exit(0)
 
-    device_name = socket.gethostname() or "unknown-device"
-    device_id, device_id_source = _get_device_id_with_source()
+    device = get_device_info()
 
     try:
         with console.status(
@@ -647,9 +633,9 @@ def trial(
                 response = client.post(
                     f"{resolved_site_url}/api/cli-auth/trial",
                     json={
-                        "device_name": device_name,
-                        "device_id": device_id,
-                        "device_id_source": device_id_source,
+                        "device_name": device["device_name"],
+                        "device_id": device["device_id"],
+                        "device_id_source": device["device_id_source"],
                     },
                 )
     except httpx.HTTPError as exc:
