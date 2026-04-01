@@ -44,9 +44,14 @@ def deobfuscate(raw: Optional[str]) -> Optional[str]:
         raise RuntimeError("Stored API key is malformed or corrupted.\nRun:  lai auth login")
 
 
+def _resolve_env(key: str, default: str = "") -> str:
+    """Resolve a value: os.environ > .env file > default."""
+    return os.environ.get(key) or load_dotenv_value(key) or default
+
+
 def resolve_site_url(site_url: Optional[str] = None) -> str:
     """Resolve the web site URL (authorization page + code exchange)."""
-    return (site_url or os.environ.get("LATTIFAI_SITE_URL") or DEFAULT_SITE_URL).rstrip("/")
+    return (site_url or _resolve_env("LATTIFAI_SITE_URL", DEFAULT_SITE_URL)).rstrip("/")
 
 
 def resolve_api_url(api_url: Optional[str] = None) -> str:
@@ -54,7 +59,7 @@ def resolve_api_url(api_url: Optional[str] = None) -> str:
 
     Strips trailing /v1 if present — endpoint paths already include it.
     """
-    url = (api_url or os.environ.get("LATTIFAI_BASE_URL") or DEFAULT_API_URL).rstrip("/")
+    url = (api_url or _resolve_env("LATTIFAI_BASE_URL", DEFAULT_API_URL)).rstrip("/")
     if url.endswith("/v1"):
         url = url[:-3]
     return url
@@ -74,13 +79,15 @@ def load_dotenv_value(key: str) -> Optional[str]:
 
 
 def resolve_api_key() -> Optional[str]:
-    """Resolve API key: env var > config.toml [auth] session > .env fallback.
+    """Resolve API key: env var > config.toml [auth] > .env fallback.
 
     Deobfuscates stored keys automatically.
     """
-    if key := os.environ.get("LATTIFAI_API_KEY"):
+    # 1. env var or .env
+    if key := _resolve_env("LATTIFAI_API_KEY"):
         return key
 
+    # 2. config.toml [auth] session (obfuscated)
     try:
         from lattifai.cli.config import get_auth_value
 
@@ -90,7 +97,7 @@ def resolve_api_key() -> Optional[str]:
     except ImportError:
         pass
 
-    return load_dotenv_value("LATTIFAI_API_KEY")
+    return None
 
 
 def auth_headers(api_key: str) -> dict[str, str]:
