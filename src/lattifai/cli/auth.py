@@ -141,9 +141,14 @@ SUCCESS_HTML = """<!doctype html>
 """
 
 
-def _utc_now_iso() -> str:
-    """Return an ISO-8601 UTC timestamp."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+def _now_iso() -> str:
+    """Return an ISO-8601 timestamp in local timezone with UTC offset.
+
+    Stored as local time (e.g., 2026-04-01T23:36:12+08:00) so the raw
+    config.toml is human-readable without mental timezone conversion.
+    The _format_time() parser handles both Z-suffix and offset formats.
+    """
+    return datetime.now().astimezone().isoformat()
 
 
 def _resolve_site_url(site_url: Optional[str]) -> str:
@@ -284,7 +289,7 @@ def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
         set_auth_value("user_email", whoami_data["user_email"])
     if whoami_data.get("key_name"):
         set_auth_value("key_name", whoami_data["key_name"])
-    set_auth_value("logged_in_at", _utc_now_iso())
+    set_auth_value("logged_in_at", _now_iso())
 
 
 def _format_time(iso_str: Optional[str], *, future: bool = False) -> str:
@@ -548,7 +553,7 @@ def login(
             "user_email": exchange_data.get("user_email"),
             "key_name": f"CLI: {device_name}",
             "permissions": exchange_data.get("permissions", []),
-            "created_at": _utc_now_iso(),
+            "created_at": _now_iso(),
         }
         # Best-effort whoami — may fail if site and backend use different databases
         try:
@@ -650,7 +655,7 @@ def _persist_trial_auth(data: dict[str, Any]) -> None:
     set_auth_value("is_trial", True)
     set_auth_value("expires_at", data["expires_at"])
     set_auth_value("credits", data.get("credits", 120))
-    set_auth_value("logged_in_at", _utc_now_iso())
+    set_auth_value("logged_in_at", _now_iso())
 
 
 def trial(
