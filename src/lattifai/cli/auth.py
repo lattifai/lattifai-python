@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import functools
+import json
 import secrets
+import select
+import sys
 import threading
 import time
 import webbrowser
@@ -308,6 +312,83 @@ class LocalCallbackServer:
 
 
 # ---------------------------------------------------------------------------
+# Concurrent auth: callback server OR manual code paste
+# ---------------------------------------------------------------------------
+
+
+def _extract_state_from_code(code: str) -> Optional[str]:
+    """Extract the state from a signed auth code (base64url-payload.signature).
+
+    The code is opaque to the CLI (signature requires server secret), but
+    the payload is just base64url-encoded JSON containing the state field.
+    """
+    parts = code.split(".")
+    if len(parts) != 2:
+        return None
+    try:
+        padded = parts[0] + "=" * (-len(parts[0]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded))
+        return payload.get("state")
+    except Exception:
+        return None
+
+
+def _wait_for_auth(callback_server: LocalCallbackServer) -> tuple[str, str]:
+    """Wait for either a browser callback or a manually pasted verification code.
+
+    Polls the callback server and stdin concurrently. Whichever provides
+    an authorization code first wins.
+
+    Returns:
+        (code, source) where source is ``"callback"`` or ``"manual"``.
+    """
+    console.print(f"\n[{T.RICH_STEP}]Waiting for authorization...[/{T.RICH_STEP}]")
+
+    # Detect whether stdin is interactive (a TTY); disable manual input
+    # polling for non-interactive contexts (CI, piped stdin, /dev/null)
+    # to avoid busy-spinning on immediate EOF.
+    stdin_active = hasattr(sys.stdin, "fileno") and sys.stdin.isatty()
+    if stdin_active:
+        console.print(f"[{T.RICH_DIM}]Or paste the verification code and press Enter:[/{T.RICH_DIM}]")
+
+    deadline = time.time() + CALLBACK_TIMEOUT_SECS
+    while time.time() < deadline:
+        # Check callback server (browser redirect)
+        if callback_server.code:
+            console.print(f"[{T.RICH_OK}]Browser callback received.[/{T.RICH_OK}]")
+            return callback_server.code, "callback"
+
+        if callback_server.error:
+            raise RuntimeError(callback_server.error)
+
+        if not stdin_active:
+            time.sleep(0.3)
+            continue
+
+        # Check stdin for manual code paste (non-blocking via select)
+        try:
+            readable, _, _ = select.select([sys.stdin], [], [], 0.3)
+        except (ValueError, OSError):
+            time.sleep(0.3)
+            continue
+
+        if readable:
+            line = sys.stdin.readline()
+            if not line:
+                # EOF — stdin closed; stop polling stdin, wait for callback only
+                stdin_active = False
+                continue
+            line = line.strip()
+            if line:
+                console.print(f"[{T.RICH_OK}]Verification code received.[/{T.RICH_OK}]")
+                # Signal callback server to stop its background thread
+                callback_server._event.set()
+                return line, "manual"
+
+    raise RuntimeError("Timed out waiting for authorization.")
+
+
+# ---------------------------------------------------------------------------
 # CLI commands
 # ---------------------------------------------------------------------------
 
@@ -361,11 +442,13 @@ def login(
         console.print(f"[{T.RICH_ERR}]{exc}[/{T.RICH_ERR}]")
         raise typer.Exit(1) from exc
 
+    # Only include params the web page needs — device_id is sent
+    # separately during code exchange. Keeping the URL short prevents
+    # terminal line-wrap truncation when copying to another device.
     auth_params: dict[str, Any] = {
         "state": state,
         "port": callback_server.port,
         "device_name": device["device_name"],
-        "device_id": device["device_id"],
     }
     auth_url = f"{resolved_site_url}/cli-auth?" + urlencode(auth_params)
 
@@ -380,14 +463,20 @@ def login(
         console.print(f"[{T.RICH_WARN}]Could not open browser. Open the URL above manually.[/{T.RICH_WARN}]")
 
     try:
-        with console.status(
-            f"[{T.RICH_STEP}]Waiting for authorization callback...[/{T.RICH_STEP}]",
-            spinner="dots",
-        ):
-            code = callback_server.wait_for_code()
+        code, source = _wait_for_auth(callback_server)
+
+        # For manually pasted codes the state embedded in the code may
+        # differ from the CLI-generated state when the auth URL was
+        # truncated by terminal line-wrap during cross-device copy.
+        # Use the code's own state so the exchange signature check passes.
+        if source == "manual":
+            exchange_state = _extract_state_from_code(code) or state
+        else:
+            exchange_state = state
+
         exchange_data = _exchange_code(
             code,
-            state,
+            exchange_state,
             device["device_name"],
             resolved_site_url,
             device_id=device["device_id"],
