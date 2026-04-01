@@ -52,13 +52,10 @@ dependencies = [
     "questionary>=2.0",
     "yt-dlp>=2026.3.17",
     "pycryptodome",
+    "lattifai-auth>=0.2.0",
 ]
 
 [project.optional-dependencies]
-# Auth: hardware device binding and API key obfuscation
-auth = [
-    "lattifai-auth>=0.2.0",
-]
 # Event
 event = [
     "lattifai-core[event]>=0.7.2",
@@ -87,7 +84,6 @@ dev = [
 # All: install everything
 translation = ["openai>=2.26.0"]
 all = [
-    "lattifai[auth]",
     "lattifai[event]",
     "lattifai[diarization]",
     "lattifai[transcription]",

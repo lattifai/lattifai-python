@@ -10,19 +10,14 @@ def _deobfuscate_stored_key(raw: Optional[str]) -> Optional[str]:
 
     Independent from cli/auth.py to avoid circular imports.
     Returns plaintext keys unchanged. Raises RuntimeError for
-    unrecoverable v1: ciphertext (missing library or wrong device).
+    unrecoverable v1: ciphertext (wrong device or corrupted).
     """
     if not raw or not raw.startswith("v1:"):
         return raw
-    try:
-        from lattifai_auth import deobfuscate_key
+    from lattifai_auth import deobfuscate_key
 
+    try:
         return deobfuscate_key(raw)
-    except ImportError:
-        raise RuntimeError(
-            "Stored LattifAI API key is obfuscated but lattifai-auth is not installed. "
-            "Run: pip install 'lattifai[auth]'  or: lai auth login"
-        )
     except RuntimeError:
         raise RuntimeError("Stored LattifAI API key is bound to a different device. " "Run: lai auth login")
     except ValueError:

@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 import typer
+from lattifai_auth import deobfuscate_key, generate_auth_payload, get_device_id, obfuscate_key
 from rich.console import Console
 from rich.table import Table
 
@@ -29,46 +30,28 @@ DEFAULT_API_URL = "https://api.lattifai.com/v1"
 
 
 # ---------------------------------------------------------------------------
-# lattifai-auth helpers (optional dependency — graceful degradation)
+# lattifai-auth helpers
 # ---------------------------------------------------------------------------
 
 
-def _safe_obfuscate(key: str) -> str:
-    """Obfuscate an API key for local storage.
-
-    Falls back to plaintext when lattifai-auth is not installed or fails.
-    """
+def _obfuscate(key: str) -> str:
+    """Obfuscate an API key for device-bound local storage."""
     if not key:
         return key
-    try:
-        from lattifai_auth import obfuscate_key
-
-        return obfuscate_key(key)
-    except ImportError:
-        return key
-    except (RuntimeError, ValueError):
-        return key
+    return obfuscate_key(key)
 
 
-def _safe_deobfuscate(raw: Optional[str]) -> Optional[str]:
+def _deobfuscate(raw: Optional[str]) -> Optional[str]:
     """Deobfuscate a stored API key.
 
     Raises RuntimeError with actionable messages when:
-    - v1: ciphertext found but lattifai-auth is not installed
     - v1: ciphertext cannot be decrypted on this device
+    - v1: ciphertext is malformed or corrupted
     """
     if not raw:
         return raw
     if not raw.startswith("v1:"):
         return raw  # plaintext — pass through
-    try:
-        from lattifai_auth import deobfuscate_key
-    except ImportError:
-        raise RuntimeError(
-            "Stored API key is obfuscated but lattifai-auth is not installed.\n"
-            "Install it:  pip install 'lattifai[auth]'\n"
-            "Or login again:  lai auth login"
-        )
     try:
         return deobfuscate_key(raw)
     except RuntimeError:
@@ -77,40 +60,9 @@ def _safe_deobfuscate(raw: Optional[str]) -> Optional[str]:
         raise RuntimeError("Stored API key is malformed or corrupted.\n" "Run:  lai auth login")
 
 
-def _has_lattifai_auth() -> bool:
-    """Check if lattifai-auth is installed."""
-    try:
-        import lattifai_auth  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
-
-
-def _hint_install_auth() -> None:
-    """Print a one-time hint to install lattifai[auth] for secure storage."""
-    if not _has_lattifai_auth():
-        console.print(
-            f"[{T.RICH_DIM}]Tip: pip install 'lattifai[auth]' to enable "
-            f"device-bound credential storage[/{T.RICH_DIM}]"
-        )
-
-
 def _get_device_id_with_source() -> tuple[str, str]:
-    """Get device ID and its source type.
-
-    Returns (device_id, "hardware") when lattifai-auth is installed,
-    or (sha256(hostname), "hostname_fallback") otherwise.
-    """
-    try:
-        from lattifai_auth import get_device_id
-
-        return get_device_id(), "hardware"
-    except ImportError:
-        import hashlib
-
-        hostname = socket.gethostname() or "unknown"
-        return hashlib.sha256(hostname.encode()).hexdigest(), "hostname_fallback"
+    """Get hardware device ID and its source type."""
+    return get_device_id(), "hardware"
 
 
 CALLBACK_HOST = "127.0.0.1"
@@ -206,7 +158,7 @@ def _migrate_dotenv_to_config() -> None:
             f"Remove the key from .env to silence this warning.[/{T.RICH_WARN}]"
         )
         return
-    set_auth_value("lattifai_api_key", _safe_obfuscate(dotenv_key))
+    set_auth_value("lattifai_api_key", _obfuscate(dotenv_key))
     console.print(
         f"[{T.RICH_WARN}]Migrated LATTIFAI_API_KEY from .env to config.toml. "
         f"You can now remove it from .env.[/{T.RICH_WARN}]"
@@ -222,24 +174,15 @@ def _resolve_api_key() -> Optional[str]:
     if key := os.environ.get("LATTIFAI_API_KEY"):
         return key
     _migrate_dotenv_to_config()
-    return _safe_deobfuscate(get_auth_value("lattifai_api_key"))
+    return _deobfuscate(get_auth_value("lattifai_api_key"))
 
 
 def _auth_headers(api_key: str) -> dict[str, str]:
-    """Build authorization headers.
-
-    Includes X-Device-Auth signature when lattifai-auth is installed (P2).
-    Soft-fails silently during gray rollout — never blocks the request.
-    """
+    """Build authorization headers with X-Device-Auth HMAC signature."""
     headers = {"Authorization": f"Bearer {api_key}"}
     try:
-        from lattifai_auth import generate_auth_payload
-
         headers["X-Device-Auth"] = generate_auth_payload(api_key)
-    except ImportError:
-        pass
     except (RuntimeError, ValueError) as exc:
-        # Gray period: do not block request, but log for diagnostics
         console.print(f"[{T.RICH_DIM}]Device auth header unavailable: {exc}[/{T.RICH_DIM}]")
     return headers
 
@@ -284,7 +227,7 @@ def _revoke_session(api_key: str, api_url: str) -> dict[str, Any]:
 def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
     """Persist auth metadata into config.toml."""
     clear_auth()
-    set_auth_value("lattifai_api_key", _safe_obfuscate(api_key))
+    set_auth_value("lattifai_api_key", _obfuscate(api_key))
     if whoami_data.get("user_email"):
         set_auth_value("user_email", whoami_data["user_email"])
     if whoami_data.get("key_name"):
@@ -498,7 +441,7 @@ def login(
         _persist_auth(manual_api_key, whoami_data)
         console.print(f"[{T.RICH_OK}]Login successful.[/{T.RICH_OK}]")
         _print_session(whoami_data, manual_api_key)
-        _hint_install_auth()
+
         return
 
     state = secrets.token_urlsafe(32)
@@ -569,7 +512,6 @@ def login(
     _persist_auth(issued_api_key, whoami_data)
     console.print(f"[{T.RICH_OK}]Login successful.[/{T.RICH_OK}]")
     _print_session(whoami_data, issued_api_key)
-    _hint_install_auth()
 
 
 def logout(
@@ -587,7 +529,7 @@ def logout(
         return
 
     try:
-        api_key = _safe_deobfuscate(raw_key)
+        api_key = _deobfuscate(raw_key)
     except RuntimeError as exc:
         # Cannot recover key — still clear local auth so user can re-login
         clear_auth()
@@ -651,7 +593,7 @@ def _get_device_id() -> str:
 def _persist_trial_auth(data: dict[str, Any]) -> None:
     """Persist trial auth metadata into config.toml."""
     clear_auth()
-    set_auth_value("lattifai_api_key", _safe_obfuscate(data["api_key"]))
+    set_auth_value("lattifai_api_key", _obfuscate(data["api_key"]))
     set_auth_value("is_trial", True)
     set_auth_value("expires_at", data["expires_at"])
     set_auth_value("credits", data.get("credits", 120))
@@ -670,7 +612,7 @@ def trial(
 
     # Check for existing valid trial — reuse if not expired (L3)
     try:
-        existing_key = _safe_deobfuscate(get_auth_value("lattifai_api_key"))
+        existing_key = _deobfuscate(get_auth_value("lattifai_api_key"))
     except RuntimeError:
         existing_key = None  # cannot recover — treat as no existing key
     is_trial = get_auth_value("is_trial")
@@ -738,4 +680,3 @@ def trial(
     console.print("  lai youtube align https://youtu.be/VIDEO_ID -o output.vtt")
     console.print()
     console.print(f"[{T.RICH_DIM}]Upgrade to full access: lai auth login[/{T.RICH_DIM}]")
-    _hint_install_auth()
