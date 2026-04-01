@@ -43,9 +43,16 @@ class BaseTranslator:
         return f"{self.client.provider_name}:{self.config.llm.model_name}"
 
     async def _call_llm(self, prompt: str) -> str:
-        """Send a prompt to the LLM and return raw JSON text response."""
-        result = await self.client.generate_json(prompt, model=self.config.llm.model_name)
-        # generate_json returns parsed object; re-serialize for backward compat
+        """Send a prompt to the LLM and return raw JSON text response.
+
+        Uses generate() instead of generate_json() because json_mode=True
+        causes some models (e.g. Qwen3.5) to return single objects instead
+        of arrays, ignoring the batch structure in the prompt.
+        """
+        from lattifai.llm.base import parse_json_response
+
+        raw_text = await self.client.generate(prompt, model=self.config.llm.model_name)
+        result = parse_json_response(raw_text)
         return json.dumps(result, ensure_ascii=False)
 
     async def translate_batch(
@@ -84,15 +91,7 @@ class BaseTranslator:
         max_count_retries = 2
         for attempt in range(max_count_retries + 1):
             response_text = await self._call_llm(prompt)
-            raw_result = json.loads(response_text)
-            result = self._unwrap_list_response(raw_result)
-            if len(result) != len(texts):
-                logger.warning(
-                    "LLM raw response type=%s keys=%s",
-                    type(raw_result).__name__,
-                    list(raw_result.keys()) if isinstance(raw_result, dict) else "N/A",
-                )
-                logger.warning("LLM raw response (first 500 chars): %.500s", response_text)
+            result = self._unwrap_list_response(json.loads(response_text))
 
             if len(result) == len(texts):
                 return result
