@@ -15,49 +15,27 @@ from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 import typer
-from lattifai_auth import deobfuscate_key, generate_auth_payload, get_device_info, obfuscate_key
+from lattifai_auth import get_device_info
 from rich.console import Console
 from rich.table import Table
 
+from lattifai.auth import (
+    deobfuscate,
+    obfuscate,
+    request_whoami,
+    resolve_api_url,
+    resolve_site_url,
+    revoke_session,
+)
 from lattifai.cli.config import clear_auth, get_auth_value, set_auth_value
 from lattifai.theme import _Theme as T
 
 console = Console()
 
-DEFAULT_SITE_URL = "https://lattifai.com"
-DEFAULT_API_URL = "https://api.lattifai.com/v1"
-
 
 # ---------------------------------------------------------------------------
-# lattifai-auth helpers
+# CLI-specific helpers
 # ---------------------------------------------------------------------------
-
-
-def _obfuscate(key: str) -> str:
-    """Obfuscate an API key for device-bound local storage."""
-    if not key:
-        return key
-    return obfuscate_key(key)
-
-
-def _deobfuscate(raw: Optional[str]) -> Optional[str]:
-    """Deobfuscate a stored API key.
-
-    Raises RuntimeError with actionable messages when:
-    - v1: ciphertext cannot be decrypted on this device
-    - v1: ciphertext is malformed or corrupted
-    """
-    if not raw:
-        return raw
-    if not raw.startswith("v1:"):
-        return raw  # plaintext — pass through
-    try:
-        return deobfuscate_key(raw)
-    except RuntimeError:
-        raise RuntimeError("Stored API key is bound to a different device.\n" "Run:  lai auth login")
-    except ValueError:
-        raise RuntimeError("Stored API key is malformed or corrupted.\n" "Run:  lai auth login")
-
 
 CALLBACK_HOST = "127.0.0.1"
 CALLBACK_PATH = "/callback"
@@ -88,30 +66,8 @@ SUCCESS_HTML = """<!doctype html>
 
 
 def _now_iso() -> str:
-    """Return an ISO-8601 timestamp in local timezone with UTC offset.
-
-    Stored as local time (e.g., 2026-04-01T23:36:12+08:00) so the raw
-    config.toml is human-readable without mental timezone conversion.
-    The _format_time() parser handles both Z-suffix and offset formats.
-    """
+    """Return an ISO-8601 timestamp in local timezone with UTC offset."""
     return datetime.now().astimezone().isoformat()
-
-
-def _resolve_site_url(site_url: Optional[str]) -> str:
-    """Resolve the web site URL (authorization page + code exchange)."""
-    return (site_url or os.environ.get("LATTIFAI_SITE_URL") or DEFAULT_SITE_URL).rstrip("/")
-
-
-def _resolve_api_url(api_url: Optional[str]) -> str:
-    """Resolve the backend API URL (whoami + session revoke).
-
-    Strips trailing /v1 if present — endpoint paths already include it.
-    This avoids double-prefixing when LATTIFAI_BASE_URL=http://host:8000/v1.
-    """
-    url = (api_url or os.environ.get("LATTIFAI_BASE_URL") or DEFAULT_API_URL).rstrip("/")
-    if url.endswith("/v1"):
-        url = url[:-3]
-    return url
 
 
 def _load_dotenv_value(key: str) -> Optional[str]:
@@ -133,10 +89,7 @@ _dotenv_checked = False
 
 
 def _migrate_dotenv_to_config() -> None:
-    """One-time migration: copy LATTIFAI_API_KEY from .env into config.toml.
-
-    Only runs once per process; subsequent calls are no-ops.
-    """
+    """One-time migration: copy LATTIFAI_API_KEY from .env into config.toml."""
     global _dotenv_checked  # noqa: PLW0603
     if _dotenv_checked:
         return
@@ -152,7 +105,7 @@ def _migrate_dotenv_to_config() -> None:
             f"Remove the key from .env to silence this warning.[/{T.RICH_WARN}]"
         )
         return
-    set_auth_value("LATTIFAI_API_KEY", _obfuscate(dotenv_key))
+    set_auth_value("LATTIFAI_API_KEY", obfuscate(dotenv_key))
     console.print(
         f"[{T.RICH_WARN}]Migrated LATTIFAI_API_KEY from .env to config.toml. "
         f"You can now remove it from .env.[/{T.RICH_WARN}]"
@@ -160,33 +113,11 @@ def _migrate_dotenv_to_config() -> None:
 
 
 def _resolve_api_key() -> Optional[str]:
-    """Resolve API key: explicit env var > config.toml session.
-
-    On first call, migrates .env key to config.toml if no session exists.
-    Deobfuscates stored keys when lattifai-auth is available.
-    """
+    """Resolve API key with .env migration for CLI context."""
     if key := os.environ.get("LATTIFAI_API_KEY"):
         return key
     _migrate_dotenv_to_config()
-    return _deobfuscate(get_auth_value("LATTIFAI_API_KEY"))
-
-
-def _auth_headers(api_key: str) -> dict[str, str]:
-    """Build authorization headers with X-Device-Auth HMAC signature."""
-    headers = {"Authorization": f"Bearer {api_key}"}
-    try:
-        headers["X-Device-Auth"] = generate_auth_payload(api_key)
-    except (RuntimeError, ValueError) as exc:
-        console.print(f"[{T.RICH_DIM}]Device auth header unavailable: {exc}[/{T.RICH_DIM}]")
-    return headers
-
-
-def _request_whoami(api_key: str, api_url: str) -> dict[str, Any]:
-    """Fetch current auth metadata from the backend API."""
-    with httpx.Client(timeout=15.0) as client:
-        response = client.get(f"{api_url}/v1/auth/whoami", headers=_auth_headers(api_key))
-        response.raise_for_status()
-        return response.json()
+    return deobfuscate(get_auth_value("LATTIFAI_API_KEY"))
 
 
 def _exchange_code(
@@ -210,18 +141,10 @@ def _exchange_code(
         return response.json()
 
 
-def _revoke_session(api_key: str, api_url: str) -> dict[str, Any]:
-    """Revoke the current API key session via the backend API."""
-    with httpx.Client(timeout=15.0) as client:
-        response = client.delete(f"{api_url}/v1/auth/session", headers=_auth_headers(api_key))
-        response.raise_for_status()
-        return response.json()
-
-
 def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
     """Persist auth metadata into config.toml."""
     clear_auth()
-    set_auth_value("LATTIFAI_API_KEY", _obfuscate(api_key))
+    set_auth_value("LATTIFAI_API_KEY", obfuscate(api_key))
     if whoami_data.get("user_email"):
         set_auth_value("USER_EMAIL", whoami_data["user_email"])
     if whoami_data.get("key_name"):
@@ -229,20 +152,25 @@ def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
     set_auth_value("LOGGED_IN_AT", _now_iso())
 
 
-def _format_time(iso_str: Optional[str], *, future: bool = False) -> str:
-    """Format an ISO-8601 timestamp into local time with relative offset.
+def _persist_trial_auth(data: dict[str, Any]) -> None:
+    """Persist trial auth metadata into config.toml."""
+    clear_auth()
+    set_auth_value("LATTIFAI_API_KEY", obfuscate(data["api_key"]))
+    set_auth_value("IS_TRIAL", True)
+    set_auth_value("EXPIRES_AT", data["expires_at"])
+    set_auth_value("CREDITS", data.get("credits", 120))
+    set_auth_value("LOGGED_IN_AT", _now_iso())
 
-    Args:
-        iso_str: ISO-8601 timestamp (UTC). None or empty returns "".
-        future: If True, show "in Xh" instead of "Xh ago" (for expiry times).
-    """
+
+def _format_time(iso_str: Optional[str], *, future: bool = False) -> str:
+    """Format an ISO-8601 timestamp into local time with relative offset."""
     if not iso_str:
         return ""
     try:
         clean = iso_str.replace("Z", "+00:00")
         dt = datetime.fromisoformat(clean)
         now = datetime.now(timezone.utc)
-        local_dt = dt.astimezone()  # convert to local timezone
+        local_dt = dt.astimezone()
 
         delta = dt - now if future else now - dt
         secs = int(delta.total_seconds())
@@ -288,6 +216,11 @@ def _print_session(whoami_data: dict[str, Any], api_key: str, *, is_trial: bool 
     console.print(f"[{T.RICH_HEADER}]LattifAI {session_type}[/{T.RICH_HEADER}]")
     console.print(table)
     console.print()
+
+
+# ---------------------------------------------------------------------------
+# Local callback server for browser OAuth
+# ---------------------------------------------------------------------------
 
 
 class LocalCallbackServer:
@@ -348,9 +281,6 @@ class LocalCallbackServer:
                 code = params.get("code", [None])[0]
 
                 if state != self.state:
-                    # Do NOT close the server on state mismatch — keep waiting
-                    # for the legitimate browser callback. A local DoS could
-                    # otherwise kill the login flow with a single bad request.
                     handler.send_error(HTTPStatus.BAD_REQUEST, "State mismatch")
                     return
 
@@ -399,6 +329,11 @@ class LocalCallbackServer:
         self.close()
 
 
+# ---------------------------------------------------------------------------
+# CLI commands
+# ---------------------------------------------------------------------------
+
+
 def login(
     api_key: bool = typer.Option(
         False,
@@ -417,8 +352,8 @@ def login(
     ),
 ) -> None:
     """Log in to LattifAI via browser callback or manual API key input."""
-    resolved_site_url = _resolve_site_url(site_url)
-    resolved_api_url = _resolve_api_url(api_url)
+    resolved_site_url = resolve_site_url(site_url)
+    resolved_api_url = resolve_api_url(api_url)
 
     if api_key:
         manual_api_key = typer.prompt("LattifAI API key", hide_input=True).strip()
@@ -427,7 +362,7 @@ def login(
             raise typer.Exit(1)
 
         try:
-            whoami_data = _request_whoami(manual_api_key, resolved_api_url)
+            whoami_data = request_whoami(manual_api_key, resolved_api_url)
         except httpx.HTTPError as exc:
             console.print(f"[{T.RICH_ERR}]Failed to verify API key: {exc}[/{T.RICH_ERR}]")
             raise typer.Exit(1) from exc
@@ -484,16 +419,14 @@ def login(
         if not issued_api_key:
             raise RuntimeError("Code exchange response did not include an API key.")
 
-        # Use exchange response as primary auth data; whoami is optional verification
         whoami_data = {
             "user_email": exchange_data.get("user_email"),
             "key_name": f"CLI: {device['device_name']}",
             "permissions": exchange_data.get("permissions", []),
             "created_at": _now_iso(),
         }
-        # Best-effort whoami — may fail if site and backend use different databases
         try:
-            whoami_data = _request_whoami(issued_api_key, resolved_api_url)
+            whoami_data = request_whoami(issued_api_key, resolved_api_url)
         except httpx.HTTPError:
             pass
     except (RuntimeError, httpx.HTTPError) as exc:
@@ -515,16 +448,15 @@ def logout(
     ),
 ) -> None:
     """Revoke the current session and clear local auth config."""
-    resolved_api_url = _resolve_api_url(api_url)
+    resolved_api_url = resolve_api_url(api_url)
     raw_key = get_auth_value("LATTIFAI_API_KEY")
     if not raw_key:
         console.print(f"[{T.RICH_WARN}]No saved CLI session found.[/{T.RICH_WARN}]")
         return
 
     try:
-        api_key = _deobfuscate(raw_key)
+        api_key = deobfuscate(raw_key)
     except RuntimeError as exc:
-        # Cannot recover key — still clear local auth so user can re-login
         clear_auth()
         console.print(f"[{T.RICH_WARN}]Local auth cleared, but remote revoke not attempted: {exc}[/{T.RICH_WARN}]")
         raise typer.Exit(1)
@@ -535,7 +467,7 @@ def logout(
 
     revoke_error: Optional[Exception] = None
     try:
-        response = _revoke_session(api_key, resolved_api_url)
+        response = revoke_session(api_key, resolved_api_url)
     except httpx.HTTPError as exc:
         revoke_error = exc
         response = None
@@ -558,7 +490,7 @@ def whoami(
     ),
 ) -> None:
     """Display current auth identity."""
-    resolved_api_url = _resolve_api_url(api_url)
+    resolved_api_url = resolve_api_url(api_url)
     try:
         api_key = _resolve_api_key()
     except RuntimeError as exc:
@@ -569,22 +501,12 @@ def whoami(
         raise typer.Exit(1)
 
     try:
-        whoami_data = _request_whoami(api_key, resolved_api_url)
+        whoami_data = request_whoami(api_key, resolved_api_url)
     except httpx.HTTPError as exc:
         console.print(f"[{T.RICH_ERR}]Failed to fetch session info: {exc}[/{T.RICH_ERR}]")
         raise typer.Exit(1) from exc
 
     _print_session(whoami_data, api_key)
-
-
-def _persist_trial_auth(data: dict[str, Any]) -> None:
-    """Persist trial auth metadata into config.toml."""
-    clear_auth()
-    set_auth_value("LATTIFAI_API_KEY", _obfuscate(data["api_key"]))
-    set_auth_value("IS_TRIAL", True)
-    set_auth_value("EXPIRES_AT", data["expires_at"])
-    set_auth_value("CREDITS", data.get("credits", 120))
-    set_auth_value("LOGGED_IN_AT", _now_iso())
 
 
 def trial(
@@ -595,13 +517,13 @@ def trial(
     ),
 ) -> None:
     """Get a free trial API key — no sign-up required."""
-    resolved_site_url = _resolve_site_url(site_url)
+    resolved_site_url = resolve_site_url(site_url)
 
     # Check for existing valid trial — reuse if not expired (L3)
     try:
-        existing_key = _deobfuscate(get_auth_value("LATTIFAI_API_KEY"))
+        existing_key = deobfuscate(get_auth_value("LATTIFAI_API_KEY"))
     except RuntimeError:
-        existing_key = None  # cannot recover — treat as no existing key
+        existing_key = None
     is_trial = get_auth_value("IS_TRIAL")
     expires_at = get_auth_value("EXPIRES_AT")
     if existing_key and is_trial and expires_at:

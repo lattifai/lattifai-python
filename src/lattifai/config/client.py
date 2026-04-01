@@ -5,25 +5,6 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional
 
 
-def _deobfuscate_stored_key(raw: Optional[str]) -> Optional[str]:
-    """Deobfuscate a stored API key from config.toml.
-
-    Independent from cli/auth.py to avoid circular imports.
-    Returns plaintext keys unchanged. Raises RuntimeError for
-    unrecoverable v1: ciphertext (wrong device or corrupted).
-    """
-    if not raw or not raw.startswith("v1:"):
-        return raw
-    from lattifai_auth import deobfuscate_key
-
-    try:
-        return deobfuscate_key(raw)
-    except RuntimeError:
-        raise RuntimeError("Stored LattifAI API key is bound to a different device. " "Run: lai auth login")
-    except ValueError:
-        raise RuntimeError("Stored LattifAI API key is malformed or corrupted. " "Run: lai auth login")
-
-
 @dataclass
 class ClientConfig:
     """
@@ -34,7 +15,7 @@ class ClientConfig:
 
     # API configuration
     api_key: Optional[str] = field(default=None)
-    """LattifAI API key. If None, reads from LATTIFAI_API_KEY environment variable."""
+    """LattifAI API key. If None, resolved via lattifai.auth.resolve_api_key()."""
 
     timeout: float = 120.0
     """Request timeout in seconds."""
@@ -60,31 +41,15 @@ class ClientConfig:
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
-        # Auto-load API key: CLI arg > env var > config.toml [auth] > .env
+        # Auto-load API key via unified resolver
         if self.api_key is None:
-            env_val = os.environ.get("LATTIFAI_API_KEY")
+            try:
+                from lattifai.auth import resolve_api_key
 
-            if not env_val:
-                try:
-                    from lattifai.cli.config import get_auth_value
-
-                    raw = get_auth_value("LATTIFAI_API_KEY")
-                    env_val = _deobfuscate_stored_key(raw)
-                except ImportError:
-                    pass
-
-            if not env_val:
-                try:
-                    from dotenv import dotenv_values, find_dotenv
-
-                    dotenv_path = find_dotenv(usecwd=True)
-                    if dotenv_path:
-                        dotenv_value = dotenv_values(dotenv_path).get("LATTIFAI_API_KEY")
-                        env_val = str(dotenv_value) if dotenv_value else None
-                except ImportError:
-                    pass
-
-            object.__setattr__(self, "api_key", env_val)
+                object.__setattr__(self, "api_key", resolve_api_key())
+            except ImportError:
+                # Fallback: direct env var check
+                object.__setattr__(self, "api_key", os.environ.get("LATTIFAI_API_KEY"))
 
         # Auto-load client version from package if not provided
         if self.client_version is None:
