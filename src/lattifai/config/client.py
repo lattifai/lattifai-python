@@ -65,9 +65,19 @@ class ClientConfig:
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
-        # Auto-load API key: CLI arg > env var > .env > config.toml [auth]
+        # Auto-load API key: CLI arg > env var > config.toml [auth] > .env
         if self.api_key is None:
             env_val = os.environ.get("LATTIFAI_API_KEY")
+
+            if not env_val:
+                try:
+                    from lattifai.cli.config import get_auth_value
+
+                    raw = get_auth_value("lattifai_api_key")
+                    env_val = _deobfuscate_stored_key(raw)
+                except ImportError:
+                    pass
+
             if not env_val:
                 try:
                     from dotenv import dotenv_values, find_dotenv
@@ -79,14 +89,6 @@ class ClientConfig:
                 except ImportError:
                     pass
 
-            if not env_val:
-                try:
-                    from lattifai.cli.config import get_auth_value
-
-                    raw = get_auth_value("lattifai_api_key")
-                    env_val = _deobfuscate_stored_key(raw)
-                except ImportError:
-                    pass
             object.__setattr__(self, "api_key", env_val)
 
         # Auto-load client version from package if not provided
