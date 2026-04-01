@@ -9,6 +9,7 @@ from lattifai.cli.alignment import align
 from lattifai.cli.caption import convert, diff
 from lattifai.cli.diarization import diarize
 from lattifai.cli.serve import serve
+from lattifai.cli.summarization import summarize_caption
 from lattifai.cli.transcribe import transcribe, transcribe_align
 from lattifai.cli.translate import translate, translate_youtube
 from lattifai.cli.youtube import youtube, youtube_download
@@ -22,6 +23,7 @@ __all__ = [
     "diff",
     "diarize",
     "serve",
+    "summarize_caption",
     "transcribe",
     "transcribe_align",
     "translate",
