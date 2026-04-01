@@ -129,23 +129,38 @@ Caption/subtitle format parsing is provided by [lattifai-captions](https://githu
 
 ### API Keys
 
-**LattifAI API Key (Required)** - Get your free key at [lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys)
-
-```bash
-export LATTIFAI_API_KEY="lf_your_api_key_here"
-```
+**LattifAI API Key (Required)** - Get your free key at [lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys), or try instantly with `lai auth trial`.
 
 **Gemini API Key (Optional)** - For transcription with Gemini models, get key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
+#### Configuration Priority
+
+Keys and URLs are resolved in this order (first match wins):
+
+1. **Environment variable** — `export LATTIFAI_API_KEY=lf_xxx`
+2. **CLI session** (`~/.lattifai/config.toml`) — written by `lai auth login` / `lai auth trial`, device-bound obfuscated storage
+3. **`.env` file** — auto-discovered from current directory upward
+
 ```bash
+# Option 1: Environment variable
+export LATTIFAI_API_KEY="lf_your_api_key_here"
 export GEMINI_API_KEY="your_gemini_api_key_here"
+
+# Option 2: CLI login (opens browser, stores key securely)
+lai auth login
+
+# Option 3: Free trial (no sign-up, 120 minutes)
+lai auth trial
+
+# Option 4: .env file in project root
+cat > .env <<EOF
+LATTIFAI_API_KEY=lf_your_api_key_here
+LATTIFAI_BASE_URL=https://api.lattifai.com/v1
+GEMINI_API_KEY=your_gemini_api_key_here
+EOF
 ```
 
-Or use a `.env` file:
-```bash
-LATTIFAI_API_KEY=lf_your_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
-```
+The same resolution order applies to `LATTIFAI_BASE_URL` and `LATTIFAI_SITE_URL`.
 
 ---
 
