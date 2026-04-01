@@ -80,34 +80,63 @@ class BaseTranslator:
             shared_prompt=shared_prompt,
         )
 
-        response_text = await self._call_llm(prompt)
-        result = json.loads(response_text)
+        # Retry up to 2 times on count mismatch before padding
+        max_count_retries = 2
+        for attempt in range(max_count_retries + 1):
+            response_text = await self._call_llm(prompt)
+            raw_result = json.loads(response_text)
+            result = self._unwrap_list_response(raw_result)
+            if len(result) != len(texts):
+                logger.warning(
+                    "LLM raw response type=%s keys=%s",
+                    type(raw_result).__name__,
+                    list(raw_result.keys()) if isinstance(raw_result, dict) else "N/A",
+                )
+                logger.warning("LLM raw response (first 500 chars): %.500s", response_text)
 
-        # LLM may wrap the array in an object (e.g. {"translations": [...]})
-        if isinstance(result, dict):
-            # Try common wrapper keys, fall back to first list-typed value
-            for key in ("translations", "results", "data"):
-                if key in result and isinstance(result[key], list):
-                    result = result[key]
-                    break
-            else:
-                for v in result.values():
-                    if isinstance(v, list):
-                        result = v
-                        break
-            if isinstance(result, dict):
-                logger.warning("LLM returned dict instead of list, wrapping as single-item list.")
-                result = [result]
+            if len(result) == len(texts):
+                return result
 
-        if len(result) != len(texts):
-            logger.warning("Batch size mismatch: expected %d, got %d. Padding/truncating.", len(texts), len(result))
-            if len(result) < len(texts):
-                for i in range(len(result), len(texts)):
-                    result.append({"original": texts[i], "translated": texts[i]} if bilingual else texts[i])
+            if attempt < max_count_retries:
+                logger.warning(
+                    "Batch count mismatch: expected %d, got %d. Retrying (%d/%d)...",
+                    len(texts),
+                    len(result),
+                    attempt + 1,
+                    max_count_retries,
+                )
             else:
-                result = result[: len(texts)]
+                logger.warning(
+                    "Batch count mismatch after %d retries: expected %d, got %d. Padding/truncating.",
+                    max_count_retries,
+                    len(texts),
+                    len(result),
+                )
+
+        # Final fallback: pad or truncate
+        if len(result) < len(texts):
+            for i in range(len(result), len(texts)):
+                result.append({"original": texts[i], "translated": texts[i]} if bilingual else texts[i])
+        else:
+            result = result[: len(texts)]
 
         return result
+
+    @staticmethod
+    def _unwrap_list_response(result) -> list:
+        """Unwrap LLM response that may be wrapped in a dict."""
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            for key in ("translations", "results", "data", "to_translate"):
+                if key in result and isinstance(result[key], list):
+                    return result[key]
+            for v in result.values():
+                if isinstance(v, list):
+                    return v
+            logger.warning("LLM returned dict without list value, wrapping as single-item list.")
+            return [result]
+        return [result]
 
     async def translate_captions(
         self,

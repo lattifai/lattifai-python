@@ -215,7 +215,12 @@ def build_translate_prompt(
         approach=approach,
     )
     verb = "rewrite" if approach == "rewrite" else "translate"
+    n = len(texts)
     instruction += f'\n\nIMPORTANT: ONLY {verb} the lines in "to_translate". Context lines are for reference only.'
+    instruction += (
+        f"\n\nYou MUST return a JSON array with EXACTLY {n} elements — one per input line, "
+        f"in the same order. Do NOT skip, merge, or omit any line."
+    )
 
     # Build input data
     input_data: dict = {"to_translate": texts}

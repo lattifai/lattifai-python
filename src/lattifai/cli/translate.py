@@ -168,7 +168,8 @@ def translate(
         target_lang=translation_config.target_lang,
     )
 
-    if translation_config.save_artifacts and not translation_config.artifacts_dir:
+    # Always set artifacts_dir so checkpoints land next to output, not in cwd
+    if not translation_config.artifacts_dir:
         translation_config.artifacts_dir = str(output_path.parent)
 
     _translate_caption_in_place(cap, translation_config)

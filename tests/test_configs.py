@@ -160,8 +160,10 @@ class TestCaptionConfig:
 class TestTranscriptionConfig:
     """Test TranscriptionConfig class."""
 
-    def test_default_values(self):
+    def test_default_values(self, monkeypatch):
         """Test default configuration values."""
+        # Isolate from user config.toml to test built-in defaults
+        monkeypatch.setattr("lattifai.config.llm.resolve_toml_value", lambda *a, **kw: None)
         config = TranscriptionConfig()
         # Device is auto-selected based on hardware
         assert config.device in ["cpu", "cuda", "mps"]
