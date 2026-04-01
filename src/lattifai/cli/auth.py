@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import os
+import functools
 import secrets
 import threading
 import time
@@ -21,8 +21,10 @@ from rich.table import Table
 
 from lattifai.auth import (
     deobfuscate,
+    load_dotenv_value,
     obfuscate,
     request_whoami,
+    resolve_api_key,
     resolve_api_url,
     resolve_site_url,
     revoke_session,
@@ -70,32 +72,10 @@ def _now_iso() -> str:
     return datetime.now().astimezone().isoformat()
 
 
-def _load_dotenv_value(key: str) -> Optional[str]:
-    """Read a value from the nearest .env file without mutating the environment."""
-    try:
-        from dotenv import dotenv_values, find_dotenv
-    except ImportError:
-        return None
-
-    dotenv_path = find_dotenv(usecwd=True)
-    if not dotenv_path:
-        return None
-
-    value = dotenv_values(dotenv_path).get(key)
-    return str(value) if value else None
-
-
-_dotenv_checked = False
-
-
+@functools.lru_cache(maxsize=1)
 def _migrate_dotenv_to_config() -> None:
     """One-time migration: copy LATTIFAI_API_KEY from .env into config.toml."""
-    global _dotenv_checked  # noqa: PLW0603
-    if _dotenv_checked:
-        return
-    _dotenv_checked = True
-
-    dotenv_key = _load_dotenv_value("LATTIFAI_API_KEY")
+    dotenv_key = load_dotenv_value("LATTIFAI_API_KEY")
     if not dotenv_key:
         return
     if get_auth_value("LATTIFAI_API_KEY"):
@@ -114,10 +94,8 @@ def _migrate_dotenv_to_config() -> None:
 
 def _resolve_api_key() -> Optional[str]:
     """Resolve API key with .env migration for CLI context."""
-    if key := os.environ.get("LATTIFAI_API_KEY"):
-        return key
     _migrate_dotenv_to_config()
-    return deobfuscate(get_auth_value("LATTIFAI_API_KEY"))
+    return resolve_api_key()
 
 
 def _exchange_code(
@@ -528,10 +506,8 @@ def trial(
     expires_at = get_auth_value("EXPIRES_AT")
     if existing_key and is_trial and expires_at:
         try:
-            from datetime import datetime as _dt
-
-            exp = _dt.fromisoformat(expires_at.replace("Z", "+00:00"))
-            if exp > _dt.now(timezone.utc):
+            exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+            if exp > datetime.now(timezone.utc):
                 console.print(f"[{T.RICH_OK}]You already have an active trial (expires {expires_at}).[/{T.RICH_OK}]")
                 console.print(f"[{T.RICH_WARN}]Run 'lai auth logout' first to get a new trial.[/{T.RICH_WARN}]")
                 return

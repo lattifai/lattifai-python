@@ -16,13 +16,11 @@ DEFAULT_SITE_URL = "https://lattifai.com"
 DEFAULT_API_URL = "https://api.lattifai.com/v1"
 
 
-# ---------------------------------------------------------------------------
-# API key obfuscation
-# ---------------------------------------------------------------------------
-
-
 def obfuscate(key: str) -> str:
-    """Obfuscate an API key for device-bound local storage."""
+    """Obfuscate an API key for device-bound local storage.
+
+    Returns empty/None keys unchanged.
+    """
     if not key:
         return key
     return obfuscate_key(key)
@@ -37,18 +35,13 @@ def deobfuscate(raw: Optional[str]) -> Optional[str]:
     if not raw:
         return raw
     if not raw.startswith("v1:"):
-        return raw  # plaintext — pass through
+        return raw
     try:
         return deobfuscate_key(raw)
     except RuntimeError:
         raise RuntimeError("Stored API key is bound to a different device.\nRun:  lai auth login")
     except ValueError:
         raise RuntimeError("Stored API key is malformed or corrupted.\nRun:  lai auth login")
-
-
-# ---------------------------------------------------------------------------
-# URL resolution
-# ---------------------------------------------------------------------------
 
 
 def resolve_site_url(site_url: Optional[str] = None) -> str:
@@ -67,9 +60,17 @@ def resolve_api_url(api_url: Optional[str] = None) -> str:
     return url
 
 
-# ---------------------------------------------------------------------------
-# API key resolution
-# ---------------------------------------------------------------------------
+def load_dotenv_value(key: str) -> Optional[str]:
+    """Read a value from the nearest .env file without mutating the environment."""
+    try:
+        from dotenv import dotenv_values, find_dotenv
+    except ImportError:
+        return None
+    dotenv_path = find_dotenv(usecwd=True)
+    if not dotenv_path:
+        return None
+    value = dotenv_values(dotenv_path).get(key)
+    return str(value) if value else None
 
 
 def resolve_api_key() -> Optional[str]:
@@ -80,7 +81,6 @@ def resolve_api_key() -> Optional[str]:
     if key := os.environ.get("LATTIFAI_API_KEY"):
         return key
 
-    # config.toml [auth] session
     try:
         from lattifai.cli.config import get_auth_value
 
@@ -90,24 +90,7 @@ def resolve_api_key() -> Optional[str]:
     except ImportError:
         pass
 
-    # .env fallback
-    try:
-        from dotenv import dotenv_values, find_dotenv
-
-        dotenv_path = find_dotenv(usecwd=True)
-        if dotenv_path:
-            val = dotenv_values(dotenv_path).get("LATTIFAI_API_KEY")
-            if val:
-                return str(val)
-    except ImportError:
-        pass
-
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Request signing
-# ---------------------------------------------------------------------------
+    return load_dotenv_value("LATTIFAI_API_KEY")
 
 
 def auth_headers(api_key: str) -> dict[str, str]:
@@ -116,13 +99,8 @@ def auth_headers(api_key: str) -> dict[str, str]:
     try:
         headers["X-Device-Auth"] = generate_auth_payload(api_key)
     except (RuntimeError, ValueError):
-        pass  # non-fatal: request proceeds without device auth
+        pass
     return headers
-
-
-# ---------------------------------------------------------------------------
-# Backend API calls
-# ---------------------------------------------------------------------------
 
 
 def request_whoami(api_key: str, api_url: Optional[str] = None) -> dict[str, Any]:
