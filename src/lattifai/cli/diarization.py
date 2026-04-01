@@ -6,7 +6,7 @@ from typing import Optional
 import nemo_run as run
 from typing_extensions import Annotated
 
-from lattifai.client import LattifAI
+from lattifai.cli._shared import build_lattifai_client, resolve_caption_paths, resolve_media_input
 from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, MediaConfig
 from lattifai.theme import theme
 from lattifai.utils import safe_print
@@ -29,38 +29,32 @@ def diarize(
 ):
     """Run speaker diarization on aligned captions and audio."""
 
-    media_config = media or MediaConfig()
-    caption_config = caption or CaptionConfig()
+    media_config = resolve_media_input(
+        media,
+        input_media,
+        positional_name="input_media",
+        required_message="Input media path must be provided via positional input_media or media.input_path.",
+    )
+    caption_config = resolve_caption_paths(
+        caption,
+        input_path=input_caption,
+        output_path=output_caption,
+        require_input=True,
+        input_required_message=(
+            "Input caption path must be provided via positional input_caption or caption.input_path."
+        ),
+    )
     diarization_config = diarization or DiarizationConfig()
-
-    if input_media and media_config.input_path:
-        raise ValueError("Cannot specify both positional input_media and media.input_path.")
-    if input_media:
-        media_config.set_input_path(input_media)
-    if not media_config.input_path:
-        raise ValueError("Input media path must be provided via positional input_media or media.input_path.")
-
-    if input_caption and caption_config.input_path:
-        raise ValueError("Cannot specify both positional input_caption and caption.input_path.")
-    if input_caption:
-        caption_config.set_input_path(input_caption)
-    if not caption_config.input_path:
-        raise ValueError("Input caption path must be provided via positional input_caption or caption.input_path.")
-
-    if output_caption and caption_config.output_path:
-        raise ValueError("Cannot specify both positional output_caption and caption.output_path.")
-    if output_caption:
-        caption_config.set_output_path(output_caption)
 
     diarization_config.enabled = True
     if infer_speakers:
         diarization_config.infer_speakers = True
 
-    client_instance = LattifAI(
-        client_config=client,
-        alignment_config=alignment,
-        caption_config=caption_config,
-        diarization_config=diarization_config,
+    client_instance = build_lattifai_client(
+        client=client,
+        alignment=alignment,
+        caption=caption_config,
+        diarization=diarization_config,
     )
 
     safe_print(theme.step("🎧 Loading media for diarization..."))

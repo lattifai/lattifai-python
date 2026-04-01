@@ -1,10 +1,13 @@
 """Translation CLI entry point with nemo_run."""
 
+import asyncio
+from pathlib import Path
 from typing import Optional
 
 import nemo_run as run
 from typing_extensions import Annotated
 
+from lattifai.cli._shared import ensure_parent_dir, resolve_caption_paths, resolve_media_input, run_youtube_workflow
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -35,6 +38,79 @@ def _should_continue_with_refined(translation_config: TranslationConfig) -> bool
     except EOFError:
         return False
     return answer in {"y", "yes"}
+
+
+def _load_caption_for_translation(input_path: Path):
+    """Load a caption or markdown transcript for translation."""
+    from lattifai.caption import Caption, MarkdownReader
+
+    if input_path.suffix.lower() == ".md":
+        supervisions = MarkdownReader.extract_for_alignment(str(input_path))
+        return Caption.from_supervisions(supervisions)
+    return Caption.read(str(input_path))
+
+
+def _resolve_translation_output_path(
+    *,
+    input_path: Optional[Path],
+    explicit_output: Optional[str],
+    source_path: Optional[str],
+    target_lang: str,
+) -> Path:
+    """Resolve the final translation output path."""
+    from lattifai.translation.prompts import get_language_name
+
+    if explicit_output:
+        return Path(explicit_output)
+
+    lang_name = get_language_name(target_lang)
+    if input_path is not None:
+        return input_path.with_name(f"{input_path.stem}_{lang_name}{input_path.suffix}")
+    if source_path:
+        src = Path(source_path)
+        return src.with_name(f"{src.stem}_{lang_name}{src.suffix}")
+    return Path(f"translated_{lang_name}.srt")
+
+
+def _translate_caption_in_place(cap, translation_config: TranslationConfig):
+    """Run translation and optional refined review in place."""
+    from lattifai.theme import theme
+    from lattifai.translation import create_translator
+    from lattifai.translation.prompts import get_language_name
+    from lattifai.utils import safe_print
+
+    translator = create_translator(translation_config)
+    lang_name = get_language_name(translation_config.target_lang)
+    safe_print(
+        theme.step(
+            f"Translating {len(cap.supervisions)} segments to {lang_name} "
+            f"[mode={translation_config.mode}, provider={translator.name}]"
+        )
+    )
+
+    source_texts = [sup.text or "" for sup in cap.supervisions]
+    asyncio.run(translator.translate_captions(cap.supervisions, translation_config))
+
+    if _should_continue_with_refined(translation_config):
+        safe_print(theme.step("Continuing with refined review pass..."))
+        asyncio.run(
+            translator.refine_existing_draft(
+                cap.supervisions,
+                translation_config,
+                source_texts=source_texts,
+            )
+        )
+
+
+def _write_translated_caption(cap, output_path: Path, caption_config: CaptionConfig) -> None:
+    """Write translated caption to markdown or caption format."""
+    from lattifai.caption import MarkdownWriter
+
+    ensure_parent_dir(output_path)
+    if output_path.suffix.lower() == ".md":
+        MarkdownWriter.write(cap.supervisions, str(output_path))
+    else:
+        cap.write(str(output_path), translation_first=caption_config.translation_first)
 
 
 @run.cli.entrypoint(name="caption", namespace="translate")
@@ -85,18 +161,12 @@ def translate(
         lai translate caption input.srt output.srt \\
             translation.glossary_file=glossary.yaml
     """
-    import asyncio
-    from pathlib import Path
-
     from lattifai.theme import theme
-    from lattifai.translation import create_translator
-    from lattifai.translation.prompts import get_language_name
     from lattifai.utils import safe_print
 
-    # Initialize config
     translation_config = translation or TranslationConfig()
+    caption_config = caption or CaptionConfig()
 
-    # Validate input
     if not input:
         raise ValueError("Input caption file is required.")
 
@@ -104,70 +174,24 @@ def translate(
     if not input_path.exists():
         raise ValueError(f"Input file not found: {input}")
 
-    # Load caption
-    from lattifai.caption import Caption, MarkdownReader
-
     safe_print(theme.step(f"Loading: {input_path}"))
-
-    if input_path.suffix.lower() == ".md":
-        supervisions = MarkdownReader.extract_for_alignment(str(input_path))
-        cap = Caption.from_supervisions(supervisions)
-    else:
-        cap = Caption.read(str(input_path))
+    cap = _load_caption_for_translation(input_path)
 
     if not cap.supervisions:
         raise ValueError(f"No caption segments found in: {input}")
 
-    # Determine output path
-    if output:
-        output_path = Path(output)
-    else:
-        lang_name = get_language_name(translation_config.target_lang)
-        suffix = input_path.suffix
-        output_path = input_path.with_name(f"{input_path.stem}_{lang_name}{suffix}")
+    output_path = _resolve_translation_output_path(
+        input_path=input_path,
+        explicit_output=output,
+        source_path=cap.source_path,
+        target_lang=translation_config.target_lang,
+    )
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Set artifacts dir if saving
     if translation_config.save_artifacts and not translation_config.artifacts_dir:
         translation_config.artifacts_dir = str(output_path.parent)
 
-    # Create translator
-    translator = create_translator(translation_config)
-
-    lang_name = get_language_name(translation_config.target_lang)
-    mode = translation_config.mode
-    safe_print(
-        theme.step(
-            f"Translating {len(cap.supervisions)} segments to {lang_name} " f"[mode={mode}, provider={translator.name}]"
-        )
-    )
-
-    source_texts = [sup.text or "" for sup in cap.supervisions]
-
-    # Run translation (quick / normal / refined)
-    asyncio.run(translator.translate_captions(cap.supervisions, translation_config))
-
-    # Progressive upgrade: normal -> refined without retranslating draft
-    if _should_continue_with_refined(translation_config):
-        safe_print(theme.step("Continuing with refined review pass..."))
-        asyncio.run(
-            translator.refine_existing_draft(
-                cap.supervisions,
-                translation_config,
-                source_texts=source_texts,
-            )
-        )
-
-    # Write output
-    from lattifai.caption import MarkdownWriter
-
-    caption_config = caption or CaptionConfig()
-
-    if output_path.suffix.lower() == ".md":
-        MarkdownWriter.write(cap.supervisions, str(output_path))
-    else:
-        cap.write(str(output_path), translation_first=caption_config.translation_first)
+    _translate_caption_in_place(cap, translation_config)
+    _write_translated_caption(cap, output_path, caption_config)
 
     safe_print(theme.ok(f"Translation saved: {output_path}"))
 
@@ -234,97 +258,40 @@ def translate_youtube(
             translation.llm.provider=openai \\
             translation.llm.api_base_url=http://localhost:8000/v1
     """
-    import asyncio
-    from pathlib import Path
-
-    from lattifai.client import LattifAI
     from lattifai.theme import theme
-    from lattifai.translation import create_translator
-    from lattifai.translation.prompts import get_language_name
     from lattifai.utils import safe_print
 
-    # Initialize configs
-    media_config = media or MediaConfig()
-    caption_config = caption or CaptionConfig()
+    media_config = resolve_media_input(
+        media,
+        yt_url,
+        positional_name="yt_url",
+        required_message="YouTube URL is required.",
+    )
+    caption_config = resolve_caption_paths(caption)
     translation_config = translation or TranslationConfig()
 
-    # Validate URL
-    if yt_url and media_config.input_path:
-        raise ValueError("Cannot specify both positional yt_url and media.input_path.")
-    if not yt_url and not media_config.input_path:
-        raise ValueError("YouTube URL is required.")
-    if yt_url:
-        media_config.set_input_path(yt_url)
-
-    # Step 1: YouTube workflow (download + transcribe + align)
-    lattifai_client = LattifAI(
-        client_config=client,
-        alignment_config=alignment,
-        caption_config=caption_config,
-        transcription_config=transcription,
-        diarization_config=diarization,
-        event_config=event,
-    )
-
-    cap = lattifai_client.youtube(
-        url=media_config.input_path,
-        output_dir=media_config.output_dir,
-        output_caption_path=caption_config.output_path,
-        media_format=media_config.normalize_format() if media_config.output_format else None,
-        force_overwrite=media_config.force_overwrite,
-        split_sentence=caption_config.split_sentence,
-        channel_selector=media_config.channel_selector,
-        streaming_chunk_secs=media_config.streaming_chunk_secs,
+    cap = run_youtube_workflow(
+        media=media_config,
+        caption=caption_config,
+        client=client,
+        alignment=alignment,
+        transcription=transcription,
+        diarization=diarization,
+        event=event,
         use_transcription=use_transcription,
-        audio_track_id=media_config.audio_track_id,
-        quality=media_config.quality,
     )
 
     if not cap or not cap.supervisions:
         raise RuntimeError("YouTube alignment produced no caption segments.")
 
-    # Step 2: Translate the aligned captions
-    lang_name = get_language_name(translation_config.target_lang)
-    safe_print(
-        theme.step(
-            f"🌐 Translating {len(cap.supervisions)} segments to {lang_name} "
-            f"[mode={translation_config.mode}, provider={translation_config.llm.provider}]"
-        )
+    _translate_caption_in_place(cap, translation_config)
+    output_path = _resolve_translation_output_path(
+        input_path=None,
+        explicit_output=caption_config.output_path,
+        source_path=cap.source_path,
+        target_lang=translation_config.target_lang,
     )
-
-    translator = create_translator(translation_config)
-    source_texts = [sup.text or "" for sup in cap.supervisions]
-    asyncio.run(translator.translate_captions(cap.supervisions, translation_config))
-
-    # Progressive upgrade: normal -> refined
-    if _should_continue_with_refined(translation_config):
-        safe_print(theme.step("Continuing with refined review pass..."))
-        asyncio.run(
-            translator.refine_existing_draft(
-                cap.supervisions,
-                translation_config,
-                source_texts=source_texts,
-            )
-        )
-
-    # Step 3: Write translated output
-    # Determine output path: use caption.output_path or generate from aligned output
-    if caption_config.output_path:
-        output_path = Path(caption_config.output_path)
-    elif cap.source_path:
-        src = Path(cap.source_path)
-        output_path = src.with_name(f"{src.stem}_{lang_name}{src.suffix}")
-    else:
-        output_path = Path(f"translated_{lang_name}.srt")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    from lattifai.caption import MarkdownWriter
-
-    if output_path.suffix.lower() == ".md":
-        MarkdownWriter.write(cap.supervisions, str(output_path))
-    else:
-        cap.write(str(output_path), translation_first=caption_config.translation_first)
+    _write_translated_caption(cap, output_path, caption_config)
 
     safe_print(theme.ok(f"🎉 Translation saved: {output_path}"))
     return cap

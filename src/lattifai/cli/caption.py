@@ -4,10 +4,8 @@ import re
 from typing import List, Optional
 
 import nemo_run as run
-from typing_extensions import Annotated
 
 from lattifai.caption.config import KaraokeConfig
-from lattifai.config import CaptionConfig
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 

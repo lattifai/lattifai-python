@@ -15,8 +15,6 @@ per-file-ignores =
   src/lattifai/alignment/lattice1_worker.py: F401
   src/lattifai/alignment/segmenter.py: F401
   src/lattifai/alignment/tokenizer.py: F401
-  src/lattifai/cli/alignment.py: F401
-  src/lattifai/cli/caption.py: F401
   src/lattifai/diarization/lattifai.py: F401
   src/lattifai/transcription/lattifai.py: E402
   src/lattifai/transcription/vllm.py: E402, F401

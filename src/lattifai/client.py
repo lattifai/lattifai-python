@@ -195,11 +195,15 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_caption_path: Optional[Pathlike] = None,
         input_caption_format: Optional[InputCaptionFormat] = None,
         split_sentence: Optional[bool] = None,
+        word_level: Optional[bool] = None,
         channel_selector: Optional[str | int] = "average",
         streaming_chunk_secs: Optional[float] = None,
         metadata: Optional[dict] = None,
     ) -> Caption:
+        original_word_level = self.caption_config.word_level
         try:
+            if word_level is not None:
+                self.caption_config.word_level = word_level
             # Step 1: Get caption
             if isinstance(input_media, AudioData):
                 media_audio = input_media
@@ -349,6 +353,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
+        finally:
+            self.caption_config.word_level = original_word_level
 
         # Step 5: Speaker diarization
         if self.diarization_config.enabled and self.diarizer:

@@ -301,11 +301,24 @@ class LattifAIClientMixin:
         try:
             if verbose:
                 safe_print(theme.step(f"📖 Step 1: Reading caption file from {input_caption}"))
-            caption = Caption.read(
-                input_caption,
-                format=input_caption_format,
-                normalize_text=normalize_text if normalize_text is not None else self.caption_config.normalize_text,
-            )
+            input_path = Path(str(input_caption))
+            input_format = (input_caption_format or "").lower() if input_caption_format else None
+
+            if input_path.suffix.lower() == ".md" or input_format in {"markdown", "md"}:
+                from lattifai.caption import MarkdownReader
+
+                supervisions = MarkdownReader.extract_for_alignment(str(input_path))
+                caption = Caption.from_supervisions(
+                    supervisions,
+                    source_format="markdown",
+                    source_path=str(input_path),
+                )
+            else:
+                caption = Caption.read(
+                    input_caption,
+                    format=input_caption_format,
+                    normalize_text=normalize_text if normalize_text is not None else self.caption_config.normalize_text,
+                )
             diarization_file = Path(str(input_caption)).with_suffix(".Diarization")
             if diarization_file.exists():
                 if verbose:

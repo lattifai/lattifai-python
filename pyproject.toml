@@ -39,8 +39,8 @@ dependencies = [
     "python-dotenv",
     "colorful>=0.5.6",
     "lattifai-run>=1.0.2",
-    "lattifai-core>=0.7.0",
-    "lattifai-captions[splitting]>=0.2.2",
+    "lattifai-core>=0.7.2",
+    "lattifai-captions[splitting]>=0.2.8",
     "g2p-phonemizer>=0.4.0",
     "error-align-fix>=0.1.4",
     "k2py==0.4.0",
@@ -50,18 +50,18 @@ dependencies = [
     "msgpack",
     "google-genai>=1.22.0",
     "questionary>=2.0",
-    "yt-dlp",
+    "yt-dlp>=2026.3.17",
     "pycryptodome",
 ]
 
 [project.optional-dependencies]
 # Event
 event = [
-    "lattifai-core[event]>=0.7.0",
+    "lattifai-core[event]>=0.7.2",
 ]
 # Diarization
 diarization = [
-    "lattifai-core[diarization]>=0.7.0",
+    "lattifai-core[diarization]>=0.7.2",
 ]
 # Transcription: ASR models
 transcription = [

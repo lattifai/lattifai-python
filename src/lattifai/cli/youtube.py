@@ -5,7 +5,7 @@ from typing import Literal, Optional
 import nemo_run as run
 from typing_extensions import Annotated
 
-from lattifai.client import LattifAI
+from lattifai.cli._shared import resolve_caption_paths, resolve_media_input, run_youtube_workflow
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -91,50 +91,22 @@ def youtube(
             yt_url="https://www.youtube.com/watch?v=VIDEO_ID" \\
             alignment.device=mps
     """
-    # Initialize configs with defaults
-    media_config = media or MediaConfig()
-    caption_config = caption or CaptionConfig()
-
-    # Validate URL input: require exactly one of yt_url or media.input_path
-    if yt_url and media_config.input_path:
-        raise ValueError(
-            "Cannot specify both positional yt_url and media.input_path. "
-            "Use either positional argument or config, not both."
-        )
-
-    if not yt_url and not media_config.input_path:
-        raise ValueError("YouTube URL is required. Provide either positional yt_url or media.input_path parameter.")
-
-    # Assign yt_url to media_config.input_path if provided
-    if yt_url:
-        media_config.set_input_path(yt_url)
-
-    # Create LattifAI client with all configurations
-    lattifai_client = LattifAI(
-        client_config=client,
-        alignment_config=alignment,
-        caption_config=caption_config,
-        transcription_config=transcription,
-        diarization_config=diarization,
-        event_config=event,
+    media_config = resolve_media_input(
+        media,
+        yt_url,
+        positional_name="yt_url",
+        required_message="YouTube URL is required. Provide either positional yt_url or media.input_path parameter.",
     )
-
-    # Call the client's youtube method
-    # If use_transcription=True, skip YouTube caption download and use transcription directly.
-    # If use_transcription=False (default), try YouTube captions first; on failure,
-    # automatically fallback to transcription if transcription.model_name is configured.
-    return lattifai_client.youtube(
-        url=media_config.input_path,
-        output_dir=media_config.output_dir,
-        output_caption_path=caption_config.output_path,
-        media_format=media_config.normalize_format() if media_config.output_format else None,
-        force_overwrite=media_config.force_overwrite,
-        split_sentence=caption_config.split_sentence,
-        channel_selector=media_config.channel_selector,
-        streaming_chunk_secs=media_config.streaming_chunk_secs,
+    caption_config = resolve_caption_paths(caption)
+    return run_youtube_workflow(
+        media=media_config,
+        caption=caption_config,
+        client=client,
+        alignment=alignment,
+        transcription=transcription,
+        diarization=diarization,
+        event=event,
         use_transcription=use_transcription,
-        audio_track_id=media_config.audio_track_id,
-        quality=media_config.quality,
     )
 
 
@@ -229,13 +201,13 @@ def youtube_download(
     from lattifai.utils import safe_print
     from lattifai.youtube.client import YouTubeDownloader
 
-    media_config = media or MediaConfig()
-
-    if yt_url and media_config.input_path:
-        raise ValueError("Cannot specify both positional yt_url and media.input_path.")
-    if not yt_url and not media_config.input_path:
-        raise ValueError("YouTube URL is required.")
-    url = yt_url or media_config.input_path
+    media_config = resolve_media_input(
+        media,
+        yt_url,
+        positional_name="yt_url",
+        required_message="YouTube URL is required.",
+    )
+    url = media_config.input_path
 
     output_dir = media_config.output_dir or "."
     downloader = YouTubeDownloader()
