@@ -68,7 +68,7 @@ class ClientConfig:
                 try:
                     from lattifai.cli.config import get_auth_value
 
-                    raw = get_auth_value("lattifai_api_key")
+                    raw = get_auth_value("LATTIFAI_API_KEY")
                     env_val = _deobfuscate_stored_key(raw)
                 except ImportError:
                     pass

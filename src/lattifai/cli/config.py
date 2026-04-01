@@ -15,35 +15,35 @@ console = Console()
 CONFIG_DIR = Path.home() / ".lattifai"
 CONFIG_FILE = CONFIG_DIR / "config.toml"
 
-# Mapping: user-facing key name -> environment variable name
+# Mapping: user-facing key name (uppercase) -> environment variable name
 KEY_MAP = {
-    "lattifai_api_key": "LATTIFAI_API_KEY",
-    "gemini_api_key": "GEMINI_API_KEY",
-    "openai_api_key": "OPENAI_API_KEY",
-    "openai_api_base_url": "OPENAI_API_BASE_URL",
-    "default_audio_format": "LATTIFAI_DEFAULT_AUDIO_FORMAT",
-    "default_video_format": "LATTIFAI_DEFAULT_VIDEO_FORMAT",
+    "LATTIFAI_API_KEY": "LATTIFAI_API_KEY",
+    "GEMINI_API_KEY": "GEMINI_API_KEY",
+    "OPENAI_API_KEY": "OPENAI_API_KEY",
+    "OPENAI_API_BASE_URL": "OPENAI_API_BASE_URL",
+    "DEFAULT_AUDIO_FORMAT": "LATTIFAI_DEFAULT_AUDIO_FORMAT",
+    "DEFAULT_VIDEO_FORMAT": "LATTIFAI_DEFAULT_VIDEO_FORMAT",
 }
 
 SECTION_KEY_MAP = {
     "auth": {
-        "lattifai_api_key",
-        "api_key_id",
-        "user_email",
-        "key_name",
-        "logged_in_at",
-        "is_trial",
-        "expires_at",
-        "credits",
+        "LATTIFAI_API_KEY",
+        "API_KEY_ID",
+        "USER_EMAIL",
+        "KEY_NAME",
+        "LOGGED_IN_AT",
+        "IS_TRIAL",
+        "EXPIRES_AT",
+        "CREDITS",
     },
-    "api": {"gemini_api_key", "openai_api_key", "openai_api_base_url"},
-    "defaults": {"default_audio_format", "default_video_format"},
+    "api": {"GEMINI_API_KEY", "OPENAI_API_KEY", "OPENAI_API_BASE_URL"},
+    "defaults": {"DEFAULT_AUDIO_FORMAT", "DEFAULT_VIDEO_FORMAT"},
 }
 
 SECTION_ORDER = ["auth", "api", "defaults"]
 
-# Keys that should be masked in display
-SECRET_KEYS = {"lattifai_api_key", "gemini_api_key", "openai_api_key"}
+# Keys that should be masked in display (uppercase, matching KEY_MAP)
+SECRET_KEYS = {"LATTIFAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"}
 
 
 def _mask_value(value: str) -> str:
@@ -93,7 +93,7 @@ def _get_section_name(key: str) -> Optional[str]:
 
 
 def get_config_value(key: str) -> Optional[str]:
-    """Get a value from ~/.lattifai/config.toml by user-facing key name.
+    """Get a value from ~/.lattifai/config.toml by key name.
 
     This is the public API for other config modules to read persisted values.
     Returns None if the key is not set in the config file.
@@ -298,6 +298,7 @@ def show():
 @app.command("set")
 def set_value(key: str, value: str):
     """Set a configuration value."""
+    key = key.upper()
     if key not in KEY_MAP:
         valid = ", ".join(KEY_MAP.keys())
         console.print(f"[{T.RICH_ERR}]Unknown key: {key}[/{T.RICH_ERR}]")
@@ -305,11 +306,11 @@ def set_value(key: str, value: str):
         raise typer.Exit(1)
 
     # Validate format keys before persisting
-    if key in ("default_audio_format", "default_video_format"):
+    if key in ("DEFAULT_AUDIO_FORMAT", "DEFAULT_VIDEO_FORMAT"):
         from lattifai.config.media import AUDIO_FORMATS, VIDEO_FORMATS
 
         normalized = value.strip().lower()
-        valid_formats = AUDIO_FORMATS if key == "default_audio_format" else VIDEO_FORMATS
+        valid_formats = AUDIO_FORMATS if key == "DEFAULT_AUDIO_FORMAT" else VIDEO_FORMATS
         if normalized not in valid_formats:
             console.print(f"[{T.RICH_ERR}]Unsupported format: {value}[/{T.RICH_ERR}]")
             console.print(f"Supported: {', '.join(valid_formats)}")
@@ -332,6 +333,7 @@ def set_value(key: str, value: str):
 @app.command("get")
 def get_value(key: str):
     """Get a configuration value."""
+    key = key.upper()
     if key not in KEY_MAP:
         valid = ", ".join(KEY_MAP.keys())
         console.print(f"[{T.RICH_ERR}]Unknown key: {key}[/{T.RICH_ERR}]")
