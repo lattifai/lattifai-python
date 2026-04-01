@@ -1,10 +1,12 @@
 """Tests for lai summarize caption CLI command."""
 
 import asyncio
+import json
 import os
 import subprocess
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -63,6 +65,73 @@ class TestSummarizeErrors:
         if not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError):
                 run_summarize_command(args)
+
+
+class TestSummarizeCLIUnit:
+    def test_summarize_caption_success_mocked(self, tmp_path):
+        from lattifai.cli.summarize import summarize_caption
+        from lattifai.config.summarization import SummarizationConfig
+        from lattifai.summarization.schema import SummaryConfidence, SummaryResult
+
+        input_path = tmp_path / "input.srt"
+        input_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
+        cap = SimpleNamespace(
+            supervisions=[SimpleNamespace(text="Hello"), SimpleNamespace(text="World")],
+            source_path=str(input_path),
+            language="en",
+        )
+        config = SummarizationConfig(lang="en", output_format="markdown")
+        fake_client = object()
+        config.llm.create_client = Mock(return_value=fake_client)
+        fake_summarizer = Mock()
+        fake_summarizer.summarize = AsyncMock(
+            return_value=SummaryResult(
+                title="input",
+                summary="Short summary",
+                key_points=["Point 1"],
+                confidence=SummaryConfidence(score=0.8, rationale="good"),
+            )
+        )
+
+        with (
+            patch("lattifai.caption.Caption.read", return_value=cap),
+            patch("lattifai.summarization.ContentSummarizer", return_value=fake_summarizer),
+        ):
+            output_path = summarize_caption(input=str(input_path), summarization=config)
+
+        output_file = Path(output_path)
+        assert output_file.exists()
+        content = output_file.read_text(encoding="utf-8")
+        assert "## Summary" in content
+        assert "Short summary" in content
+
+    def test_summarize_caption_json_output(self, tmp_path):
+        from lattifai.cli.summarize import summarize_caption
+        from lattifai.config.summarization import SummarizationConfig
+        from lattifai.summarization.schema import SummaryResult
+
+        input_path = tmp_path / "input.srt"
+        input_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
+        cap = SimpleNamespace(
+            supervisions=[SimpleNamespace(text="Hello")],
+            source_path=str(input_path),
+            language="en",
+        )
+        config = SummarizationConfig(lang="zh", output_format="json")
+        config.llm.create_client = Mock(return_value=object())
+        fake_summarizer = Mock()
+        fake_summarizer.summarize = AsyncMock(return_value=SummaryResult(title="input", summary="JSON summary"))
+
+        with (
+            patch("lattifai.caption.Caption.read", return_value=cap),
+            patch("lattifai.summarization.ContentSummarizer", return_value=fake_summarizer),
+        ):
+            output_path = summarize_caption(input=str(input_path), summarization=config)
+
+        output_file = Path(output_path)
+        assert output_file.suffix == ".json"
+        parsed = json.loads(output_file.read_text(encoding="utf-8"))
+        assert parsed["summary"] == "JSON summary"
 
 
 class TestSummarizationUnit:

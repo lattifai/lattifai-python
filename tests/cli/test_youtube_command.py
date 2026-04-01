@@ -2,6 +2,8 @@
 
 import os
 import subprocess
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 import pytest
 import torch
@@ -15,6 +17,34 @@ LATTIFAI_TESTS_CLI_DRYRUN = bool(os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "fa
 def run_youtube_command(args, env=None):
     """Helper function to run the youtube command and return result"""
     cmd = ["lai", "youtube", "align", "-Y"]
+
+    if LATTIFAI_TESTS_CLI_DRYRUN:
+        cmd.append("--dryrun")
+
+    cmd.extend(args)
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=True,
+            env=env,
+        )
+        return result
+    except subprocess.TimeoutExpired:
+        return None
+    except subprocess.CalledProcessError as e:
+        print(f"Command failed: {' '.join(cmd)}")
+        print(f"Return code: {e.returncode}")
+        print(f"Stdout: {e.stdout}")
+        print(f"Stderr: {e.stderr}")
+        raise e
+
+
+def run_youtube_download_command(args, env=None):
+    """Helper function to run the youtube download command and return result."""
+    cmd = ["lai", "youtube", "download", "-Y"]
 
     if LATTIFAI_TESTS_CLI_DRYRUN:
         cmd.append("--dryrun")
@@ -107,6 +137,140 @@ class TestYoutubeCommand:
                 _ = run_youtube_command(args)
         else:
             _ = run_youtube_command(args)
+
+
+class TestYoutubeDownloadCommand:
+    """Test cases for youtube download command."""
+
+    def test_youtube_download_help(self):
+        result = subprocess.run(
+            ["lai", "youtube", "download", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0 or "usage:" in result.stdout or "help" in result.stdout
+
+    def test_youtube_download_invalid_only(self, tmp_path):
+        args = [
+            "https://www.youtube.com/watch?v=kb9suz-kkoM",
+            "only=invalid_value",
+            f"media.output_dir={tmp_path}",
+        ]
+        if not LATTIFAI_TESTS_CLI_DRYRUN:
+            with pytest.raises(subprocess.CalledProcessError):
+                run_youtube_download_command(args)
+
+    def test_youtube_download_only_media(self, tmp_path):
+        from lattifai.cli.youtube import youtube_download
+        from lattifai.config import MediaConfig
+
+        media = MediaConfig(input_path="https://www.youtube.com/watch?v=kb9suz-kkoM", output_dir=str(tmp_path))
+        loop = Mock()
+        loop.run_until_complete.side_effect = [
+            {
+                "title": "Video",
+                "duration": 12,
+                "uploader": "Uploader",
+                "upload_date": "20250101",
+                "view_count": 1,
+                "description": "",
+                "thumbnail": "",
+                "webpage_url": media.input_path,
+                "chapters": [],
+            },
+            str(tmp_path / "audio.mp3"),
+        ]
+        downloader = Mock()
+        downloader.extract_video_id.return_value = "video123"
+        downloader.download_media = Mock(return_value=str(tmp_path / "audio.mp3"))
+
+        with (
+            patch("asyncio.get_event_loop", return_value=loop),
+            patch("lattifai.youtube.client.YouTubeDownloader", return_value=downloader),
+        ):
+            result = youtube_download(media=media, only="media")
+
+        assert result == str(tmp_path / "audio.mp3")
+        downloader.download_media.assert_called_once()
+        downloader.download_captions.assert_not_called()
+
+    def test_youtube_download_only_caption(self, tmp_path):
+        from lattifai.cli.youtube import youtube_download
+        from lattifai.config import MediaConfig
+
+        media = MediaConfig(input_path="https://www.youtube.com/watch?v=kb9suz-kkoM", output_dir=str(tmp_path))
+        loop = Mock()
+        loop.run_until_complete.side_effect = [
+            {
+                "title": "Video",
+                "duration": 12,
+                "uploader": "Uploader",
+                "upload_date": "20250101",
+                "view_count": 1,
+                "description": "",
+                "thumbnail": "",
+                "webpage_url": media.input_path,
+                "chapters": [],
+            },
+            str(tmp_path / "captions.srt"),
+        ]
+        downloader = Mock()
+        downloader.extract_video_id.return_value = "video123"
+        downloader.download_captions = Mock(return_value=str(tmp_path / "captions.srt"))
+
+        with (
+            patch("asyncio.get_event_loop", return_value=loop),
+            patch("lattifai.youtube.client.YouTubeDownloader", return_value=downloader),
+        ):
+            result = youtube_download(media=media, only="caption", source_lang="en")
+
+        assert result == str(tmp_path / "captions.srt")
+        downloader.download_media.assert_not_called()
+        downloader.download_captions.assert_called_once()
+        assert downloader.download_captions.call_args.kwargs["source_lang"] == "en"
+
+    def test_youtube_download_only_meta(self, tmp_path):
+        from lattifai.cli.youtube import youtube_download
+        from lattifai.config import MediaConfig
+
+        media = MediaConfig(input_path="https://www.youtube.com/watch?v=kb9suz-kkoM", output_dir=str(tmp_path))
+        info = {
+            "title": "Video",
+            "duration": 3723,
+            "uploader": "Uploader",
+            "upload_date": "20250101",
+            "view_count": 42,
+            "description": "Metadata body",
+            "thumbnail": "thumb.jpg",
+            "webpage_url": media.input_path,
+            "chapters": [{"title": "Intro", "start_time": 0}],
+            "channel": "Uploader",
+        }
+        loop = Mock()
+        loop.run_until_complete.return_value = info
+        downloader = Mock()
+        downloader.extract_video_id.return_value = "video123"
+
+        with (
+            patch("asyncio.get_event_loop", return_value=loop),
+            patch("lattifai.youtube.client.YouTubeDownloader", return_value=downloader),
+        ):
+            result = youtube_download(media=media, only="meta")
+
+        meta_path = tmp_path / "video123.meta.md"
+        assert result is None
+        assert meta_path.exists()
+        content = meta_path.read_text(encoding="utf-8")
+        assert 'title: "Video"' in content
+        assert 'duration: "01:02:03"' in content
+        assert "Metadata body" in content
+
+    def test_youtube_download_missing_url(self):
+        from lattifai.cli.youtube import youtube_download
+
+        with pytest.raises(ValueError, match="YouTube URL is required"):
+            youtube_download()
 
     def test_youtube_help(self):
         """Test youtube command help output"""
