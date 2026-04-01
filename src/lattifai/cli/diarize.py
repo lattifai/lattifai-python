@@ -14,7 +14,7 @@ from lattifai.utils import safe_print
 __all__ = ["diarize"]
 
 
-@run.cli.entrypoint(name="run", namespace="diarization")
+@run.cli.entrypoint(name="run", namespace="diarize")
 def diarize(
     input_media: Optional[str] = None,
     input_caption: Optional[str] = None,
