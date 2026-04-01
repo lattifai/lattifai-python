@@ -12,6 +12,14 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class DiarizationLLMConfig(LLMConfig):
+    """LLM config bound to [diarization] section. Survives nemo_run reconstruction."""
+
+    section: str = "diarization"
+    fallback_model: Optional[str] = "gemini-3-flash-preview"
+
+
+@dataclass
 class DiarizationConfig:
     """
     Speaker diarization configuration.
@@ -86,7 +94,7 @@ class DiarizationConfig:
     When enabled, speakers still labeled as SPEAKER_XX after acoustic diarization
     will be identified via LLM analysis of their speech content."""
 
-    llm: Optional[LLMConfig] = None
+    llm: Optional[DiarizationLLMConfig] = None
     """LLM provider configuration for speaker name inference.
     Auto-created from config.toml [diarization] when infer_speakers=True."""
 
@@ -128,4 +136,4 @@ class DiarizationConfig:
 
         # Auto-create LLM config only when speaker inference is enabled
         if self.infer_speakers and self.llm is None:
-            self.llm = LLMConfig(section="diarization", fallback_model="gemini-3-flash-preview")
+            self.llm = DiarizationLLMConfig()

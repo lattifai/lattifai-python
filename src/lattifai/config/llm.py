@@ -55,20 +55,20 @@ class LLMConfig:
 
     def __post_init__(self) -> None:
         """Resolve defaults from config.toml, then API key and base URL."""
-        # Step 1: fill None fields from config.toml [section]
+        # Step 1: fill empty/None fields from config.toml [section]
         if self.section:
-            if self.model_name is None:
+            if not self.model_name:
                 self.model_name = resolve_toml_value(self.section, "model_name")
-            if self.provider is None:
+            if not self.provider:
                 saved = resolve_toml_value(self.section, "provider")
                 if saved and saved in ("gemini", "openai"):
                     self.provider = saved  # type: ignore[assignment]
 
         # Step 2: apply fallbacks
-        if self.model_name is None:
+        if not self.model_name:
             self.model_name = self.fallback_model
 
-        if self.provider is None:
+        if not self.provider:
             self.provider = "gemini"
 
         # Step 3: validate required fields
@@ -101,7 +101,7 @@ class LLMConfig:
         )
 
     def _resolve_api_key(self) -> Optional[str]:
-        """Resolve API key: env var > .env > config.toml."""
+        """Resolve API key: env var > [section].api_key > global config > .env."""
         try:
             from dotenv import find_dotenv, load_dotenv
 
@@ -119,6 +119,12 @@ class LLMConfig:
         if env_key:
             return env_key
 
+        # Section-specific api_key (e.g. [translation].api_key)
+        if self.section:
+            section_key = resolve_toml_value(self.section, "api_key")
+            if section_key:
+                return section_key
+
         try:
             from lattifai.cli.config import get_config_value
 
@@ -127,10 +133,16 @@ class LLMConfig:
             return None
 
     def _resolve_base_url(self) -> Optional[str]:
-        """Resolve base URL for OpenAI-compatible providers: env var > config.toml."""
+        """Resolve base URL for OpenAI-compatible providers: env var > [section] > global config."""
         env_url = os.environ.get("OPENAI_API_BASE_URL") or os.environ.get("OPENAI_API_BASE")
         if env_url:
             return env_url
+
+        # Section-specific api_base_url (e.g. [translation].api_base_url)
+        if self.section:
+            section_url = resolve_toml_value(self.section, "api_base_url")
+            if section_url:
+                return section_url
 
         try:
             from lattifai.cli.config import get_config_value

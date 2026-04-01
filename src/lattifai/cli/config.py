@@ -31,8 +31,12 @@ SECTION_KEYS = {
     "transcription.model_name": None,
     "translation.model_name": None,
     "translation.provider": None,
+    "translation.api_key": None,
+    "translation.api_base_url": None,
     "diarization.model_name": None,
     "diarization.provider": None,
+    "diarization.api_key": None,
+    "diarization.api_base_url": None,
 }
 
 # All valid keys for CLI validation
@@ -56,7 +60,7 @@ SECTION_KEY_MAP = {
 SECTION_ORDER = ["auth", "api", "defaults", "transcription", "translation"]
 
 # Keys that should be masked in display
-SECRET_KEYS = {"LATTIFAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"}
+SECRET_KEYS = {"LATTIFAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "translation.api_key", "diarization.api_key"}
 
 
 def _mask_value(value: str) -> str:
