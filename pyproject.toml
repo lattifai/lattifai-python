@@ -52,7 +52,7 @@ dependencies = [
     "questionary>=2.0",
     "yt-dlp>=2026.3.17",
     "pycryptodome",
-    "lattifai-auth>=0.2.0",
+    "lattifai-auth>=0.2.1",
 ]
 
 [project.optional-dependencies]
