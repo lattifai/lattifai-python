@@ -83,6 +83,22 @@ class BaseTranslator:
         response_text = await self._call_llm(prompt)
         result = json.loads(response_text)
 
+        # LLM may wrap the array in an object (e.g. {"translations": [...]})
+        if isinstance(result, dict):
+            # Try common wrapper keys, fall back to first list-typed value
+            for key in ("translations", "results", "data"):
+                if key in result and isinstance(result[key], list):
+                    result = result[key]
+                    break
+            else:
+                for v in result.values():
+                    if isinstance(v, list):
+                        result = v
+                        break
+            if isinstance(result, dict):
+                logger.warning("LLM returned dict instead of list, wrapping as single-item list.")
+                result = [result]
+
         if len(result) != len(texts):
             logger.warning("Batch size mismatch: expected %d, got %d. Padding/truncating.", len(texts), len(result))
             if len(result) < len(texts):
@@ -114,6 +130,13 @@ class BaseTranslator:
         if not texts:
             return supervisions
 
+        total_phases = {"quick": 1, "normal": 2, "refined": 3}.get(cfg.mode, 1)
+        phase = 0
+
+        if cfg.mode in ("normal", "refined"):
+            phase += 1
+            logger.info("[%d/%d] Analyzing content...", phase, total_phases)
+
         analysis = await self._maybe_analyze(texts, cfg)
         glossary_terms = self._extract_glossary_terms(analysis)
         merged_glossary = self._load_and_merge_glossaries(cfg, glossary_terms)
@@ -132,6 +155,9 @@ class BaseTranslator:
                 self._save_artifact(cfg, "01-analysis.json", analysis)
                 self._save_artifact(cfg, "01-analysis.md", self._format_analysis_markdown(analysis))
             self._save_artifact(cfg, "02-prompt.md", shared_prompt)
+
+        phase += 1
+        logger.info("[%d/%d] Translating %d segments...", phase, total_phases, len(texts))
 
         checkpoint_path = self._checkpoint_path(cfg)
         translated = await self._translate_all_batches(
@@ -156,6 +182,8 @@ class BaseTranslator:
         )
 
         if cfg.mode == "refined":
+            phase += 1
+            logger.info("[%d/%d] Reviewing & refining translations...", phase, total_phases)
             revised_texts, _ = await self._review_draft(
                 original_texts=texts,
                 draft_translations=draft_plain,
@@ -203,6 +231,7 @@ class BaseTranslator:
 
         review_analysis = analysis or (state.analysis if state else None)
         if review_analysis is None:
+            logger.info("[1/2] Analyzing content...")
             review_analysis = await self._maybe_analyze(original_texts, cfg)
 
         glossary_terms = self._extract_glossary_terms(review_analysis)
@@ -210,6 +239,7 @@ class BaseTranslator:
             glossary or (state.glossary if state else None) or self._load_and_merge_glossaries(cfg, glossary_terms)
         )
 
+        logger.info("[2/2] Reviewing & refining %d segments...", len(draft_translations))
         revised_texts, _ = await self._review_draft(
             original_texts=original_texts,
             draft_translations=draft_translations,
