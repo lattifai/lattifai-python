@@ -6,6 +6,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.cli._shared import build_lattifai_client, resolve_caption_paths, resolve_media_input, run_youtube_workflow
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -19,7 +20,7 @@ from lattifai.config import (
 __all__ = ["align"]
 
 
-@run.cli.entrypoint(name="align", namespace="alignment")
+@run.cli.entrypoint(name="align", namespace="alignment", entrypoint_cls=LattifAIEntrypoint)
 def align(
     input_media: Optional[str] = None,
     input_caption: Optional[str] = None,

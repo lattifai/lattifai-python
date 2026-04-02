@@ -19,6 +19,7 @@ from uuid import uuid4
 import nemo_run as run
 
 from lattifai.cli.caption import convert as caption_convert
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.cli.transcribe import transcribe as transcribe_run
 from lattifai.cli.translate import translate as translate_run
 from lattifai.client import LattifAI
@@ -448,7 +449,7 @@ def _build_browser_url(host: str, port: int) -> str:
     return f"http://{host}:{port}/"
 
 
-@run.cli.entrypoint(name="run", namespace="serve")
+@run.cli.entrypoint(name="run", namespace="serve", entrypoint_cls=LattifAIEntrypoint)
 def serve(
     host: str = "127.0.0.1",
     port: int = 8765,

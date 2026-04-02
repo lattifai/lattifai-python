@@ -13,15 +13,19 @@ if TYPE_CHECKING:
 
 
 def resolve_toml_value(section: str, key: str) -> Optional[str]:
-    """Read a value from config.toml [section].key.
+    """Read a value from config.toml [section].key as a string.
 
     Shared helper for all config classes that read from config.toml.
+    Supports dotted sections for nested tables (e.g., ``"diarization.llm"``).
     Returns None if not set or config system is unavailable.
     """
     try:
-        from lattifai.cli.config import get_config_value
+        from lattifai.config.toml_mixin import resolve_toml_raw_value
 
-        return get_config_value(f"{section}.{key}")
+        raw = resolve_toml_raw_value(section, key)
+        if raw is None:
+            return None
+        return str(raw)
     except (ImportError, OSError):
         return None
 

@@ -9,11 +9,12 @@ from typing import Optional
 import nemo_run as run
 from typing_extensions import Annotated
 
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.config import CaptionConfig
 from lattifai.config.summarization import SummarizationConfig
 
 
-@run.cli.entrypoint(name="caption", namespace="summarize")
+@run.cli.entrypoint(name="caption", namespace="summarize", entrypoint_cls=LattifAIEntrypoint)
 def summarize_caption(
     input: Optional[str] = None,
     output: Optional[str] = None,

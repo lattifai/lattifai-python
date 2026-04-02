@@ -6,6 +6,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.cli._shared import resolve_caption_paths, resolve_media_input, run_youtube_workflow
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -17,7 +18,7 @@ from lattifai.config import (
 )
 
 
-@run.cli.entrypoint(name="align", namespace="youtube")
+@run.cli.entrypoint(name="align", namespace="youtube", entrypoint_cls=LattifAIEntrypoint)
 def youtube(
     yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
@@ -162,7 +163,7 @@ def _build_meta_speaker_context(video_info: dict) -> Optional[str]:
     return "\n".join(parts) if parts else None
 
 
-@run.cli.entrypoint(name="download", namespace="youtube")
+@run.cli.entrypoint(name="download", namespace="youtube", entrypoint_cls=LattifAIEntrypoint)
 def youtube_download(
     yt_url: Optional[str] = None,
     only: Optional[Literal["media", "caption", "transcript", "meta"]] = None,

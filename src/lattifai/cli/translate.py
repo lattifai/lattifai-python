@@ -8,6 +8,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.cli._shared import ensure_parent_dir, resolve_caption_paths, resolve_media_input, run_youtube_workflow
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -92,7 +93,7 @@ def _translate_caption_in_place(cap, translation_config: TranslationConfig):
         )
 
 
-@run.cli.entrypoint(name="caption", namespace="translate")
+@run.cli.entrypoint(name="caption", namespace="translate", entrypoint_cls=LattifAIEntrypoint)
 def translate(
     input: Optional[str] = None,
     output: Optional[str] = None,
@@ -181,7 +182,7 @@ def translate(
     return cap
 
 
-@run.cli.entrypoint(name="youtube", namespace="translate")
+@run.cli.entrypoint(name="youtube", namespace="translate", entrypoint_cls=LattifAIEntrypoint)
 def translate_youtube(
     yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
