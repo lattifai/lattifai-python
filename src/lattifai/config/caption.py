@@ -63,6 +63,9 @@ class CaptionConfig:
     """Place translation text above original text in bilingual output.
     When True: translation appears on the first line, original on the second line."""
 
+    speaker_color: str = ""
+    """Speaker name color for ASS output ("auto", "#RRGGBB", or comma-separated)."""
+
     encoding: str = "utf-8"
     """Character encoding for reading/writing caption files (default: utf-8)."""
 
