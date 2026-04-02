@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-import colorful
+from lattifai.theme import theme
 
 
 def setup_workflow_logger(name: str) -> logging.Logger:
@@ -111,12 +111,12 @@ class WorkflowAgent(abc.ABC):
         context = kwargs.copy()
         step_results = []
 
-        self.logger.info(colorful.bold_white_on_green(f"🚀 Starting workflow: {self.name}"))
+        self.logger.info(theme.menu_active(f"🚀 Starting workflow: {self.name}"))
 
         try:
             for i, step in enumerate(self.steps):
                 step_info = f"📋 Step {i + 1}/{len(self.steps)}: {step.name}"
-                self.logger.info(colorful.bold_white_on_green(step_info))
+                self.logger.info(theme.menu_active(step_info))
 
                 step_start = time.time()
                 step_result = await self._execute_step_with_retry(step, context)

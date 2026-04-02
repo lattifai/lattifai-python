@@ -66,19 +66,26 @@ The project uses `nemo_run` for CLI entry points. All CLI commands are in `src/l
 
 ```bash
 # Alignment
-lai alignment align <audio> <caption> <output>
-lai alignment youtube <url>
+lai-align <audio> <caption> <output>
 
 # Transcription
-lai transcribe run <input> <output>
-lai transcribe align <input_media> <output_caption>
+lai-transcribe <input> <output>
 
 # Caption utilities
-lai caption convert <input> <output>
-lai caption shift <input> <output> <offset_seconds>
+laicap-convert <input> <output>
+laicap-shift <input> <output> <offset_seconds>
+
+# Diarization
+lai-diarize <audio> [--num-speakers N]
+
+# Translation
+lai-translate <input> <output> --target-lang <lang>
+
+# YouTube
+lai-youtube <url>
 
 # Server
-lai-server --port 8001
+lai-serve --port 8001
 ```
 
 ## Architecture
@@ -102,20 +109,29 @@ Configuration Layer (nemo_run Config objects)
 ```
 src/lattifai/
 ├── client.py              # Main LattifAI client (config-driven)
+├── mixin.py               # Mixins for transcribe/save workflows
+├── audio2.py              # Audio loading and resampling
+├── errors.py              # Custom exception hierarchy
+├── utils.py               # Shared utilities
+├── languages.py           # Language code definitions
 ├── config/                # Configuration classes (all inherit from nemo_run.Config)
 │   ├── client.py          # API settings
 │   ├── alignment.py       # Model & device config
 │   ├── caption.py         # I/O format config
 │   ├── transcription.py   # ASR model config
 │   ├── diarization.py     # Speaker detection config
+│   ├── translation.py     # Translation config
+│   ├── event.py           # Event tracking config
 │   └── media.py           # Audio loading config
 ├── alignment/             # Forced alignment engine
 │   ├── lattice1_aligner.py    # Main aligner using Lattice-1 model
 │   ├── lattice1_worker.py     # Low-level alignment worker
-│   ├── tokenizer.py           # Text preprocessing
-│   ├── sentence_splitter.py   # Smart sentence splitting
+│   ├── tokenizer.py           # Text preprocessing & normalization
+│   ├── sentence_splitter.py   # Smart sentence splitting (wtpsplit)
 │   ├── segmenter.py           # Audio segmentation
-│   └── text_align.py          # Supervision-transcription alignment
+│   ├── text_align.py          # Supervision-transcription alignment & duplicate detection
+│   ├── phonemizer.py          # G2P phoneme conversion
+│   └── punctuation.py         # Punctuation handling
 ├── caption/               # Caption I/O and data structures
 │   ├── caption.py         # Caption dataclass (container for all results)
 │   ├── supervision.py     # Supervision segment dataclass
@@ -131,19 +147,37 @@ src/lattifai/
 │   ├── base.py            # BaseTranscriber interface
 │   ├── gemini.py          # Gemini API (100+ languages)
 │   ├── lattifai.py        # Local models (Parakeet, SenseVoice)
+│   ├── vllm.py            # vLLM/SGLang inference backend
 │   └── __init__.py        # create_transcriber() factory
+├── translation/           # Caption translation pipeline
+│   ├── base.py            # BaseTranslator interface
+│   ├── analyzer.py        # Language/terminology analysis
+│   ├── glossary.py        # Terminology management
+│   ├── reviewer.py        # Translation review
+│   └── prompts.py         # Translation prompts
 ├── diarization/           # Speaker diarization
 │   └── lattifai.py        # LattifAIDiarizer using pyannote.audio
+├── llm/                   # LLM integrations
+│   ├── base.py            # BaseLLM interface
+│   ├── gemini.py          # Gemini LLM client
+│   └── openai_compat.py   # OpenAI-compatible clients
 ├── youtube/               # YouTube download/processing
-│   └── client.py          # YouTube downloader
+│   └── client.py          # YouTube downloader & transcript parser
 ├── workflow/              # Agentic workflow system
 │   ├── base.py            # WorkflowAgent, WorkflowStep
 │   └── file_manager.py    # File existence handling
 ├── cli/                   # CLI entry points (nemo_run)
-│   ├── alignment.py       # lai alignment commands
-│   ├── transcribe.py      # lai transcribe commands
-│   ├── caption.py         # lai caption commands
-│   └── youtube.py         # lai youtube commands
+│   ├── alignment.py       # lai-align commands
+│   ├── transcribe.py      # lai-transcribe commands
+│   ├── caption.py         # laicap-* commands
+│   ├── diarization.py     # lai-diarize command
+│   ├── translate.py       # lai-translate command
+│   ├── youtube.py         # lai-youtube commands
+│   └── serve.py           # lai-serve web server
+├── event/                 # Event tracking
+│   └── lattifai.py        # Event processing
+├── data/                  # Data handling & resampler models
+├── podcast/               # Podcast processing
 └── server/                # FastAPI web server
     └── app.py
 ```
@@ -200,7 +234,7 @@ YouTube URL → Downloader → Media File + Auto Caption
 
 2. **Streaming Mode** (`media.streaming_chunk_secs`):
    - Enables processing of long audio (up to 20 hours)
-   - Default chunk size: 600 seconds (10 minutes)
+   - Default chunk size: 300 seconds (5 minutes)
    - Preserves alignment accuracy with minimal memory overhead
 
 3. **Sentence Splitting** (`caption.split_sentence`):
@@ -262,7 +296,10 @@ YouTube URL → Downloader → Media File + Auto Caption
 
 - `LATTIFAI_API_KEY`: LattifAI API key (required for alignment)
 - `GEMINI_API_KEY`: Google Gemini API key (required for Gemini transcription)
+- `OPENAI_API_KEY`: OpenAI API key (optional, for translation)
+- `OPENAI_API_BASE_URL`: Custom OpenAI-compatible endpoint (optional)
 - `TOKENIZERS_PARALLELISM=false`: Suppress tokenizers warning (set in `__init__.py`)
+- `LATTIFAI_TESTS_CLI_DRYRUN`: Enable dry-run mode for CLI tests
 
 ## Dependencies
 
@@ -304,6 +341,15 @@ YouTube URL → Downloader → Media File + Auto Caption
 - Type hints: Use for public APIs, optional for internal helpers
 - Docstrings: Google style for public classes/methods
 - Error handling: Custom exceptions in `errors.py`, raise specific errors with context
+- **Multilingual**: All text processing (tokenization, splitting, duplicate detection, normalization) must handle mixed-language content (CJK, Latin, accented characters, etc.). Never assume input is English-only.
+
+## Common Pitfalls
+
+- **`nemo_run.Config` subclasses**: Do NOT use mutable defaults (list, dict). Use `field(default_factory=...)` instead.
+- **`lattifai-captions`**: This is a separate package (not in this repo). Import as `from lattifai_captions import ...`. Do not confuse with `src/lattifai/caption/` which is the local caption module.
+- **Tests requiring API keys**: Alignment tests need `LATTIFAI_API_KEY`, transcription tests need `GEMINI_API_KEY`. Tests will skip or fail without them.
+- **W503 is globally ignored**: Do not add per-file W503 ignores in `.flake8` — it is already in the top-level `ignore` list.
+- **`youtube/client.py` is 78KB**: This file is very large. Read only the specific function you need, not the whole file.
 
 ## Language Guidelines
 

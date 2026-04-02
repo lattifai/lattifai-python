@@ -13,12 +13,19 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
-    "gemini-3-pro-preview",
+    # "gemini-3-pro-preview",  # Deprecated, auto-switched to gemini-3.1-pro-preview
     "gemini-3-flash-preview",
     "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview",
     "nvidia/parakeet-tdt-0.6b-v3",
     "nvidia/canary-1b-v2",
     "iic/SenseVoiceSmall",
+    "FunAudioLLM/Fun-ASR-Nano-2512",
+    "FunAudioLLM/Fun-ASR-MLT-Nano-2512",
+    "Qwen/Qwen3-ASR-0.6B",
+    "Qwen/Qwen3-ASR-1.7B",
+    # Any model served via vLLM/SGLang with api_base_url is also supported
+    # (Whisper, Qwen3-ASR, GLM-ASR, VibeVoice, Voxtral, etc.)
 ]
 
 
@@ -30,8 +37,12 @@ class TranscriptionConfig:
     Settings for audio/video transcription using various providers.
     """
 
-    model_name: SUPPORTED_TRANSCRIPTION_MODELS = "nvidia/parakeet-tdt-0.6b-v3"
-    """Model name for transcription."""
+    model_name: str = "nvidia/parakeet-tdt-0.6b-v3"
+    """Model name for transcription. See SUPPORTED_TRANSCRIPTION_MODELS for built-in models.
+    Any model name is accepted when api_base_url is set (vLLM/SGLang)."""
+
+    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
+    """Which model hub to use when resolving lattice models for transcription."""
 
     gemini_api_key: Optional[str] = None
     """Gemini API key. If None, reads from GEMINI_API_KEY environment variable."""
@@ -78,19 +89,58 @@ class TranscriptionConfig:
     lattice_model_path: Optional[str] = None
     """Path to local LattifAI model. Will be auto-set in LattifAI client."""
 
-    model_hub: Literal["huggingface", "modelscope"] = "huggingface"
-    """Which model hub to use when resolving lattice models for transcription."""
+    api_base_url: Optional[str] = None
+    """Base URL for OpenAI-compatible API server (e.g. http://localhost:8000/v1).
+    When set, routes to VLLMTranscriber which uses the /v1/audio/transcriptions endpoint.
+    Works with any ASR model served via vLLM/SGLang (Whisper, Qwen3-ASR, GLM-ASR, etc.)."""
+
+    api_mode: Literal["transcriptions", "chat", "realtime"] = "transcriptions"
+    """API mode for vLLM/SGLang.
+    'transcriptions' (default) uses /v1/audio/transcriptions (multipart upload, best for dedicated ASR models).
+    'chat' uses /v1/chat/completions with audio_url (base64, required for general-purpose LLMs like Gemma-3n).
+    'realtime' uses /v1/realtime WebSocket endpoint (for Voxtral Realtime models)."""
+
+    max_tokens: Optional[int] = None
+    """Maximum output tokens for chat/realtime API modes (vLLM/SGLang only).
+    If None, defaults to 4096 for chat mode. Increase for long audio transcription."""
+
+    batch_size: int = 1
+    """Number of concurrent requests for VAD chunk transcription (vLLM/SGLang only).
+    Set >1 to parallelize HTTP requests to the server. Requires server-side concurrency support.
+    Note: gemma-3n does NOT support concurrent audio requests in vLLM."""
+
+    vad_chunk_size: Optional[float] = None
+    """Maximum audio chunk size in seconds for VAD segmentation (vLLM/SGLang only).
+    If None, auto-estimated from the model's max_model_len and tokens_per_second."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
+    # Deprecated model -> replacement mapping
+    # https://ai.google.dev/gemini-api/docs/deprecations
+    _DEPRECATED_MODELS = {
+        "gemini-3-pro-preview": "gemini-3.1-pro-preview",
+    }
+
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
-        if self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__:
+        # Auto-switch deprecated models
+        if self.model_name in self._DEPRECATED_MODELS:
+            replacement = self._DEPRECATED_MODELS[self.model_name]
+            import logging
+
+            logging.getLogger(__name__).warning(
+                f"Model '{self.model_name}' is deprecated, auto-switching to '{replacement}'"
+            )
+            self.model_name = replacement
+
+        # When api_base_url is set, any model name is valid (forwarded to vLLM/SGLang server)
+        if self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__ and not self.api_base_url:
             raise ValueError(
                 f"Unsupported model_name: '{self.model_name}'. "
-                f"Supported models are: {SUPPORTED_TRANSCRIPTION_MODELS.__args__}"
+                f"Supported models are: {SUPPORTED_TRANSCRIPTION_MODELS.__args__}. "
+                f"For vLLM/SGLang-served models, set api_base_url to enable any model."
             )
 
         # Load environment variables from .env file
@@ -99,9 +149,17 @@ class TranscriptionConfig:
         # Try to find and load .env file from current directory or parent directories
         load_dotenv(find_dotenv(usecwd=True))
 
-        # Auto-load Gemini API key from environment if not provided
+        # Auto-load Gemini API key: env var > config.toml
         if self.gemini_api_key is None:
-            self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+            env_val = os.environ.get("GEMINI_API_KEY")
+            if not env_val:
+                try:
+                    from lattifai.cli.config import get_config_value
+
+                    env_val = get_config_value("gemini_api_key")
+                except ImportError:
+                    pass
+            self.gemini_api_key = env_val
 
         # Validate max_retries
         if self.max_retries < 0:

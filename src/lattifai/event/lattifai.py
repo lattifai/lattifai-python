@@ -99,7 +99,6 @@ class LattifAIEventDetector:
             vad_chunk_size=vad_chunk_size or self.config.vad_chunk_size,
             vad_max_gap=vad_max_gap or self.config.vad_max_gap,
             fast_mode=fast_mode if fast_mode is not None else self.config.fast_mode,
-            custom_aliases=self.config.event_aliases or {},
         )
 
     def profile(self, reset: bool = False) -> None:

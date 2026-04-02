@@ -1,9 +1,10 @@
 """LattifAI client implementation with config-driven architecture."""
 
+import functools
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
-import colorful
 from lattifai_core.client import SyncAPIClient
 
 from lattifai.alignment import Lattice1Aligner, Segmenter
@@ -25,12 +26,98 @@ from lattifai.errors import (
     LatticeEncodingError,
 )
 from lattifai.mixin import LattifAIClientMixin
+from lattifai.theme import theme
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
 if TYPE_CHECKING:
     from lattifai.diarization import LattifAIDiarizer  # noqa: F401
     from lattifai.event import LattifAIEventDetector  # noqa: F401
+
+# Patterns for _extract_speaker_description (module-level for compile-once)
+_SPEAKER_PATTERNS = re.compile(
+    r"(?:host|guest|嘉宾|主播|主持|interviewer|panelist|speaker|featuring|"
+    r"joined\s+by|co-host|with\s+\w+\s+(and|&)|【|嘉宾|主讲|对谈)",
+    re.IGNORECASE,
+)
+_SKIP_LINE = re.compile(
+    r"^(\d{1,2}:\d{2}(?::\d{2})?\s*[-–—]\s*|https?://|http://|Sign up|Subscribe|"
+    r"Follow us|#\w|DISCLAIMER|CONTACT:|Email\s)",
+    re.IGNORECASE,
+)
+
+
+def _build_speaker_context(metadata: dict) -> Optional[str]:
+    """Build speaker context string from video metadata for LLM inference.
+
+    If structured ``speakers`` are present (from enhanced meta.md), includes
+    them directly. Otherwise falls back to extracting from title, channel,
+    and description text.
+    """
+    parts = []
+
+    # Structured speakers field (from enhanced meta.md download pipeline)
+    speakers = metadata.get("speakers")
+    if speakers and isinstance(speakers, list):
+        host_names = [s["name"] for s in speakers if s.get("role") == "host" and s.get("name")]
+        guest_names = [s["name"] for s in speakers if s.get("role") == "guest" and s.get("name")]
+        if host_names:
+            parts.append(f"Channel/Host: {', '.join(host_names)}")
+        if guest_names:
+            parts.append(f"Guests: {', '.join(guest_names)}")
+
+    title = metadata.get("title")
+    if title:
+        parts.append(f"Title: {title}")
+
+    if not speakers:
+        # Fallback: extract from channel and description when no structured speakers
+        uploader = metadata.get("uploader") or metadata.get("channel")
+        if uploader:
+            parts.append(f"Channel/Host: {uploader}")
+
+    description = metadata.get("description", "")
+    if description:
+        parts.append(f"Description:\n{_extract_speaker_description(description)}")
+
+    return "\n".join(parts) if parts else None
+
+
+def _extract_speaker_description(description: str, budget: int = 1500) -> str:
+    """Extract speaker-relevant lines from a video description.
+
+    Keeps the intro paragraph and any lines containing speaker/host/guest
+    signals, discarding timestamps-only blocks, links, and boilerplate.
+    """
+    paragraphs = description.split("\n\n")
+    kept = []
+    total = 0
+
+    # Always keep first paragraph (intro)
+    if paragraphs:
+        intro = paragraphs[0].strip()
+        if len(intro) > 600:
+            intro = intro[:600] + "..."
+        kept.append(intro)
+        total += len(intro)
+
+    # Scan remaining paragraphs for speaker signals
+    for para in paragraphs[1:]:
+        para = para.strip()
+        if not para:
+            continue
+        # Keep paragraphs with speaker patterns
+        if _SPEAKER_PATTERNS.search(para):
+            # Filter out pure-link / pure-timestamp lines within the paragraph
+            lines = [ln for ln in para.split("\n") if ln.strip() and not _SKIP_LINE.match(ln.strip())]
+            if lines:
+                block = "\n".join(lines)
+                if total + len(block) > budget:
+                    break
+                kept.append(block)
+                total += len(block)
+
+    return "\n\n".join(kept)
 
 
 class LattifAI(LattifAIClientMixin, SyncAPIClient):
@@ -108,11 +195,15 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_caption_path: Optional[Pathlike] = None,
         input_caption_format: Optional[InputCaptionFormat] = None,
         split_sentence: Optional[bool] = None,
+        word_level: Optional[bool] = None,
         channel_selector: Optional[str | int] = "average",
         streaming_chunk_secs: Optional[float] = None,
         metadata: Optional[dict] = None,
     ) -> Caption:
+        original_word_level = self.caption_config.word_level
         try:
+            if word_level is not None:
+                self.caption_config.word_level = word_level
             # Step 1: Get caption
             if isinstance(input_media, AudioData):
                 media_audio = input_media
@@ -140,7 +231,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             alignment_strategy = self.aligner.config.strategy
 
             if alignment_strategy != "entire" or caption.transcription:
-                safe_print(colorful.cyan(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
+                safe_print(theme.step(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
 
                 if caption.supervisions and alignment_strategy == "transcription":
                     from lattifai.alignment.text_align import align_supervisions_and_transcription
@@ -203,9 +294,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 supervisions, alignments = [], []
                 for i, (start, end, _supervisions, skipalign) in enumerate(segments, 1):
                     safe_print(
-                        colorful.green(
-                            f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s"
-                        )
+                        theme.ok(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
                     )
                     if skipalign:
                         supervisions.extend(_supervisions)
@@ -264,10 +353,12 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 caption_path=str(input_caption),
                 context={"original_error": str(e), "error_type": e.__class__.__name__},
             )
+        finally:
+            self.caption_config.word_level = original_word_level
 
         # Step 5: Speaker diarization
         if self.diarization_config.enabled and self.diarizer:
-            safe_print(colorful.cyan("🗣️  Performing speaker diarization..."))
+            safe_print(theme.step("🗣️  Performing speaker diarization..."))
             caption = self.speaker_diarization(
                 input_media=media_audio,
                 caption=caption,
@@ -276,7 +367,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
         # Step 6: Event detection
         if self.event_config.enabled and self.event_detector:
-            safe_print(colorful.cyan("🔊 Performing audio event detection..."))
+            safe_print(theme.step("🔊 Performing audio event detection..."))
             caption = self.event_detector.detect_and_update_caption(caption, media_audio)
             if output_caption_path:
                 self._write_caption(caption, output_caption_path)
@@ -294,6 +385,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         input_media: AudioData,
         caption: Caption,
         output_caption_path: Optional[Pathlike] = None,
+        speaker_context: Optional[str] = None,
     ) -> Caption:
         """
         Perform speaker diarization on aligned caption.
@@ -302,6 +394,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             input_media: AudioData object
             caption: Caption object with aligned segments
             output_caption_path: Optional path to write diarized caption
+            speaker_context: Per-call speaker context hint for LLM inference.
+                When None and infer_speakers is enabled, auto-builds from
+                caption.metadata if available.
 
         Returns:
             Caption object with speaker labels assigned
@@ -312,22 +407,31 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         if not self.diarizer:
             raise RuntimeError("Diarizer not initialized. Set diarization_config.enabled=True")
 
+        # Merge per-call context with metadata auto-detect
+        if self.diarization_config.infer_speakers and caption.metadata:
+            meta_context = _build_speaker_context(caption.metadata)
+            if meta_context:
+                speaker_context = f"{speaker_context}\n{meta_context}" if speaker_context else meta_context
+
         # Perform diarization and assign speaker labels to caption alignments
         if output_caption_path:
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if diarization_file.exists():
-                safe_print(colorful.cyan(f"Reading existing speaker diarization from {diarization_file}"))
+                safe_print(theme.step(f"Reading existing speaker diarization from {diarization_file}"))
                 caption.read_diarization(diarization_file)
 
         diarization, alignments = self.diarizer.diarize_with_alignments(
             input_media,
             caption.alignments,
             diarization=caption.diarization,
-            alignment_fn=self.aligner.alignment,
+            alignment_fn=(
+                functools.partial(self.aligner.alignment, skip_duplicate_prompt=True),
+                self.aligner.emission,
+            ),
             transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
             separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
-            debug=self.diarizer.config.debug,
             output_path=output_caption_path,
+            speaker_context=speaker_context,
         )
         caption.alignments = alignments
         caption.diarization = diarization
@@ -357,7 +461,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_dir = self._prepare_youtube_output_dir(output_dir)
         media_format = self._determine_media_format(media_format)
 
-        safe_print(colorful.cyan(f"🎬 Starting YouTube workflow for: {url}"))
+        safe_print(theme.step(f"🎬 Starting YouTube workflow for: {url}"))
 
         # Step 1: Download media
         media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite, audio_track_id, quality)
@@ -381,7 +485,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         output_caption_path = self._generate_output_caption_path(output_caption_path, media_file, output_dir)
 
         # Step 4: Perform alignment
-        safe_print(colorful.cyan("🔗 Performing forced alignment..."))
+        # Metadata flows from frontmatter (read into caption.metadata) + video_url fallback
+        safe_print(theme.step("🔗 Performing forced alignment..."))
 
         caption: Caption = self.alignment(
             input_media=media_audio,

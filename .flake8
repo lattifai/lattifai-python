@@ -4,18 +4,22 @@ statistics=true
 max-line-length = 120
 ignore = W503, E203
 per-file-ignores =
-  src/lattifai/client.py: F841, E501, W503
-  src/lattifai/*.py: E402, F401
-  src/lattifai/config/media.py: E501
+  src/lattifai/__init__.py: E402, F401
+  src/lattifai/client.py: F841, E501
   src/lattifai/audio2.py: E226
-  src/lattifai/bin/*.py: W503, F541, E501, F541, F811
-  src/lattifai/workflow/*.py: W503
+  src/lattifai/config/media.py: E501
+  src/lattifai/config/alignment.py: F401
+  src/lattifai/bin/*.py: F541, E501, F811
   src/lattifai/server/app.py: E501
-  src/lattifai/caption/caption.py: W503
-  src/lattifai/caption/formats/ttml.py: W503
-  src/lattifai/caption/formats/gemini.py: W503
-  src/lattifai/alignment/text_align.py: W503, E501
+  src/lattifai/alignment/text_align.py: E501
+  src/lattifai/alignment/lattice1_worker.py: F401
+  src/lattifai/alignment/segmenter.py: F401
+  src/lattifai/alignment/tokenizer.py: F401
+  src/lattifai/diarization/lattifai.py: F401
+  src/lattifai/transcription/lattifai.py: E402
+  src/lattifai/transcription/vllm.py: E402, F401
   src/lattifai/youtube/client.py: E501
+  src/lattifai/youtube/types.py: F401
   tests/*/*.py: E501, F541, F401, F841, W605, E226, E741
   tests/*.py: F541
 

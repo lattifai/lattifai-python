@@ -4,13 +4,13 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-import colorful
 import numpy as np
 import onnxruntime as ort
 from tqdm import tqdm
 
 from lattifai.audio2 import AudioData
 from lattifai.errors import AlignmentError, DependencyError, ModelLoadError
+from lattifai.theme import theme
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
@@ -72,13 +72,10 @@ class Lattice1Worker:
         # Initialize separator if available
         separator_model_path = Path(model_path) / "separator.onnx"
         if separator_model_path.exists():
-            try:
-                self.separator_ort = ort.InferenceSession(
-                    str(separator_model_path),
-                    providers=["CUDAExecutionProvider", "CPUExecutionProvider"],
-                )
-            except Exception as e:
-                raise ModelLoadError(f"separator model from {model_path}", original_error=e)
+            self.separator_ort = ort.InferenceSession(
+                str(separator_model_path),
+                providers=providers + ["CPUExecutionProvider"],
+            )
         else:
             self.separator_ort = None
 
@@ -97,6 +94,11 @@ class Lattice1Worker:
         Returns:
             Emission numpy array of shape (1, T, vocab_size)
         """
+        if self.alignment_config and self.alignment_config.normalize_volume:
+            from lattifai.audio2 import normalize_volume
+
+            ndarray = normalize_volume(ndarray)
+
         _start = time.time()
 
         if ndarray.shape[1] < 160:
@@ -196,13 +198,29 @@ class Lattice1Worker:
                 allow_partial=True,
             )
 
-            # Streaming mode with confidence score accumulation
+            # Streaming mode — flush every N chunks for memory/quality tradeoff.
+            # flush_interval=0: never flush (O(total) memory, globally optimal)
+            # flush_interval=N: flush every N chunks (higher N = better quality, more memory)
+            # flush_interval="auto": auto-decide based on duration and chunk size
+            flush_cfg = getattr(self.alignment_config, "flush_interval", "auto") if self.alignment_config else "auto"
+            has_flush = hasattr(intersecter, "decode_and_flush")
+            if isinstance(flush_cfg, int):
+                flush_interval = flush_cfg if has_flush else 0
+            elif flush_cfg == "auto":
+                _MIN_DURATION = 2400  # 40 minutes
+                _MIN_CHUNK_SECS = 300  # chunk must be large enough for ShortestPath
+                if has_flush and audio.duration > _MIN_DURATION and audio.streaming_chunk_secs >= _MIN_CHUNK_SECS:
+                    # Auto: ~10 min worth of chunks per flush cycle
+                    flush_interval = max(1, int(1200 / audio.streaming_chunk_secs))
+                else:
+                    flush_interval = 0
+            else:
+                flush_interval = 0
             total_duration = audio.duration
             total_minutes = int(total_duration / 60.0)
 
             max_probs = []
             aligned_probs = []
-            prev_labels_len = 0
 
             with tqdm(
                 total=total_minutes,
@@ -211,36 +229,40 @@ class Lattice1Worker:
                 unit_scale=False,
                 unit_divisor=1,
             ) as pbar:
+                chunk_counter = 0
+                cycle_probs = []
                 for chunk in audio.iter_chunks():
                     chunk_emission = self.emission(chunk.ndarray, acoustic_scale=acoustic_scale)
-                    intersecter.decode(chunk_emission[0])
 
                     __start = time.time()
-                    # Get partial labels and compute confidence stats for this chunk
-                    partial_labels = intersecter.get_partial_labels()
-                    chunk_len = chunk_emission.shape[1]
+                    chunk_counter += 1
+                    do_flush = flush_interval > 0 and chunk_counter % flush_interval == 0
 
-                    # Get labels for current chunk (new labels since last chunk)
-                    chunk_labels = partial_labels[prev_labels_len : prev_labels_len + chunk_len]
-                    prev_labels_len = len(partial_labels)
-
-                    # Compute emission-based confidence stats
-                    probs = np.exp(chunk_emission[0])  # [T, V]
-                    max_probs.append(np.max(probs, axis=-1))  # [T]
-
-                    # Handle case where chunk_labels length might differ from chunk_len
-                    if len(chunk_labels) == chunk_len:
-                        aligned_probs.append(probs[np.arange(chunk_len), chunk_labels])
+                    if do_flush:
+                        intersecter.decode_and_flush(chunk_emission[0])
                     else:
-                        # Fallback: use max probs as aligned probs (approximate)
-                        aligned_probs.append(np.max(probs, axis=-1))
+                        intersecter.decode(chunk_emission[0])
 
-                    del chunk_emission, probs  # Free memory
+                    probs = np.exp(chunk_emission[0])
+                    max_probs.append(np.max(probs, axis=-1))
+                    cycle_probs.append(probs)
+
+                    if do_flush or flush_interval == 0:
+                        labels = intersecter.get_partial_labels()
+                        emission = np.concatenate(cycle_probs, axis=0)
+                        if len(labels) == len(emission):
+                            aligned_probs.append(emission[np.arange(len(labels)), labels])
+                        else:
+                            aligned_probs.append(np.max(emission, axis=-1))
+                        cycle_probs = []
+
+                    del chunk_emission
                     self.timings["align_>labels"] += time.time() - __start
+                    pbar.update(int(chunk.duration / 60.0))
 
-                    # Update progress
-                    chunk_duration = int(chunk.duration / 60.0)
-                    pbar.update(chunk_duration)
+                # Tail chunks that didn't complete a flush cycle
+                if cycle_probs:
+                    aligned_probs.append(np.max(np.concatenate(cycle_probs, axis=0), axis=-1))
 
             # Build emission_stats for confidence calculation
             emission_stats = {
@@ -248,7 +270,6 @@ class Lattice1Worker:
                 "aligned_probs": np.concatenate(aligned_probs),
             }
 
-            # Get results from intersecter
             __start = time.time()
             results, labels = intersecter.finish()
             self.timings["align_>finish"] += time.time() - __start
@@ -286,14 +307,14 @@ class Lattice1Worker:
         if not self.timings:
             return
 
-        safe_print(colorful.bold(colorful.cyan("\n⏱️  Alignment Profiling")))
-        safe_print(colorful.gray("─" * 44))
+        safe_print(theme.step("\n⏱️  Alignment Profiling"))
+        safe_print(theme.dim("─" * 44))
         safe_print(
-            f"{colorful.bold('Phase'.ljust(21))} "
-            f"{colorful.bold('Time'.ljust(12))} "
-            f"{colorful.bold('Percent'.rjust(8))}"
+            f"{theme.label('Phase'.ljust(21))} "
+            f"{theme.label('Time'.ljust(12))} "
+            f"{theme.label('Percent'.rjust(8))}"
         )
-        safe_print(colorful.gray("─" * 44))
+        safe_print(theme.dim("─" * 44))
 
         total_time = sum(self.timings.values())
 
@@ -305,16 +326,13 @@ class Lattice1Worker:
             # Name: Cyan, Time: Yellow, Percent: Gray
             safe_print(
                 f"{name:<20} "
-                f"{colorful.yellow(f'{duration:7.4f}s'.ljust(12))} "
-                f"{colorful.gray(f'{percentage:.2f}%'.rjust(8))}"
+                f"{theme.warn(f'{duration:7.4f}s'.ljust(12))} "
+                f"{theme.dim(f'{percentage:.2f}%'.rjust(8))}"
             )
 
-        safe_print(colorful.gray("─" * 44))
+        safe_print(theme.dim("─" * 44))
         # Pad "Total Time" before coloring to ensure correct alignment (ANSI codes don't count for width)
-        safe_print(
-            f"{colorful.bold('Total Time'.ljust(20))} "
-            f"{colorful.bold(colorful.yellow(f'{total_time:7.4f}s'.ljust(12)))}\n"
-        )
+        safe_print(f"{theme.label('Total Time'.ljust(20))} " f"{theme.value(f'{total_time:7.4f}s'.ljust(12))}\n")
 
 
 def _load_worker(model_path: str, device: str, config: Optional[Any] = None) -> Lattice1Worker:

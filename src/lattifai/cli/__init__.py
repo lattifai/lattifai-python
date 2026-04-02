@@ -8,15 +8,24 @@ import nemo_run as run  # noqa: F401
 from lattifai.cli.alignment import align
 from lattifai.cli.caption import convert, diff
 from lattifai.cli.diarization import diarize
+from lattifai.cli.serve import serve
 from lattifai.cli.transcribe import transcribe, transcribe_align
-from lattifai.cli.youtube import youtube
+from lattifai.cli.translate import translate, translate_youtube
+from lattifai.cli.youtube import youtube, youtube_download
+
+# doctor and update are registered as direct Typer commands via _main.py,
+# not through nemo_run's namespace system, so they don't need re-export here.
 
 __all__ = [
     "align",
     "convert",
     "diff",
     "diarize",
+    "serve",
     "transcribe",
     "transcribe_align",
+    "translate",
+    "translate_youtube",
     "youtube",
+    "youtube_download",
 ]

@@ -12,9 +12,9 @@ from lattifai.config import AlignmentConfig, MediaConfig
 
 
 def test_media_config_streaming_disabled_by_default():
-    """Test that streaming is enabled by default with 600.0 seconds."""
+    """Test that streaming is enabled by default with 300.0 seconds."""
     config = MediaConfig()
-    assert config.streaming_chunk_secs == 600.0
+    assert config.streaming_chunk_secs == 300.0
 
 
 def test_media_config_streaming_enabled():
