@@ -523,8 +523,14 @@ When speakers remain as `SPEAKER_XX` after acoustic diarization, enable LLM infe
 DiarizationConfig(
     enabled=True,
     infer_speakers=True,              # Use LLM to infer speaker names
+)
+
+# Pass context as a per-call parameter to speaker_diarization()
+client.speaker_diarization(
+    input_media=audio,
+    caption=caption,
+    output_caption_path="output.srt",
     speaker_context="podcast, host is Alice, guest is Bob",  # Optional hint
-    infer_model="gemini-2.5-flash",   # LLM model (default)
 )
 ```
 
@@ -538,8 +544,6 @@ DiarizationConfig(
 | `min_speakers` | — | Minimum speakers to detect |
 | `max_speakers` | — | Maximum speakers to detect |
 | `infer_speakers` | `False` | Use LLM to infer real names from dialogue |
-| `speaker_context` | — | Context hint for LLM inference |
-| `infer_model` | `gemini-2.5-flash` | Model for speaker name inference |
 
 **CLI:**
 ```bash
@@ -550,8 +554,11 @@ lai alignment align audio.wav subtitle.srt output.srt \
 # With LLM speaker name inference
 lai alignment align audio.wav subtitle.srt output.srt \
     diarization.enabled=true \
-    diarization.infer_speakers=true \
-    diarization.speaker_context="interview with Dr. Smith"
+    diarization.infer_speakers=true
+
+# Diarize subcommand with speaker context
+lai diarize run audio.wav subtitle.srt output.srt \
+    --context "interview with Dr. Smith"
 ```
 
 ### Data Flow

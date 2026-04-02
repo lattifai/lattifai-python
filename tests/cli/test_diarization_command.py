@@ -86,7 +86,7 @@ class TestDiarizeErrors:
         input_caption_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
         media = MediaConfig(input_path=str(audio_path))
         caption = CaptionConfig(input_path=str(input_caption_path), output_path=str(tmp_path / "output.srt"))
-        diarization_config = DiarizationConfig()
+        diarization_config = DiarizationConfig(infer_speakers=True)
         fake_caption = SimpleNamespace(alignments=[SimpleNamespace(text="hello")], supervisions=[])
         fake_client = Mock()
         fake_client.audio_loader = Mock(return_value="audio")
@@ -100,7 +100,7 @@ class TestDiarizeErrors:
             return fake_client
 
         with patch("lattifai.cli.diarize.build_lattifai_client", side_effect=_build_client):
-            result = diarize(media=media, caption=caption, diarization=diarization_config, infer_speakers=True)
+            result = diarize(media=media, caption=caption, diarization=diarization_config)
 
         assert result == "diarized"
         fake_client.speaker_diarization.assert_called_once()
