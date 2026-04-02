@@ -27,16 +27,17 @@ KEY_MAP = {
 
 # Section-scoped keys: "section.key" format, stored as [section] key = value
 # Value is the env var name (or None if no env mapping).
+# LLM keys use nested TOML tables: [translation.llm] model_name = ...
 SECTION_KEYS = {
     "transcription.model_name": None,
-    "translation.model_name": None,
-    "translation.provider": None,
-    "translation.api_key": None,
-    "translation.api_base_url": None,
-    "diarization.model_name": None,
-    "diarization.provider": None,
-    "diarization.api_key": None,
-    "diarization.api_base_url": None,
+    "translation.llm.model_name": None,
+    "translation.llm.provider": None,
+    "translation.llm.api_key": None,
+    "translation.llm.api_base_url": None,
+    "diarization.llm.model_name": None,
+    "diarization.llm.provider": None,
+    "diarization.llm.api_key": None,
+    "diarization.llm.api_base_url": None,
 }
 
 # All valid keys for CLI validation
@@ -57,10 +58,16 @@ SECTION_KEY_MAP = {
     "defaults": {"DEFAULT_AUDIO_FORMAT", "DEFAULT_VIDEO_FORMAT"},
 }
 
-SECTION_ORDER = ["auth", "api", "defaults", "transcription", "translation"]
+SECTION_ORDER = ["auth", "api", "defaults", "transcription", "translation", "diarization"]
 
 # Keys that should be masked in display
-SECRET_KEYS = {"LATTIFAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "translation.api_key", "diarization.api_key"}
+SECRET_KEYS = {
+    "LATTIFAI_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENAI_API_KEY",
+    "translation.llm.api_key",
+    "diarization.llm.api_key",
+}
 
 
 def _mask_value(value: str) -> str:
@@ -110,17 +117,36 @@ def _get_section_name(key: str) -> Optional[str]:
 
 
 def _parse_dotted_key(key: str) -> tuple[Optional[str], str]:
-    """Parse 'section.key' into (section, key). Returns (None, key) for top-level."""
+    """Parse 'section.key' into (section, key). Returns (None, key) for top-level.
+
+    For multi-level keys like 'translation.llm.model_name', splits on the
+    **last** dot: section='translation.llm', subkey='model_name'.
+    """
     if "." in key:
-        section, _, subkey = key.partition(".")
+        section, _, subkey = key.rpartition(".")
         return section, subkey
     return None, key
+
+
+def _walk_nested(config: dict, dotted_section: str) -> dict:
+    """Walk into nested dicts following a dotted section path.
+
+    For 'translation.llm', returns config['translation']['llm'] (or {}).
+    """
+    data = config
+    for part in dotted_section.split("."):
+        if isinstance(data, dict):
+            data = data.get(part, {})
+        else:
+            return {}
+    return data if isinstance(data, dict) else {}
 
 
 def get_config_value(key: str) -> Optional[str]:
     """Get a value from ~/.lattifai/config.toml by key name.
 
-    Supports both top-level keys ('GEMINI_API_KEY') and dotted keys ('transcription.model').
+    Supports both top-level keys ('GEMINI_API_KEY') and dotted keys
+    ('transcription.model_name', 'translation.llm.model_name').
     Returns None if the key is not set in the config file.
     """
     config = _normalize_config(_load_config())
@@ -128,7 +154,7 @@ def get_config_value(key: str) -> Optional[str]:
     # Try dotted key first
     section, subkey = _parse_dotted_key(key)
     if section:
-        section_data = config.get(section, {})
+        section_data = _walk_nested(config, section)
         if subkey in section_data:
             return str(section_data[subkey])
         return None
@@ -270,11 +296,11 @@ def clear_auth() -> None:
 def _normalize_key(key: str) -> str:
     """Normalize a user-provided key for lookup.
 
-    Top-level keys -> UPPERCASE. Dotted keys -> section lowercase, key lowercase.
+    Top-level keys -> UPPERCASE. Dotted keys -> all parts lowercase.
+    Supports multi-level: 'Translation.LLM.Model_Name' -> 'translation.llm.model_name'.
     """
-    section, subkey = _parse_dotted_key(key)
-    if section:
-        return f"{section.lower()}.{subkey.lower()}"
+    if "." in key:
+        return key.lower()
     return key.upper()
 
 
@@ -294,7 +320,7 @@ def _resolve_value(key: str) -> tuple[Optional[str], str]:
                 return env_val, "environment"
 
         config = _normalize_config(_load_config())
-        section_data = config.get(section, {})
+        section_data = _walk_nested(config, section)
         if subkey in section_data:
             return str(section_data[subkey]), "config file"
 
@@ -376,7 +402,7 @@ def show():
 def set_value(key: str, value: str):
     """Set a configuration value.
 
-    Use dotted keys for section values: transcription.model, translation.provider
+    Use dotted keys for section values: transcription.model_name, translation.llm.model_name
     """
     normalized = _normalize_key(key)
     if normalized not in ALL_KEYS:
@@ -403,8 +429,12 @@ def set_value(key: str, value: str):
     section, subkey = _parse_dotted_key(normalized)
 
     if section:
-        config.setdefault(section, {})
-        config[section][subkey] = value
+        # Walk into nested sections, creating dicts as needed
+        parts = section.split(".")
+        node = config
+        for part in parts:
+            node = node.setdefault(part, {})
+        node[subkey] = value
     else:
         legacy_section = _get_section_name(normalized)
         if legacy_section:
@@ -422,7 +452,7 @@ def set_value(key: str, value: str):
 def get_value(key: str):
     """Get a configuration value.
 
-    Use dotted keys for section values: transcription.model, translation.provider
+    Use dotted keys for section values: transcription.model_name, translation.llm.model_name
     """
     normalized = _normalize_key(key)
     if normalized not in ALL_KEYS:

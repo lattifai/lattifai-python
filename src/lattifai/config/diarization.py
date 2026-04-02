@@ -13,9 +13,9 @@ if TYPE_CHECKING:
 
 @dataclass
 class DiarizationLLMConfig(LLMConfig):
-    """LLM config bound to [diarization] section. Survives nemo_run reconstruction."""
+    """LLM config bound to [diarization.llm] section. Survives nemo_run reconstruction."""
 
-    section: str = "diarization"
+    section: str = "diarization.llm"
     fallback_model: Optional[str] = "gemini-3-flash-preview"
 
 
@@ -26,6 +26,8 @@ class DiarizationConfig:
 
     Settings for speaker diarization operations.
     """
+
+    _toml_section = "diarization"
 
     enabled: bool = False
     """Enable speaker diarization."""

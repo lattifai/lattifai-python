@@ -163,7 +163,7 @@ class TestSubclassSurvivesNemoRun:
         # nemo_run would construct: TranslationLLMConfig(model_name=None)
         # section="translation" and fallback_model survive as class defaults
         c = TranslationLLMConfig()
-        assert c.section == "translation"
+        assert c.section == "translation.llm"
         assert c.model_name is not None  # resolved from config.toml or fallback
 
     def test_translation_subclass_with_explicit_model(self):
@@ -171,11 +171,11 @@ class TestSubclassSurvivesNemoRun:
 
         c = TranslationLLMConfig(model_name="my-model")
         assert c.model_name == "my-model"
-        assert c.section == "translation"
+        assert c.section == "translation.llm"
 
     def test_translation_config_llm_type(self):
         from lattifai.config.translation import TranslationConfig, TranslationLLMConfig
 
         tc = TranslationConfig()
         assert isinstance(tc.llm, TranslationLLMConfig)
-        assert tc.llm.section == "translation"
+        assert tc.llm.section == "translation.llm"

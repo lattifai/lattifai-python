@@ -8,9 +8,9 @@ from lattifai.config.llm import LLMConfig
 
 @dataclass
 class TranslationLLMConfig(LLMConfig):
-    """LLM config bound to [translation] section. Survives nemo_run reconstruction."""
+    """LLM config bound to [translation.llm] section. Survives nemo_run reconstruction."""
 
-    section: str = "translation"
+    section: str = "translation.llm"
     fallback_model: Optional[str] = "gemini-3-flash-preview"
 
 
