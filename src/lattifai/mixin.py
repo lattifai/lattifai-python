@@ -389,13 +389,28 @@ class LattifAIClientMixin:
             CaptionProcessingError: If caption cannot be written
         """
         try:
+            # Merge caption_config.style into karaoke_config.style if karaoke is active
+            karaoke_config = self.caption_config.karaoke
+            if karaoke_config and karaoke_config.enabled:
+                base_style = self.caption_config.style
+                k_style = karaoke_config.style
+                # Base style fields apply if karaoke style hasn't overridden them
+                if not k_style.background_color and base_style.background_color:
+                    k_style.background_color = base_style.background_color
+                # font from base style (karaoke default is Arial/20, use config if set differently)
+                if k_style.font_name == "Arial" and base_style.font_name != "Arial":
+                    k_style.font_name = base_style.font_name
+                if k_style.font_size == 20 and base_style.font_size != 20:
+                    k_style.font_size = base_style.font_size
+
             result = caption.write(
                 output_caption_path,
                 include_speaker_in_text=self.caption_config.include_speaker_in_text,
                 word_level=self.caption_config.word_level,
-                karaoke_config=self.caption_config.karaoke,
+                karaoke_config=karaoke_config,
                 translation_first=self.caption_config.translation_first,
                 speaker_color=self.caption_config.speaker_color,
+                background_color=self.caption_config.style.background_color,
             )
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if not diarization_file.exists() and caption.diarization:

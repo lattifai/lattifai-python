@@ -148,6 +148,7 @@ def convert(
     karaoke: Annotated[Optional[KaraokeConfig], run.Config[KaraokeConfig]] = None,
     translation_first: bool = False,
     speaker_color: str = "",
+    background_color: str = "",
 ):
     """
     Convert caption file to another format.
@@ -208,10 +209,13 @@ def convert(
 
     from lattifai.data import Caption
 
-    # nemo_run passes KaraokeConfig directly; ensure enabled flag is set
+    # Auto-enable karaoke if any karaoke.* field is set (e.g., karaoke.color_scheme=xxx)
     karaoke_config = None
-    if karaoke is not None and karaoke.enabled:
-        karaoke_config = karaoke
+    if karaoke is not None:
+        if not karaoke.enabled and (karaoke.color_scheme or karaoke.effect != "sweep"):
+            karaoke.enabled = True
+        if karaoke.enabled:
+            karaoke_config = karaoke
 
     try:
         caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
@@ -247,6 +251,7 @@ def convert(
         karaoke_config=karaoke_config,
         translation_first=translation_first,
         speaker_color=speaker_color,
+        background_color=background_color,
     )
 
     safe_print(f"Converted {input_path} -> {output_path}")

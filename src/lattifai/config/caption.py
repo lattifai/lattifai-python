@@ -1,12 +1,13 @@
 """Caption I/O configuration for LattifAI SDK."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 from lattifai.caption.config import (
     INPUT_CAPTION_FORMATS,
     OUTPUT_CAPTION_FORMATS,
+    CaptionStyle,
     InputCaptionFormat,
     KaraokeConfig,
     OutputCaptionFormat,
@@ -56,10 +57,15 @@ class CaptionConfig:
     word_level: bool = False
     """Include word-level timestamps in alignment results (useful for karaoke, dubbing)."""
 
+    style: CaptionStyle = field(default_factory=CaptionStyle)
+    """Subtitle style (font, colors, background, alignment).
+    Applies to all ASS/VTT output. Controls font_name, font_size, primary_color,
+    outline_color, background_color, alignment, margins, etc.
+    When karaoke.color_scheme is set, scheme colors override style colors."""
+
     karaoke: Optional[KaraokeConfig] = None
-    """Karaoke configuration when word_level=True (e.g., ASS \\kf tags, enhanced LRC).
-    When None with word_level=True, outputs word-per-segment instead of karaoke styling.
-    When provided, karaoke.enabled controls whether karaoke styling is applied."""
+    """Karaoke-specific settings (effect, color_scheme).
+    When enabled, karaoke.color_scheme overrides style colors for the karaoke track."""
 
     translation_first: bool = False
     """Place translation text above original text in bilingual output.
