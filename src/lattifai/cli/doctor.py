@@ -278,11 +278,31 @@ def _check_model_cache() -> tuple[str, str, str]:
 
 
 def _check_api_key() -> tuple[str, str, str]:
-    """Check LATTIFAI_API_KEY environment variable."""
+    """Check LATTIFAI_API_KEY: env var > config.toml [auth] > .env."""
     key = os.environ.get("LATTIFAI_API_KEY", "")
+    source = "env"
+
+    if not key:
+        try:
+            from lattifai.cli.config import get_auth_value
+
+            key = get_auth_value("LATTIFAI_API_KEY") or ""
+            source = "config.toml"
+        except (ImportError, OSError):
+            pass
+
+    if not key:
+        try:
+            from dotenv import dotenv_values
+
+            key = dotenv_values().get("LATTIFAI_API_KEY", "")
+            source = ".env"
+        except ImportError:
+            pass
+
     if key:
         masked = f"...{key[-4:]}" if len(key) > 4 else "***"
-        return ("API key", f"[{T.RICH_OK}]Set ({masked})[/{T.RICH_OK}]", "OK")
+        return ("API key", f"[{T.RICH_OK}]Set ({masked}) [{source}][/{T.RICH_OK}]", "OK")
     return ("API key", f"[{T.RICH_WARN}]LATTIFAI_API_KEY not set[/{T.RICH_WARN}]", "WARN")
 
 
