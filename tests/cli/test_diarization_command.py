@@ -2,10 +2,13 @@
 
 import os
 import subprocess
+import textwrap
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+
+from lattifai.cli.diarize import _resolve_context
 
 LATTIFAI_TESTS_CLI_DRYRUN = bool(os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false"))
 
@@ -23,6 +26,169 @@ def run_diarize_command(args, env=None):
     except subprocess.CalledProcessError as e:
         print(f"Command: {' '.join(cmd)} failed with exit code {e.returncode}")
         raise e
+
+
+class TestResolveContext:
+    """Unit tests for _resolve_context() — file path vs inline string detection."""
+
+    def test_none_returns_none(self):
+        assert _resolve_context(None) is None
+
+    def test_empty_string_returns_none(self):
+        assert _resolve_context("") is None
+
+    def test_inline_string_passthrough(self):
+        ctx = "podcast, host is Alice, guest is Bob"
+        assert _resolve_context(ctx) == ctx
+
+    def test_nonexistent_path_treated_as_inline(self):
+        result = _resolve_context("/nonexistent/path/to/meta.md")
+        assert result == "/nonexistent/path/to/meta.md"
+
+    def test_file_without_frontmatter(self, tmp_path):
+        f = tmp_path / "plain.txt"
+        f.write_text("Just some plain text about speakers.", encoding="utf-8")
+        assert _resolve_context(str(f)) == "Just some plain text about speakers."
+
+    def test_empty_file_returns_none(self, tmp_path):
+        f = tmp_path / "empty.md"
+        f.write_text("", encoding="utf-8")
+        assert _resolve_context(str(f)) is None
+
+    def test_meta_md_with_speakers(self, tmp_path):
+        f = tmp_path / "video.meta.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: AI and Mathematics
+                speakers:
+                  - name: Terence Tao
+                    role: guest
+                  - name: Dwarkesh Patel
+                    role: host
+                ---
+                A deep conversation about AI.
+            """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(f))
+        assert "Channel/Host: Dwarkesh Patel" in result
+        assert "Guests: Terence Tao" in result
+        assert "Title: AI and Mathematics" in result
+        assert "A deep conversation about AI" in result
+
+    def test_meta_md_channel_fallback(self, tmp_path):
+        """Channel field used when no speakers with host role."""
+        f = tmp_path / "video.meta.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Great Talk
+                channel: TechChannel
+                ---
+            """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(f))
+        assert "Channel/Host: TechChannel" in result
+        assert "Title: Great Talk" in result
+
+    def test_meta_md_uploader_fallback(self, tmp_path):
+        """'uploader' used as channel fallback."""
+        f = tmp_path / "video.meta.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: My Video
+                uploader: SomeCreator
+                ---
+            """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(f))
+        assert "Channel/Host: SomeCreator" in result
+
+    def test_meta_md_channel_not_duplicated_with_host(self, tmp_path):
+        """Channel is NOT added when speakers already provide a host."""
+        f = tmp_path / "video.meta.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Interview
+                channel: MyChannel
+                speakers:
+                  - name: Alice
+                    role: host
+                ---
+            """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(f))
+        assert result.count("Channel/Host:") == 1
+        assert "Channel/Host: Alice" in result
+
+    def test_description_filters_urls_and_timestamps(self, tmp_path):
+        f = tmp_path / "video.meta.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Talk
+                ---
+                https://example.com/sponsor
+                00:00 Intro
+                This is the real description.
+                Another meaningful line.
+                #hashtag should be skipped
+            """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(f))
+        assert "This is the real description." in result
+        assert "Another meaningful line." in result
+        assert "https://example.com" not in result
+        assert "00:00" not in result
+        assert "#hashtag" not in result
+
+    def test_description_limited_to_3_lines(self, tmp_path):
+        f = tmp_path / "video.meta.md"
+        f.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Long
+                ---
+                Line one.
+                Line two.
+                Line three.
+                Line four should not appear.
+            """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(f))
+        assert "Line three." in result
+        assert "Line four" not in result
+
+    def test_unclosed_frontmatter_returns_none(self, tmp_path):
+        f = tmp_path / "broken.meta.md"
+        f.write_text("---\ntitle: Broken\nno closing delimiter", encoding="utf-8")
+        assert _resolve_context(str(f)) is None
+
+    def test_invalid_yaml_falls_back_to_raw(self, tmp_path):
+        f = tmp_path / "bad.meta.md"
+        f.write_text("---\n: [invalid yaml\n---\nbody\n", encoding="utf-8")
+        result = _resolve_context(str(f))
+        assert result is not None  # Falls back to raw frontmatter text
 
 
 class TestDiarizeHelp:
