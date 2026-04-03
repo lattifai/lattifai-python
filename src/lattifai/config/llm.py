@@ -6,7 +6,7 @@ Each caller passes section= to bind LLMConfig to its config.toml section.
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal, Optional
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from lattifai.llm.base import BaseLLMClient
@@ -36,11 +36,11 @@ class LLMConfig:
 
     Resolution order: explicit value > config.toml [section] > fallback.
     Uses None as sentinel — only None triggers config.toml lookup.
-    Explicit values (including "gemini") are never overwritten.
-    """
 
-    provider: Optional[Literal["gemini", "openai"]] = None
-    """LLM provider. None = resolve from config.toml, fallback to 'gemini'."""
+    Provider is inferred from model_name prefix:
+    - "gemini*" → gemini (GEMINI_API_KEY + Google endpoint)
+    - otherwise → openai (OPENAI_API_KEY + user-provided or default endpoint)
+    """
 
     model_name: Optional[str] = None
     """Model name. None = resolve from config.toml -> fallback -> raise."""
@@ -57,23 +57,31 @@ class LLMConfig:
     fallback_model: Optional[str] = None
     """Fallback model when config.toml has no value. Set by consumer (e.g. TranslationConfig)."""
 
+    @staticmethod
+    def _infer_provider(model_name: Optional[str]) -> str:
+        """Infer LLM provider from model name prefix.
+
+        Returns "gemini" for models starting with "gemini", "openai" otherwise.
+        """
+        if model_name and model_name.startswith("gemini"):
+            return "gemini"
+        return "openai"
+
+    @property
+    def provider(self) -> str:
+        """Inferred provider based on model_name. Read-only."""
+        return self._infer_provider(self.model_name)
+
     def __post_init__(self) -> None:
         """Resolve defaults from config.toml, then API key and base URL."""
-        # Step 1: fill empty/None fields from config.toml [section]
+        # Step 1: fill model_name from config.toml [section]
         if self.section:
             if not self.model_name:
                 self.model_name = resolve_toml_value(self.section, "model_name")
-            if not self.provider:
-                saved = resolve_toml_value(self.section, "provider")
-                if saved and saved in ("gemini", "openai"):
-                    self.provider = saved  # type: ignore[assignment]
 
         # Step 2: apply fallbacks
         if not self.model_name:
             self.model_name = self.fallback_model
-
-        if not self.provider:
-            self.provider = "gemini"
 
         # Step 3: validate required fields
         if not self.model_name:
@@ -86,7 +94,7 @@ class LLMConfig:
                 "  Pass model_name= explicitly or set section= for config.toml lookup."
             )
 
-        # Step 4: resolve API credentials
+        # Step 4: resolve API credentials (provider is now inferred from model_name)
         if self.api_key is None:
             self.api_key = self._resolve_api_key()
 

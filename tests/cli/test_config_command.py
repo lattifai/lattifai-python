@@ -107,3 +107,88 @@ class TestConfigInternals:
             assert get_auth_value("LATTIFAI_API_KEY") == "test-key"
             clear_auth()
             assert get_auth_value("LATTIFAI_API_KEY") is None
+
+
+class TestSectionKeyDiscovery:
+    """Verify auto-discovery of section keys from Config dataclasses."""
+
+    def test_discovers_legacy_keys(self):
+        """All previously hardcoded keys are still present."""
+        from lattifai.cli.config import SECTION_KEYS
+
+        legacy = [
+            "transcription.model_name",
+            "translation.llm.model_name",
+            "translation.llm.api_key",
+            "translation.llm.api_base_url",
+            "diarization.llm.model_name",
+            "diarization.llm.api_key",
+            "diarization.llm.api_base_url",
+        ]
+        for key in legacy:
+            assert key in SECTION_KEYS, f"Legacy key missing: {key}"
+
+    def test_discovers_new_section_keys(self):
+        """Fields added to Config classes are auto-discovered."""
+        from lattifai.cli.config import SECTION_KEYS
+
+        # Spot-check a few fields from different Config classes
+        expected = [
+            "translation.target_lang",
+            "translation.mode",
+            "diarization.infer_speakers",
+            "diarization.num_speakers",
+            "alignment.device",
+            "alignment.strategy",
+            "transcription.device",
+            "transcription.language",
+            "summarization.lang",
+            "summarization.length",
+        ]
+        for key in expected:
+            assert key in SECTION_KEYS, f"Expected key missing: {key}"
+
+    def test_excludes_internal_fields(self):
+        """LLMConfig internal fields (section, fallback_model) are excluded."""
+        from lattifai.cli.config import SECTION_KEYS
+
+        for key in SECTION_KEYS:
+            assert not key.endswith(".section"), f"Internal field leaked: {key}"
+            assert not key.endswith(".fallback_model"), f"Internal field leaked: {key}"
+
+    def test_excludes_repr_false_fields(self):
+        """Fields with repr=False (e.g. client_wrapper) are excluded."""
+        from lattifai.cli.config import SECTION_KEYS
+
+        for key in SECTION_KEYS:
+            assert not key.endswith(".client_wrapper"), f"repr=False field leaked: {key}"
+
+    def test_excludes_nested_config_fields(self):
+        """Nested Config fields (e.g. karaoke, llm) are sections, not keys."""
+        from lattifai.cli.config import SECTION_KEYS
+
+        for key in SECTION_KEYS:
+            # "diarization.llm" would be wrong — "diarization.llm.model_name" is correct
+            parts = key.split(".")
+            assert len(parts) >= 2, f"Invalid key format: {key}"
+
+    def test_provider_removed_from_section_keys(self):
+        """provider field no longer exists in LLMConfig, thus not discovered."""
+        from lattifai.cli.config import SECTION_KEYS
+
+        for key in SECTION_KEYS:
+            assert not key.endswith(".provider"), f"Removed provider field found: {key}"
+
+    def test_secret_keys_auto_detected(self):
+        """Keys ending with .api_key are auto-detected as secrets."""
+        from lattifai.cli.config import SECRET_KEYS
+
+        assert "translation.llm.api_key" in SECRET_KEYS
+        assert "diarization.llm.api_key" in SECRET_KEYS
+        assert "client.api_key" in SECRET_KEYS
+
+    def test_all_keys_includes_both_maps(self):
+        """ALL_KEYS is the union of KEY_MAP and SECTION_KEYS."""
+        from lattifai.cli.config import ALL_KEYS, KEY_MAP, SECTION_KEYS
+
+        assert ALL_KEYS == set(KEY_MAP) | set(SECTION_KEYS)

@@ -34,8 +34,8 @@ def summarize_caption(
             is written next to the input with a ``.summary.<lang>.md``
             suffix.
         summarization: Summarisation configuration.
-            Fields: llm.provider, llm.model_name, llm.api_key,
-                    llm.api_base_url, lang, length, output_format,
+            Fields: llm.model_name, llm.api_base_url, lang, length,
+                    output_format,
                     source_lang, max_input_chars, chunk_chars,
                     max_chunks, overlap_chars, include_chapters,
                     include_metadata, temperature, verbose
@@ -55,11 +55,10 @@ def summarize_caption(
         # Long summary with custom output path
         lai summarize caption input.srt output=my_summary.md summarization.length=long
 
-        # Use OpenAI-compatible endpoint
+        # Use OpenAI-compatible endpoint (provider inferred from model_name)
         lai summarize caption input.srt \\
-            summarization.llm.provider=openai \\
-            summarization.llm.api_base_url=http://localhost:8000/v1 \\
-            summarization.llm.model_name=qwen3
+            summarization.llm.model_name=qwen3 \\
+            summarization.llm.api_base_url=http://localhost:8000/v1
     """
     from lattifai.caption import Caption
     from lattifai.summarization import ContentSummarizer, SummaryInput

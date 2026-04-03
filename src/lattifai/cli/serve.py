@@ -138,7 +138,6 @@ OUTPUT_SUFFIX = {
 }
 
 ALLOWED_DEVICES = {"auto", "cpu", "cuda", "mps"}
-ALLOWED_PROVIDERS = {"gemini", "openai"}
 ALLOWED_TRANSLATION_MODES = {"quick", "normal", "refined"}
 
 
@@ -398,10 +397,6 @@ class ServeHandler(BaseHTTPRequestHandler):
     def _run_translate(self, form: FormData, run_dir: Path) -> Path:
         caption_file = self._save_uploaded_file(form, "caption_file", run_dir, "caption.srt")
 
-        provider = (self._field_value(form, "provider", "gemini") or "gemini").strip().lower()
-        if provider not in ALLOWED_PROVIDERS:
-            raise ValueError(f"Unsupported provider: {provider}")
-
         mode = (self._field_value(form, "mode", "normal") or "normal").strip().lower()
         if mode not in ALLOWED_TRANSLATION_MODES:
             raise ValueError(f"Unsupported translation mode: {mode}")
@@ -413,13 +408,16 @@ class ServeHandler(BaseHTTPRequestHandler):
         )
         output_path = run_dir / f"{caption_file.stem}_{target_lang}{output_suffix}"
 
-        default_model = "gemini-3-flash-preview" if provider == "gemini" else "gpt-4.1-mini"
-        model_name = (self._field_value(form, "model_name", default_model) or default_model).strip()
+        # model_name is the primary parameter; legacy "provider" hint selects default model
+        model_name = (self._field_value(form, "model_name") or "").strip()
+        if not model_name:
+            provider_hint = (self._field_value(form, "provider") or "").strip().lower()
+            model_name = "gpt-4.1-mini" if provider_hint == "openai" else "gemini-3-flash-preview"
         api_key = (self._field_value(form, "api_key") or "").strip() or None
         api_base_url = (self._field_value(form, "api_base_url") or "").strip() or None
         bilingual = parse_bool(self._field_value(form, "bilingual"), default=False)
 
-        llm_config = LLMConfig(provider=provider, model_name=model_name, api_key=api_key, api_base_url=api_base_url)
+        llm_config = LLMConfig(model_name=model_name, api_key=api_key, api_base_url=api_base_url)
         translation_config = TranslationConfig(
             llm=llm_config,
             target_lang=target_lang,

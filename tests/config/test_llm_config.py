@@ -51,38 +51,37 @@ class TestModelNameResolution:
         assert c.model_name == "fb-model"
 
 
-class TestProviderResolution:
-    """provider: explicit > config.toml [section] > 'gemini'."""
+class TestProviderInference:
+    """provider: inferred from model_name prefix (read-only property)."""
 
-    def test_default_provider_is_gemini(self):
-        c = LLMConfig(model_name="m")
+    def test_gemini_model_infers_gemini(self):
+        c = LLMConfig(model_name="gemini-3-flash-preview")
         assert c.provider == "gemini"
 
-    def test_explicit_provider_preserved(self):
-        c = LLMConfig(model_name="m", provider="openai")
+    def test_gemini_prefix_variants(self):
+        for name in ("gemini-2.5-pro", "gemini-2.5-flash", "gemini-3-flash-preview"):
+            assert LLMConfig._infer_provider(name) == "gemini"
+
+    def test_non_gemini_infers_openai(self):
+        c = LLMConfig(model_name="gpt-4o")
         assert c.provider == "openai"
 
-    def test_empty_string_falls_back_to_gemini(self):
-        c = LLMConfig(model_name="m", provider="")
+    def test_openai_model_variants(self):
+        for name in ("gpt-4o", "qwen3", "deepseek-r1", "llama-3.1-70b"):
+            assert LLMConfig._infer_provider(name) == "openai"
+
+    def test_none_model_infers_openai(self):
+        assert LLMConfig._infer_provider(None) == "openai"
+
+    def test_empty_model_infers_openai(self):
+        assert LLMConfig._infer_provider("") == "openai"
+
+    def test_provider_is_read_only_property(self):
+        c = LLMConfig(model_name="gemini-3-flash-preview")
         assert c.provider == "gemini"
-
-    @patch("lattifai.config.llm.resolve_toml_value")
-    def test_provider_from_toml(self, mock_resolve):
-        def side_effect(section, key):
-            return {"model_name": "m", "provider": "openai"}.get(key)
-
-        mock_resolve.side_effect = side_effect
-        c = LLMConfig(section="translation")
+        # Changing model_name changes the inferred provider
+        c.model_name = "gpt-4o"
         assert c.provider == "openai"
-
-    @patch("lattifai.config.llm.resolve_toml_value")
-    def test_invalid_provider_in_toml_ignored(self, mock_resolve):
-        def side_effect(section, key):
-            return {"model_name": "m", "provider": "invalid"}.get(key)
-
-        mock_resolve.side_effect = side_effect
-        c = LLMConfig(section="translation")
-        assert c.provider == "gemini"
 
 
 class TestApiKeyResolution:
@@ -95,13 +94,13 @@ class TestApiKeyResolution:
     @patch("lattifai.config.llm.resolve_toml_value", return_value=None)
     @patch.dict("os.environ", {"GEMINI_API_KEY": "env-key"}, clear=False)
     def test_env_var_gemini(self, _):
-        c = LLMConfig(model_name="m", provider="gemini")
+        c = LLMConfig(model_name="gemini-3-flash-preview")
         assert c.api_key == "env-key"
 
     @patch("lattifai.config.llm.resolve_toml_value", return_value=None)
     @patch.dict("os.environ", {"OPENAI_API_KEY": "env-key"}, clear=False)
     def test_env_var_openai(self, _):
-        c = LLMConfig(model_name="m", provider="openai", api_base_url="http://x")
+        c = LLMConfig(model_name="gpt-4o", api_base_url="http://x")
         assert c.api_key == "env-key"
 
     @patch("lattifai.config.llm.resolve_toml_value")
@@ -128,7 +127,7 @@ class TestBaseUrlResolution:
     @patch("lattifai.config.llm.resolve_toml_value", return_value=None)
     @patch.dict("os.environ", {"OPENAI_API_BASE_URL": "http://env"}, clear=False)
     def test_env_var(self, _):
-        c = LLMConfig(model_name="m", provider="openai")
+        c = LLMConfig(model_name="gpt-4o")
         assert c.api_base_url == "http://env"
 
     @patch("lattifai.config.llm.resolve_toml_value")
@@ -143,8 +142,7 @@ class TestBaseUrlResolution:
 
         def side_effect(section, key):
             return {
-                "model_name": "m",
-                "provider": "openai",
+                "model_name": "gpt-4o",
                 "api_key": "k",
                 "api_base_url": "http://section",
             }.get(key)

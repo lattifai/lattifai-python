@@ -112,7 +112,7 @@ def translate(
         input: Path to input caption file (positional argument)
         output: Path for output caption file (positional argument)
         translation: Translation configuration.
-            Fields: llm.model_name, llm.provider, llm.api_base_url, target_lang,
+            Fields: llm.model_name, llm.api_base_url, target_lang,
                     mode, bilingual, style, approach, batch_size, glossary_file,
                     save_artifacts, ask_refine_after_normal, auto_refine_after_normal
         caption: Caption I/O configuration.
@@ -131,11 +131,10 @@ def translate(
             translation.save_artifacts=true \\
             translation.artifacts_dir=/tmp/artifacts
 
-        # Using OpenAI-compatible API
+        # Using OpenAI-compatible API (provider inferred from model_name)
         lai translate caption input.srt output.srt \\
-            translation.llm.provider=openai \\
-            translation.llm.api_base_url=http://localhost:8000/v1 \\
-            translation.llm.model_name=qwen3
+            translation.llm.model_name=qwen3 \\
+            translation.llm.api_base_url=http://localhost:8000/v1
 
         # With custom glossary
         lai translate caption input.srt output.srt \\
@@ -216,7 +215,7 @@ def translate_youtube(
         diarization: Speaker diarization configuration.
         event: Event tracking configuration.
         translation: Translation configuration.
-            Fields: target_lang, mode, bilingual, llm.provider, llm.model_name, glossary_file
+            Fields: target_lang, mode, bilingual, llm.model_name, glossary_file
         use_transcription: Skip YouTube caption download and transcribe directly.
 
     Examples:
@@ -236,10 +235,10 @@ def translate_youtube(
             translation.mode=refined \\
             translation.glossary_file=glossary.yaml
 
-        # Using OpenAI-compatible API for translation
+        # Using OpenAI-compatible API for translation (provider inferred from model_name)
         lai translate youtube "VIDEO_ID" \\
             translation.target_lang=ko \\
-            translation.llm.provider=openai \\
+            translation.llm.model_name=qwen3 \\
             translation.llm.api_base_url=http://localhost:8000/v1
     """
     from lattifai.theme import theme

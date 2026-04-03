@@ -1,5 +1,6 @@
 """Implementation of 'lai config' for managing LattifAI CLI configuration."""
 
+import dataclasses
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -25,20 +26,79 @@ KEY_MAP = {
     "DEFAULT_VIDEO_FORMAT": "LATTIFAI_DEFAULT_VIDEO_FORMAT",
 }
 
-# Section-scoped keys: "section.key" format, stored as [section] key = value
+# LLMConfig internal fields — not user-settable via config.toml
+_INTERNAL_FIELDS = frozenset({"section", "fallback_model"})
+
+
+def _discover_section_keys() -> dict[str, None]:
+    """Auto-discover valid section keys from Config dataclasses.
+
+    Scans all Config classes with ``_toml_section`` and LLMConfig subclasses
+    to build the set of valid ``section.field`` keys for config.toml.
+    """
+    from lattifai.config import (
+        AlignmentConfig,
+        CaptionConfig,
+        ClientConfig,
+        DiarizationConfig,
+        EventConfig,
+        MediaConfig,
+        SummarizationConfig,
+        TranscriptionConfig,
+        TranslationConfig,
+    )
+    from lattifai.config.diarization import DiarizationLLMConfig
+    from lattifai.config.translation import TranslationLLMConfig
+
+    result: dict[str, None] = {}
+
+    def _extract(cls: type, section: str) -> None:
+        if not dataclasses.is_dataclass(cls):
+            return
+        for f in dataclasses.fields(cls):
+            if f.name.startswith("_"):
+                continue
+            if f.repr is False:
+                continue
+            if f.name in _INTERNAL_FIELDS:
+                continue
+            # Skip nested Config / dataclass fields (they become sub-sections)
+            if "Config" in str(f.type):
+                continue
+            result[f"{section}.{f.name}"] = None
+
+    # Config classes with _toml_section
+    for cls in (
+        AlignmentConfig,
+        CaptionConfig,
+        ClientConfig,
+        DiarizationConfig,
+        EventConfig,
+        MediaConfig,
+        SummarizationConfig,
+        TranscriptionConfig,
+        TranslationConfig,
+    ):
+        section = getattr(cls, "_toml_section", "")
+        if section:
+            _extract(cls, section)
+
+    # LLMConfig subclasses — section is a dataclass field, not a class attribute
+    for cls in (DiarizationLLMConfig, TranslationLLMConfig):
+        section = ""
+        for f in dataclasses.fields(cls):
+            if f.name == "section" and f.default is not dataclasses.MISSING:
+                section = f.default
+                break
+        if section:
+            _extract(cls, section)
+
+    return result
+
+
+# Section-scoped keys: auto-discovered from Config dataclasses.
 # Value is the env var name (or None if no env mapping).
-# LLM keys use nested TOML tables: [translation.llm] model_name = ...
-SECTION_KEYS = {
-    "transcription.model_name": None,
-    "translation.llm.model_name": None,
-    "translation.llm.provider": None,
-    "translation.llm.api_key": None,
-    "translation.llm.api_base_url": None,
-    "diarization.llm.model_name": None,
-    "diarization.llm.provider": None,
-    "diarization.llm.api_key": None,
-    "diarization.llm.api_base_url": None,
-}
+SECTION_KEYS = _discover_section_keys()
 
 # All valid keys for CLI validation
 ALL_KEYS = set(KEY_MAP) | set(SECTION_KEYS)
@@ -58,15 +118,24 @@ SECTION_KEY_MAP = {
     "defaults": {"DEFAULT_AUDIO_FORMAT", "DEFAULT_VIDEO_FORMAT"},
 }
 
-SECTION_ORDER = ["auth", "api", "defaults", "transcription", "translation", "diarization"]
+SECTION_ORDER = [
+    "auth",
+    "api",
+    "defaults",
+    "alignment",
+    "caption",
+    "client",
+    "diarization",
+    "event",
+    "media",
+    "summarization",
+    "transcription",
+    "translation",
+]
 
-# Keys that should be masked in display
-SECRET_KEYS = {
-    "LATTIFAI_API_KEY",
-    "GEMINI_API_KEY",
-    "OPENAI_API_KEY",
-    "translation.llm.api_key",
-    "diarization.llm.api_key",
+# Keys that should be masked in display — top-level + any key ending with "api_key"
+SECRET_KEYS = {"LATTIFAI_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"} | {
+    k for k in SECTION_KEYS if k.endswith(".api_key")
 }
 
 
@@ -361,13 +430,17 @@ app = typer.Typer(help="Manage LattifAI CLI configuration.")
 
 @app.command("show")
 def show():
-    """Show all configuration values and their sources."""
+    """Show all configuration values and their sources.
+
+    Top-level keys (API keys, defaults) are always shown.
+    Section keys are only shown when they have a value set.
+    """
     table = Table(show_header=True, header_style=T.RICH_LABEL, show_lines=False, pad_edge=False)
     table.add_column("Key", min_width=24)
     table.add_column("Value", min_width=30)
     table.add_column("Source", min_width=12)
 
-    # Top-level keys
+    # Top-level keys — always shown
     for key in KEY_MAP:
         value, source = _resolve_value(key)
         if value is None:
@@ -379,16 +452,18 @@ def show():
             display_src = source
         table.add_row(key, display_val, display_src)
 
-    # Section-scoped keys
-    for key in SECTION_KEYS:
+    # Section-scoped keys — only show keys that have a value
+    section_rows = []
+    for key in sorted(SECTION_KEYS):
         value, source = _resolve_value(key)
-        if value is None:
-            display_val = f"[{T.RICH_DIM}]not set[/{T.RICH_DIM}]"
-            display_src = f"[{T.RICH_DIM}]-[/{T.RICH_DIM}]"
-        else:
-            display_val = f"[{T.RICH_OK}]{value}[/{T.RICH_OK}]"
-            display_src = source
-        table.add_row(key, display_val, display_src)
+        if value is not None:
+            display_value = _mask_value(value) if key in SECRET_KEYS else value
+            section_rows.append((key, f"[{T.RICH_OK}]{display_value}[/{T.RICH_OK}]", source))
+
+    if section_rows:
+        table.add_row("", "", "")  # separator
+        for key, display_val, display_src in section_rows:
+            table.add_row(key, display_val, display_src)
 
     console.print()
     console.print(f"[{T.RICH_HEADER}]LattifAI Configuration[/{T.RICH_HEADER}]")
