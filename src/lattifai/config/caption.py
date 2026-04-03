@@ -23,6 +23,8 @@ class CaptionConfig:
     Controls caption file reading, writing, and formatting options.
     """
 
+    _toml_section = "caption"
+
     input_format: InputCaptionFormat = "auto"
     """Input caption format. Supports: 'auto' (detect),
         standard formats (srt, vtt, ass, ssa, sub, sbv, txt, sami, smi),

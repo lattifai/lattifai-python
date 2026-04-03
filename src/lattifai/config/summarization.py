@@ -14,6 +14,8 @@ class SummarizationConfig:
     behaviour for long inputs, and rendering format.
     """
 
+    _toml_section = "summarization"
+
     llm: LLMConfig = field(default_factory=lambda: LLMConfig(model_name="gemini-2.5-flash"))
     """LLM provider configuration (provider, model, api_key, api_base_url)."""
 

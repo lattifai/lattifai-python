@@ -22,6 +22,8 @@ class TranslationConfig:
     Settings for caption translation using various LLM providers.
     """
 
+    _toml_section = "translation"
+
     llm: TranslationLLMConfig = field(default_factory=TranslationLLMConfig)
     """LLM provider configuration. Reads defaults from config.toml [translation]."""
 

@@ -37,6 +37,8 @@ class TranscriptionConfig:
     Settings for audio/video transcription using various providers.
     """
 
+    _toml_section = "transcription"
+
     model_name: Optional[str] = None
     """Model name for transcription. None = resolve from config.toml, fallback to nvidia/parakeet-tdt-0.6b-v3.
     See SUPPORTED_TRANSCRIPTION_MODELS for built-in models.

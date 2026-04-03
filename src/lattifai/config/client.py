@@ -13,6 +13,8 @@ class ClientConfig:
     Defines model selection, decoding behavior, and API settings for forced alignment.
     """
 
+    _toml_section = "client"
+
     # API configuration
     api_key: Optional[str] = field(default=None)
     """LattifAI API key. If None, resolved via lattifai.auth.resolve_api_key()."""

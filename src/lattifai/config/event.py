@@ -26,6 +26,8 @@ class EventConfig:
         Event matching logic is implemented in lattifai_core.event.EventMatcher.
     """
 
+    _toml_section = "event"
+
     enabled: bool = False
     """Enable audio event detection."""
 
