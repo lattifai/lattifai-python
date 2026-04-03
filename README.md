@@ -437,6 +437,7 @@ caption = client.youtube(
 | `normalize_text` | `True` | Clean HTML entities and special characters |
 | `include_speaker_in_text` | `True` | Include speaker labels in text output |
 | `translation_first` | `False` | Place translation above original in bilingual output |
+| `speaker_color` | `""` | Speaker name color in ASS output: `""` (off), `"auto"` (10-color palette), `"#RRGGBB"`, or comma-separated list |
 
 ```python
 from lattifai.client import LattifAI
@@ -663,6 +664,48 @@ JSON is the most flexible format for storing caption data with full word-level t
 | **ASS** | One word per segment | `{\kf}` karaoke tags (sweep effect) |
 | **LRC** | One word per line | Enhanced `<timestamp>` tags |
 | **TTML** | One word per `<p>` element | `<span>` with `itunes:timing="Word"` |
+
+#### Speaker Colors
+
+The `speaker_color` option colorizes speaker names in ASS output (works with both karaoke and non-karaoke modes):
+
+| Value | Behavior |
+|-------|----------|
+| `""` (default) | No speaker coloring |
+| `"auto"` | Assigns from a built-in 10-color palette |
+| `"#RRGGBB"` | Single color for all speakers |
+| `"#RRGGBB,#00BFFF,..."` | Comma-separated list, one per speaker (cycles if more speakers than colors) |
+
+![Speaker Palette](docs/speaker-palette-en.png)
+
+```bash
+# Auto-color speakers in ASS output
+lai caption convert input.json output.ass \
+    include_speaker_in_text=true \
+    speaker_color=auto
+
+# Custom single color
+lai caption convert input.json output.ass \
+    include_speaker_in_text=true \
+    speaker_color="#1387C0"
+```
+
+#### Karaoke Color Schemes
+
+Use `karaoke.color_scheme` to apply a predefined color scheme for karaoke ASS output. Each scheme sets `primary_color`, `secondary_color`, `outline_color`, and `back_color`.
+
+12 schemes available: `azure-gold`, `sakura-purple`, `mint-ocean`, `gardenia-green`, `sunset-warm`, `prussian-elegant`, `burgundy-classic`, `langgan-spring`, `mars-teal`, `spring-field`, `navy-pink`, `apricot-dark`
+
+![Karaoke Color Schemes](docs/karaoke-presets-en.png)
+
+```bash
+# Karaoke with color scheme + auto speaker colors
+lai caption convert input.json output.ass \
+    word_level=true \
+    karaoke.enabled=true \
+    karaoke.color_scheme=azure-gold \
+    speaker_color=auto
+```
 
 ### VTT Format (YouTube VTT Support)
 
