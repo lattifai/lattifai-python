@@ -130,6 +130,7 @@ class Caption(BaseCaption):
         translation_first: bool = False,
         speaker_color: str = "",
         background_color: str = "",
+        style=None,
     ):
         """
         Write caption to file or return as bytes.
@@ -169,6 +170,7 @@ class Caption(BaseCaption):
                 translation_first=translation_first,
                 speaker_color=speaker_color,
                 background_color=background_color,
+                style=style,
             )
         finally:
             # Restore original supervisions

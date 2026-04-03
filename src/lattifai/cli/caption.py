@@ -5,7 +5,7 @@ from typing import Annotated, List, Optional
 
 import nemo_run as run
 
-from lattifai.caption.config import KaraokeConfig
+from lattifai.caption.config import CaptionStyle, KaraokeConfig
 from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
@@ -145,10 +145,10 @@ def convert(
     include_speaker_in_text: bool = False,
     normalize_text: bool = False,
     word_level: bool = False,
+    style: Annotated[Optional[CaptionStyle], run.Config[CaptionStyle]] = None,
     karaoke: Annotated[Optional[KaraokeConfig], run.Config[KaraokeConfig]] = None,
     translation_first: bool = False,
     speaker_color: str = "",
-    background_color: str = "",
 ):
     """
     Convert caption file to another format.
@@ -178,14 +178,18 @@ def convert(
         word_level: Use word-level output format if supported.
             When True without karaoke: outputs word-per-segment (each word as separate segment).
             JSON format will include a 'words' field with word-level timestamps.
+        style: Subtitle style configuration (nemo_run Config).
+            Controls font, colors, background, alignment for ASS/VTT output.
+            Use dot notation: style.font_name="PingFang SC" style.font_size=24
+            style.background_color="#00000080" for semi-transparent background box.
         karaoke: Karaoke configuration (nemo_run Config).
-            Use dot notation to configure: karaoke.enabled=true karaoke.effect=sweep
+            Use dot notation: karaoke.enabled=true karaoke.effect=sweep
             Effects: "sweep" (\\kf, default), "instant" (\\k), "outline" (\\ko)
-            Style: karaoke.style.primary_color=#FFFFFF karaoke.style.secondary_color=#00FFFF
+            karaoke.color_scheme=azure-gold overrides style colors.
         translation_first: Place translation text above original text in bilingual output.
             When True: translation appears on the first line, original on the second line.
         speaker_color: Speaker name color for ASS output.
-            - "auto": built-in 8-color palette, auto-assigned per speaker
+            - "auto": built-in 10-color palette, auto-assigned per speaker
             - "#RRGGBB": single color for all speakers
             - "#FFA500,#00BFFF,...": comma-separated, auto-assigned per speaker
             - "": no special color (default)
@@ -194,16 +198,15 @@ def convert(
         # Basic format conversion
         lai caption convert input.srt output.vtt
 
-        # ASS with auto-colored speaker names
-        lai caption convert input.json output.ass include_speaker_in_text=true speaker_color=auto
+        # Custom font and background box
+        lai caption convert input.json output.ass \\
+            style.font_name="PingFang SC" style.font_size=24 \\
+            style.background_color="#00000080"
 
-        # Karaoke with default sweep effect
-        lai caption convert input.json output.ass word_level=true karaoke.enabled=true
-
-        # Karaoke with instant effect, gold highlight, auto speaker colors
+        # Karaoke with color scheme (overrides style colors, keeps font)
         lai caption convert input.json output.ass word_level=true \\
-            karaoke.enabled=true karaoke.effect=instant \\
-            karaoke.style.secondary_color=#FFD700 speaker_color=auto
+            style.font_name="PingFang SC" \\
+            karaoke.color_scheme=azure-gold speaker_color=auto
     """
     from pathlib import Path
 
@@ -244,14 +247,21 @@ def convert(
         ref_caption = Caption.read(reference)
         caption.supervisions = align_timestamps_from_ref(caption.supervisions, ref_caption.supervisions)
 
+    # Apply color_scheme overlay to style (colors only, preserves font/alignment)
+    effective_style = style or CaptionStyle()
+    if karaoke_config and karaoke_config.color_scheme:
+        from lattifai.caption.config import apply_color_scheme
+
+        apply_color_scheme(effective_style, karaoke_config.color_scheme)
+
     caption.write(
         output_path,
         include_speaker_in_text=include_speaker_in_text,
         word_level=word_level,
-        karaoke_config=karaoke_config,
         translation_first=translation_first,
+        karaoke_config=karaoke_config,
         speaker_color=speaker_color,
-        background_color=background_color,
+        style=effective_style,
     )
 
     safe_print(f"Converted {input_path} -> {output_path}")
