@@ -19,6 +19,7 @@ CONFIG_FILE = CONFIG_DIR / "config.toml"
 # Top-level keys: user-facing name (uppercase) -> environment variable name
 KEY_MAP = {
     "LATTIFAI_API_KEY": "LATTIFAI_API_KEY",
+    "LATTIFAI_BASE_URL": "LATTIFAI_BASE_URL",
     "GEMINI_API_KEY": "GEMINI_API_KEY",
     "OPENAI_API_KEY": "OPENAI_API_KEY",
     "OPENAI_API_BASE_URL": "OPENAI_API_BASE_URL",

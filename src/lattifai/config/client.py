@@ -19,6 +19,9 @@ class ClientConfig:
     api_key: Optional[str] = field(default=None)
     """LattifAI API key. If None, resolved via lattifai.auth.resolve_api_key()."""
 
+    base_url: Optional[str] = field(default=None)
+    """LattifAI API base URL. If None, resolved via LATTIFAI_BASE_URL env or auth config."""
+
     timeout: float = 120.0
     """Request timeout in seconds."""
 
@@ -50,8 +53,20 @@ class ClientConfig:
 
                 object.__setattr__(self, "api_key", resolve_api_key())
             except ImportError:
-                # Fallback: direct env var check
                 object.__setattr__(self, "api_key", os.environ.get("LATTIFAI_API_KEY"))
+
+        # Auto-load base URL: env var > config.toml [auth].LATTIFAI_BASE_URL
+        if self.base_url is None:
+            base = os.environ.get("LATTIFAI_BASE_URL")
+            if not base:
+                try:
+                    from lattifai.cli.config import get_config_value
+
+                    base = get_config_value("auth.LATTIFAI_BASE_URL")
+                except (ImportError, OSError):
+                    pass
+            if base:
+                object.__setattr__(self, "base_url", base)
 
         # Auto-load client version from package if not provided
         if self.client_version is None:
