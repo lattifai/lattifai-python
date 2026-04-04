@@ -57,6 +57,11 @@ class LLMConfig:
     fallback_model: Optional[str] = None
     """Fallback model when config.toml has no value. Set by consumer (e.g. TranslationConfig)."""
 
+    reasoning: bool = True
+    """Enable reasoning/thinking for models that support it (e.g. doubao-seed, o1, deepseek-r1).
+    When False, reasoning_content is stripped from responses.
+    Default True — set to False for faster non-reasoning responses."""
+
     @staticmethod
     def _infer_provider(model_name: Optional[str]) -> str:
         """Infer LLM provider from model name prefix.
@@ -74,10 +79,13 @@ class LLMConfig:
 
     def __post_init__(self) -> None:
         """Resolve defaults from config.toml, then API key and base URL."""
-        # Step 1: fill model_name from config.toml [section]
+        # Step 1: fill model_name and reasoning from config.toml [section]
         if self.section:
             if not self.model_name:
                 self.model_name = resolve_toml_value(self.section, "model_name")
+            reasoning_val = resolve_toml_value(self.section, "reasoning")
+            if reasoning_val is not None:
+                self.reasoning = reasoning_val.lower() in ("true", "1", "yes")
 
         # Step 2: apply fallbacks
         if not self.model_name:
@@ -110,6 +118,7 @@ class LLMConfig:
             api_key=self.api_key,
             model=self.model_name,
             base_url=self.api_base_url,
+            reasoning=self.reasoning,
         )
 
     def _resolve_api_key(self) -> Optional[str]:
