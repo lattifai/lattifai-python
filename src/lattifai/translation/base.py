@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -158,20 +159,20 @@ class BaseTranslator:
         if not texts:
             return supervisions
 
-        from tqdm import tqdm
+        _status = self._status
 
         total_phases = {"quick": 1, "normal": 2, "refined": 3}.get(cfg.mode, 1)
         phase = 0
 
         if cfg.mode in ("normal", "refined"):
             phase += 1
-            tqdm.write(f"[{phase}/{total_phases}] Analyzing content...")
+            _status(f"[{phase}/{total_phases}] Analyzing content...")
 
         analysis = await self._maybe_analyze(texts, cfg)
         glossary_terms = self._extract_glossary_terms(analysis)
         merged_glossary = self._load_and_merge_glossaries(cfg, glossary_terms) or {}
 
-        tqdm.write(f"  Building translation prompt (glossary: {len(merged_glossary)} terms)...")
+        _status(f"  Building translation prompt (glossary: {len(merged_glossary)} terms)...")
         shared_prompt = build_shared_translate_prompt(
             target_lang=cfg.target_lang,
             bilingual=cfg.bilingual,
@@ -188,7 +189,7 @@ class BaseTranslator:
             self._save_artifact(cfg, "02-prompt.md", shared_prompt)
 
         phase += 1
-        tqdm.write(f"[{phase}/{total_phases}] Translating {len(texts)} segments...")
+        _status(f"[{phase}/{total_phases}] Translating {len(texts)} segments...")
 
         checkpoint_path = self._checkpoint_path(cfg)
         translated = await self._translate_all_batches(
@@ -214,7 +215,7 @@ class BaseTranslator:
 
         if cfg.mode == "refined":
             phase += 1
-            tqdm.write(f"[{phase}/{total_phases}] Reviewing & refining translations...")
+            _status(f"[{phase}/{total_phases}] Reviewing & refining translations...")
             revised_texts, _ = await self._review_draft(
                 original_texts=texts,
                 draft_translations=draft_plain,
@@ -243,8 +244,6 @@ class BaseTranslator:
         glossary: Optional[dict[str, str]] = None,
     ) -> list[Supervision]:
         """Run refined review on an existing draft without retranslating."""
-        from tqdm import tqdm
-
         cfg = config or self.config
         state = self._last_pipeline_state
 
@@ -264,7 +263,7 @@ class BaseTranslator:
 
         review_analysis = analysis or (state.analysis if state else None)
         if review_analysis is None:
-            tqdm.write("[1/2] Analyzing content...")
+            self._status("[1/2] Analyzing content...")
             review_analysis = await self._maybe_analyze(original_texts, cfg)
 
         glossary_terms = self._extract_glossary_terms(review_analysis)
@@ -272,7 +271,7 @@ class BaseTranslator:
             glossary or (state.glossary if state else None) or self._load_and_merge_glossaries(cfg, glossary_terms)
         )
 
-        tqdm.write(f"[2/2] Reviewing & refining {len(draft_translations)} segments...")
+        self._status(f"[2/2] Reviewing & refining {len(draft_translations)} segments...")
         revised_texts, _ = await self._review_draft(
             original_texts=original_texts,
             draft_translations=draft_translations,
@@ -377,11 +376,11 @@ class BaseTranslator:
                 raw = json.loads(checkpoint_path.read_text(encoding="utf-8"))
                 completed = {int(k): v for k, v in raw.items()}
                 cached_segs = sum(len(v) for v in completed.values())
-                tqdm.write(
+                self._status(
                     f"  Resuming from checkpoint: {len(completed)}/{total_batches} batches ({cached_segs} segments)"
                 )
             except Exception:
-                tqdm.write("  Corrupt checkpoint, starting fresh")
+                self._status("  Corrupt checkpoint, starting fresh")
                 completed = {}
 
         remaining = [s for s in batch_starts if s not in completed]
@@ -447,7 +446,7 @@ class BaseTranslator:
             self._write_checkpoint(checkpoint_path, completed)
             cached_segs = sum(len(v) for v in completed.values())
             if checkpoint_path:
-                tqdm.write(
+                self._status(
                     f"  Translation interrupted — checkpoint saved: {checkpoint_path}"
                     f" ({cached_segs}/{len(texts)} segments)"
                 )
@@ -464,6 +463,11 @@ class BaseTranslator:
         for start_idx in batch_starts:
             results.extend(completed[start_idx])
         return results
+
+    @staticmethod
+    def _status(msg: str) -> None:
+        """Print a status message to stderr (visible alongside tqdm progress bars)."""
+        print(msg, file=sys.stderr, flush=True)
 
     @staticmethod
     def _write_checkpoint(path: Optional[Path], data: dict[int, list]) -> None:
