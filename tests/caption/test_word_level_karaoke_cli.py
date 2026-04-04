@@ -17,6 +17,19 @@ from dotenv import find_dotenv, load_dotenv
 
 load_dotenv(find_dotenv(usecwd=True))
 
+
+def _load_json_segments(path):
+    """Load JSON caption file and return the segments list.
+
+    Handles both document format ({"supervisions": [...]}) and legacy array format ([...]).
+    """
+    with open(path) as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        return data
+    return data.get("supervisions", data.get("segments", []))
+
+
 # Test data paths
 TEST_DATA_DIR = Path(__file__).parent.parent / "data" / "examples"
 EN_AUDIO = TEST_DATA_DIR / "en.mp3"
@@ -189,12 +202,10 @@ class TestJSONFormat:
         result = run_caption_convert(aligned_json_en, output_path, word_level=False, karaoke=False)
         assert result.returncode == 0, f"Command failed: {result.stderr}"
 
-        with open(output_path) as f:
-            data = json.load(f)
+        data = _load_json_segments(output_path)
 
-        # 1. Must be array
-        assert isinstance(data, list), "Output must be JSON array"
-        assert len(data) > 0, "Array must not be empty"
+        # 1. Must have segments
+        assert len(data) > 0, "Segments must not be empty"
 
         prev_end = -1
         for i, seg in enumerate(data):
@@ -219,11 +230,8 @@ class TestJSONFormat:
             # 5. Text validity
             assert len(seg["text"].strip()) > 0, f"Segment {i} text must not be empty"
 
-            # 6. NO words field when word_level=False
-            assert "words" not in seg, f"Segment {i} should NOT have 'words' when word_level=False"
-
-            # 7. duration field should NOT exist (we removed it)
-            assert "duration" not in seg, f"Segment {i} should NOT have 'duration' field (use start/end only)"
+            # 6. JSON v2 always preserves word data (lossless format)
+            # words field may or may not exist depending on input alignment data
 
     def test_json_word_level_true_structure(self, aligned_json_en, tmp_path):
         """JSON with word_level=True: validate complete structure including words array."""
@@ -232,12 +240,10 @@ class TestJSONFormat:
         result = run_caption_convert(aligned_json_en, output_path, word_level=True, karaoke=False)
         assert result.returncode == 0, f"Command failed: {result.stderr}"
 
-        with open(output_path) as f:
-            data = json.load(f)
+        data = _load_json_segments(output_path)
 
-        # 1. Must be array
-        assert isinstance(data, list), "Output must be JSON array"
-        assert len(data) > 0, "Array must not be empty"
+        # 1. Must have segments
+        assert len(data) > 0, "Segments must not be empty"
 
         total_words = 0
         for i, seg in enumerate(data):
@@ -929,8 +935,7 @@ class TestEdgeCasesAndConsistency:
         # JSON
         json_out = tmp_path / "output.json"
         run_caption_convert(aligned_json_en, json_out, word_level=True, karaoke=False)
-        with open(json_out) as f:
-            data = json.load(f)
+        data = _load_json_segments(json_out)
         json_words = sum(len(seg.get("words", [])) for seg in data)
         word_counts["json"] = json_words
 
@@ -976,10 +981,8 @@ class TestEdgeCasesAndConsistency:
         run_caption_convert(output1, output2, word_level=True, karaoke=False)
 
         # Compare
-        with open(output1) as f:
-            data1 = json.load(f)
-        with open(output2) as f:
-            data2 = json.load(f)
+        data1 = _load_json_segments(output1)
+        data2 = _load_json_segments(output2)
 
         # Same number of segments
         assert len(data1) == len(data2), "Round-trip should preserve segment count"

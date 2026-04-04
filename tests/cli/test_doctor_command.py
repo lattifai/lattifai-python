@@ -46,10 +46,18 @@ class TestDoctorInternals:
         assert status in ("OK", "WARN", "FAIL")
 
     def test_check_api_key_not_set(self, monkeypatch):
+        from unittest.mock import patch
+
         monkeypatch.delenv("LATTIFAI_API_KEY", raising=False)
         from lattifai.cli.doctor import _check_api_key
 
-        name, detail, status = _check_api_key()
+        # Patch all three fallback sources to return nothing
+        with (
+            patch("lattifai.cli.doctor.os.environ.get", return_value=""),
+            patch("lattifai.cli.config.get_auth_value", return_value=None),
+            patch("dotenv.dotenv_values", return_value={}),
+        ):
+            name, detail, status = _check_api_key()
         assert status == "WARN"
 
     def test_check_api_key_set(self, monkeypatch):

@@ -158,17 +158,20 @@ class BaseTranslator:
         if not texts:
             return supervisions
 
+        from tqdm import tqdm
+
         total_phases = {"quick": 1, "normal": 2, "refined": 3}.get(cfg.mode, 1)
         phase = 0
 
         if cfg.mode in ("normal", "refined"):
             phase += 1
-            logger.info("[%d/%d] Analyzing content...", phase, total_phases)
+            tqdm.write(f"[{phase}/{total_phases}] Analyzing content...")
 
         analysis = await self._maybe_analyze(texts, cfg)
         glossary_terms = self._extract_glossary_terms(analysis)
-        merged_glossary = self._load_and_merge_glossaries(cfg, glossary_terms)
+        merged_glossary = self._load_and_merge_glossaries(cfg, glossary_terms) or {}
 
+        tqdm.write(f"  Building translation prompt (glossary: {len(merged_glossary)} terms)...")
         shared_prompt = build_shared_translate_prompt(
             target_lang=cfg.target_lang,
             bilingual=cfg.bilingual,
@@ -185,7 +188,7 @@ class BaseTranslator:
             self._save_artifact(cfg, "02-prompt.md", shared_prompt)
 
         phase += 1
-        logger.info("[%d/%d] Translating %d segments...", phase, total_phases, len(texts))
+        tqdm.write(f"[{phase}/{total_phases}] Translating {len(texts)} segments...")
 
         checkpoint_path = self._checkpoint_path(cfg)
         translated = await self._translate_all_batches(
@@ -211,7 +214,7 @@ class BaseTranslator:
 
         if cfg.mode == "refined":
             phase += 1
-            logger.info("[%d/%d] Reviewing & refining translations...", phase, total_phases)
+            tqdm.write(f"[{phase}/{total_phases}] Reviewing & refining translations...")
             revised_texts, _ = await self._review_draft(
                 original_texts=texts,
                 draft_translations=draft_plain,
@@ -240,6 +243,8 @@ class BaseTranslator:
         glossary: Optional[dict[str, str]] = None,
     ) -> list[Supervision]:
         """Run refined review on an existing draft without retranslating."""
+        from tqdm import tqdm
+
         cfg = config or self.config
         state = self._last_pipeline_state
 
@@ -259,7 +264,7 @@ class BaseTranslator:
 
         review_analysis = analysis or (state.analysis if state else None)
         if review_analysis is None:
-            logger.info("[1/2] Analyzing content...")
+            tqdm.write("[1/2] Analyzing content...")
             review_analysis = await self._maybe_analyze(original_texts, cfg)
 
         glossary_terms = self._extract_glossary_terms(review_analysis)
@@ -267,7 +272,7 @@ class BaseTranslator:
             glossary or (state.glossary if state else None) or self._load_and_merge_glossaries(cfg, glossary_terms)
         )
 
-        logger.info("[2/2] Reviewing & refining %d segments...", len(draft_translations))
+        tqdm.write(f"[2/2] Reviewing & refining {len(draft_translations)} segments...")
         revised_texts, _ = await self._review_draft(
             original_texts=original_texts,
             draft_translations=draft_translations,
@@ -372,11 +377,11 @@ class BaseTranslator:
                 raw = json.loads(checkpoint_path.read_text(encoding="utf-8"))
                 completed = {int(k): v for k, v in raw.items()}
                 cached_segs = sum(len(v) for v in completed.values())
-                logger.info(
-                    "Resuming from checkpoint: %d/%d batches (%d segments)", len(completed), total_batches, cached_segs
+                tqdm.write(
+                    f"  Resuming from checkpoint: {len(completed)}/{total_batches} batches ({cached_segs} segments)"
                 )
             except Exception:
-                logger.warning("Corrupt checkpoint, starting fresh")
+                tqdm.write("  Corrupt checkpoint, starting fresh")
                 completed = {}
 
         remaining = [s for s in batch_starts if s not in completed]
@@ -442,11 +447,9 @@ class BaseTranslator:
             self._write_checkpoint(checkpoint_path, completed)
             cached_segs = sum(len(v) for v in completed.values())
             if checkpoint_path:
-                logger.error(
-                    "Translation interrupted — checkpoint saved: %s (%d/%d segments)",
-                    checkpoint_path,
-                    cached_segs,
-                    len(texts),
+                tqdm.write(
+                    f"  Translation interrupted — checkpoint saved: {checkpoint_path}"
+                    f" ({cached_segs}/{len(texts)} segments)"
                 )
             raise
         finally:
