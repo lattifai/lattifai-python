@@ -81,7 +81,7 @@ def youtube(
         lai youtube align "https://www.youtube.com/watch?v=VIDEO_ID" \\
             caption.output.path=aligned.srt \\
             caption.input.split_sentence=true \\
-            caption.output.word_level=true \\
+            caption.style.word_level=true \\
             alignment.device=cuda
 
         # Use Gemini transcription (requires API key)

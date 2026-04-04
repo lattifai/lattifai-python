@@ -27,7 +27,7 @@ from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
     CaptionInputConfig,
-    CaptionOutputConfig,
+    CaptionStyle,
     EventConfig,
     TranscriptionConfig,
 )
@@ -343,7 +343,7 @@ class ServeHandler(BaseHTTPRequestHandler):
             alignment_config=AlignmentConfig(device=device),
             caption_config=CaptionConfig(
                 input=CaptionInputConfig(split_sentence=split_sentence),
-                output=CaptionOutputConfig(word_level=word_level),
+                style=CaptionStyle(word_level=word_level),
             ),
         )
         client.alignment(
@@ -394,13 +394,17 @@ class ServeHandler(BaseHTTPRequestHandler):
         if karaoke:
             word_level = True
 
+        from lattifai.caption.config import KaraokeConfig
+
         caption_convert(
             input_path=str(caption_file),
             output_path=str(output_path),
-            include_speaker_in_text=include_speaker,
             normalize_text=normalize_text,
-            word_level=word_level,
-            karaoke=karaoke,
+            style=CaptionStyle(
+                include_speaker_in_text=include_speaker,
+                word_level=word_level,
+            ),
+            karaoke=KaraokeConfig(enabled=True) if karaoke else None,
         )
         return output_path
 

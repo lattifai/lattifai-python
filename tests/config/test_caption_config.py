@@ -118,10 +118,10 @@ class TestCaptionConfigDefaults:
 
         assert config.input.format == "auto"
         assert config.output.format == "srt"
-        assert config.output.include_speaker_in_text is True
+        assert config.style.include_speaker_in_text is True
         assert config.input.normalize_text is True
         assert config.input.split_sentence is False
-        assert config.output.word_level is False
+        assert config.style.word_level is False
         assert config.input.encoding == "utf-8"
 
     def test_backward_compat_properties(self):
@@ -138,15 +138,18 @@ class TestCaptionConfigDefaults:
 
     def test_custom_values(self):
         """Test that custom values override defaults."""
+        from lattifai.caption.config import CaptionStyle
+
         config = CaptionConfig(
             input=CaptionInputConfig(format="vtt", normalize_text=True),
-            output=CaptionOutputConfig(format="json", word_level=True),
+            output=CaptionOutputConfig(format="json"),
+            style=CaptionStyle(word_level=True),
         )
 
         assert config.input.format == "vtt"
         assert config.output.format == "json"
         assert config.input.normalize_text is True
-        assert config.output.word_level is True
+        assert config.style.word_level is True
 
 
 class TestCaptionConfigStructure:

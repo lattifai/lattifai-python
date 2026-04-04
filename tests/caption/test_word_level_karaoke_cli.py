@@ -42,7 +42,7 @@ def run_alignment_command(audio_path, caption_path, output_path, word_level=True
         f"input_media={audio_path}",
         f"input_caption={caption_path}",
         f"output_caption={output_path}",
-        f"caption.output.word_level={str(word_level).lower()}",
+        f"caption.style.word_level={str(word_level).lower()}",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
@@ -60,7 +60,7 @@ def run_caption_convert(input_path, output_path, word_level=False, karaoke=False
         "-Y",
         f"input_path={input_path}",
         f"output_path={output_path}",
-        f"word_level={str(word_level).lower()}",
+        f"style.word_level={str(word_level).lower()}",
     ]
     if karaoke:
         cmd.append("karaoke.enabled=true")

@@ -123,10 +123,10 @@ class LLMConfig:
 
         if self.provider == "gemini":
             env_key = os.environ.get("GEMINI_API_KEY")
-            config_key = "gemini_api_key"
+            config_key = "GEMINI_API_KEY"
         else:
             env_key = os.environ.get("OPENAI_API_KEY")
-            config_key = "openai_api_key"
+            config_key = "OPENAI_API_KEY"
 
         if env_key:
             return env_key
@@ -159,6 +159,6 @@ class LLMConfig:
         try:
             from lattifai.cli.config import get_config_value
 
-            return get_config_value("openai_api_base_url")
+            return get_config_value("OPENAI_API_BASE_URL")
         except (ImportError, OSError):
             return None

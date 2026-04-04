@@ -142,65 +142,43 @@ def convert(
     output_path: Pathlike,
     reference: Optional[Pathlike] = None,
     input_format: Optional[str] = None,
-    include_speaker_in_text: bool = False,
     normalize_text: bool = False,
-    word_level: bool = False,
     style: Annotated[Optional[CaptionStyle], run.Config[CaptionStyle]] = None,
     karaoke: Annotated[Optional[KaraokeConfig], run.Config[KaraokeConfig]] = None,
-    translation_first: bool = False,
 ):
     """
     Convert caption file to another format.
-
-    This command reads a caption file from one format and writes it to another format,
-    preserving all timing information, text content, and speaker labels (if present).
-    Supports common caption formats including SRT, VTT, JSON, and Praat TextGrid.
-
-    When ``reference`` is provided, timestamps are aligned from the reference caption
-    via text matching. This is useful for combining human-edited text (with coarse
-    timestamps) with ASR subtitles (with accurate timestamps).
 
     Shortcut: invoking ``laisub-convert`` is equivalent to running ``lai caption convert``.
 
     Args:
         input_path: Path to input caption file (supports SRT, VTT, JSON, TextGrid formats)
         output_path: Path to output caption file (format determined by file extension)
-        reference: Optional reference caption for timestamp alignment.
-        input_format: Explicitly specify input format (e.g., 'markdown', 'srt').
-            If None (default), auto-detect from file extension/content.
-            When provided, timestamps are matched from the reference via text similarity.
-            Input keeps its text and speaker labels; only timestamps are updated.
-        include_speaker_in_text: Preserve speaker labels in caption text content.
-        normalize_text: Whether to normalize caption text during conversion.
-            This applies text cleaning such as removing HTML tags, decoding entities,
-            collapsing whitespace, and standardizing punctuation.
-        word_level: Use word-level output format if supported.
-            When True without karaoke: outputs word-per-segment (each word as separate segment).
-            JSON format will include a 'words' field with word-level timestamps.
-        style: Subtitle style configuration (nemo_run Config).
-            Controls font, colors, background, alignment, speaker colors for ASS/VTT output.
-            Use dot notation: style.font_name="PingFang SC" style.font_size=24
-            style.background_color="#00000080" for semi-transparent background box.
-            style.speaker_color=auto for auto speaker coloring.
+        reference: Optional reference caption for timestamp alignment
+        input_format: Explicitly specify input format (e.g., 'markdown', 'srt')
+        normalize_text: Clean HTML entities and normalize whitespace
+        style: Subtitle style and output behavior (nemo_run Config).
+            Visual: style.font_name, style.font_size, style.background_color,
+                    style.speaker_color, style.primary_color, style.outline_color
+            Behavior: style.include_speaker_in_text, style.word_level,
+                      style.translation_first
         karaoke: Karaoke configuration (nemo_run Config).
-            Use dot notation: karaoke.enabled=true karaoke.effect=sweep
-            Effects: "sweep" (\\kf, default), "instant" (\\k), "outline" (\\ko)
-            karaoke.color_scheme=azure-gold overrides style colors.
-        translation_first: Place translation text above original text in bilingual output.
-            When True: translation appears on the first line, original on the second line.
+            karaoke.enabled, karaoke.effect (sweep/instant/outline),
+            karaoke.color_scheme (overrides style colors)
 
     Examples:
         # Basic format conversion
         lai caption convert input.srt output.vtt
 
-        # Custom font, background box, and speaker coloring
+        # Custom font, background box, speaker coloring, word-level
         lai caption convert input.json output.ass \\
             style.font_name="PingFang SC" style.font_size=24 \\
-            style.background_color="#00000080" style.speaker_color=auto
+            style.background_color="#00000080" style.speaker_color=auto \\
+            style.word_level=true
 
-        # Karaoke with color scheme (overrides style colors, keeps font)
-        lai caption convert input.json output.ass word_level=true \\
-            style.font_name="PingFang SC" style.speaker_color=auto \\
+        # Karaoke with color scheme
+        lai caption convert input.json output.ass \\
+            style.word_level=true style.speaker_color=auto \\
             karaoke.color_scheme=azure-gold
     """
     from pathlib import Path
@@ -244,11 +222,8 @@ def convert(
 
     caption.write(
         output_path,
-        include_speaker_in_text=include_speaker_in_text,
-        word_level=word_level,
-        translation_first=translation_first,
-        karaoke=karaoke_config,
         style=style,
+        karaoke=karaoke_config,
     )
 
     safe_print(f"Converted {input_path} -> {output_path}")
@@ -297,7 +272,7 @@ def normalize(
     output_path = Path(output_path).expanduser()
 
     caption_obj = Caption.read(input_path, normalize_text=True)
-    caption_obj.write(output_path, include_speaker_in_text=True)
+    caption_obj.write(output_path)
 
     if output_path == input_path:
         safe_print(f"✅ Normalized {input_path} (in-place)")
@@ -358,7 +333,7 @@ def shift(
     shifted_caption = caption_obj.shift_time(seconds)
 
     # Write shifted captions
-    shifted_caption.write(output_path, include_speaker_in_text=True)
+    shifted_caption.write(output_path)
 
     if seconds >= 0:
         direction = f"delayed by {seconds}s"

@@ -177,9 +177,9 @@ def translate(
     ensure_parent_dir(output_path)
     cap.write(
         str(output_path),
-        translation_first=caption_config.translation_first,
         style=caption_config.style,
         karaoke=caption_config.karaoke,
+        standardization=caption_config.standardization,
     )
 
     safe_print(theme.ok(f"Translation saved: {output_path}"))
@@ -233,7 +233,7 @@ def translate_youtube(
         lai translate youtube "dQw4w9WgXcQ" \\
             translation.target_lang=ja \\
             translation.bilingual=true \\
-            caption.word_level=true
+            caption.style.word_level=true
 
         # Refined translation with custom glossary
         lai translate youtube "VIDEO_ID" \\
@@ -283,9 +283,9 @@ def translate_youtube(
     ensure_parent_dir(output_path)
     cap.write(
         str(output_path),
-        translation_first=caption_config.translation_first,
         style=caption_config.style,
         karaoke=caption_config.karaoke,
+        standardization=caption_config.standardization,
     )
 
     safe_print(theme.ok(f"🎉 Translation saved: {output_path}"))

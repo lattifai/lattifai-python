@@ -166,7 +166,7 @@ class TranscriptionConfig:
                 try:
                     from lattifai.cli.config import get_config_value
 
-                    env_val = get_config_value("gemini_api_key")
+                    env_val = get_config_value("GEMINI_API_KEY")
                 except ImportError:
                     pass
             self.gemini_api_key = env_val

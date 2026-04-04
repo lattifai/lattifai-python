@@ -7,6 +7,7 @@ from lattifai.config import (
     CaptionConfig,
     CaptionInputConfig,
     CaptionOutputConfig,
+    CaptionStyle,
     ClientConfig,
     DiarizationConfig,
     MediaConfig,
@@ -137,7 +138,8 @@ class TestCaptionConfig:
         """Test custom configuration values."""
         config = CaptionConfig(
             input=CaptionInputConfig(format="vtt", normalize_text=True, encoding="utf-16"),
-            output=CaptionOutputConfig(format="json", include_speaker_in_text=False),
+            output=CaptionOutputConfig(format="json"),
+            style=CaptionStyle(include_speaker_in_text=False),
         )
         assert config.input_format == "vtt"
         assert config.output_format == "json"

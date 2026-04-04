@@ -65,7 +65,7 @@ def align(
         # Mixing positional and keyword arguments
         lai alignment align audio.mp4 caption.srt output.json \\
             alignment.device=cuda \\
-            caption.output.word_level=true
+            caption.style.word_level=true
 
         # Smart sentence splitting with custom output format
         lai alignment align audio.wav caption.srt output.vtt \\
@@ -81,7 +81,7 @@ def align(
         lai alignment align audio.wav caption.srt aligned.json \\
             media.output_dir=/tmp/output \\
             caption.input.split_sentence=true \\
-            caption.output.word_level=true \\
+            caption.style.word_level=true \\
             caption.input.normalize_text=true \\
             alignment.device=mps \\
             alignment.model_name=LattifAI/Lattice-1-Alpha

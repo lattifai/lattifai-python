@@ -109,10 +109,10 @@ class CaptionInputConfig:
 
 @dataclass
 class CaptionOutputConfig:
-    """Caption output: destination, format, content policy.
+    """Caption output: destination and format.
 
-    Controls where to write captions to and what content to include.
-    Visual rendering (font, colors, background) is in CaptionStyle, not here.
+    Output behavior (include_speaker_in_text, word_level, translation_first)
+    is controlled via CaptionStyle, not here.
     """
 
     path: Optional[str] = None
@@ -122,16 +122,6 @@ class CaptionOutputConfig:
     """Output caption format. Supports: standard, tabular, specialized,
     TTML profiles (ttml, imsc1, ebu_tt_d),
     NLE (avid_ds, fcpxml, premiere_xml, audition_csv, edimarker_csv)."""
-
-    include_speaker_in_text: bool = True
-    """Preserve speaker labels in caption text content."""
-
-    word_level: bool = False
-    """Use word-level output (useful for karaoke, dubbing).
-    JSON format includes 'words' field with word-level timestamps."""
-
-    translation_first: bool = False
-    """Place translation text above original text in bilingual output."""
 
     def __post_init__(self):
         """Validate output configuration."""
@@ -223,7 +213,7 @@ class CaptionConfig:
 
     @property
     def include_speaker_in_text(self) -> bool:
-        return self.output.include_speaker_in_text
+        return self.style.include_speaker_in_text
 
     @property
     def normalize_text(self) -> bool:
@@ -235,15 +225,15 @@ class CaptionConfig:
 
     @property
     def word_level(self) -> bool:
-        return self.output.word_level
+        return self.style.word_level
 
     @word_level.setter
     def word_level(self, value: bool) -> None:
-        self.output.word_level = value
+        self.style.word_level = value
 
     @property
     def translation_first(self) -> bool:
-        return self.output.translation_first
+        return self.style.translation_first
 
     @property
     def encoding(self) -> str:

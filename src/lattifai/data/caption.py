@@ -123,29 +123,23 @@ class Caption(BaseCaption):
         self,
         path=None,
         output_format: Optional[str] = None,
-        include_speaker_in_text: bool = True,
-        word_level: bool = False,
-        karaoke=None,
-        metadata: Optional[Dict[str, Any]] = None,
-        translation_first: bool = False,
         style=None,
+        karaoke=None,
+        standardization=None,
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         Write caption to file or return as bytes.
 
         Prefers alignments > supervisions > transcription as source.
-        All visual rendering options are controlled via ``style`` (CaptionStyle).
 
         Args:
             path: Path to output caption file, BytesIO object, or None to return bytes
             output_format: Output format (e.g., 'srt', 'vtt', 'ass')
-            include_speaker_in_text: Whether to include speaker labels in text
-            word_level: Use word-level output format if supported
-            karaoke: Karaoke configuration
+            style: CaptionStyle controlling rendering and output behavior
+            karaoke: Karaoke configuration (effect, color_scheme)
+            standardization: Broadcast standardization config
             metadata: Optional metadata dict to pass to writer
-            translation_first: When True, render translation text above original text
-            style: CaptionStyle controlling visual rendering (font, colors,
-                background_color, speaker_color, alignment, etc.)
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -162,15 +156,12 @@ class Caption(BaseCaption):
             result = super().write(
                 path=path,
                 output_format=output_format,
-                include_speaker_in_text=include_speaker_in_text,
-                word_level=word_level,
-                karaoke=karaoke,
-                metadata=metadata,
-                translation_first=translation_first,
                 style=style,
+                karaoke=karaoke,
+                standardization=standardization,
+                metadata=metadata,
             )
         finally:
-            # Restore original supervisions
             self.supervisions = original_supervisions
 
         return result
