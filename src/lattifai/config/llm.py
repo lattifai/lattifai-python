@@ -122,7 +122,13 @@ class LLMConfig:
         )
 
     def _resolve_api_key(self) -> Optional[str]:
-        """Resolve API key: env var > [section].api_key > global config > .env."""
+        """Resolve API key: [section].api_key > env var > global config > .env."""
+        # Section-specific api_key has highest priority (e.g. [translation.llm].api_key)
+        if self.section:
+            section_key = resolve_toml_value(self.section, "api_key")
+            if section_key:
+                return section_key
+
         try:
             from dotenv import find_dotenv, load_dotenv
 
@@ -140,12 +146,6 @@ class LLMConfig:
         if env_key:
             return env_key
 
-        # Section-specific api_key (e.g. [translation].api_key)
-        if self.section:
-            section_key = resolve_toml_value(self.section, "api_key")
-            if section_key:
-                return section_key
-
         try:
             from lattifai.cli.config import get_config_value
 
@@ -154,16 +154,16 @@ class LLMConfig:
             return None
 
     def _resolve_base_url(self) -> Optional[str]:
-        """Resolve base URL for OpenAI-compatible providers: env var > [section] > global config."""
-        env_url = os.environ.get("OPENAI_API_BASE_URL") or os.environ.get("OPENAI_API_BASE")
-        if env_url:
-            return env_url
-
-        # Section-specific api_base_url (e.g. [translation].api_base_url)
+        """Resolve base URL: [section].api_base_url > env var > global config."""
+        # Section-specific has highest priority
         if self.section:
             section_url = resolve_toml_value(self.section, "api_base_url")
             if section_url:
                 return section_url
+
+        env_url = os.environ.get("OPENAI_API_BASE_URL") or os.environ.get("OPENAI_API_BASE")
+        if env_url:
+            return env_url
 
         try:
             from lattifai.cli.config import get_config_value
