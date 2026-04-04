@@ -56,7 +56,7 @@ class FileExistenceManager:
 
         # Default formats - combine audio and video formats
         media_formats = media_formats or ["mp3", "wav", "m4a", "aac", "opus", "mp4", "webm", "mkv", "avi"]
-        caption_formats = caption_formats or ["md", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt"]
+        caption_formats = caption_formats or ["md", "srt", "vtt", "sub", "sbv", "txt"]
 
         # Check for media files (audio and video)
         for ext in set(media_formats):  # Remove duplicates
