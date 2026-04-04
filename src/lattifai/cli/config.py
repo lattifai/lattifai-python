@@ -474,11 +474,21 @@ def show():
 
 
 @app.command("set")
-def set_value(key: str, value: str):
+def set_value(key: str, value: Optional[str] = typer.Argument(None)):
     """Set a configuration value.
 
+    Accepts both `KEY VALUE` and `KEY=VALUE` syntax.
     Use dotted keys for section values: transcription.model_name, translation.llm.model_name
     """
+    # Support KEY=VALUE syntax
+    if value is None and "=" in key:
+        key, value = key.split("=", 1)
+    if value is None:
+        console.print(
+            f"[{T.RICH_ERR}]Missing value. Usage: lai config set KEY VALUE  or  lai config set KEY=VALUE[/{T.RICH_ERR}]"
+        )
+        raise typer.Exit(1)
+
     normalized = _normalize_key(key)
     if normalized not in ALL_KEYS:
         valid_top = ", ".join(KEY_MAP.keys())

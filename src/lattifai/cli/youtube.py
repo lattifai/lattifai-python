@@ -53,9 +53,11 @@ def youtube(
             Fields: api_key, timeout, max_retries
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name, device, batch_size
-        caption: Caption configuration for reading/writing caption files.
-            Fields: output_format, output_path, normalize_text,
-                    split_sentence, word_level, encoding
+        caption: Caption pipeline configuration.
+            Sub-configs: caption.input (normalize_text, split_sentence, source_lang),
+                         caption.output (path, format, word_level),
+                         caption.style (font, colors, speaker_color),
+                         caption.karaoke (enabled, effect, color_scheme)
         transcription: Transcription service configuration (enables Gemini transcription).
             Fields: gemini_api_key, model_name, language, device
         diarization: Speaker diarization configuration.
@@ -77,9 +79,9 @@ def youtube(
 
         # Full configuration with smart splitting and word-level alignment
         lai youtube align "https://www.youtube.com/watch?v=VIDEO_ID" \\
-            caption.output_path=aligned.srt \\
-            caption.split_sentence=true \\
-            caption.word_level=true \\
+            caption.output.path=aligned.srt \\
+            caption.input.split_sentence=true \\
+            caption.output.word_level=true \\
             alignment.device=cuda
 
         # Use Gemini transcription (requires API key)

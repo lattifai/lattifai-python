@@ -132,7 +132,7 @@ def diarize(
         output_path=output_caption,
         require_input=True,
         input_required_message=(
-            "Input caption path must be provided via positional input_caption or caption.input_path."
+            "Input caption path must be provided via positional input_caption or caption.input.path."
         ),
     )
     diarization_config = diarization or DiarizationConfig()

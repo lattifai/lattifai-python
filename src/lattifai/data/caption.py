@@ -125,7 +125,7 @@ class Caption(BaseCaption):
         output_format: Optional[str] = None,
         include_speaker_in_text: bool = True,
         word_level: bool = False,
-        karaoke_config=None,
+        karaoke=None,
         metadata: Optional[Dict[str, Any]] = None,
         translation_first: bool = False,
         style=None,
@@ -141,7 +141,7 @@ class Caption(BaseCaption):
             output_format: Output format (e.g., 'srt', 'vtt', 'ass')
             include_speaker_in_text: Whether to include speaker labels in text
             word_level: Use word-level output format if supported
-            karaoke_config: Karaoke configuration
+            karaoke: Karaoke configuration
             metadata: Optional metadata dict to pass to writer
             translation_first: When True, render translation text above original text
             style: CaptionStyle controlling visual rendering (font, colors,
@@ -164,7 +164,7 @@ class Caption(BaseCaption):
                 output_format=output_format,
                 include_speaker_in_text=include_speaker_in_text,
                 word_level=word_level,
-                karaoke_config=karaoke_config,
+                karaoke=karaoke,
                 metadata=metadata,
                 translation_first=translation_first,
                 style=style,

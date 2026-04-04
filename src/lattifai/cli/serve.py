@@ -23,7 +23,14 @@ from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.cli.transcribe import transcribe as transcribe_run
 from lattifai.cli.translate import translate as translate_run
 from lattifai.client import LattifAI
-from lattifai.config import AlignmentConfig, CaptionConfig, EventConfig, TranscriptionConfig
+from lattifai.config import (
+    AlignmentConfig,
+    CaptionConfig,
+    CaptionInputConfig,
+    CaptionOutputConfig,
+    EventConfig,
+    TranscriptionConfig,
+)
 from lattifai.config.llm import LLMConfig
 from lattifai.config.translation import TranslationConfig
 
@@ -334,7 +341,10 @@ class ServeHandler(BaseHTTPRequestHandler):
 
         client = LattifAI(
             alignment_config=AlignmentConfig(device=device),
-            caption_config=CaptionConfig(split_sentence=split_sentence, word_level=word_level),
+            caption_config=CaptionConfig(
+                input=CaptionInputConfig(split_sentence=split_sentence),
+                output=CaptionOutputConfig(word_level=word_level),
+            ),
         )
         client.alignment(
             input_media=str(media_file),

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Awaitable, Optional, Union
 
 from lattifai.audio2 import AudioData
-from lattifai.caption.config import apply_color_scheme
 from lattifai.data import Caption
 from lattifai.errors import CaptionProcessingError
 from lattifai.theme import theme
@@ -390,17 +389,14 @@ class LattifAIClientMixin:
             CaptionProcessingError: If caption cannot be written
         """
         try:
-            # Apply color_scheme to style if karaoke is active
             style = self.caption_config.style
             karaoke_config = self.caption_config.karaoke
-            if karaoke_config and karaoke_config.enabled and karaoke_config.color_scheme:
-                apply_color_scheme(style, karaoke_config.color_scheme)
 
             result = caption.write(
                 output_caption_path,
                 include_speaker_in_text=self.caption_config.include_speaker_in_text,
                 word_level=self.caption_config.word_level,
-                karaoke_config=karaoke_config,
+                karaoke=karaoke_config,
                 translation_first=self.caption_config.translation_first,
                 style=style,
             )

@@ -5,7 +5,7 @@ from typing import Annotated, List, Optional
 
 import nemo_run as run
 
-from lattifai.caption.config import CaptionStyle, KaraokeConfig, apply_color_scheme
+from lattifai.caption.config import CaptionStyle, KaraokeConfig
 from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
@@ -242,17 +242,13 @@ def convert(
         ref_caption = Caption.read(reference)
         caption.supervisions = align_timestamps_from_ref(caption.supervisions, ref_caption.supervisions)
 
-    effective_style = style or CaptionStyle()
-    if karaoke_config and karaoke_config.color_scheme:
-        apply_color_scheme(effective_style, karaoke_config.color_scheme)
-
     caption.write(
         output_path,
         include_speaker_in_text=include_speaker_in_text,
         word_level=word_level,
         translation_first=translation_first,
-        karaoke_config=karaoke_config,
-        style=effective_style,
+        karaoke=karaoke_config,
+        style=style,
     )
 
     safe_print(f"Converted {input_path} -> {output_path}")

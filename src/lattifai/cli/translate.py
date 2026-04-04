@@ -115,8 +115,9 @@ def translate(
             Fields: llm.model_name, llm.api_base_url, target_lang,
                     mode, bilingual, style, approach, batch_size, glossary_file,
                     save_artifacts, ask_refine_after_normal, auto_refine_after_normal
-        caption: Caption I/O configuration.
-            Fields: input_format, output_format
+        caption: Caption pipeline configuration.
+            Sub-configs: caption.output (translation_first),
+                         caption.style (font, colors for styled output)
 
     Examples:
         # Quick mode
@@ -174,7 +175,12 @@ def translate(
 
     _translate_caption_in_place(cap, translation_config)
     ensure_parent_dir(output_path)
-    cap.write(str(output_path), translation_first=caption_config.translation_first)
+    cap.write(
+        str(output_path),
+        translation_first=caption_config.translation_first,
+        style=caption_config.style,
+        karaoke=caption_config.karaoke,
+    )
 
     safe_print(theme.ok(f"Translation saved: {output_path}"))
 
@@ -275,7 +281,12 @@ def translate_youtube(
         target_lang=translation_config.target_lang,
     )
     ensure_parent_dir(output_path)
-    cap.write(str(output_path), translation_first=caption_config.translation_first)
+    cap.write(
+        str(output_path),
+        translation_first=caption_config.translation_first,
+        style=caption_config.style,
+        karaoke=caption_config.karaoke,
+    )
 
     safe_print(theme.ok(f"🎉 Translation saved: {output_path}"))
     return cap

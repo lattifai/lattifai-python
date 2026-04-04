@@ -49,14 +49,14 @@ def resolve_caption_paths(
     caption_config = caption or CaptionConfig()
 
     if input_path and caption_config.input_path:
-        raise ValueError(f"Cannot specify both positional {input_name} and caption.input_path.")
+        raise ValueError(f"Cannot specify both positional {input_name} and caption.input.path.")
     if input_path:
         caption_config.set_input_path(input_path)
     if require_input and not caption_config.input_path:
         raise ValueError(input_required_message or "Input caption path is required.")
 
     if output_path and caption_config.output_path:
-        raise ValueError(f"Cannot specify both positional {output_name} and caption.output_path.")
+        raise ValueError(f"Cannot specify both positional {output_name} and caption.output.path.")
     if output_path:
         caption_config.set_output_path(output_path)
 

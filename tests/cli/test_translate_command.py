@@ -78,7 +78,7 @@ class TestTranslateUnit:
         cap.supervisions = [SimpleNamespace(text="Hello")]
         cap.source_path = str(input_path)
 
-        def _write(path, translation_first=False):
+        def _write(path, **kwargs):
             Path(path).write_text("Translated content", encoding="utf-8")
 
         cap.write.side_effect = _write
