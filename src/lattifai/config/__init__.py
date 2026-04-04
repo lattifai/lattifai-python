@@ -16,8 +16,8 @@ from lattifai.caption.config import (
 
 from .alignment import AlignmentConfig
 
-# CaptionConfig is defined in lattifai-python (workflow config)
-from .caption import CaptionConfig
+# CaptionConfig and sub-configs defined in lattifai-python (workflow config)
+from .caption import CaptionConfig, CaptionInputConfig, CaptionOutputConfig
 from .client import ClientConfig
 from .diarization import DiarizationConfig
 from .event import EventConfig
@@ -32,6 +32,8 @@ __all__ = [
     "ClientConfig",
     "AlignmentConfig",
     "CaptionConfig",
+    "CaptionInputConfig",
+    "CaptionOutputConfig",
     "CaptionFonts",
     "CaptionStyle",
     "KaraokeConfig",

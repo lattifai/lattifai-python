@@ -83,7 +83,7 @@ class TestYoutubeCommand:
             "https://www.youtube.com/watch\?v\=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
             "media.force_overwrite=true",
-            f"caption.output_format={output_format}",
+            f"caption.output.format={output_format}",
             "alignment.device=cpu",
         ]
 
@@ -115,7 +115,7 @@ class TestYoutubeCommand:
             f"media.output_dir={tmp_path}",
             "media.output_format=mp3",
             "media.prefer_audio=true",
-            "caption.split_sentence=true",
+            "caption.input.split_sentence=true",
             "alignment.model_name=LattifAI/Lattice-1",
             "media.force_overwrite=true",
             "alignment.device=cpu",
@@ -130,7 +130,7 @@ class TestYoutubeCommand:
             f"media.output_dir={tmp_path}",
             "alignment.device=cpu",
             "media.force_overwrite=true",
-            "caption.input_path=dummy.srt",
+            "caption.input.path=dummy.srt",
         ]
         if not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError):
@@ -294,7 +294,7 @@ class TestYoutubeDownloadCommand:
         args = [
             "media.input_path=https://www.youtube.com/watch\?v\=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
-            f"caption.source_lang={lang_code}",
+            f"caption.input.source_lang={lang_code}",
             "media.force_overwrite=true",
             "alignment.device=cpu",
         ]
@@ -314,7 +314,7 @@ class TestYoutubeDownloadCommand:
         args = [
             "media.input_path=https://www.youtube.com/watch\?v\=kb9suz-kkoM",
             f"media.output_dir={tmp_path}",
-            "caption.source_lang=en-US",  # not exist
+            "caption.input.source_lang=en-US",  # not exist
             "media.force_overwrite=true",
             "alignment.device=cpu",
         ]

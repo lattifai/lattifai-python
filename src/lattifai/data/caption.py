@@ -128,14 +128,13 @@ class Caption(BaseCaption):
         karaoke_config=None,
         metadata: Optional[Dict[str, Any]] = None,
         translation_first: bool = False,
-        speaker_color: str = "",
-        background_color: str = "",
         style=None,
     ):
         """
         Write caption to file or return as bytes.
 
         Prefers alignments > supervisions > transcription as source.
+        All visual rendering options are controlled via ``style`` (CaptionStyle).
 
         Args:
             path: Path to output caption file, BytesIO object, or None to return bytes
@@ -145,8 +144,8 @@ class Caption(BaseCaption):
             karaoke_config: Karaoke configuration
             metadata: Optional metadata dict to pass to writer
             translation_first: When True, render translation text above original text
-            speaker_color: Speaker name color mode for ASS ("auto", "#RRGGBB", or comma-separated)
-            background_color: Background box color ("", "#RRGGBB", or "#RRGGBBAA")
+            style: CaptionStyle controlling visual rendering (font, colors,
+                background_color, speaker_color, alignment, etc.)
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -168,8 +167,6 @@ class Caption(BaseCaption):
                 karaoke_config=karaoke_config,
                 metadata=metadata,
                 translation_first=translation_first,
-                speaker_color=speaker_color,
-                background_color=background_color,
                 style=style,
             )
         finally:

@@ -5,7 +5,7 @@ from typing import Annotated, List, Optional
 
 import nemo_run as run
 
-from lattifai.caption.config import CaptionStyle, KaraokeConfig
+from lattifai.caption.config import CaptionStyle, KaraokeConfig, apply_color_scheme
 from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
@@ -148,7 +148,6 @@ def convert(
     style: Annotated[Optional[CaptionStyle], run.Config[CaptionStyle]] = None,
     karaoke: Annotated[Optional[KaraokeConfig], run.Config[KaraokeConfig]] = None,
     translation_first: bool = False,
-    speaker_color: str = "",
 ):
     """
     Convert caption file to another format.
@@ -179,34 +178,30 @@ def convert(
             When True without karaoke: outputs word-per-segment (each word as separate segment).
             JSON format will include a 'words' field with word-level timestamps.
         style: Subtitle style configuration (nemo_run Config).
-            Controls font, colors, background, alignment for ASS/VTT output.
+            Controls font, colors, background, alignment, speaker colors for ASS/VTT output.
             Use dot notation: style.font_name="PingFang SC" style.font_size=24
             style.background_color="#00000080" for semi-transparent background box.
+            style.speaker_color=auto for auto speaker coloring.
         karaoke: Karaoke configuration (nemo_run Config).
             Use dot notation: karaoke.enabled=true karaoke.effect=sweep
             Effects: "sweep" (\\kf, default), "instant" (\\k), "outline" (\\ko)
             karaoke.color_scheme=azure-gold overrides style colors.
         translation_first: Place translation text above original text in bilingual output.
             When True: translation appears on the first line, original on the second line.
-        speaker_color: Speaker name color for ASS output.
-            - "auto": built-in 10-color palette, auto-assigned per speaker
-            - "#RRGGBB": single color for all speakers
-            - "#FFA500,#00BFFF,...": comma-separated, auto-assigned per speaker
-            - "": no special color (default)
 
     Examples:
         # Basic format conversion
         lai caption convert input.srt output.vtt
 
-        # Custom font and background box
+        # Custom font, background box, and speaker coloring
         lai caption convert input.json output.ass \\
             style.font_name="PingFang SC" style.font_size=24 \\
-            style.background_color="#00000080"
+            style.background_color="#00000080" style.speaker_color=auto
 
         # Karaoke with color scheme (overrides style colors, keeps font)
         lai caption convert input.json output.ass word_level=true \\
-            style.font_name="PingFang SC" \\
-            karaoke.color_scheme=azure-gold speaker_color=auto
+            style.font_name="PingFang SC" style.speaker_color=auto \\
+            karaoke.color_scheme=azure-gold
     """
     from pathlib import Path
 
@@ -247,11 +242,8 @@ def convert(
         ref_caption = Caption.read(reference)
         caption.supervisions = align_timestamps_from_ref(caption.supervisions, ref_caption.supervisions)
 
-    # Apply color_scheme overlay to style (colors only, preserves font/alignment)
     effective_style = style or CaptionStyle()
     if karaoke_config and karaoke_config.color_scheme:
-        from lattifai.caption.config import apply_color_scheme
-
         apply_color_scheme(effective_style, karaoke_config.color_scheme)
 
     caption.write(
@@ -260,7 +252,6 @@ def convert(
         word_level=word_level,
         translation_first=translation_first,
         karaoke_config=karaoke_config,
-        speaker_color=speaker_color,
         style=effective_style,
     )
 

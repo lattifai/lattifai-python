@@ -226,14 +226,17 @@ class TestDiarizeErrors:
 
     def test_diarize_empty_caption_segments(self, tmp_path):
         from lattifai.cli.diarize import diarize
-        from lattifai.config import CaptionConfig, MediaConfig
+        from lattifai.config import CaptionConfig, CaptionInputConfig, CaptionOutputConfig, MediaConfig
 
         audio_path = tmp_path / "audio.wav"
         audio_path.write_bytes(b"fake")
         input_caption_path = tmp_path / "input.srt"
         input_caption_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
         media = MediaConfig(input_path=str(tmp_path / "audio.wav"))
-        caption = CaptionConfig(input_path=str(input_caption_path), output_path=str(tmp_path / "output.srt"))
+        caption = CaptionConfig(
+            input=CaptionInputConfig(path=str(input_caption_path)),
+            output=CaptionOutputConfig(path=str(tmp_path / "output.srt")),
+        )
         fake_client = Mock()
         fake_client.audio_loader = Mock(return_value="audio")
         fake_client._read_caption = Mock(return_value=SimpleNamespace(alignments=[], supervisions=[]))
@@ -244,14 +247,23 @@ class TestDiarizeErrors:
 
     def test_diarize_infer_speakers_flag(self, tmp_path):
         from lattifai.cli.diarize import diarize
-        from lattifai.config import CaptionConfig, DiarizationConfig, MediaConfig
+        from lattifai.config import (
+            CaptionConfig,
+            CaptionInputConfig,
+            CaptionOutputConfig,
+            DiarizationConfig,
+            MediaConfig,
+        )
 
         audio_path = tmp_path / "audio.wav"
         audio_path.write_bytes(b"fake")
         input_caption_path = tmp_path / "input.srt"
         input_caption_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
         media = MediaConfig(input_path=str(audio_path))
-        caption = CaptionConfig(input_path=str(input_caption_path), output_path=str(tmp_path / "output.srt"))
+        caption = CaptionConfig(
+            input=CaptionInputConfig(path=str(input_caption_path)),
+            output=CaptionOutputConfig(path=str(tmp_path / "output.srt")),
+        )
         diarization_config = DiarizationConfig(infer_speakers=True)
         fake_caption = SimpleNamespace(alignments=[SimpleNamespace(text="hello")], supervisions=[])
         fake_client = Mock()
