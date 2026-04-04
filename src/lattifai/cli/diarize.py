@@ -13,7 +13,7 @@ from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, Diariz
 from lattifai.theme import theme
 from lattifai.utils import safe_print
 
-__all__ = ["diarize"]
+__all__ = ["diarize", "naming"]
 
 
 def _resolve_context(context: Optional[str]) -> Optional[str]:
@@ -188,6 +188,102 @@ def diarize(
     )
 
     return diarized_caption
+
+
+@run.cli.entrypoint(name="naming", namespace="diarize", entrypoint_cls=LattifAIEntrypoint)
+def naming(
+    input_caption: Optional[str] = None,
+    output_caption: Optional[str] = None,
+    context: Optional[str] = None,
+    caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
+    diarization: Annotated[Optional[DiarizationConfig], run.Config[DiarizationConfig]] = None,
+):
+    """Infer real speaker names from a diarized caption file using LLM.
+
+    Reads a caption file with speaker labels (e.g. SPEAKER_00, SPEAKER_01),
+    then uses an LLM to identify each speaker's real name from conversation
+    content and optional metadata context.
+
+    No audio input required — operates purely on caption text.
+
+    Args:
+        input_caption: Path to diarized caption file (SRT, JSON, VTT, etc.).
+        output_caption: Optional output path. If omitted, prints the mapping
+            and rewrites in-place.
+        context: File path (.meta.md) or inline string providing speaker/media
+            context (title, channel, speakers, description).
+
+    Examples:
+        lai diarize naming episode.diarized.json
+        lai diarize naming episode.srt --context="Lex Fridman interviews Sam Altman"
+        lai diarize naming episode.json episode.named.json context=metadata.meta.md
+    """
+    from lattifai.caption import Caption
+    from lattifai.diarization.speaker import infer_speaker_names
+
+    caption_config = resolve_caption_paths(
+        caption,
+        input_path=input_caption,
+        output_path=output_caption,
+        require_input=True,
+        input_required_message="Input caption path required: lai diarize naming <caption_file>",
+    )
+    diarization_config = diarization or DiarizationConfig()
+
+    # Resolve context: file path → parsed metadata, string → pass through
+    speaker_context = _resolve_context(context)
+
+    safe_print(theme.step(f"Loading caption: {caption_config.input_path}"))
+    cap = Caption.read(str(caption_config.input_path))
+
+    if not cap.supervisions:
+        raise ValueError("Caption file contains no segments.")
+
+    # Check speakers exist
+    speaker_labels = {sup.speaker for sup in cap.supervisions if sup.speaker}
+    if len(speaker_labels) < 2:
+        safe_print(theme.warn(f"Only {len(speaker_labels)} speaker(s) found — naming requires 2+ speakers."))
+        return cap
+
+    safe_print(theme.step(f"Found {len(speaker_labels)} speakers: {', '.join(sorted(speaker_labels))}"))
+
+    # Build LLM client from diarization config
+    if diarization_config.llm is None:
+        from lattifai.config.diarization import DiarizationLLMConfig
+
+        diarization_config.llm = DiarizationLLMConfig()
+    llm_client = diarization_config.llm.create_client()
+
+    safe_print(theme.step(f"Inferring speaker names via LLM [{diarization_config.llm.model_name}]..."))
+    name_map = infer_speaker_names(
+        supervisions=cap.supervisions,
+        context=speaker_context,
+        llm_client=llm_client,
+    )
+
+    if not name_map:
+        safe_print(theme.warn("Could not infer any speaker names."))
+        return cap
+
+    # Display results
+    safe_print(theme.ok("\nSpeaker name mapping:"))
+    for label, name in sorted(name_map.items()):
+        safe_print(f"  {label} → {name}")
+
+    # Apply mapping to supervisions
+    for sup in cap.supervisions:
+        if sup.speaker in name_map:
+            sup.speaker = name_map[sup.speaker]
+
+    # Write output
+    output_path = caption_config.output_path or caption_config.input_path
+    cap.write(
+        str(output_path),
+        output_format=caption_config.output_format if caption_config.output_format != "auto" else None,
+    )
+    safe_print(theme.ok(f"Saved: {output_path}"))
+
+    return cap
 
 
 def main():

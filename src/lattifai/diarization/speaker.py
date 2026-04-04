@@ -440,3 +440,57 @@ class SpeakerNameInferrer:
             )
 
         return "\n".join(parts)
+
+
+def infer_speaker_names(
+    supervisions: list,
+    context: Optional[str] = None,
+    llm_client: Optional[BaseLLMClient] = None,
+    model: Optional[str] = None,
+    voting_rounds: int = 1,
+) -> Dict[str, str]:
+    """Infer speaker names from diarized caption supervisions.
+
+    Standalone entry point that extracts speaker_texts and dialogue_turns
+    from supervisions, then delegates to SpeakerNameInferrer.
+
+    Args:
+        supervisions: List of Supervision objects with speaker labels.
+        context: Optional metadata context (title, channel, description).
+        llm_client: LLM client instance. If None, auto-created from config.
+        model: Override LLM model name.
+        voting_rounds: Number of inference passes for majority voting.
+
+    Returns:
+        Mapping from speaker label (e.g. "SPEAKER_00") to inferred name.
+    """
+    from collections import defaultdict
+
+    # Build speaker_texts and dialogue_turns from supervisions
+    speaker_texts: Dict[str, List[str]] = defaultdict(list)
+    dialogue_turns: List[tuple] = []
+
+    for sup in supervisions:
+        label = sup.speaker or "UNKNOWN"
+        text = sup.text or ""
+        if not text.strip():
+            continue
+        speaker_texts[label].append(text)
+        dialogue_turns.append((label, text))
+
+    speaker_texts = dict(speaker_texts)
+
+    if not speaker_texts:
+        return {}
+
+    # Auto-create LLM client if not provided
+    if llm_client is None:
+        from lattifai.config.diarization import DiarizationLLMConfig
+
+        llm_config = DiarizationLLMConfig()
+        if model:
+            llm_config.model_name = model
+        llm_client = llm_config.create_client()
+
+    inferrer = SpeakerNameInferrer(llm_client, model=model, voting_rounds=voting_rounds)
+    return inferrer(speaker_texts, context=context, dialogue_turns=dialogue_turns)

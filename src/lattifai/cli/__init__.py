@@ -7,7 +7,7 @@ import nemo_run as run  # noqa: F401
 # Import and re-export entrypoints at package level so NeMo Run can find them
 from lattifai.cli.alignment import align
 from lattifai.cli.caption import convert, diff
-from lattifai.cli.diarize import diarize
+from lattifai.cli.diarize import diarize, naming
 from lattifai.cli.serve import serve
 from lattifai.cli.summarize import summarize_caption
 from lattifai.cli.transcribe import transcribe, transcribe_align
@@ -22,6 +22,7 @@ __all__ = [
     "convert",
     "diff",
     "diarize",
+    "naming",
     "serve",
     "summarize_caption",
     "transcribe",
