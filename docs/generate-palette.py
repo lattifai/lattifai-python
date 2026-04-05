@@ -35,7 +35,7 @@ SPEAKER_COLORS = [
 # Keep in sync with lattifai-captions config.py KARAOKE_PRESETS
 # Format: (key, cn_name, en_name, primary, secondary, outline, back)
 KARAOKE_PRESETS = [
-    ("azure-gold", "晴空金柠", "Azure Gold", "#FFFFFF", "#FFC209", "#1387C0", "#0A3D5C"),
+    ("azure-gold", "晴空金柠", "Azure Gold", "#FFC209", "#FFFFFF", "#1387C0", "#0A3D5C"),
     ("sakura-purple", "樱花紫鸢", "Sakura Purple", "#F7C3D9", "#7953B1", "#063C85", "#1A1A2E"),
     ("mint-ocean", "薄荷深海", "Mint Ocean", "#A1FEEF", "#658AE4", "#28314E", "#0A0A1A"),
     ("gardenia-green", "栀子碧山", "Gardenia Green", "#FFFFFF", "#9DC92A", "#77964A", "#1C2B1A"),
