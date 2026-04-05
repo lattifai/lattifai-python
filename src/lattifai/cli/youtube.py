@@ -56,7 +56,8 @@ def youtube(
         caption: Caption pipeline configuration.
             Sub-configs: caption.input (normalize_text, split_sentence, source_lang),
                          caption.output (path, format, word_level),
-                         caption.style (font, colors, speaker_color),
+                         caption.behavior (include_speaker_in_text, word_level),
+                         caption.ass (font, colors, speaker_color),
                          caption.karaoke (enabled, effect, color_scheme)
         transcription: Transcription service configuration (enables Gemini transcription).
             Fields: gemini_api_key, model_name, language, device
@@ -81,7 +82,7 @@ def youtube(
         lai youtube align "https://www.youtube.com/watch?v=VIDEO_ID" \\
             caption.output.path=aligned.srt \\
             caption.input.split_sentence=true \\
-            caption.style.word_level=true \\
+            caption.behavior.word_level=true \\
             alignment.device=cuda
 
         # Use Gemini transcription (requires API key)

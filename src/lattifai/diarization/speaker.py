@@ -128,7 +128,7 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
                 channel,
                 flags=re.IGNORECASE,
             ).strip()
-            if stripped and stripped != channel:
+            if stripped and stripped != channel and _looks_like_person_name(stripped):
                 _add("host", stripped)
 
     # 2. Title pattern: "Guest Name — topic" or "topic — Guest Name"

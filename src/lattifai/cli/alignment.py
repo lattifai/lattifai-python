@@ -52,10 +52,11 @@ def align(
             Fields: api_key, timeout, max_retries, default_headers
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name, device, batch_size
-        caption: Caption pipeline configuration (input/output/style/karaoke).
+        caption: Caption pipeline configuration (input/output/behavior/karaoke).
             Sub-configs: caption.input (path, format, normalize_text, split_sentence),
-                         caption.output (path, format, word_level, include_speaker_in_text),
-                         caption.style (font, colors, speaker_color, background_color),
+                         caption.output (path, format),
+                         caption.behavior (include_speaker_in_text, word_level, translation_first),
+                         caption.ass (font, colors, speaker_color, background_color),
                          caption.karaoke (enabled, effect, color_scheme)
 
     Examples:
@@ -65,7 +66,7 @@ def align(
         # Mixing positional and keyword arguments
         lai alignment align audio.mp4 caption.srt output.json \\
             alignment.device=cuda \\
-            caption.style.word_level=true
+            caption.behavior.word_level=true
 
         # Smart sentence splitting with custom output format
         lai alignment align audio.wav caption.srt output.vtt \\
@@ -81,7 +82,7 @@ def align(
         lai alignment align audio.wav caption.srt aligned.json \\
             media.output_dir=/tmp/output \\
             caption.input.split_sentence=true \\
-            caption.style.word_level=true \\
+            caption.behavior.word_level=true \\
             caption.input.normalize_text=true \\
             alignment.device=mps \\
             alignment.model_name=LattifAI/Lattice-1-Alpha

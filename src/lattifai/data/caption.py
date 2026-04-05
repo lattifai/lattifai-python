@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Dict, List, Optional, TypeVar
 
 from lattifai.caption import Caption as BaseCaption
 from lattifai.caption import Pathlike, Supervision
@@ -122,11 +122,10 @@ class Caption(BaseCaption):
     def write(
         self,
         path=None,
-        output_format: Optional[str] = None,
-        style=None,
+        format_config=None,
+        behavior=None,
         karaoke=None,
         standardization=None,
-        metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         Write caption to file or return as bytes.
@@ -135,11 +134,10 @@ class Caption(BaseCaption):
 
         Args:
             path: Path to output caption file, BytesIO object, or None to return bytes
-            output_format: Output format (e.g., 'srt', 'vtt', 'ass')
-            style: CaptionStyle controlling rendering and output behavior
+            format_config: Format-specific configuration (ASSConfig, TTMLConfig, etc.)
+            behavior: OutputBehavior controlling include_speaker, word_level, translation_first
             karaoke: Karaoke configuration (effect, color_scheme)
             standardization: Broadcast standardization config
-            metadata: Optional metadata dict to pass to writer
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -155,11 +153,10 @@ class Caption(BaseCaption):
         try:
             result = super().write(
                 path=path,
-                output_format=output_format,
-                style=style,
+                format_config=format_config,
+                behavior=behavior,
                 karaoke=karaoke,
                 standardization=standardization,
-                metadata=metadata,
             )
         finally:
             self.supervisions = original_supervisions

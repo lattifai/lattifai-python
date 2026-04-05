@@ -7,12 +7,16 @@ from typing import Optional
 from lattifai.caption.config import (
     INPUT_CAPTION_FORMATS,
     OUTPUT_CAPTION_FORMATS,
-    CaptionStyle,
+    ASSConfig,
     InputCaptionFormat,
     KaraokeConfig,
+    OutputBehavior,
     OutputCaptionFormat,
     StandardizationConfig,
 )
+from lattifai.caption.formats.nle.fcpxml import FCPXMLConfig
+from lattifai.caption.formats.nle.premiere import PremiereXMLConfig
+from lattifai.caption.formats.ttml import TTMLConfig
 from lattifai.caption.supervision import Pathlike
 
 
@@ -112,7 +116,7 @@ class CaptionOutputConfig:
     """Caption output: destination and format.
 
     Output behavior (include_speaker_in_text, word_level, translation_first)
-    is controlled via CaptionStyle, not here.
+    is controlled via OutputBehavior, not here.
     """
 
     path: Optional[str] = None
@@ -159,12 +163,13 @@ class CaptionOutputConfig:
 class CaptionConfig:
     """Caption pipeline configuration.
 
-    Five clearly separated sub-configs:
+    Sub-configs:
     - input: source file, format, text preprocessing
-    - output: destination, format, content policy
-    - style: visual rendering (font, colors, background, speaker colors)
+    - output: destination, format
+    - behavior: output behavior (include_speaker, word_level, translation_first)
     - karaoke: karaoke behavior (effect, color scheme, format options)
     - standardization: broadcast compliance (Netflix/BBC guidelines)
+    - ass/ttml/fcpxml/premiere: format-specific visual configs
     """
 
     _toml_section = "caption"
@@ -175,15 +180,28 @@ class CaptionConfig:
     output: CaptionOutputConfig = field(default_factory=CaptionOutputConfig)
     """Caption output: destination, format, content policy."""
 
-    style: CaptionStyle = field(default_factory=CaptionStyle)
-    """Visual rendering: font, colors, background, speaker colors, alignment.
-    When karaoke.color_scheme is set, scheme colors override style colors."""
+    behavior: OutputBehavior = field(default_factory=OutputBehavior)
+    """Output behavior: include_speaker_in_text, word_level, translation_first."""
 
     karaoke: Optional[KaraokeConfig] = None
     """Karaoke behavior: effect type, color scheme, LRC/TTML options."""
 
     standardization: Optional[StandardizationConfig] = None
     """Broadcast compliance: Netflix/BBC guidelines for segment duration, CPS, etc."""
+
+    # ── Format-specific configs ──
+
+    ass: Optional[ASSConfig] = None
+    """ASS/SSA format configuration: font, colors, outline, shadow, positioning."""
+
+    ttml: Optional[TTMLConfig] = None
+    """TTML/IMSC1/EBU-TT-D format configuration: style, region, profile."""
+
+    fcpxml: Optional[FCPXMLConfig] = None
+    """Final Cut Pro XML format configuration: fps, roles, styles."""
+
+    premiere: Optional[PremiereXMLConfig] = None
+    """Premiere Pro XML format configuration: fps, resolution, tracks."""
 
     # ── Convenience accessors (backward compatibility) ──
 
@@ -213,7 +231,7 @@ class CaptionConfig:
 
     @property
     def include_speaker_in_text(self) -> bool:
-        return self.style.include_speaker_in_text
+        return self.behavior.include_speaker_in_text
 
     @property
     def normalize_text(self) -> bool:
@@ -225,15 +243,15 @@ class CaptionConfig:
 
     @property
     def word_level(self) -> bool:
-        return self.style.word_level
+        return self.behavior.word_level
 
     @word_level.setter
     def word_level(self, value: bool) -> None:
-        self.style.word_level = value
+        self.behavior.word_level = value
 
     @property
     def translation_first(self) -> bool:
-        return self.style.translation_first
+        return self.behavior.translation_first
 
     @property
     def encoding(self) -> str:
@@ -249,7 +267,31 @@ class CaptionConfig:
 
     @property
     def speaker_color(self) -> str:
-        return self.style.speaker_color
+        """Speaker color for ASS output. Returns from ASSConfig if set, else empty."""
+        if self.ass:
+            return self.ass.speaker_color
+        return ""
+
+    def get_format_config(self, output_format: Optional[str] = None):
+        """Return the format-specific config matching the output format.
+
+        Args:
+            output_format: Format string (e.g., 'ass', 'ttml', 'fcpxml', 'premiere_xml').
+                           If None, uses self.output.format.
+
+        Returns:
+            The matching format config, or None if not set.
+        """
+        fmt = output_format or self.output.format
+        if fmt in ("ass", "ssa"):
+            return self.ass
+        elif fmt in ("ttml", "imsc1", "ebu_tt_d"):
+            return self.ttml
+        elif fmt == "fcpxml":
+            return self.fcpxml
+        elif fmt == "premiere_xml":
+            return self.premiere
+        return None
 
     def need_alignment(self, trust_timestamps: bool) -> bool:
         """Determine if alignment is needed based on configuration."""

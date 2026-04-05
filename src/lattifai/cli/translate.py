@@ -116,8 +116,9 @@ def translate(
                     mode, bilingual, style, approach, batch_size, glossary_file,
                     save_artifacts, ask_refine_after_normal, auto_refine_after_normal
         caption: Caption pipeline configuration.
-            Sub-configs: caption.output (translation_first),
-                         caption.style (font, colors for styled output)
+            Sub-configs: caption.output (format),
+                         caption.behavior (include_speaker_in_text, word_level, translation_first),
+                         caption.ass (font, colors for ASS output)
 
     Examples:
         # Quick mode
@@ -175,9 +176,14 @@ def translate(
 
     _translate_caption_in_place(cap, translation_config)
     ensure_parent_dir(output_path)
+    # Determine format-specific config from output path extension
+    ext = output_path.suffix.lstrip(".").lower()
+    format_config = caption_config.get_format_config(ext)
+
     cap.write(
         str(output_path),
-        style=caption_config.style,
+        format_config=format_config,
+        behavior=caption_config.behavior,
         karaoke=caption_config.karaoke,
         standardization=caption_config.standardization,
     )
@@ -233,7 +239,7 @@ def translate_youtube(
         lai translate youtube "dQw4w9WgXcQ" \\
             translation.target_lang=ja \\
             translation.bilingual=true \\
-            caption.style.word_level=true
+            caption.behavior.word_level=true
 
         # Refined translation with custom glossary
         lai translate youtube "VIDEO_ID" \\
@@ -281,9 +287,15 @@ def translate_youtube(
         target_lang=translation_config.target_lang,
     )
     ensure_parent_dir(output_path)
+
+    # Determine format-specific config from output path extension
+    ext = output_path.suffix.lstrip(".").lower()
+    format_config = caption_config.get_format_config(ext)
+
     cap.write(
         str(output_path),
-        style=caption_config.style,
+        format_config=format_config,
+        behavior=caption_config.behavior,
         karaoke=caption_config.karaoke,
         standardization=caption_config.standardization,
     )

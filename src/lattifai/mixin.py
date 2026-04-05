@@ -389,9 +389,14 @@ class LattifAIClientMixin:
             CaptionProcessingError: If caption cannot be written
         """
         try:
+            # Determine format-specific config from output path extension
+            ext = Path(str(output_caption_path)).suffix.lstrip(".").lower()
+            format_config = self.caption_config.get_format_config(ext)
+
             result = caption.write(
                 output_caption_path,
-                style=self.caption_config.style,
+                format_config=format_config,
+                behavior=self.caption_config.behavior,
                 karaoke=self.caption_config.karaoke,
                 standardization=self.caption_config.standardization,
             )

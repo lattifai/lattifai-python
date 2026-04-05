@@ -118,10 +118,10 @@ class TestCaptionConfigDefaults:
 
         assert config.input.format == "auto"
         assert config.output.format == "srt"
-        assert config.style.include_speaker_in_text is True
+        assert config.behavior.include_speaker_in_text is True
         assert config.input.normalize_text is True
         assert config.input.split_sentence is False
-        assert config.style.word_level is False
+        assert config.behavior.word_level is False
         assert config.input.encoding == "utf-8"
 
     def test_backward_compat_properties(self):
@@ -138,36 +138,40 @@ class TestCaptionConfigDefaults:
 
     def test_custom_values(self):
         """Test that custom values override defaults."""
-        from lattifai.caption.config import CaptionStyle
+        from lattifai.caption.config import OutputBehavior
 
         config = CaptionConfig(
             input=CaptionInputConfig(format="vtt", normalize_text=True),
             output=CaptionOutputConfig(format="json"),
-            style=CaptionStyle(word_level=True),
+            behavior=OutputBehavior(word_level=True),
         )
 
         assert config.input.format == "vtt"
         assert config.output.format == "json"
         assert config.input.normalize_text is True
-        assert config.style.word_level is True
+        assert config.behavior.word_level is True
 
 
 class TestCaptionConfigStructure:
-    """Test the 5-field CaptionConfig structure."""
+    """Test CaptionConfig structure."""
 
-    def test_five_sub_configs(self):
-        """CaptionConfig should have exactly 5 sub-config fields."""
+    def test_sub_configs(self):
+        """CaptionConfig should have core sub-config fields."""
         config = CaptionConfig()
         assert hasattr(config, "input")
         assert hasattr(config, "output")
-        assert hasattr(config, "style")
+        assert hasattr(config, "behavior")
         assert hasattr(config, "karaoke")
         assert hasattr(config, "standardization")
+        assert hasattr(config, "ass")
+        assert hasattr(config, "ttml")
+        assert hasattr(config, "fcpxml")
+        assert hasattr(config, "premiere")
 
-    def test_speaker_color_in_style(self):
-        """speaker_color should be in style, not a top-level field."""
-        from lattifai.caption.config import CaptionStyle
+    def test_speaker_color_in_ass(self):
+        """speaker_color should be in ASSConfig, not a top-level field."""
+        from lattifai.caption.config import ASSConfig
 
-        config = CaptionConfig(style=CaptionStyle(speaker_color="auto"))
-        assert config.style.speaker_color == "auto"
+        config = CaptionConfig(ass=ASSConfig(speaker_color="auto"))
+        assert config.ass.speaker_color == "auto"
         assert config.speaker_color == "auto"  # backward compat property

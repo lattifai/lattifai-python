@@ -27,8 +27,8 @@ from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
     CaptionInputConfig,
-    CaptionStyle,
     EventConfig,
+    OutputBehavior,
     TranscriptionConfig,
 )
 from lattifai.config.llm import LLMConfig
@@ -343,7 +343,7 @@ class ServeHandler(BaseHTTPRequestHandler):
             alignment_config=AlignmentConfig(device=device),
             caption_config=CaptionConfig(
                 input=CaptionInputConfig(split_sentence=split_sentence),
-                style=CaptionStyle(word_level=word_level),
+                behavior=OutputBehavior(word_level=word_level),
             ),
         )
         client.alignment(
@@ -400,7 +400,7 @@ class ServeHandler(BaseHTTPRequestHandler):
             input_path=str(caption_file),
             output_path=str(output_path),
             normalize_text=normalize_text,
-            style=CaptionStyle(
+            behavior=OutputBehavior(
                 include_speaker_in_text=include_speaker,
                 word_level=word_level,
             ),

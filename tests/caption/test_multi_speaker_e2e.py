@@ -19,7 +19,7 @@ import pytest
 from dotenv import find_dotenv, load_dotenv
 
 from lattifai.caption import Caption, Supervision
-from lattifai.caption.config import CaptionStyle
+from lattifai.caption.config import OutputBehavior
 
 load_dotenv(find_dotenv(usecwd=True))
 
@@ -148,7 +148,7 @@ class TestMultiSpeakerRoundtrip:
         caption = Caption.read(input_file)
 
         # Write output WITHOUT speaker in text
-        caption.write(output_file, style=CaptionStyle(include_speaker_in_text=False))
+        caption.write(output_file, behavior=OutputBehavior(include_speaker_in_text=False))
 
         # Read back
         caption_read = Caption.read(output_file)
@@ -184,7 +184,7 @@ class TestMultiSpeakerRoundtrip:
 
         # Step 2: Write without speakers
         no_speaker_file = tmp_path / "no_speaker.srt"
-        caption.write(no_speaker_file, style=CaptionStyle(include_speaker_in_text=False))
+        caption.write(no_speaker_file, behavior=OutputBehavior(include_speaker_in_text=False))
 
         # Step 3: Read back - should have no speakers
         caption_no_speaker = Caption.read(no_speaker_file)
@@ -212,7 +212,7 @@ class TestMultiSpeakerRoundtrip:
 
         # Write without speakers
         output_file = tmp_path / "output.srt"
-        caption.write(output_file, style=CaptionStyle(include_speaker_in_text=False))
+        caption.write(output_file, behavior=OutputBehavior(include_speaker_in_text=False))
 
         # Read back and verify text is exactly the expected text
         caption_read = Caption.read(output_file)
@@ -305,7 +305,7 @@ class TestMultiSpeakerCLI:
             str(MULTI_SPEAKER_AUDIO),
             str(MULTI_SPEAKER_VTT),
             str(output_file),
-            "caption.style.include_speaker_in_text=false",
+            "caption.behavior.include_speaker_in_text=false",
             "-Y",
             "alignment.model_hub=modelscope",  # Skip confirmation prompt
         ]
@@ -383,7 +383,7 @@ class TestMultiSpeakerCLI:
             str(MULTI_SPEAKER_AUDIO),
             str(MULTI_SPEAKER_VTT),
             str(output_file),
-            f"caption.style.include_speaker_in_text={str(include_speaker).lower()}",
+            f"caption.behavior.include_speaker_in_text={str(include_speaker).lower()}",
             "-Y",
             "alignment.model_hub=modelscope",  # Skip confirmation prompt
         ]
