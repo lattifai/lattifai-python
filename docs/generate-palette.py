@@ -19,16 +19,16 @@ from PIL import Image, ImageDraw, ImageFont
 # ─── Speaker palette ───────────────────────────────────────────────
 # Keep in sync with lattifai-captions pysubs2.py ASSFormat._SPEAKER_PALETTE
 SPEAKER_COLORS = [
-    ("#1387C0", "晴空海蓝", "Azure"),
-    ("#FFC209", "金柠暖阳", "Warm Yellow"),
+    ("#658AE4", "柔空蓝", "Sky Blue"),
+    ("#008C8C", "马尔斯绿", "Mars Green"),
     ("#F7C3D9", "柔樱粉", "Soft Pink"),
+    ("#CC5D84", "琅玕紫", "Langgan Purple"),
+    ("#FBC03D", "栀子黄", "Gardenia"),
+    ("#F4520D", "暖橙光", "Warm Orange"),
     ("#9DC92A", "苹果绿", "Apple Green"),
     ("#A1FEEF", "薄荷冰青", "Mint Ice"),
-    ("#F4520D", "暖橙光", "Warm Orange"),
-    ("#658AE4", "柔空蓝", "Sky Blue"),
-    ("#FBC03D", "栀子黄", "Gardenia"),
-    ("#CC5D84", "琅玕紫", "Langgan Purple"),
-    ("#008C8C", "马尔斯绿", "Mars Green"),
+    ("#1387C0", "晴空海蓝", "Azure"),
+    ("#FFC209", "金柠暖阳", "Warm Yellow"),
 ]
 
 # ─── Karaoke presets ───────────────────────────────────────────────

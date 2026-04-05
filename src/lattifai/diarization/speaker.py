@@ -114,9 +114,22 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
     if m:
         channel = m.group(1).strip()
         if not re.search(
-            r"(?:podcast|show|radio|channel|talk|street|播客|节目|频道|Priors|Space|MLST)", channel, re.IGNORECASE
+            r"(?:podcast|show|radio|channel|talk|street|clips|shorts|highlights|播客|节目|频道|Priors|Space|MLST)",
+            channel,
+            re.IGNORECASE,
         ):
             _add("host", channel)
+        else:
+            # Strip common sub-channel suffixes to recover host name
+            # e.g. "Dwarkesh Clips" → "Dwarkesh", "Lex Fridman Clips" → "Lex Fridman"
+            stripped = re.sub(
+                r"\s+(?:Clips|Shorts|Highlights|Podcast|Show|Channel|Radio|TV)$",
+                "",
+                channel,
+                flags=re.IGNORECASE,
+            ).strip()
+            if stripped and stripped != channel:
+                _add("host", stripped)
 
     # 2. Title pattern: "Guest Name — topic" or "topic — Guest Name"
     m = re.search(r"Title:\s*(.+?)(?:\n|$)", context)

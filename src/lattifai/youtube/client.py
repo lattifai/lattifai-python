@@ -767,6 +767,10 @@ class YouTubeDownloader:
                 "chapters": metadata.get("chapters") or [],
                 "categories": metadata.get("categories") or [],
                 "channel": metadata.get("channel", ""),
+                "channel_id": metadata.get("channel_id", ""),
+                "uploader_id": metadata.get("uploader_id", ""),
+                "uploader_url": metadata.get("uploader_url", ""),
+                "channel_follower_count": metadata.get("channel_follower_count"),
             }
 
             self.logger.info(f'✅ Video info extracted: {info["title"]}')
@@ -778,6 +782,180 @@ class YouTubeDownloader:
         except Exception as e:
             self.logger.error(f"Failed to parse video metadata: {str(e)}")
             raise RuntimeError(f"Failed to parse video metadata: {str(e)}")
+
+    async def get_channel_info(self, channel_url: str) -> Optional[Dict[str, Any]]:
+        """Fetch channel-level metadata via yt-dlp + page scraping for links."""
+        loop = asyncio.get_event_loop()
+
+        def _extract():
+            opts = {
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "extract_flat": True,
+                "playlist_items": "0",
+            }
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                return ydl.extract_info(channel_url, download=False)
+
+        try:
+            meta = await loop.run_in_executor(None, _extract)
+            if not meta or not meta.get("channel"):
+                return None
+            result: Dict[str, Any] = {
+                "channel": meta.get("channel", ""),
+                "channel_id": meta.get("channel_id", ""),
+                "description": meta.get("description", ""),
+                "uploader_id": meta.get("uploader_id", ""),
+                "uploader_url": meta.get("uploader_url", ""),
+                "follower_count": meta.get("channel_follower_count"),
+                "tags": meta.get("tags") or [],
+            }
+
+            # Enrich with about-page scraping (links, country, full description)
+            about_url = channel_url.rstrip("/") + "/about"
+            about = await loop.run_in_executor(None, self._scrape_channel_about, about_url)
+            if about:
+                result["links"] = about.get("links", [])
+                result["country"] = about.get("country", "")
+                result["joined"] = about.get("joined", "")
+                # Prefer scraped description (often longer/richer)
+                if about.get("description"):
+                    result["description"] = about["description"]
+
+            return result
+        except Exception as e:
+            self.logger.debug(f"Failed to fetch channel info for {channel_url}: {e}")
+            return None
+
+    @staticmethod
+    def _scrape_channel_about(about_url: str) -> Optional[Dict[str, Any]]:
+        """Scrape YouTube channel about page for links, country, and description."""
+        import json as _json
+        import urllib.request
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        try:
+            req = urllib.request.Request(about_url, headers=headers)
+            resp = urllib.request.urlopen(req, timeout=15)
+            html = resp.read().decode("utf-8")
+        except Exception:
+            return None
+
+        match = re.search(r"ytInitialData\s*=\s*({.*?});</script>", html, re.DOTALL)
+        if not match:
+            return None
+
+        try:
+            data = _json.loads(match.group(1))
+        except _json.JSONDecodeError:
+            return None
+
+        def _find(obj, key):
+            if isinstance(obj, dict):
+                if key in obj:
+                    return obj[key]
+                for v in obj.values():
+                    r = _find(v, key)
+                    if r is not None:
+                        return r
+            elif isinstance(obj, list):
+                for item in obj:
+                    r = _find(item, key)
+                    if r is not None:
+                        return r
+            return None
+
+        result: Dict[str, Any] = {}
+
+        # Extract channel external links (YouTube's current structure)
+        raw_links = _find(data, "links") or _find(data, "primaryLinks") or []
+        links = []
+        for link_item in raw_links:
+            vm = link_item.get("channelExternalLinkViewModel") if isinstance(link_item, dict) else None
+            if vm:
+                title = _find(vm.get("title"), "content") or ""
+                link_content = _find(vm.get("link"), "content") or ""
+                if title and link_content:
+                    links.append({"title": title, "url": link_content})
+            else:
+                # Fallback for older YouTube structure
+                title = _find(link_item, "simpleText") or _find(link_item, "content") or ""
+                url = _find(link_item, "url") or ""
+                if title and url:
+                    links.append({"title": title, "url": url})
+        result["links"] = links
+
+        # Extract description (prefer runs format for full text)
+        desc_obj = _find(data, "description")
+        if isinstance(desc_obj, dict) and "runs" in desc_obj:
+            result["description"] = "".join(r.get("text", "") for r in desc_obj["runs"])
+        elif isinstance(desc_obj, dict):
+            result["description"] = desc_obj.get("simpleText", "")
+        elif isinstance(desc_obj, str):
+            result["description"] = desc_obj
+
+        # Country
+        country = _find(data, "country")
+        if isinstance(country, dict):
+            country = country.get("simpleText", "")
+        result["country"] = country or ""
+
+        # Joined date
+        joined = _find(data, "joinedDateText")
+        if isinstance(joined, dict):
+            joined = joined.get("content", "")
+        result["joined"] = joined or ""
+
+        return result
+
+    async def resolve_parent_channel(self, video_info: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """Detect parent channel by following YouTube links in video description.
+
+        For clips/shorts channels, the description often links to the full episode
+        on the main channel. If a linked video belongs to a different uploader,
+        that uploader is the parent channel.
+        """
+        description = video_info.get("description", "")
+        current_uploader_id = video_info.get("uploader_id", "")
+        if not description or not current_uploader_id:
+            return None
+
+        # Extract YouTube video IDs from description
+        yt_video_ids = re.findall(r"(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})", description)
+        if not yt_video_ids:
+            return None
+
+        # Check linked videos (max 2) for different uploader
+        for vid_id in yt_video_ids[:2]:
+            try:
+                linked_info = await self.get_video_info(f"https://www.youtube.com/watch?v={vid_id}")
+                linked_uploader_id = linked_info.get("uploader_id", "")
+                if linked_uploader_id and linked_uploader_id != current_uploader_id:
+                    self.logger.info(
+                        f"Parent channel found: {linked_info.get('uploader', '')} "
+                        f"({linked_uploader_id}) via linked video {vid_id}"
+                    )
+                    # Fetch parent channel metadata
+                    parent_url = linked_info.get("uploader_url", "")
+                    parent_channel_info = {}
+                    if parent_url:
+                        parent_channel_info = await self.get_channel_info(parent_url) or {}
+                    return {
+                        "channel": linked_info.get("uploader", ""),
+                        "channel_id": parent_channel_info.get("channel_id") or linked_info.get("channel_id", ""),
+                        "uploader_id": linked_uploader_id,
+                        "uploader_url": parent_url,
+                        "description": parent_channel_info.get("description", ""),
+                        "follower_count": parent_channel_info.get("follower_count"),
+                        "tags": parent_channel_info.get("tags", []),
+                    }
+            except Exception:
+                continue
+        return None
 
     async def download_media(
         self,

@@ -126,7 +126,9 @@ def _build_meta_speaker_context(video_info: dict) -> Optional[str]:
     if title:
         parts.append(f"Title: {title}")
 
-    uploader = video_info.get("uploader") or video_info.get("channel")
+    # Prefer parent channel name (actual host) over sub-channel name
+    parent_channel = video_info.get("_parent_channel")
+    uploader = parent_channel or video_info.get("uploader") or video_info.get("channel")
     if uploader:
         parts.append(f"Channel/Host: {uploader}")
 
@@ -326,10 +328,41 @@ def youtube_download(
         meta_lines.append(f"upload_date: \"{info.get('upload_date', '')}\"")
         meta_lines.append(f"view_count: {info.get('view_count', 0)}")
         meta_lines.append(f"thumbnail: \"{info.get('thumbnail', '')}\"")
+        if info.get("channel_id"):
+            meta_lines.append(f"channel_id: \"{info.get('channel_id', '')}\"")
+
+        # Resolve parent channel for clips/shorts sub-channels
+        parent_channel = asyncio.get_event_loop().run_until_complete(downloader.resolve_parent_channel(info))
+        if parent_channel:
+            meta_lines.append("parent_channel:")
+            meta_lines.append(f"  name: \"{parent_channel['channel']}\"")
+            if parent_channel.get("channel_id"):
+                meta_lines.append(f"  channel_id: \"{parent_channel['channel_id']}\"")
+            if parent_channel.get("uploader_url"):
+                meta_lines.append(f"  url: \"{parent_channel['uploader_url']}\"")
+            if parent_channel.get("description"):
+                parent_desc = parent_channel["description"].replace('"', '\\"').replace("\n", " ").strip()[:200]
+                meta_lines.append(f'  description: "{parent_desc}"')
+            if parent_channel.get("follower_count"):
+                meta_lines.append(f"  follower_count: {parent_channel['follower_count']}")
+            if parent_channel.get("country"):
+                meta_lines.append(f"  country: \"{parent_channel['country']}\"")
+            links = parent_channel.get("links") or []
+            if links:
+                meta_lines.append("  links:")
+                for link in links:
+                    link_title = link["title"].replace('"', '\\"')
+                    meta_lines.append(f'    - title: "{link_title}"')
+                    meta_lines.append(f"      url: \"{link['url']}\"")
+            safe_print(theme.ok(f"  🔗 Parent channel: {parent_channel['channel']}"))
 
         # Extract speakers from description and title for structured metadata
+        # Enrich context with parent channel name if available
         description = info.get("description", "")
-        speaker_context = _build_meta_speaker_context(info)
+        enriched_info = dict(info)
+        if parent_channel:
+            enriched_info["_parent_channel"] = parent_channel["channel"]
+        speaker_context = _build_meta_speaker_context(enriched_info)
         if speaker_context:
             from lattifai.diarization.speaker import extract_candidate_names
 
