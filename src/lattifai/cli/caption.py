@@ -5,7 +5,7 @@ from typing import Annotated, List, Optional
 
 import nemo_run as run
 
-from lattifai.caption.config import CaptionStyle, KaraokeConfig
+from lattifai.caption.config import CaptionStyle, KaraokeConfig, StandardizationConfig
 from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
@@ -145,6 +145,7 @@ def convert(
     normalize_text: bool = False,
     style: Annotated[Optional[CaptionStyle], run.Config[CaptionStyle]] = None,
     karaoke: Annotated[Optional[KaraokeConfig], run.Config[KaraokeConfig]] = None,
+    standardization: Annotated[Optional[StandardizationConfig], run.Config[StandardizationConfig]] = None,
 ):
     """
     Convert caption file to another format.
@@ -224,6 +225,7 @@ def convert(
         output_path,
         style=style,
         karaoke=karaoke_config,
+        standardization=standardization,
     )
 
     safe_print(f"Converted {input_path} -> {output_path}")
