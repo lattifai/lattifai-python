@@ -305,7 +305,7 @@ class TestMultiSpeakerCLI:
             str(MULTI_SPEAKER_AUDIO),
             str(MULTI_SPEAKER_VTT),
             str(output_file),
-            "caption.behavior.include_speaker_in_text=false",
+            "caption.render.include_speaker_in_text=false",
             "-Y",
             "alignment.model_hub=modelscope",  # Skip confirmation prompt
         ]
@@ -383,7 +383,7 @@ class TestMultiSpeakerCLI:
             str(MULTI_SPEAKER_AUDIO),
             str(MULTI_SPEAKER_VTT),
             str(output_file),
-            f"caption.behavior.include_speaker_in_text={str(include_speaker).lower()}",
+            f"caption.render.include_speaker_in_text={str(include_speaker).lower()}",
             "-Y",
             "alignment.model_hub=modelscope",  # Skip confirmation prompt
         ]
