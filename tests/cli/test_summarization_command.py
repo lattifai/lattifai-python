@@ -48,6 +48,18 @@ class TestSummarizeHelp:
         )
         assert result.returncode == 0 or "usage:" in result.stdout or "help" in result.stdout
 
+    def test_summarize_group_lists_caption_subcommand(self):
+        """'lai summarize --help' should list the 'caption' subcommand."""
+        result = subprocess.run(
+            ["lai", "summarize", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        combined = result.stdout + result.stderr
+        assert result.returncode == 0
+        assert "caption" in combined.lower()
+
 
 class TestSummarizeErrors:
     """Test summarize command error handling."""

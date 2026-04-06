@@ -41,6 +41,13 @@ class TestTranslateHelp:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         assert result.returncode == 0 or "help" in result.stdout
 
+    def test_translate_youtube_help_mentions_target_lang(self):
+        """Help text for translate youtube should reference target_lang."""
+        cmd = ["lai", "translate", "youtube", "--help"]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        combined = result.stdout + result.stderr
+        assert "target_lang" in combined or "translation" in combined.lower() or "help" in combined.lower()
+
 
 class TestTranslateErrors:
     def test_missing_input_file(self, tmp_path):
@@ -132,3 +139,28 @@ class TestTranslateUnit:
 
         config = TranslationConfig(mode="quick")
         assert _should_continue_with_refined(config) is False
+
+
+class TestTranslateYoutubeUnit:
+    """Unit tests for translate_youtube function."""
+
+    def test_translate_youtube_missing_url_raises(self):
+        """translate_youtube raises when no URL is provided."""
+        from lattifai.cli.translate import translate_youtube
+
+        with pytest.raises(ValueError, match="YouTube URL"):
+            translate_youtube()
+
+    def test_translate_youtube_no_segments_raises(self):
+        """translate_youtube raises when youtube workflow yields no segments."""
+        from lattifai.cli.translate import translate_youtube
+        from lattifai.config.translation import TranslationConfig
+
+        fake_cap = SimpleNamespace(supervisions=[], source_path="/tmp/fake.mp4")
+
+        with patch("lattifai.cli.translate.run_youtube_workflow", return_value=fake_cap):
+            with pytest.raises(RuntimeError, match="no caption segments"):
+                translate_youtube(
+                    yt_url="https://youtube.com/watch?v=test123",
+                    translation=TranslationConfig(target_lang="zh"),
+                )

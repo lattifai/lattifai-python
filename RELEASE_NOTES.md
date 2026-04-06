@@ -1,3 +1,178 @@
+# Release Notes - LattifAI Python v1.5.0
+
+**Release Date:** April 6, 2026
+
+---
+
+## Overview
+
+v1.5.0 is the largest update since v1.0.0 — 132 files changed, 18,600+ lines added. This release solidifies LattifAI as a full-featured audio-text processing platform with authentication, translation, advanced diarization, and a self-contained config system.
+
+### Upgrade Now
+
+```bash
+pip install --upgrade "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+**Highlights:**
+- Start building instantly: `lai auth trial` provisions an API key in seconds with zero signup
+- End-to-end YouTube pipeline: download → transcribe → align → translate → export
+- 10 new CLI commands for daily workflows
+- Config-driven defaults via `config.toml` — set once, use everywhere
+- Streaming alignment with O(chunk) memory — process 20-hour files in constant ~500MB RAM
+- Python 3.13 ready (replaced deprecated `cgi.FieldStorage`)
+- Breaking config API cleanup: cleaner, more explicit interfaces
+
+---
+
+## What's New
+
+### Authentication System
+
+No more manual API key management. LattifAI now stores credentials in a device-bound keychain using HMAC-SHA256 fingerprinting.
+
+```bash
+lai auth trial          # Get a trial key instantly (no signup)
+lai auth login          # Full authentication flow
+lai auth whoami         # Check current credentials
+lai auth logout         # Clear stored credentials
+```
+
+### Caption Translation
+
+Full translation pipeline with three quality tiers:
+
+| Mode | Steps | Best For |
+|------|-------|----------|
+| `quick` | Direct translation | Drafts, previews |
+| `normal` | Analyze → Translate | General use |
+| `refined` | Analyze → Translate → Review → Polish | Published content |
+
+```bash
+# Translate captions to Chinese with bilingual output
+lai translate run input.srt -o output.srt --target-lang zh --bilingual
+
+# YouTube video → translated captions (one command)
+lai translate youtube "https://youtube.com/watch?v=..." --target-lang ja
+```
+
+### Transcription Backends
+
+Beyond Gemini: connect any ASR model served via vLLM or SGLang.
+
+| Model | Deployment | Languages |
+|-------|------------|-----------|
+| Gemini 2.5 Flash | Cloud API | 100+ |
+| Qwen3-ASR | Local | Multilingual |
+| FunASR Nano | Local | Chinese/English |
+| Voxtral Realtime | Cloud API (WebSocket) | Multilingual |
+| Gemma-3n | Self-hosted (vLLM/SGLang) | Multilingual |
+| Parakeet | Local | 24 |
+| SenseVoice | Local | 5 |
+
+### Speaker Diarization + Naming
+
+Beyond speaker detection — LattifAI now infers actual speaker names using LLM analysis:
+
+```bash
+lai diarize naming audio.wav caption.srt -o output.srt
+```
+
+Uses YouTube metadata, dialogue context voting, talk format detection, and post-LLM audience correction to map `SPEAKER_00` → `Alice`, `SPEAKER_01` → `Bob`.
+
+> Requires `GEMINI_API_KEY` or a configured LLM provider in `config.toml`.
+
+### Web Playground
+
+A local web server with four processing tabs:
+
+```bash
+lai serve --port 8001
+# Open http://localhost:8001
+```
+
+Tabs: **Align** | **Transcribe** | **Convert** | **Translate** — drag-and-drop files, adjust settings, download results.
+
+### Config System Overhaul
+
+Set defaults once in `~/.config/lattifai/config.toml`:
+
+```toml
+[transcription]
+model_name = "gemini-2.5-flash"
+
+[translation]
+model_name = "gemini-2.5-pro"
+target_lang = "zh"
+
+[alignment]
+device = "mps"
+```
+
+All CLI commands auto-resolve defaults from this file. Override per-invocation as needed.
+
+### ASS Karaoke & Speaker Colors
+
+12 color schemes and a 10-color speaker palette:
+
+```bash
+# Karaoke with color scheme
+lai caption convert input.json output.ass \
+    ass.karaoke_effect=sweep \
+    ass.karaoke_color_scheme=azure-gold
+
+# Auto-color speakers
+lai caption convert input.json output.ass \
+    render.include_speaker_in_text=true \
+    ass.speaker_color=auto
+```
+
+---
+
+## Breaking Changes
+
+| Before (v1.4.x) | After (v1.5.0) |
+|------------------|----------------|
+| `OutputBehavior(...)` | `RenderConfig(...)` |
+| `KaraokeConfig(enabled=True)` | `ASSConfig(karaoke_effect="sweep")` |
+| `caption.write(behavior=..., karaoke=...)` | `caption.write(render=...)` |
+| `behavior.word_level=true` (CLI) | `render.word_level=true` |
+| `karaoke.enabled=true` (CLI) | `ass.karaoke_effect=sweep` |
+| `AlignmentConfig(flush=...)` | `AlignmentConfig(flush_interval=...)` |
+
+---
+
+## New CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `lai auth login/logout/whoami/trial` | Authentication management |
+| `lai config set KEY=VALUE` | config.toml management |
+| `lai doctor` | Diagnostics with bundled selftest |
+| `lai update` | Automated SDK updater |
+| `lai serve` | Local web playground |
+| `lai translate run` | Caption translation |
+| `lai translate youtube` | YouTube → translated captions |
+| `lai diarize naming` | LLM-based speaker identification |
+| `lai summarize caption` | Caption summarization |
+| `lai youtube run` | Top-level YouTube pipeline |
+
+---
+
+## Dependencies
+
+| Package | Version | Change |
+|---------|---------|--------|
+| `lattifai-captions` | ≥ 0.4.0 | Breaking: RenderConfig API |
+| `lattifai-core` | ≥ 0.7.3 | Updated |
+| `lattifai-auth` | ≥ 0.2.1 | **New** required dependency |
+| `lattifai-run` | ≥ 1.0.4 | Updated |
+| `k2py` | 0.4.0 | Upgraded from 0.2.4 |
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.4.2
 
 **Release Date:** February 26, 2026

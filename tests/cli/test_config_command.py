@@ -192,3 +192,80 @@ class TestSectionKeyDiscovery:
         from lattifai.cli.config import ALL_KEYS, KEY_MAP, SECTION_KEYS
 
         assert ALL_KEYS == set(KEY_MAP) | set(SECTION_KEYS)
+
+
+class TestConfigSetSubprocess:
+    """Subprocess-level tests for 'lai config set' parameter validation."""
+
+    def test_config_set_missing_value_exits_nonzero(self):
+        """'lai config set KEY' without a value should fail."""
+        result = subprocess.run(
+            ["lai", "config", "set", "GEMINI_API_KEY"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        combined = result.stdout + result.stderr
+        assert "missing" in combined.lower() or "value" in combined.lower() or "usage" in combined.lower()
+
+    def test_config_set_unknown_key_exits_nonzero(self):
+        """'lai config set UNKNOWN_KEY value' should fail with unknown key error."""
+        result = subprocess.run(
+            ["lai", "config", "set", "TOTALLY_BOGUS_KEY", "some-value"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode != 0
+        combined = result.stdout + result.stderr
+        assert "unknown" in combined.lower() or "key" in combined.lower()
+
+    def test_config_set_equals_syntax_help(self):
+        """'lai config set KEY=VALUE' syntax should be documented in help."""
+        result = subprocess.run(
+            ["lai", "config", "set", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0
+        combined = result.stdout + result.stderr
+        assert "KEY" in combined or "key" in combined.lower()
+
+
+class TestConfigSetUnit:
+    """Unit tests for 'lai config set' logic."""
+
+    def test_set_and_get_section_key(self, tmp_path):
+        """Setting a dotted section key persists and can be read back."""
+        config_file = tmp_path / "config.toml"
+        config_dir = tmp_path
+        with (
+            patch("lattifai.cli.config.CONFIG_FILE", config_file),
+            patch("lattifai.cli.config.CONFIG_DIR", config_dir),
+        ):
+            from lattifai.cli.config import _load_config, _normalize_config, _save_config
+
+            # Simulate what 'lai config set transcription.model_name gemini-2.5-flash' does
+            config = _normalize_config(_load_config())
+            config.setdefault("transcription", {})["model_name"] = "gemini-2.5-flash"
+            _save_config(config)
+
+            loaded = _normalize_config(_load_config())
+            assert loaded.get("transcription", {}).get("model_name") == "gemini-2.5-flash"
+
+    def test_set_equals_syntax_parsing(self):
+        """KEY=VALUE syntax is correctly split."""
+        key_raw = "GEMINI_API_KEY=test-key-123"
+        if "=" in key_raw:
+            key, value = key_raw.split("=", 1)
+        assert key == "GEMINI_API_KEY"
+        assert value == "test-key-123"
+
+    def test_set_equals_with_equals_in_value(self):
+        """KEY=VAL=UE only splits on the first '='."""
+        key_raw = "OPENAI_API_BASE_URL=http://localhost:8000/v1?key=abc"
+        key, value = key_raw.split("=", 1)
+        assert key == "OPENAI_API_BASE_URL"
+        assert value == "http://localhost:8000/v1?key=abc"

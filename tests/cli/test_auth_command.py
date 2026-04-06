@@ -44,6 +44,19 @@ class TestAuthHelp:
         )
         assert result.returncode == 0 or "help" in result.stdout
 
+    def test_auth_group_lists_subcommands(self):
+        """'lai auth --help' should list all 4 subcommands."""
+        result = subprocess.run(
+            ["lai", "auth", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        combined = result.stdout + result.stderr
+        assert result.returncode == 0
+        for cmd in ("login", "logout", "whoami", "trial"):
+            assert cmd in combined, f"Subcommand '{cmd}' not found in 'lai auth --help' output"
+
 
 class TestAuthInternals:
     """Unit tests for auth helper functions."""

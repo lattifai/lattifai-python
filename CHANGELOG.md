@@ -1,40 +1,99 @@
 # CHANGELOG
 
 
-## [1.4.4] - 2026-04-02
+## [1.5.0] - 2026-04-06
+
+> This release contains **breaking changes** — see migration guide below. Config API overhaul, new auth system, 10 new CLI commands, and major feature additions across transcription, translation, diarization, and YouTube pipelines.
+
+### Breaking Changes
+- **Config API**: `OutputBehavior` renamed to `RenderConfig`; `KaraokeConfig` deleted — replace `KaraokeConfig(enabled=True)` with `ASSConfig(karaoke_effect="sweep")`
+- **Caption.write()**: `behavior=` parameter renamed to `render=`; `karaoke=` parameter removed
+- **CLI args**: `behavior.word_level=true` → `render.word_level=true`; `karaoke.enabled=true` → `ass.karaoke_effect=sweep`
+- **Migration**: find-replace `OutputBehavior` → `RenderConfig`, `behavior=` → `render=`, remove all `karaoke=` kwargs from `write()` calls
+- **AlignmentConfig**: `flush` renamed to `flush_interval`
+- **DiarizationConfig**: `speaker_context` moved to per-call parameter (`context`)
 
 ### Features
-- **Translation Module**: Full caption translation pipeline with multi-provider support (Gemini/OpenAI), three modes (quick/normal/refined), glossary management, and bilingual output
-- **vLLM Transcription**: Support for vLLM/SGLang-served ASR models — Voxtral Realtime (WebSocket), Gemma-3n, Fun-ASR-Nano, batch concurrent transcription for VAD chunks
-- **Speaker Diarization**: LLM-based speaker name inference using YouTube metadata, dialogue context voting, talk format detection, and post-LLM audience correction
-- **YouTube Enhancements**: 4+ transcript extraction strategies (Dwarkesh, Substack, podscripts.co, Rescript API), Chrome CDP and Safari fallbacks, SSL hijack detection, auto-detect caption language from video metadata
-- **Unified CLI**: New top-level `lai` command with subcommands — `lai doctor`, `lai update`, `lai config`, `lai serve`, `lai translate`, `lai youtube run`
-- **Web Playground**: `lai-serve` local web server with 4-tab UI (align, transcribe, convert, translate)
-- **LLM Abstraction**: Unified `lattifai.llm` module with `BaseLLM`, `GeminiLLM`, `OpenAICompatLLM` and shared `LLMConfig`
-- **Streaming Alignment**: Flush-every-N-chunks mechanism for O(chunk) memory, duplicate text block detection with diff-aware detokenization
-- **RMS Volume Normalization**: Automatic audio normalization before ONNX inference
-- **Selftest Data**: Bundled test WAV/SRT/VTT for `lai doctor` diagnostics
+
+#### Authentication
+- Device-bound credential storage via `lattifai-auth` (HMAC-SHA256 device fingerprinting)
+- New CLI commands: `lai auth login`, `lai auth logout`, `lai auth whoami`
+- `lai auth trial` — no-signup quick start with auto-provisioned trial key
+
+#### Transcription
+- **vLLM/SGLang backend**: Voxtral Realtime (WebSocket), Gemma-3n, Fun-ASR-Nano
+- **Qwen3-ASR** local model support
+- Batch concurrent transcription for VAD chunks
+- Auto-inject ASR system prompt and temperature for general-purpose LLMs
+- Dual API mode (transcriptions / chat), event detection, verbose_json support
+
+#### Translation
+- Full caption translation pipeline with multi-provider support (Gemini / OpenAI)
+- Three modes: quick (direct), normal (analyze → translate), refined (analyze → translate → review → polish)
+- Glossary management and bilingual output with `translation_first` display order
+- Retry with exponential backoff and checkpoint/resume for long documents
+
+#### Speaker Diarization
+- LLM-based speaker name inference using YouTube metadata and dialogue context
+- Candidate extraction with voting, talk format detection, post-LLM audience correction
+- `lai diarize naming` — dedicated command for speaker identification
+
+#### YouTube
+- 4+ transcript extraction strategies (Dwarkesh, Substack, podscripts.co, Rescript API)
+- Chrome CDP and Safari fallbacks for SPA transcript pages
+- SSL hijack detection, auto-detect caption language from video metadata
+- Parent channel metadata resolution and reordered speaker palette
+
+#### CLI
+- `lai doctor` — diagnostics with bundled selftest data
+- `lai update` — automated updater with stale editable install detection
+- `lai config set KEY=VALUE` — config.toml management
+- `lai serve` — local web playground (4-tab: align, transcribe, convert, translate)
+- `lai summarize caption` — caption summarization
+- `lai youtube run` — top-level YouTube processing command
+- `lai translate youtube` — YouTube-to-translation pipeline
+- Broadcast standardization parameter for `lai caption convert`
+
+#### Config System
+- `config.toml` auto-resolution: CLI defaults sourced from `~/.config/lattifai/config.toml` via `_toml_section`
+- Structured `CaptionConfig` with sub-configs: `CaptionInputConfig`, `CaptionOutputConfig`, `RenderConfig`
+- `CaptionConfig.write_kwargs()` helper — centralizes `Caption.write()` argument construction
+- `LRCConfig` support for LRC lyric format export
+- Nested TOML sections for per-module LLM configs
+
+#### Alignment
+- Streaming flush-every-N-chunks for O(chunk) memory usage
+- Duplicate text block detection — identifies repeated subtitle segments across flush boundaries with diff-aware detokenization
+- RMS volume normalization before ONNX inference
+- `start_margin` / `end_margin` unified defaults (0.10s)
+
+#### ASS / Karaoke
+- 12 karaoke color schemes (azure-gold, sakura-purple, mint-ocean, etc.)
+- 10-color speaker palette with `ass.speaker_color=auto`
+- `ASSConfig` self-contained: font, colors, outline, shadow, positioning, karaoke effect
+
+#### LLM
+- Unified `lattifai.llm` module: `BaseLLM`, `GeminiLLM`, `OpenAICompatLLM`
+- Shared `LLMConfig` with reasoning toggle and section-based auto-resolution
+- Gemini routed through OpenAI-compatible endpoint via shared client
 
 ### Fixes
-- YouTube: `Strategy 3b` tx_start logic, strip inline UI noise, SSL hijack page detection, speed up unreachable host fallback
-- Alignment: low word-level alignment ratio warning, punctuation-inflated duplicate filter, multilingual tokenizer in duplicate detection, label-aware boundary merge
-- CLI: CJK support in `align_timestamps_from_ref`, wire `config.toml` into runtime configs, harden `doctor`/`update` commands
+- YouTube: Strategy 3b tx_start logic, strip inline UI noise, SSL hijack detection, unreachable host fallback
+- Alignment: low word-level ratio warning, punctuation-inflated duplicate filter, multilingual tokenizer, label-aware boundary merge
+- Transcription: numpy array wrapping for Qwen3-ASR, propagate detected language, verbose_json fallback, correct Supervision timing
+- CLI: CJK support in `align_timestamps_from_ref`, wire config.toml into runtime, harden doctor/update, check API key in config.toml and .env
+- Translation: handle dict response from LLM, replace tqdm.write with stderr, phase progress display
+- Diarization: make llm field non-optional for CLI, section-specific config priority
 - Media: honor `output_format` in `normalize_format`, fix video download
-- Transcription: propagate detected language to Supervision/Caption, `verbose_json` fallback, correct Supervision timing
+- Config: uppercase key names for config.toml lookup, load .env in LLMConfig
 
-### Changed
-- **k2py**: Upgraded from 0.2.4 to 0.4.0
-- **Streaming**: Default `streaming_chunk_secs` reduced from 600 to 300
-- **Config**: Renamed `flush` to `flush_interval` in AlignmentConfig; `speaker_context` moved to per-call parameter
-- **Gemini**: Routed through OpenAI-compatible endpoint via shared LLM client
-- **CLI Theme**: Centralized color theme for light/dark terminal compatibility
-- **Deprecation**: Replaced `cgi.FieldStorage` with stdlib-only multipart parser (Python 3.13 ready)
-
-### Refactor
-- Extracted shared `LLMConfig` for diarization and translation configs
-- Reorganized YouTube CLI commands into dedicated namespace
-- Simplified flush cycle loop and unified confidence score path
-- Removed `_merge_partial_results` in favor of unified `flush`/`non-flush` finish
+### Dependencies
+- `lattifai-captions` ≥ 0.4.0 (breaking: RenderConfig API)
+- `lattifai-core` ≥ 0.7.3
+- `lattifai-auth` ≥ 0.2.1 (new required dependency)
+- `lattifai-run` ≥ 1.0.4
+- `k2py` 0.4.0 (upgraded from 0.2.4)
+- Replaced `cgi.FieldStorage` with stdlib-only multipart parser (Python 3.13 ready)
 
 
 ## [1.4.2] - 2026-02-26

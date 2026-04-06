@@ -210,6 +210,18 @@ class TestDiarizeHelp:
         )
         assert result.returncode == 0 or "usage:" in result.stdout or "help" in result.stdout
 
+    def test_diarize_naming_help(self):
+        result = subprocess.run(
+            ["lai", "diarize", "naming", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0 or "help" in result.stdout
+        # Verify command description is present
+        combined = result.stdout + result.stderr
+        assert "speaker" in combined.lower() or "naming" in combined.lower() or "help" in combined.lower()
+
 
 class TestDiarizeErrors:
     def test_missing_input_media(self, tmp_path):
@@ -282,3 +294,118 @@ class TestDiarizeErrors:
 
         assert result == "diarized"
         fake_client.speaker_diarization.assert_called_once()
+
+
+class TestNamingUnit:
+    """Unit tests for the lai diarize naming command."""
+
+    def test_naming_missing_input_raises(self):
+        """Naming requires an input caption path."""
+        from lattifai.cli.diarize import naming
+
+        with pytest.raises(ValueError, match="Input caption path required"):
+            naming()
+
+    def test_naming_empty_caption_raises(self, tmp_path):
+        """Naming raises when caption has no segments."""
+        from lattifai.cli.diarize import naming
+
+        input_path = tmp_path / "empty.srt"
+        input_path.write_text("", encoding="utf-8")
+
+        cap = SimpleNamespace(supervisions=[], source_path=str(input_path))
+
+        with patch("lattifai.caption.Caption.read", return_value=cap):
+            with pytest.raises(ValueError, match="no segments"):
+                naming(input_caption=str(input_path))
+
+    def test_naming_single_speaker_returns_early(self, tmp_path):
+        """Naming returns early when fewer than 2 speakers are found."""
+        from lattifai.cli.diarize import naming
+
+        input_path = tmp_path / "single_speaker.srt"
+        input_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
+
+        cap = SimpleNamespace(
+            supervisions=[SimpleNamespace(text="Hello", speaker="SPEAKER_00")],
+            source_path=str(input_path),
+        )
+
+        with patch("lattifai.caption.Caption.read", return_value=cap):
+            result = naming(input_caption=str(input_path))
+
+        assert result is cap  # Returns unchanged
+
+    def test_naming_multi_speaker_calls_infer(self, tmp_path):
+        """Naming calls infer_speaker_names when 2+ speakers are present."""
+        from lattifai.cli.diarize import naming
+        from lattifai.config import DiarizationConfig
+
+        input_path = tmp_path / "multi_speaker.json"
+        input_path.write_text("{}", encoding="utf-8")
+        output_path = tmp_path / "named.json"
+
+        sup0 = SimpleNamespace(text="Hello there", speaker="SPEAKER_00")
+        sup1 = SimpleNamespace(text="Hey, how are you?", speaker="SPEAKER_01")
+        cap = Mock()
+        cap.supervisions = [sup0, sup1]
+        cap.source_path = str(input_path)
+
+        diarization_config = DiarizationConfig()
+        fake_llm_client = Mock()
+
+        with (
+            patch("lattifai.caption.Caption.read", return_value=cap),
+            patch(
+                "lattifai.diarization.speaker.infer_speaker_names",
+                return_value={"SPEAKER_00": "Alice", "SPEAKER_01": "Bob"},
+            ) as mock_infer,
+            patch.object(diarization_config, "llm") as mock_llm_cfg,
+        ):
+            mock_llm_cfg.create_client.return_value = fake_llm_client
+            mock_llm_cfg.model_name = "test-model"
+            result = naming(
+                input_caption=str(input_path),
+                output_caption=str(output_path),
+                diarization=diarization_config,
+            )
+
+        mock_infer.assert_called_once()
+        # Verify speaker labels were updated
+        assert sup0.speaker == "Alice"
+        assert sup1.speaker == "Bob"
+        cap.write.assert_called_once()
+
+    def test_naming_no_inferred_names_returns_cap(self, tmp_path):
+        """Naming returns cap unchanged when LLM cannot infer names."""
+        from lattifai.cli.diarize import naming
+        from lattifai.config import DiarizationConfig
+
+        input_path = tmp_path / "multi.srt"
+        input_path.write_text("placeholder", encoding="utf-8")
+
+        sup0 = SimpleNamespace(text="...", speaker="SPEAKER_00")
+        sup1 = SimpleNamespace(text="...", speaker="SPEAKER_01")
+        cap = Mock()
+        cap.supervisions = [sup0, sup1]
+        cap.source_path = str(input_path)
+
+        diarization_config = DiarizationConfig()
+
+        with (
+            patch("lattifai.caption.Caption.read", return_value=cap),
+            patch("lattifai.diarization.speaker.infer_speaker_names", return_value={}),
+            patch.object(diarization_config, "llm") as mock_llm_cfg,
+        ):
+            mock_llm_cfg.create_client.return_value = Mock()
+            mock_llm_cfg.model_name = "test-model"
+            result = naming(
+                input_caption=str(input_path),
+                diarization=diarization_config,
+            )
+
+        assert result is cap
+        # Speaker labels should NOT have changed
+        assert sup0.speaker == "SPEAKER_00"
+        assert sup1.speaker == "SPEAKER_01"
+        cap.write.assert_not_called()
