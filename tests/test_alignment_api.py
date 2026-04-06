@@ -102,10 +102,15 @@ class TestAlignmentReturnValue:
         client = LattifAI()
 
         # Example usage (would run with real files):
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".srt", delete=False) as f:
+            output_path = f.name
+
         caption = client.alignment(
             input_media="tests/data/SA1.mp3",
-            input_caption="tests/data/SA1.txt",
-            output_caption_path="tests/data/SA1.srt",
+            input_caption="tests/data/SA1.TXT",
+            output_caption_path=output_path,
         )
 
         assert isinstance(caption, Caption)

@@ -94,7 +94,7 @@ def test_gemini_transcribe_numpy_mono(sample_audio):
     if not api_key:
         pytest.skip("GEMINI_API_KEY not set")
 
-    config = TranscriptionConfig(model_name="gemini-2.5-pro", gemini_api_key=api_key)
+    config = TranscriptionConfig(model_name="gemini-3.1-pro-preview", gemini_api_key=api_key)
     transcriber = create_transcriber(config)
 
     supervision = transcriber.transcribe_numpy(sample_audio, language="en")
@@ -113,7 +113,7 @@ def test_gemini_transcribe_numpy_batch(audio_list):
     if not api_key:
         pytest.skip("GEMINI_API_KEY not set")
 
-    config = TranscriptionConfig(model_name="gemini-2.5-pro", gemini_api_key=api_key)
+    config = TranscriptionConfig(model_name="gemini-3.1-pro-preview", gemini_api_key=api_key)
     transcriber = create_transcriber(config)
 
     supervisions = transcriber.transcribe_numpy(audio_list, language="en")
@@ -128,7 +128,7 @@ def test_gemini_transcribe_numpy_batch(audio_list):
 
 def test_gemini_transcriber_instance():
     """Test that Gemini transcriber can be instantiated."""
-    config = TranscriptionConfig(model_name="gemini-2.5-pro", gemini_api_key="test_key")
+    config = TranscriptionConfig(model_name="gemini-3.1-pro-preview", gemini_api_key="test_key")
     transcriber = create_transcriber(config)
 
     assert isinstance(transcriber, GeminiTranscriber)
