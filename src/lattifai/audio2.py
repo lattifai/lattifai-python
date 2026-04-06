@@ -13,6 +13,36 @@ from lattifai.types import Pathlike
 
 _RESAMPLER_DIR = Path(__file__).parent / "data" / "resamplers"
 
+# RMS-based volume normalization constants (matching lattifai-site alignment.worker.ts)
+_NORM_TARGET_DB = -14.0
+_NORM_THRESHOLD_DB = -24.0
+_NORM_MAX_GAIN_DB = 40.0
+_NORM_FLOOR_DB = -80.0
+
+
+def normalize_volume(audio: np.ndarray) -> np.ndarray:
+    """RMS-based volume normalization for alignment.
+
+    Matches lattifai-site alignment.worker.ts normalizeVolume().
+    Only boosts quiet audio; loud audio passes through unchanged.
+
+    Args:
+        audio: shape (1, T) or (C, T), float32
+
+    Returns:
+        Normalized audio (same shape), or original if no normalization needed.
+    """
+    rms = np.sqrt(np.mean(audio[:, ::16] ** 2))
+    rms_db = 20 * np.log10(rms + 1e-10)
+
+    if rms_db < _NORM_FLOOR_DB or rms_db >= _NORM_THRESHOLD_DB:
+        return audio
+
+    gain_db = min(_NORM_TARGET_DB - rms_db, _NORM_MAX_GAIN_DB)
+    gain = 10 ** (gain_db / 20)
+    return (audio * gain).astype(np.float32)
+
+
 # ChannelSelectorType = Union[int, Iterable[int], str]
 ChannelSelectorType = Union[int, str]
 
@@ -57,7 +87,7 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "path", "st
         """Iterate over audio chunks with configurable duration and overlap.
 
         Args:
-            chunk_secs: Duration of each chunk in seconds (default: uses streaming_chunk_secs or 600.0).
+            chunk_secs: Duration of each chunk in seconds (default: uses streaming_chunk_secs or 300.0).
             overlap_secs: Overlap between consecutive chunks in seconds (default: uses overlap_secs or 0.0).
 
         Yields:
@@ -68,7 +98,7 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "path", "st
             >>> for chunk in audio.iter_chunks(chunk_secs=60.0, overlap_secs=2.0):
             ...     process(chunk)
         """
-        chunk_duration = chunk_secs or self.streaming_chunk_secs or 600.0
+        chunk_duration = chunk_secs or self.streaming_chunk_secs or 300.0
         overlap_duration = overlap_secs or self.overlap_secs or 0.0
 
         chunk_size = int(chunk_duration * self.sampling_rate)

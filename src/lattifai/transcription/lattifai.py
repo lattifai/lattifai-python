@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple, Union
 
 import numpy as np
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -84,16 +85,16 @@ class LattifAITranscriber(BaseTranscriber):
     LattifAI local transcription with config-driven architecture.
 
     Uses TranscriptionConfig for all behavioral settings.
-    Loads NeMo ASR models or OmniSenseVoice locally
+    Loads NeMo ASR models, OmniSenseVoice, FunASR, or Qwen3-ASR locally.
     """
 
     file_suffix = ".ass"
     supports_url = False
+    needs_vad = True
 
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
         self._asr_model = None
-        self.event_detector = None
 
     @property
     def name(self) -> str:
@@ -134,6 +135,35 @@ class LattifAITranscriber(BaseTranscriber):
 
             return OmniSenseVoiceSmall("iic/SenseVoiceSmall", quantize=False, device_id=device_id, device=str(device))
 
+        elif model_name in ("FunAudioLLM/Fun-ASR-Nano-2512", "FunAudioLLM/Fun-ASR-MLT-Nano-2512"):
+            import sys
+
+            import funasr
+            from funasr import AutoModel
+
+            # funasr's fun_asr_nano uses bare `from ctc import CTC` which needs the
+            # package's own directory on sys.path
+            nano_dir = os.path.join(os.path.dirname(funasr.__file__), "models", "fun_asr_nano")
+            if nano_dir not in sys.path:
+                sys.path.insert(0, nano_dir)
+
+            hub = self.config.model_hub  # "huggingface" or "modelscope"
+            return AutoModel(model=model_name, trust_remote_code=True, device=str(device), hub=hub, disable_update=True)
+
+        elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
+            from qwen_asr import Qwen3ASRModel
+
+            # Map LattifAI device to qwen_asr device_map
+            device_str = str(device)
+            device_map = "cuda:0" if device_str == "cuda" else device_str
+
+            # bfloat16 for CUDA, float32 for CPU/MPS
+            dtype = torch.bfloat16 if "cuda" in device_map else torch.float32
+
+            model = Qwen3ASRModel.from_pretrained(model_name, dtype=dtype, device_map=device_map, max_new_tokens=256)
+            logger.info("Loaded %s on %s", model_name, device_map)
+            return model
+
         else:
             raise ValueError(f"Unsupported model_name: {model_name}")
 
@@ -165,27 +195,13 @@ class LattifAITranscriber(BaseTranscriber):
 
         with torch.inference_mode():
             # If input is AudioData, run event detection for VAD segmentation
-            if hasattr(audio, "sampling_rate") and hasattr(audio, "ndarray"):
+            if isinstance(audio, AudioData):
                 assert audio.ndarray.ndim == 2, "AudioData.ndarray must be 2D (channels, samples)"
                 assert audio.ndarray.shape[0] == 1, "AudioData.ndarray must have 1 channel for transcription"
 
-                # AED — use lattifai.event wrapper
-                detector = self.event_detector
-                if detector is not None:
-                    try:
-                        led = detector.detect(audio, fast_mode=True, vad_chunk_size=30.0, vad_max_gap=4.0)
-                    except Exception as e:
-                        logger.warning("Event detection failed, proceeding without VAD: %s", e)
-                        led = None
-
-                if led is not None:
-                    segments = [
-                        (event.start_time, event.end_time) for event in led.audio_events.get_tier_by_name("VAD")
-                    ]
-                    audio = [
-                        audio.ndarray[0, int(start * audio.sampling_rate) : int(end * audio.sampling_rate)]
-                        for start, end in segments
-                    ]
+                segments, led = self._vad_segment(audio)
+                if segments:
+                    audio = self._slice_audio_by_segments(audio, segments)
 
             model_name = self.config.model_name
             asr_model = self._asr_model
@@ -202,6 +218,7 @@ class LattifAITranscriber(BaseTranscriber):
                         if model_name == "nvidia/canary-1b-v2"
                         else {}
                     ),
+                    verbose=progress_bar,
                 )
                 hypotheses = self._to_supervisions(audio, hypotheses, return_hypotheses)
 
@@ -225,6 +242,55 @@ class LattifAITranscriber(BaseTranscriber):
                     progressbar=progress_bar,
                 )
                 hypotheses = self._to_supervisions(audio, hypotheses, return_hypotheses)
+
+            elif model_name in ("FunAudioLLM/Fun-ASR-Nano-2512", "FunAudioLLM/Fun-ASR-MLT-Nano-2512"):
+                # Fun-ASR-Nano: funasr AutoModel, accepts file paths or torch.Tensor
+                device = self.config.device
+                if isinstance(audio, np.ndarray):
+                    audio = [audio]
+                inputs = audio if isinstance(audio, list) else [audio]
+                hypotheses = []
+                iterable = tqdm(inputs, desc="Transcribing", unit="seg") if progress_bar else inputs
+                for inp in iterable:
+                    if isinstance(inp, np.ndarray):
+                        dur = inp.shape[-1] / _ASR_SAMPLE_RATE
+                        inp = torch.from_numpy(inp).to(device)
+                    elif isinstance(inp, torch.Tensor):
+                        dur = inp.shape[-1] / _ASR_SAMPLE_RATE
+                        inp = inp.to(device)
+                    else:
+                        dur = 0.0
+                    res = asr_model.generate(
+                        input=[inp], cache={}, batch_size=1, language=language or "auto", itn=True, disable_pbar=True
+                    )
+                    text = res[0]["text"] if res else ""
+                    hypotheses.append(Supervision(text=text, duration=dur))
+
+            elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
+                # Qwen3-ASR: native batch inference via qwen_asr package
+                if isinstance(audio, np.ndarray):
+                    audio_inputs = [audio]
+                elif isinstance(audio, list):
+                    audio_inputs = audio
+                else:
+                    audio_inputs = [audio]
+
+                lang_list = [language] * len(audio_inputs) if language else [None] * len(audio_inputs)
+
+                results = asr_model.transcribe(audio=audio_inputs, language=lang_list)
+
+                hypotheses = []
+                for i, r in enumerate(results):
+                    inp = audio_inputs[i]
+                    dur = inp.shape[-1] / _ASR_SAMPLE_RATE if isinstance(inp, np.ndarray) else 0.0
+                    hypotheses.append(
+                        Supervision(
+                            text=r.text,
+                            duration=dur,
+                            language=getattr(r, "language", language),
+                        )
+                    )
+
             else:
                 raise ValueError(f"Unsupported model_name: {model_name}")
 
@@ -315,7 +381,7 @@ class LattifAITranscriber(BaseTranscriber):
         )
         return result[0]
 
-    def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_event: bool = True) -> Path:
+    def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_event: bool = False) -> Path:
         """Persist transcript text to disk and return the file path."""
         transcript.write(output_file, include_speaker_in_text=False)
         if cache_event and transcript.event:

@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## [1.5.0] - 2026-03-31
+
+### Features
+- **Translation Module**: Full caption translation pipeline with multi-provider support (Gemini/OpenAI), three modes (quick/normal/refined), glossary management, and bilingual output
+- **vLLM Transcription**: Support for vLLM/SGLang-served ASR models — Voxtral Realtime (WebSocket), Gemma-3n, Fun-ASR-Nano, batch concurrent transcription for VAD chunks
+- **Speaker Diarization**: LLM-based speaker name inference using YouTube metadata, dialogue context voting, talk format detection, and post-LLM audience correction
+- **YouTube Enhancements**: 4+ transcript extraction strategies (Dwarkesh, Substack, podscripts.co, Rescript API), Chrome CDP and Safari fallbacks, SSL hijack detection, auto-detect caption language from video metadata
+- **Unified CLI**: New top-level `lai` command with subcommands — `lai doctor`, `lai update`, `lai config`, `lai serve`, `lai translate`, `lai youtube run`
+- **Web Playground**: `lai-serve` local web server with 4-tab UI (align, transcribe, convert, translate)
+- **LLM Abstraction**: Unified `lattifai.llm` module with `BaseLLM`, `GeminiLLM`, `OpenAICompatLLM` and shared `LLMConfig`
+- **Streaming Alignment**: Flush-every-N-chunks mechanism for O(chunk) memory, duplicate text block detection with diff-aware detokenization
+- **RMS Volume Normalization**: Automatic audio normalization before ONNX inference
+- **Selftest Data**: Bundled test WAV/SRT/VTT for `lai doctor` diagnostics
+
+### Fixes
+- YouTube: `Strategy 3b` tx_start logic, strip inline UI noise, SSL hijack page detection, speed up unreachable host fallback
+- Alignment: low word-level alignment ratio warning, punctuation-inflated duplicate filter, multilingual tokenizer in duplicate detection, label-aware boundary merge
+- CLI: CJK support in `align_timestamps_from_ref`, wire `config.toml` into runtime configs, harden `doctor`/`update` commands
+- Media: honor `output_format` in `normalize_format`, fix video download
+- Transcription: propagate detected language to Supervision/Caption, `verbose_json` fallback, correct Supervision timing
+
+### Changed
+- **k2py**: Upgraded from 0.2.4 to 0.4.0
+- **Streaming**: Default `streaming_chunk_secs` reduced from 600 to 300
+- **Config**: Renamed `flush` to `flush_interval` in AlignmentConfig; `speaker_context` moved to per-call parameter
+- **Gemini**: Routed through OpenAI-compatible endpoint via shared LLM client
+- **CLI Theme**: Centralized color theme for light/dark terminal compatibility
+- **Deprecation**: Replaced `cgi.FieldStorage` with stdlib-only multipart parser (Python 3.13 ready)
+
+### Refactor
+- Extracted shared `LLMConfig` for diarization and translation configs
+- Reorganized YouTube CLI commands into dedicated namespace
+- Simplified flush cycle loop and unified confidence score path
+- Removed `_merge_partial_results` in favor of unified `flush`/`non-flush` finish
+
+
 ## [1.4.2] - 2026-02-26
 
 ### Features

@@ -4,7 +4,7 @@ import functools
 import traceback
 from typing import Any, Dict, Optional
 
-import colorful
+from lattifai.theme import theme
 
 
 def format_exception(e: "LattifAIError") -> str:
@@ -77,21 +77,21 @@ class LattifAIError(Exception):
     def get_support_info(self) -> str:
         """Get support information for users."""
         return (
-            f'\n{colorful.green("🔧 Need help? Here are two ways to get support:")}\n'
-            f'   1. 📝 Create a GitHub issue: {colorful.green("https://github.com/lattifai/lattifai-python/issues")}\n'
+            f'\n{theme.ok("🔧 Need help? Here are two ways to get support:")}\n'
+            f'   1. 📝 Create a GitHub issue: {theme.ok("https://github.com/lattifai/lattifai-python/issues")}\n'
             "      Please include:\n"
             "      - Your audio file format and duration\n"
             "      - The text/caption content you're trying to align\n"
             "      - This error message and stack trace\n"
-            f'   2. 💬 Join our Discord community: {colorful.green("https://discord.gg/vzmTzzZgNu")}\n'
+            f'   2. 💬 Join our Discord community: {theme.ok("https://discord.gg/vzmTzzZgNu")}\n'
             "      Our team and community can help you troubleshoot\n"
         )
 
     def get_message(self) -> str:
         """Return formatted error message without support information."""
-        base_message = f'{colorful.red(f"[{self.error_code}] {self.message}")}'
+        base_message = f'{theme.err(f"[{self.error_code}] {self.message}")}'
         if self.context:
-            context_str = f'\n{colorful.yellow("Context:")} ' + ", ".join(f"{k}={v}" for k, v in self.context.items())
+            context_str = f'\n{theme.warn("Context:")} ' + ", ".join(f"{k}={v}" for k, v in self.context.items())
             base_message += context_str
         return base_message
 
@@ -117,9 +117,9 @@ class AudioLoadError(AudioProcessingError):
     """Error loading or reading audio file."""
 
     def __init__(self, media_path: str, original_error: Optional[Exception] = None, **kwargs):
-        message = f"Failed to load audio file: {colorful.red(media_path)}"
+        message = f"Failed to load audio file: {theme.err(media_path)}"
         if original_error:
-            message += f" - {colorful.red(str(original_error))}"
+            message += f" - {theme.err(str(original_error))}"
         _merge_context(
             kwargs, {"media_path": media_path, "original_error": str(original_error) if original_error else None}
         )
@@ -130,7 +130,7 @@ class AudioFormatError(AudioProcessingError):
     """Error with audio format or codec."""
 
     def __init__(self, media_path: str, format_issue: str, **kwargs):
-        message = f"Audio format error for {colorful.red(media_path)}: {colorful.red(format_issue)}"
+        message = f"Audio format error for {theme.err(media_path)}: {theme.err(format_issue)}"
         _merge_context(kwargs, {"media_path": media_path, "format_issue": format_issue})
         super().__init__(message, media_path=media_path, **kwargs)
 
@@ -173,7 +173,7 @@ class LatticeEncodingError(AlignmentError):
     def __init__(self, text_content: str, original_error: Optional[Exception] = None, **kwargs):
         message = "Failed to generate lattice graph from text"
         if original_error:
-            message += f": {colorful.red(str(original_error))}"
+            message += f": {theme.err(str(original_error))}"
         text_preview = text_content[:100] + "..." if len(text_content) > 100 else text_content
         _merge_context(
             kwargs,
@@ -197,13 +197,13 @@ class LatticeDecodingError(AlignmentError):
         skip_help: bool = False,
         **kwargs,
     ):
-        message = message or f"Failed to decode lattice alignment results for lattice ID: {colorful.red(lattice_id)}"
+        message = message or f"Failed to decode lattice alignment results for lattice ID: {theme.err(lattice_id)}"
 
         error_str = str(original_error) if original_error else None
         is_help_message = error_str == LATTICE_DECODING_FAILURE_HELP
 
         if original_error and not is_help_message:
-            message += f" - {colorful.red(error_str)}"
+            message += f" - {theme.err(error_str)}"
 
         context_updates = {"lattice_id": lattice_id}
         if original_error and not is_help_message:
@@ -215,13 +215,13 @@ class LatticeDecodingError(AlignmentError):
 
     def get_message(self) -> str:
         """Return formatted error message with help text."""
-        base_message = f'{colorful.red(f"[{self.error_code}]")} {self.message}'
+        base_message = f'{theme.err(f"[{self.error_code}]")} {self.message}'
         if self.context and self.context.get("lattice_id"):
             # Only show essential context (lattice_id), not the duplicated help message
-            base_message += f'\n{colorful.yellow("Lattice ID:")} {self.context["lattice_id"]}'
+            base_message += f'\n{theme.warn("Lattice ID:")} {self.context["lattice_id"]}'
         # Append help message only if not skipped (e.g., when anomaly info is provided)
         if not self.skip_help:
-            base_message += f"\n\n{colorful.yellow(LATTICE_DECODING_FAILURE_HELP)}"
+            base_message += f"\n\n{theme.warn(LATTICE_DECODING_FAILURE_HELP)}"
         return base_message
 
 
@@ -229,9 +229,9 @@ class ModelLoadError(LattifAIError):
     """Error loading AI model."""
 
     def __init__(self, model_name: str, original_error: Optional[Exception] = None, **kwargs):
-        message = f"Failed to load model: {colorful.red(model_name)}"
+        message = f"Failed to load model: {theme.err(model_name)}"
         if original_error:
-            message += f" - {colorful.red(str(original_error))}"
+            message += f" - {theme.err(str(original_error))}"
         _merge_context(
             kwargs, {"model_name": model_name, "original_error": str(original_error) if original_error else None}
         )
@@ -242,9 +242,9 @@ class DependencyError(LattifAIError):
     """Error with required dependencies."""
 
     def __init__(self, dependency_name: str, install_command: Optional[str] = None, **kwargs):
-        message = f"Missing required dependency: {colorful.red(dependency_name)}"
+        message = f"Missing required dependency: {theme.err(dependency_name)}"
         if install_command:
-            message += f"\nPlease install it using: {colorful.yellow(install_command)}"
+            message += f"\nPlease install it using: {theme.warn(install_command)}"
         _merge_context(kwargs, {"dependency_name": dependency_name, "install_command": install_command})
         super().__init__(message, **kwargs)
 

@@ -63,8 +63,8 @@ class Caption(BaseCaption):
 
     def with_margins(
         self,
-        start_margin: float = 0.08,
-        end_margin: float = 0.20,
+        start_margin: float = 0.10,
+        end_margin: float = 0.10,
         min_gap: float = 0.08,
         collision_mode: str = "trim",
     ) -> "Caption":
@@ -77,8 +77,8 @@ class Caption(BaseCaption):
         Prefers alignments > supervisions > transcription as source.
 
         Args:
-            start_margin: Seconds to extend before the first word (default: 0.08)
-            end_margin: Seconds to extend after the last word (default: 0.20)
+            start_margin: Seconds to extend before the first word (default: 0.10)
+            end_margin: Seconds to extend after the last word (default: 0.10)
             min_gap: Minimum gap between segments for collision handling (default: 0.08)
             collision_mode: How to handle segment overlap - 'trim' or 'gap' (default: 'trim')
 
@@ -127,6 +127,7 @@ class Caption(BaseCaption):
         word_level: bool = False,
         karaoke_config=None,
         metadata: Optional[Dict[str, Any]] = None,
+        translation_first: bool = False,
     ):
         """
         Write caption to file or return as bytes.
@@ -140,6 +141,7 @@ class Caption(BaseCaption):
             word_level: Use word-level output format if supported
             karaoke_config: Karaoke configuration
             metadata: Optional metadata dict to pass to writer
+            translation_first: When True, render translation text above original text
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -160,6 +162,7 @@ class Caption(BaseCaption):
                 word_level=word_level,
                 karaoke_config=karaoke_config,
                 metadata=metadata,
+                translation_first=translation_first,
             )
         finally:
             # Restore original supervisions

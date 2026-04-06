@@ -2,7 +2,6 @@
 
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import colorful
 import numpy as np
 
 from lattifai.audio2 import AudioData
@@ -13,6 +12,7 @@ from lattifai.errors import (
     LatticeDecodingError,
     LatticeEncodingError,
 )
+from lattifai.theme import theme
 from lattifai.utils import _resolve_model_path, safe_print
 
 from .lattice1_worker import _load_worker
@@ -97,6 +97,7 @@ class Lattice1Aligner(object):
         offset: float = 0.0,
         verbose: bool = True,
         metadata: Optional[dict] = None,
+        skip_duplicate_prompt: bool = False,
     ) -> Tuple[List[Supervision], List[Supervision]]:
         """
         Perform alignment on audio and supervisions.
@@ -116,29 +117,28 @@ class Lattice1Aligner(object):
         """
         # Step 2: Create lattice graph
         if verbose:
-            safe_print(colorful.cyan("🔗 Step 2: Creating lattice graph from segments"))
+            safe_print(theme.step("🔗 Step 2: Creating lattice graph from caption"))
         try:
-            supervisions, lattice_id, lattice_graph = self.tokenizer.tokenize(
+            supervisions, lattice_id, lattice_graph, diff_detokenize = self.tokenizer.tokenize(
                 supervisions,
                 split_sentence=split_sentence,
                 boost=self.config.boost,
                 transition_penalty=self.config.transition_penalty,
                 metadata=metadata,
+                skip_duplicate_prompt=skip_duplicate_prompt,
             )
             if verbose:
-                safe_print(colorful.green(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
+                safe_print(theme.ok(f"         ✓ Generated lattice graph with ID: {lattice_id}"))
         except Exception as e:
             text_content = _extract_text_for_error(supervisions)
             raise LatticeEncodingError(text_content, original_error=e)
 
         # Step 3: Search lattice graph
         if verbose:
-            safe_print(colorful.cyan(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
+            safe_print(theme.step(f"🔍 Step 3: Searching lattice graph with media: {audio}"))
             if audio.streaming_mode:
                 safe_print(
-                    colorful.yellow(
-                        f"         ⚡Using streaming mode with {audio.streaming_chunk_secs}s (chunk duration)"
-                    )
+                    theme.warn(f"         ⚡Using streaming mode with {audio.streaming_chunk_secs}s (chunk duration)")
                 )
         try:
             lattice_results = self.worker.alignment(
@@ -148,7 +148,7 @@ class Lattice1Aligner(object):
                 offset=offset,
             )
             if verbose:
-                safe_print(colorful.green("         ✓ Lattice search completed"))
+                safe_print(theme.ok("         ✓ Lattice search completed"))
         except Exception as e:
             raise AlignmentError(
                 f"Audio alignment failed for {audio}",
@@ -158,7 +158,7 @@ class Lattice1Aligner(object):
 
         # Step 4: Decode lattice results
         if verbose:
-            safe_print(colorful.cyan("🎯 Step 4: Decoding lattice results to aligned segments"))
+            safe_print(theme.step("🎯 Step 4: Decoding lattice results to aligned segments"))
         try:
             alignments = self.tokenizer.detokenize(
                 lattice_id,
@@ -168,16 +168,17 @@ class Lattice1Aligner(object):
                 start_margin=self.config.start_margin,
                 end_margin=self.config.end_margin,
                 check_sanity=self.config.check_sanity,
+                diff_detokenize=diff_detokenize,
             )
             if verbose:
-                safe_print(colorful.green(f"         ✓ Successfully aligned {len(alignments)} segments"))
+                safe_print(theme.ok(f"         ✓ Successfully aligned {len(alignments)} segments"))
             if not self.config.check_sanity:
                 # Find and report low-score segments
                 low_score_segments = _find_low_score_segments(alignments)
                 if low_score_segments:
-                    safe_print(colorful.yellow(_format_low_score_warning(low_score_segments)))
+                    safe_print(theme.warn(_format_low_score_warning(low_score_segments)))
         except LatticeDecodingError as e:
-            safe_print(colorful.red("         x Failed to decode lattice alignment results"))
+            safe_print(theme.err("         x Failed to decode lattice alignment results"))
             _alignments = self.tokenizer.detokenize(
                 lattice_id,
                 lattice_results,
@@ -186,6 +187,7 @@ class Lattice1Aligner(object):
                 start_margin=self.config.start_margin,
                 end_margin=self.config.end_margin,
                 check_sanity=False,
+                diff_detokenize=diff_detokenize,
             )
             # Find low-score segments to provide helpful error context
             low_score_segments = _find_low_score_segments(_alignments)
@@ -194,13 +196,13 @@ class Lattice1Aligner(object):
                 warning_str = _format_low_score_warning(low_score_segments)
                 raise LatticeDecodingError(
                     lattice_id,
-                    message=colorful.yellow("Media-text mismatch detected:\n" + warning_str),
+                    message=theme.warn("Media-text mismatch detected:\n" + warning_str),
                     skip_help=True,
                 )
             else:
                 raise e
         except Exception as e:
-            safe_print(colorful.red("         x Failed to decode lattice alignment results"))
+            safe_print(theme.err("         x Failed to decode lattice alignment results"))
             raise LatticeDecodingError(lattice_id, original_error=e)
 
         return (supervisions, alignments)

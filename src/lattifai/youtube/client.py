@@ -688,16 +688,25 @@ class YouTubeDownloader:
         Returns:
             yt-dlp format selector string
         """
+        # Extract primary audio selector (before '/' fallbacks) to avoid
+        # audio-only fallbacks leaking into the video format selector.
+        primary_audio = audio_format_selector.split("/")[0]
+
         # Normalize quality for video context
         quality_lower = self._normalize_video_quality(quality)
 
         if quality_lower.isdigit():
             height = int(quality_lower)
             self.logger.info(f"🎬 Video quality: {height}p")
-            return f"bestvideo[height<={height}]+{audio_format_selector}/best[height<={height}]/best"
+            return (
+                f"bestvideo[height<={height}]+{primary_audio}"
+                f"/bestvideo[height<={height}]+bestaudio"
+                f"/best[height<={height}]"
+                f"/best"
+            )
 
-        # "best" or fallback
-        return f"bestvideo*+{audio_format_selector}/best"
+        # "best" or fallback — every alternative includes video
+        return f"bestvideo*+{primary_audio}/bestvideo*+bestaudio/best"
 
     @staticmethod
     def extract_video_id(url: str) -> str:
@@ -755,6 +764,9 @@ class YouTubeDownloader:
                 "description": metadata.get("description", ""),
                 "thumbnail": metadata.get("thumbnail", ""),
                 "webpage_url": metadata.get("webpage_url", url),
+                "chapters": metadata.get("chapters") or [],
+                "categories": metadata.get("categories") or [],
+                "channel": metadata.get("channel", ""),
             }
 
             self.logger.info(f'✅ Video info extracted: {info["title"]}')
@@ -1040,6 +1052,1215 @@ class YouTubeDownloader:
             quality=quality,
         )
 
+    @staticmethod
+    def _extract_transcript_url_from_description(description: str) -> Optional[str]:
+        """Extract a transcript URL from YouTube video description.
+
+        Looks for patterns like:
+          *Transcript:*
+          https://lexfridman.com/some-guest-transcript
+
+        Or inline:
+          Transcript: https://example.com/transcript
+          Substack Article w/Show Notes: https://www.latent.space/p/jeffdean
+
+        Returns:
+            Full transcript URL or None
+        """
+        if not description:
+            return None
+
+        # Keywords that indicate a transcript or show notes URL
+        _LABEL_KEYWORDS = r"transcript|show\s*notes|rescript"
+
+        lines = description.split("\n")
+        for i, line in enumerate(lines):
+            stripped = line.strip().lower()
+            # Check if this line is a standalone label (e.g., "*Transcript:*", "Show Notes:")
+            if re.match(rf"^[\*_]*(?:{_LABEL_KEYWORDS})[\s:]*[\*_]*\s*$", stripped):
+                # Look at the next non-empty line for URL
+                for j in range(i + 1, min(i + 3, len(lines))):
+                    next_line = lines[j].strip()
+                    if next_line.startswith("http"):
+                        return next_line
+            # Check if URL is on the same line after a keyword
+            # Matches: "Transcript: URL", "Show Notes: URL", "Substack Article w/Show Notes: URL"
+            m = re.search(rf"(?:{_LABEL_KEYWORDS})\s*[:\-–]\s*(https?://\S+)", stripped)
+            if m:
+                # Re-extract from original case line to preserve URL case
+                m2 = re.search(r"https?://\S+", line)
+                if m2:
+                    return m2.group(0)
+
+        return None
+
+    async def _find_podscripts_url(self, video_title: str, channel_name: str) -> Optional[str]:
+        """Search podscripts.co for a transcript matching the video title.
+
+        Podscripts.co hosts third-party transcripts for popular podcasts.
+        This method searches the podcast's episode listing page and fuzzy-matches
+        the video title to find the correct episode URL.
+        """
+        import urllib.request
+
+        if not video_title:
+            return None
+
+        # Map known channels to podscripts slugs
+        _CHANNEL_SLUGS = {
+            "No Priors: AI, Machine Learning, Tech, & Startups": "no-priors-artificial-intelligence-technology-startups",
+            "No Priors": "no-priors-artificial-intelligence-technology-startups",
+            "Machine Learning Street Talk": "machine-learning-street-talk",
+            "Latent Space": "latent-space-the-ai-engineer-podcast",
+            "Dwarkesh Patel": "the-dwarkesh-patel-podcast",
+            "Lex Fridman": "lex-fridman-podcast",
+        }
+
+        slug = _CHANNEL_SLUGS.get(channel_name)
+        if not slug:
+            # Try to find slug by normalizing channel name
+            normalized = channel_name.lower().replace(" ", "-").replace(".", "")
+            slug = normalized
+
+        listing_url = f"https://podscripts.co/podcasts/{slug}"
+        self.logger.info(f"🔍 Searching podscripts.co: {listing_url}")
+
+        try:
+            loop = asyncio.get_event_loop()
+
+            def _fetch_listing():
+                req = urllib.request.Request(
+                    listing_url,
+                    headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+                )
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    return resp.read().decode("utf-8")
+
+            html = await loop.run_in_executor(None, _fetch_listing)
+
+            # Extract all episode links
+            episode_links = re.findall(rf'href="(/podcasts/{re.escape(slug)}/[^"]+)"', html)
+            episode_links = list(set(episode_links))  # deduplicate
+
+            if not episode_links:
+                return None
+
+            # Fuzzy match: extract keywords from video title and find best match
+            title_words = set(
+                w.lower() for w in re.findall(r"[a-zA-Z]+", video_title) if len(w) > 3  # skip short words
+            )
+
+            best_match = None
+            best_score = 0
+            for link in episode_links:
+                # Extract slug words from URL
+                slug_part = link.split("/")[-1]
+                slug_words = set(slug_part.replace("-", " ").split())
+                # Score by word overlap
+                score = len(title_words & slug_words)
+                if score > best_score:
+                    best_score = score
+                    best_match = link
+
+            if best_match and best_score >= 2:
+                full_url = f"https://podscripts.co{best_match}"
+                self.logger.info(f"✅ Matched podscripts episode (score={best_score}): {full_url}")
+                return full_url
+
+            self.logger.info(f"No matching episode found on podscripts.co (best score={best_score})")
+            return None
+
+        except Exception as e:
+            self.logger.debug(f"podscripts.co search failed: {e}")
+            return None
+
+    async def _download_external_transcript(
+        self,
+        transcript_url: str,
+        output_dir: str,
+        video_id: str,
+        youtube_url: Optional[str] = None,
+        video_info: Optional[Dict[str, Any]] = None,
+        force_overwrite: bool = False,
+    ) -> Optional[str]:
+        """Download and parse a transcript from an external URL.
+
+        Fetches the webpage, extracts text content with speaker labels and timestamps.
+        Saves as {video_id}.transcript.md in markdown transcript format compatible
+        with lattifai-captions MarkdownReader.
+
+        Uses urllib first (fast, no dependencies). If the result looks like a
+        JS-rendered SPA (very little text content), falls back to headless Chrome
+        ``--dump-dom`` which executes JavaScript before returning the DOM.
+
+        Returns:
+            Path to saved transcript file, or None on failure
+        """
+        output_path = Path(output_dir).expanduser() / f"{video_id}.transcript.md"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Skip if already downloaded (unless force_overwrite)
+        if output_path.exists() and not force_overwrite:
+            self.logger.info(f"✅ Using existing external transcript: {output_path}")
+            return str(output_path)
+
+        self.logger.info(f"📥 Downloading external transcript from: {transcript_url}")
+
+        try:
+            loop = asyncio.get_event_loop()
+
+            # Rescript API shortcut: SPA site with a JSON API
+            rescript_match = re.match(r"https://app\.rescript\.info/public/share/(.+)", transcript_url)
+            if rescript_match:
+                transcript_text = await self._fetch_rescript_transcript(transcript_url, loop)
+                if transcript_text:
+                    frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+                    output_path.write_text(frontmatter + transcript_text, encoding="utf-8")
+                    self.logger.info(f"✅ Saved Rescript transcript: {output_path} ({len(transcript_text)} chars)")
+                    return str(output_path)
+
+            # Quick reachability check — avoid wasting 100s+ on unreachable hosts
+            from urllib.parse import urlparse
+
+            host = urlparse(transcript_url).hostname
+            reachable = await loop.run_in_executor(None, self._is_host_reachable, host)
+
+            html = None
+            if reachable:
+                # Direct fetch with proxy support from environment
+                def _fetch():
+                    import urllib.request
+
+                    proxy_handler = urllib.request.ProxyHandler()
+                    opener = urllib.request.build_opener(proxy_handler)
+                    req = urllib.request.Request(
+                        transcript_url,
+                        headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+                    )
+                    with opener.open(req, timeout=15) as resp:
+                        return resp.read().decode("utf-8")
+
+                try:
+                    html = await loop.run_in_executor(None, _fetch)
+                except Exception as e:
+                    self.logger.info(f"🔄 urllib failed ({e}), trying fallbacks...")
+            else:
+                self.logger.info(f"🔄 Host {host} unreachable, skipping direct fetch")
+
+            # Fallback 1: headless Chrome (only if host is reachable — Chrome also connects directly)
+            if not html and reachable:
+                html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url, 20)
+
+            # Fallback 2: Jina Reader API (server-side fetch, bypasses local network blocks)
+            if not html:
+                self.logger.info("🔄 Trying Jina Reader API (server-side fetch)...")
+                jina_md = await loop.run_in_executor(None, self._fetch_with_jina_reader, transcript_url, 15)
+                if jina_md:
+                    frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+                    output_path.write_text(frontmatter + jina_md, encoding="utf-8")
+                    self.logger.info(f"✅ Saved transcript via Jina Reader: {output_path} ({len(jina_md)} chars)")
+                    return str(output_path)
+
+            # Fallback 3: Safari (macOS only — Safari may route through per-app VPN)
+            if not html:
+                import platform
+
+                if platform.system() == "Darwin":
+                    self.logger.info("🔄 Trying Safari (may use system VPN)...")
+                    html = await loop.run_in_executor(None, self._fetch_with_safari, transcript_url)
+
+            if not html:
+                if not reachable:
+                    self.logger.warning(
+                        f"Host {host} is unreachable and all fallbacks failed. " "Try setting HTTPS_PROXY or use a VPN."
+                    )
+                else:
+                    self.logger.warning("Failed to fetch transcript page")
+                return None
+
+            # Detect SSL hijack / DNS poisoning (e.g. GFW returning a fake certificate page)
+            if self._is_hijacked_page(html):
+                self.logger.warning("🔄 SSL hijack detected (DNS poisoning), discarding fetched HTML")
+                html = None
+
+            if not html:
+                self.logger.warning("Failed to fetch transcript page")
+                return None
+
+            # Parse HTML to extract transcript in markdown format
+            transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
+
+            # Detect SPA: if parsed text is too short but HTML is large, content is JS-rendered
+            if (not transcript_text or len(transcript_text) < 200) and len(html) > 2000:
+                spa_indicators = ['<div id="root"></div>', '<div id="app"></div>', "noscript>You need to enable"]
+                if any(indicator in html for indicator in spa_indicators):
+                    self.logger.info("🔄 SPA detected, falling back to headless Chrome...")
+                    html = await loop.run_in_executor(None, self._fetch_with_headless_chrome, transcript_url)
+                    if html:
+                        transcript_text = self._parse_transcript_html(html, youtube_url=youtube_url)
+
+            if not transcript_text:
+                # Last resort: Jina Reader API
+                self.logger.info("🔄 HTML parsing failed, trying Jina Reader API...")
+                jina_md = await loop.run_in_executor(None, self._fetch_with_jina_reader, transcript_url)
+                if jina_md:
+                    frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+                    output_path.write_text(frontmatter + jina_md, encoding="utf-8")
+                    self.logger.info(f"✅ Saved transcript via Jina Reader: {output_path} ({len(jina_md)} chars)")
+                    return str(output_path)
+                self.logger.warning("Failed to extract transcript content from page")
+                return None
+
+            frontmatter = self._build_transcript_frontmatter(video_info, youtube_url, transcript_url)
+            output_path.write_text(frontmatter + transcript_text, encoding="utf-8")
+            self.logger.info(f"✅ Saved external transcript: {output_path} ({len(transcript_text)} chars)")
+            return str(output_path)
+
+        except Exception as e:
+            self.logger.warning(f"Failed to download external transcript: {e}")
+            return None
+
+    @staticmethod
+    def _fetch_with_safari(url: str, timeout: int = 120, min_content_length: int = 500) -> Optional[str]:
+        """Fetch rendered page content using Safari via AppleScript (macOS only).
+
+        Safari may route traffic through per-app VPN or system proxy configurations
+        that are not available to command-line tools. This makes it a useful fallback
+        when direct connections and headless Chrome fail.
+
+        Requires: macOS + Safari + "Allow JavaScript from Apple Events" enabled
+        in Safari Settings → Advanced (or Develop menu on older macOS).
+        """
+        import subprocess
+
+        logger = logging.getLogger(__name__)
+
+        script = f"""
+        tell application "Safari"
+            make new document with properties {{URL:"{url}"}}
+            repeat {timeout // 3} times
+                delay 3
+                try
+                    set textLen to (do JavaScript "document.body.innerText.length" in document 1) as integer
+                    if textLen > {min_content_length} then exit repeat
+                end try
+            end repeat
+            set pageHTML to (do JavaScript "document.documentElement.outerHTML" in document 1)
+            close document 1
+            return pageHTML
+        end tell
+        """
+
+        try:
+            result = subprocess.run(
+                ["osascript", "-e", script],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 30,
+            )
+            html = result.stdout
+            if result.returncode != 0:
+                logger.warning(f"Safari AppleScript error: {result.stderr.strip()}")
+                return None
+            if html and len(html) > min_content_length:
+                logger.info(f"✅ Safari returned {len(html)} chars")
+                return html
+            logger.warning(f"Safari returned insufficient content ({len(html) if html else 0} chars)")
+            return None
+        except subprocess.TimeoutExpired:
+            # Try to close the tab we opened
+            subprocess.run(
+                ["osascript", "-e", 'tell application "Safari" to close document 1'],
+                capture_output=True,
+                timeout=5,
+            )
+            logger.warning(f"Safari timed out after {timeout}s for {url}")
+            return None
+        except Exception as e:
+            logger.warning(f"Safari fetch failed: {e}")
+            return None
+
+    @staticmethod
+    def _is_hijacked_page(html: str) -> bool:
+        """Detect SSL hijack / DNS poisoning pages (e.g. GFW certificate errors)."""
+        if not html or len(html) < 100:
+            return False
+        indicators = [
+            "ERR_CERT_COMMON_NAME_INVALID",
+            "NET::ERR_CERT",
+            "您的连接不是私密连接",
+            "Your connection is not private",
+            "-----BEGIN CERTIFICATE-----",
+            "PEM encoded chain",
+        ]
+        return any(indicator in html for indicator in indicators)
+
+    @staticmethod
+    def _is_host_reachable(host: str, port: int = 443, timeout: float = 3.0) -> bool:
+        """Quick TCP connect check to determine if a host is reachable."""
+        import socket
+
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                return True
+        except (socket.timeout, OSError):
+            return False
+
+    @staticmethod
+    def _build_transcript_frontmatter(
+        video_info: Optional[Dict[str, Any]],
+        youtube_url: Optional[str],
+        transcript_url: str,
+    ) -> str:
+        """Build YAML frontmatter string for transcript files."""
+        if not video_info:
+            return ""
+        fm_fields = []
+        for key in ["title", "duration", "upload_date"]:
+            if video_info.get(key):
+                fm_fields.append(f"{key}: {video_info[key]}")
+        if video_info.get("uploader"):
+            fm_fields.append(f"channel: {video_info['uploader']}")
+        if youtube_url:
+            fm_fields.append(f'url: "{youtube_url}"')
+        fm_fields.append(f"transcript_source: {transcript_url}")
+        desc = video_info.get("description", "")
+        if desc:
+            for marker in ["*SPONSORS:", "*CONTACT ", "*EPISODE LINKS:", "*PODCAST LINKS:", "*SOCIAL LINKS:"]:
+                pos = desc.find(marker)
+                if pos > 0:
+                    desc = desc[:pos].rstrip()
+                    break
+            desc = desc.replace("\n\n", "\n")
+            fm_fields.append("description: |")
+            for line in desc.split("\n"):
+                fm_fields.append(f"  {line}")
+        return "---\n" + "\n".join(fm_fields) + "\n---\n\n"
+
+    async def _fetch_rescript_transcript(self, transcript_url: str, loop) -> Optional[str]:
+        """Fetch transcript from Rescript API (SPA with JSON backend).
+
+        Rescript (app.rescript.info) stores transcripts as JSON accessible via
+        /api/public/share/{share_id}. The response contains `final_transcript`
+        with speaker labels and timestamps.
+        """
+        import json
+        import urllib.request
+
+        api_url = transcript_url.replace("/public/share/", "/api/public/share/")
+        self.logger.info(f"🔗 Fetching Rescript API: {api_url}")
+
+        def _fetch_api():
+            req = urllib.request.Request(
+                api_url,
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        try:
+            data = await loop.run_in_executor(None, _fetch_api)
+        except Exception as e:
+            self.logger.warning(f"Rescript API failed: {e}")
+            return None
+
+        session = data.get("session", {})
+        transcript = session.get("final_transcript") or session.get("transcript", "")
+        if not transcript:
+            self.logger.warning("Rescript API returned no transcript content")
+            return None
+
+        # Parse Rescript format: "Speaker [HH:MM:SS]:\n  text\n\n  [HH:MM:SS]\n\n  text continued"
+        # into markdown format: **Speaker:** text [HH:MM:SS]
+        lines = transcript.split("\n")
+        segments = []
+        current_speaker = ""
+        current_hms = ""
+        current_text = []
+
+        speaker_pattern = re.compile(r"^(.+?)\s*\[(\d{1,2}:\d{2}:\d{2})\]\s*:?\s*$")
+        ts_pattern = re.compile(r"^\s*\[(\d{1,2}:\d{2}:\d{2})\]\s*$")
+
+        for line in lines:
+            sp_m = speaker_pattern.match(line)
+            ts_m = ts_pattern.match(line)
+            if sp_m:
+                # Save previous segment
+                if current_text:
+                    text = " ".join(current_text).strip()
+                    if text:
+                        segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+                current_speaker = sp_m.group(1).strip()
+                current_hms = sp_m.group(2)
+                current_text = []
+            elif ts_m:
+                # Mid-segment timestamp: save current text as segment, start new one
+                if current_text:
+                    text = " ".join(current_text).strip()
+                    if text:
+                        segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+                current_hms = ts_m.group(1)
+                current_text = []
+            else:
+                stripped = line.strip()
+                if stripped:
+                    current_text.append(stripped)
+
+        # Don't forget the last segment
+        if current_text:
+            text = " ".join(current_text).strip()
+            if text:
+                segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+
+        if not segments:
+            return transcript  # Return raw text as fallback
+
+        # Extract chapters from _narrativeData (title + time range)
+        narrative = session.get("_narrativeData") or {}
+        chapters = []
+        for title, chapter_data in narrative.items():
+            if not isinstance(chapter_data, dict):
+                continue
+            spans = chapter_data.get("spans", [])
+            if spans:
+                # Use the earliest span start as chapter start time
+                start_sec = min(s.get("start", 0) for s in spans if isinstance(s, dict))
+                chapters.append({"title": title, "start": start_sec})
+        chapters.sort(key=lambda c: c["start"])
+
+        # Build TOC if chapters exist
+        toc_lines = []
+        if chapters:
+
+            def _secs_to_hms(secs):
+                h, r = divmod(int(secs), 3600)
+                m, s = divmod(r, 60)
+                return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+            toc_lines.append("## Table of Contents")
+            for ch in chapters:
+                toc_lines.append(f"- {_secs_to_hms(ch['start'])} – {ch['title']}")
+            toc_lines.append("")
+
+        # Convert chapter start times to HH:MM:SS for insertion into transcript
+        chapter_by_hms = {}
+        if chapters:
+            for ch in chapters:
+                # Find the segment whose timestamp is closest to (but >= ) chapter start
+                chapter_by_hms[ch["title"]] = ch["start"]
+
+        # Format as markdown, inserting chapter headings at the right positions
+        md_lines = list(toc_lines)
+        chapter_idx = 0
+        for seg in segments:
+            # Insert chapter heading before this segment if its time matches
+            seg_secs = self._hms_to_secs(seg["hms"]) if seg["hms"] else 0
+            while chapter_idx < len(chapters) and chapters[chapter_idx]["start"] <= seg_secs:
+                md_lines.append(f"## {chapters[chapter_idx]['title']}")
+                md_lines.append("")
+                chapter_idx += 1
+
+            speaker = seg["speaker"]
+            prefix = f"**{speaker}:** " if speaker else ""
+            suffix = f" [{seg['hms']}]" if seg["hms"] else ""
+            md_lines.append(f"{prefix}{seg['text']}{suffix}")
+            md_lines.append("")
+
+        self.logger.info(f"✅ Parsed {len(segments)} segments, {len(chapters)} chapters from Rescript API")
+        return "\n".join(md_lines)
+
+    @staticmethod
+    def _hms_to_secs(hms: str) -> float:
+        """Convert HH:MM:SS or MM:SS to seconds."""
+        parts = hms.split(":")
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        elif len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        return float(parts[0])
+
+    @staticmethod
+    def _fetch_with_jina_reader(url: str, timeout: int = 15) -> Optional[str]:
+        """Fetch page content via Jina Reader API (r.jina.ai).
+
+        Jina Reader renders JS-heavy pages server-side and returns clean markdown.
+        Useful as a fallback when both urllib and headless Chrome fail.
+        """
+        import urllib.request
+
+        logger = logging.getLogger(__name__)
+        jina_url = f"https://r.jina.ai/{url}"
+        try:
+            req = urllib.request.Request(
+                jina_url,
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"},
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                content = resp.read().decode("utf-8")
+            if content and len(content) > 500:
+                # Strip Jina metadata header (Title:, URL Source:, etc.)
+                lines = content.split("\n")
+                body_start = 0
+                for i, line in enumerate(lines):
+                    if line.startswith("Markdown Content:"):
+                        body_start = i + 1
+                        break
+                if body_start:
+                    content = "\n".join(lines[body_start:]).strip()
+                # Normalize Substack transcript format to standard markdown
+                content = YouTubeDownloader._normalize_substack_transcript(content)
+                logger.info(f"✅ Jina Reader returned {len(content)} chars")
+                return content
+            logger.warning(f"Jina Reader returned insufficient content ({len(content) if content else 0} chars)")
+            return None
+        except Exception as e:
+            logger.warning(f"Jina Reader failed: {e}")
+            return None
+
+    @staticmethod
+    def _normalize_substack_transcript(content: str) -> str:
+        """Normalize Substack/Dwarkesh transcript to standard markdown format.
+
+        Converts:
+          - Chapter links: [(HH:MM:SS) - Title](url) → ## Title
+          - Standalone bold speaker: **Name**\\n\\ntext → **Name:** text [HH:MM:SS]
+          - Strips markdown links: [text](url) → text
+
+        The output matches the format expected by lattifai-captions MarkdownReader:
+            **Speaker:** text [HH:MM:SS]
+        """
+        lines = content.split("\n")
+        output = []
+        # Collect chapters for TOC and timestamp assignment
+        chapters = []  # [(seconds, title)]
+        chapter_pattern = re.compile(r"^\[\((\d{1,2}:\d{2}:\d{2})\)\s*[-–—]\s*(.+?)\]\(https?://[^)]+\)\s*$")
+        standalone_speaker = re.compile(r"^\*\*([^*:：]+)\*\*\s*$")
+        md_link = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+
+        # First pass: detect if this is a Substack transcript
+        has_standalone_speakers = False
+        has_chapter_links = False
+        for line in lines:
+            if standalone_speaker.match(line):
+                has_standalone_speakers = True
+            if chapter_pattern.match(line):
+                has_chapter_links = True
+            if has_standalone_speakers and has_chapter_links:
+                break
+
+        if not has_standalone_speakers:
+            return content  # Not a Substack transcript, return as-is
+
+        # Collect all chapters
+        for line in lines:
+            ch_m = chapter_pattern.match(line)
+            if ch_m:
+                hms = ch_m.group(1)
+                title = ch_m.group(2).strip()
+                parts = hms.split(":")
+                secs = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                chapters.append((secs, title, hms))
+
+        # Build TOC
+        if chapters:
+            output.append("## Table of Contents")
+            for secs, title, hms in chapters:
+                output.append(f"- {hms} – {title}")
+            output.append("")
+
+        # Second pass: convert speaker blocks
+        current_speaker = None
+        current_text = []
+        in_preamble = True  # Skip sponsor/intro content before first speaker
+
+        def _flush_segment():
+            nonlocal current_text
+            if current_speaker and current_text:
+                text = " ".join(current_text)
+                # Strip markdown links
+                text = md_link.sub(r"\1", text)
+                output.append(f"**{current_speaker}:** {text}")
+                output.append("")
+            current_text = []
+
+        for line in lines:
+            # Skip chapter link lines (already in TOC)
+            if chapter_pattern.match(line):
+                continue
+
+            sp_m = standalone_speaker.match(line)
+            if sp_m:
+                # Flush previous segment
+                _flush_segment()
+                current_speaker = sp_m.group(1).strip()
+                in_preamble = False
+
+                # Insert chapter heading if this speaker's position matches
+                # (use chapter_idx to track progress through chapters)
+                continue
+
+            if in_preamble:
+                continue
+
+            stripped = line.strip()
+            if stripped:
+                current_text.append(stripped)
+
+        # Flush last segment
+        _flush_segment()
+
+        return "\n".join(output)
+
+    @staticmethod
+    def _find_chrome() -> Optional[str]:
+        """Find Chrome/Chromium executable on the system."""
+        import shutil
+
+        candidates = [
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "google-chrome",
+            "google-chrome-stable",
+            "chromium",
+            "chromium-browser",
+        ]
+        # Allow override via environment variable
+        env_path = os.environ.get("CHROME_PATH") or os.environ.get("URL_CHROME_PATH")
+        if env_path:
+            candidates.insert(0, env_path)
+
+        for candidate in candidates:
+            if os.path.isfile(candidate) or shutil.which(candidate):
+                return candidate
+        return None
+
+    @staticmethod
+    def _fetch_with_headless_chrome(url: str, timeout: int = 45) -> Optional[str]:
+        """Fetch rendered page content using headless Chrome via CDP.
+
+        Zero-dependency fallback for SPA/CSR sites. Uses a lightweight TypeScript
+        script (fetch_rendered_html.ts) that launches system Chrome in headless mode,
+        waits for JS execution and network idle, then returns the rendered DOM.
+
+        Requires: system Chrome + bun (``npx -y bun``).
+        """
+        import shutil
+        import subprocess
+
+        logger = logging.getLogger(__name__)
+
+        # Locate the CDP fetch script (shipped alongside this module)
+        script = Path(__file__).parent / "fetch_rendered_html.ts"
+        if not script.exists():
+            logger.warning(f"CDP fetch script not found at {script}")
+            return None
+
+        # Check bun availability
+        if not shutil.which("bun") and not shutil.which("npx"):
+            logger.warning("Neither bun nor npx found. Cannot run headless Chrome CDP script.")
+            return None
+
+        runner = ["bun"] if shutil.which("bun") else ["npx", "-y", "bun"]
+
+        try:
+            result = subprocess.run(
+                [*runner, str(script), url, str(timeout * 1000)],
+                capture_output=True,
+                text=True,
+                timeout=timeout + 10,  # subprocess timeout slightly longer than script timeout
+            )
+            html = result.stdout
+            if result.stderr:
+                logger.debug(f"CDP fetch: {result.stderr.strip()}")
+            if html and len(html) > 500:
+                return html
+            logger.warning(f"CDP fetch returned insufficient content ({len(html) if html else 0} bytes)")
+            return None
+        except subprocess.TimeoutExpired:
+            logger.warning(f"Headless Chrome CDP timed out after {timeout}s for {url}")
+            return None
+        except Exception as e:
+            logger.warning(f"Headless Chrome CDP failed: {e}")
+            return None
+
+    @staticmethod
+    def _parse_transcript_html(html: str, youtube_url: Optional[str] = None) -> Optional[str]:
+        """Parse transcript HTML into markdown transcript format.
+
+        Output is compatible with lattifai-captions MarkdownReader:
+
+            **Speaker Name:** Transcript text... [HH:MM:SS]
+
+        Also supports the legacy podcast-transcript format:
+
+            Speaker Name
+            [(HH:MM:SS)](youtube_url&t=N)
+            Transcript text...
+        """
+        try:
+            from html.parser import HTMLParser
+
+            class TranscriptParser(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.lines = []
+                    self.current_text = []
+                    self.in_body = False
+                    self.skip_depth = 0
+
+                def handle_starttag(self, tag, attrs):
+                    if tag == "body":
+                        self.in_body = True
+                    elif tag in ("script", "style", "nav", "header", "footer", "noscript"):
+                        self.skip_depth += 1
+                    elif tag in ("p", "br", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
+                        self._flush()
+
+                def handle_endtag(self, tag):
+                    if tag in ("script", "style", "nav", "header", "footer", "noscript"):
+                        self.skip_depth = max(0, self.skip_depth - 1)
+                    elif tag in ("p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6"):
+                        self._flush(block_break=(tag in ("p", "div")))
+
+                def handle_data(self, data):
+                    if self.in_body and self.skip_depth == 0:
+                        text = data.strip()
+                        if text:
+                            self.current_text.append(text)
+
+                def _flush(self, block_break=False):
+                    if self.current_text:
+                        line = " ".join(self.current_text).strip()
+                        if line:
+                            self.lines.append(line)
+                        self.current_text = []
+                    if block_break and self.lines and self.lines[-1] != "":
+                        self.lines.append("")  # blank line → block separator
+
+                def get_text(self):
+                    self._flush()
+                    return "\n".join(self.lines)
+
+            # If input is not HTML (e.g. markdown from url-to-markdown), use as-is
+            if "<body" not in html.lower() and "<html" not in html.lower():
+                text = html
+            else:
+                parser = TranscriptParser()
+                parser.feed(html)
+                text = parser.get_text()
+            lines = text.split("\n")
+
+            # Patterns that indicate post-transcript UI noise (footer, social, nav).
+            # Must be precise to avoid matching spoken dialogue (e.g. "Subscribe to our YouTube...").
+            _ui_noise_re = re.compile(
+                r"^(\d+\s*Likes?\s*(∙|·)?\s*\d*\s*Restacks?"  # "36 Likes ∙ 7 Restacks"
+                r"|Discussion about this"
+                r"|Comments?\s*Restacks?"  # "Comments Restacks" nav
+                r"|Ready for more\?"
+                r"|Share$|Reply$|Like$|Subscribe$"  # standalone button labels
+                r"|©\s*\d{4}|Privacy\s*∙\s*Terms|Start your Substack|Get the app$"
+                r"|Show Topics$|See all$|Sign in$"
+                r"|Click on any sentence in the transcript"
+                r"|\d{1,2}月\d{1,2}日$"  # Chinese date (comment timestamps)
+                r"|OK: \d+ bytes)"  # CDP stderr leak
+            )
+
+            # Patterns to truncate from the end of the last segment's text content
+            _inline_noise_re = re.compile(
+                r"\s*(?:"
+                r"There aren't comments yet.*"
+                r"|Click on any sentence in the transcript.*"
+                r"|DO NOT SELL OR SHARE MY PERSONAL INFORMATION.*"
+                r"|What is this\?.*Report Ad.*"
+                r"|OK: \d+ bytes.*"
+                r")$"
+            )
+
+            def _clean_trailing_noise(md_text: str) -> str:
+                """Remove UI noise lines and inline noise from parsed transcript."""
+                out_lines = md_text.rstrip().split("\n")
+                # Remove trailing noise lines
+                while out_lines:
+                    last = out_lines[-1].strip()
+                    if not last or _ui_noise_re.match(last):
+                        out_lines.pop()
+                    else:
+                        break
+                # Also truncate inline noise from the last text line
+                if out_lines:
+                    out_lines[-1] = _inline_noise_re.sub("", out_lines[-1])
+                return "\n".join(out_lines) + "\n"
+
+            def _hms_to_secs(hms: str) -> int:
+                parts = hms.split(":")
+                if len(parts) == 3:
+                    return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                elif len(parts) == 2:
+                    return int(parts[0]) * 60 + int(parts[1])
+                return int(parts[0])
+
+            def _format_segments(segments: list) -> str:
+                """Format segments into markdown transcript format: **Speaker:** text [HH:MM:SS]"""
+                md_lines = []
+                for seg in segments:
+                    # Chapter heading marker
+                    if "_chapter" in seg:
+                        md_lines.append(f"## {seg['_chapter']}")
+                        md_lines.append("")
+                        continue
+                    speaker = seg.get("speaker") or ""
+                    text = seg.get("text", "").strip()
+                    hms = seg.get("hms")
+                    # Skip empty speaker or "Unknown"
+                    prefix = f"**{speaker}:** " if speaker and speaker != "Unknown" else ""
+                    suffix = f" [{hms}]" if hms else ""
+                    md_lines.append(f"{prefix}{text}{suffix}")
+                    md_lines.append("")
+                return _clean_trailing_noise("\n".join(md_lines))
+
+            # Strategy 1: timestamped lines with speaker names
+            # Supports: "Speaker (HH:MM:SS) text"       — lexfridman.com
+            #           "Speaker [HH:MM:SS]: text"      — latent.space / Substack
+            # Convert to markdown format:
+            #   **Speaker Name:** text [HH:MM:SS]
+            ts_pattern = re.compile(r"^(.+?)\s+[\(\[](\d{1,2}:\d{2}:\d{2})[\)\]]:?\s*(.*)")
+            # Chapter line: "0:00 – Topic" or "1:30:00 - Topic"
+            chapter_pattern = re.compile(r"^(\d{1,2}:\d{2}(?::\d{2})?)\s*[–—-]\s*(.+)")
+            ts_segments = []
+            in_transcript = False
+            current_seg = None
+
+            # Collect pre-transcript content: intro text and table of contents
+            preamble_lines = []
+            chapters = []
+            in_toc = False
+            # UI noise lines to skip entirely
+            _preamble_skip_re = re.compile(
+                r"^(Skip to|Go back to|Watch the full|Useful links"
+                r"|Please note that the transcript"
+                r"|Here are some useful links)"
+            )
+
+            # Set of chapter titles collected from TOC (populated in first pass below)
+            chapter_titles = set()
+
+            for line in lines:
+                m = ts_pattern.match(line)
+                if m:
+                    in_transcript = True
+                    in_toc = False
+                    if current_seg:
+                        ts_segments.append(current_seg)
+                    current_seg = {"speaker": m.group(1), "hms": m.group(2), "text": m.group(3).strip()}
+                elif in_transcript and current_seg:
+                    # Skip navigation / UI noise lines
+                    if re.match(r"^(Skip to|Go back|Watch the|Useful links|Table of Contents)", line):
+                        continue
+                    # Stop appending when we hit post-transcript UI elements
+                    if re.match(
+                        r"^(\d+\s*Likes?|Discussion|Comments|Restacks?|Subscribe|Ready for"
+                        r"|Share|Reply|Like$|©|Privacy|Terms|Start your|Substack"
+                        r"|Show Topics|See all|\d{1,2}月\d{1,2}日)",
+                        line,
+                    ):
+                        in_transcript = False
+                        continue
+                    # Detect chapter heading lines (match TOC titles or standalone short lines
+                    # that don't look like transcript text)
+                    stripped = line.strip()
+                    if stripped and stripped in chapter_titles:
+                        ts_segments.append(current_seg)
+                        ts_segments.append({"_chapter": stripped})
+                        current_seg = None
+                        continue
+                    if current_seg and len(line) > 10:
+                        current_seg["text"] += " " + line.strip()
+                elif not in_transcript:
+                    # Pre-transcript: collect intro and chapters
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+                    if stripped.lower().startswith("table of contents") or stripped.lower().startswith("here are the"):
+                        in_toc = True
+                        continue
+                    if in_toc:
+                        ch_m = chapter_pattern.match(stripped)
+                        if ch_m:
+                            chapter_title = ch_m.group(2).strip()
+                            chapters.append(f"- {ch_m.group(1)} – {chapter_title}")
+                            chapter_titles.add(chapter_title)
+                            continue
+                        # Exit TOC only after we've seen at least one chapter entry
+                        if chapters:
+                            in_toc = False
+                        else:
+                            # Still in TOC preamble (e.g. "Here are the loose chapters...")
+                            continue
+                    if _preamble_skip_re.match(stripped):
+                        continue
+                    # Chapter title appearing before first transcript segment
+                    if stripped in chapter_titles:
+                        ts_segments.append({"_chapter": stripped})
+                        continue
+                    # Keep meaningful intro lines (description, episode info)
+                    if len(stripped) > 20:
+                        preamble_lines.append(stripped)
+
+            if current_seg:
+                ts_segments.append(current_seg)
+
+            if ts_segments:
+                header_parts = []
+                if preamble_lines:
+                    header_parts.append("\n".join(preamble_lines))
+                if chapters:
+                    header_parts.append("## Table of Contents\n" + "\n".join(chapters))
+                header = "\n\n".join(header_parts) + "\n\n" if header_parts else ""
+                return header + _format_segments(ts_segments)
+
+            # Split text into blocks for block-based strategies
+            blocks = [b.strip() for b in re.split(r"\n\n+", text) if b.strip()]
+
+            # Strategy 2a: Dwarkesh/Substack article transcript (most specific — check first)
+            # Looks for "## Transcript" section with "**Speaker**" labels and
+            # "### HH:MM:SS - Topic" chapter headers.
+            # Within each chapter, interpolates timestamps proportionally by text length.
+            if any(b == "## Transcript" or b.startswith("## Transcript\n") for b in blocks):
+                tx_start = next(
+                    (i for i, b in enumerate(blocks) if b == "## Transcript" or b.startswith("## Transcript\n")),
+                    None,
+                )
+                if tx_start is not None:
+                    # Match "**Speaker**" with optional trailing timestamp like "**Speaker** 1:20:33"
+                    bold_speaker = re.compile(r"^\*\*([^*]+)\*\*(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$")
+                    chapter_ts = re.compile(r"^###?\s+(\d{1,2}:\d{2}:\d{2})\s*[-–—]?\s*(.*)")
+                    art_segments = []
+                    current_speaker = "Unknown"
+                    current_hms = "0:00:00"
+
+                    for bi2 in range(tx_start + 1, len(blocks)):
+                        b = blocks[bi2]
+                        ch_m = chapter_ts.match(b)
+                        if ch_m:
+                            current_hms = ch_m.group(1)
+                            continue
+                        sp_m = bold_speaker.match(b)
+                        if sp_m:
+                            current_speaker = sp_m.group(1)
+                            continue
+                        if len(b) < 15:
+                            continue
+                        if b.startswith("[") and b.endswith(")") and len(b) < 200:
+                            continue
+                        # Stop at post-transcript comment/discussion sections
+                        if re.match(
+                            r"^(####?\s+Discussion|CommentsRestacks"
+                            r"|\d+\s*Likes?\s*(∙|·|\[)"
+                            r"|Like\s*(\(\d+\))?\s*Reply)",
+                            b,
+                        ):
+                            break
+                        # Skip markdown headers that aren't chapter timestamps
+                        if b.startswith("#") and not chapter_ts.match(b):
+                            continue
+                        # Stop at post-transcript UI elements
+                        if _ui_noise_re.match(b):
+                            break
+                        art_segments.append({"speaker": current_speaker, "hms": current_hms, "text": b})
+
+                    if len(art_segments) >= 5:
+                        # Interpolate timestamps within each chapter based on text length.
+                        # Group consecutive segments by chapter timestamp, then distribute
+                        # time proportionally so each segment gets a unique start time.
+                        chapter_boundaries = []
+                        for idx, seg in enumerate(art_segments):
+                            if idx == 0 or seg["hms"] != art_segments[idx - 1]["hms"]:
+                                chapter_boundaries.append(idx)
+
+                        # Estimate chars-per-second from known chapters for last chapter extrapolation
+                        _total_known_chars = 0
+                        _total_known_secs = 0
+                        if len(chapter_boundaries) >= 2:
+                            first_secs = _hms_to_secs(art_segments[chapter_boundaries[0]]["hms"])
+                            last_known_secs = _hms_to_secs(art_segments[chapter_boundaries[-1]]["hms"])
+                            _total_known_secs = last_known_secs - first_secs
+                            for ci2 in range(len(chapter_boundaries) - 1):
+                                s2 = chapter_boundaries[ci2]
+                                e2 = chapter_boundaries[ci2 + 1]
+                                _total_known_chars += sum(len(seg["text"]) for seg in art_segments[s2:e2])
+
+                        for ci, ch_start_idx in enumerate(chapter_boundaries):
+                            ch_end_idx = (
+                                chapter_boundaries[ci + 1] if ci + 1 < len(chapter_boundaries) else len(art_segments)
+                            )
+                            ch_start_secs = _hms_to_secs(art_segments[ch_start_idx]["hms"])
+                            if ci + 1 < len(chapter_boundaries):
+                                ch_end_secs = _hms_to_secs(art_segments[chapter_boundaries[ci + 1]]["hms"])
+                            else:
+                                # Last chapter: estimate duration from chars/sec ratio of known chapters
+                                last_ch_chars = sum(len(seg["text"]) for seg in art_segments[ch_start_idx:])
+                                if _total_known_chars > 0 and _total_known_secs > 0:
+                                    cps = _total_known_chars / _total_known_secs
+                                    ch_end_secs = ch_start_secs + last_ch_chars / cps
+                                else:
+                                    ch_end_secs = ch_start_secs + 600
+                            ch_duration = ch_end_secs - ch_start_secs
+                            ch_segs = art_segments[ch_start_idx:ch_end_idx]
+                            total_chars = sum(len(s["text"]) for s in ch_segs)
+                            if total_chars == 0:
+                                total_chars = 1
+                            elapsed = 0.0
+                            for seg in ch_segs:
+                                seg_secs = ch_start_secs + elapsed
+                                h = int(seg_secs // 3600)
+                                m = int((seg_secs % 3600) // 60)
+                                s = int(seg_secs % 60)
+                                seg["hms"] = f"{h:02d}:{m:02d}:{s:02d}"
+                                elapsed += (len(seg["text"]) / total_chars) * ch_duration
+
+                        return _format_segments(art_segments)
+
+            # Strategy 2b: block-based format (Rescript, podcast apps)
+            # Supports two block orderings:
+            #   A) Speaker → HH:MM:SS → text  (Rescript)
+            #   B) M:SS → SPEAKER N → text    (Dwarkesh audio player preview)
+            block_segments = []
+            bi = 0
+            while bi < len(blocks) - 2:
+                b0, b1, b2 = blocks[bi], blocks[bi + 1], blocks[bi + 2]
+                # Order A: [speaker, timestamp, text]
+                ts_a = re.match(r"^(\d{1,2}:\d{2}:\d{2})$", b1)
+                if (
+                    ts_a
+                    and len(b0) < 80
+                    and not b0.startswith(("#", "[", "!", "http", "---"))
+                    and not re.match(r"^\d", b0)
+                ):
+                    block_segments.append({"speaker": b0, "hms": ts_a.group(1), "text": b2})
+                    bi += 3
+                    continue
+                # Order B: Dwarkesh/Substack — timestamps + optional speaker labels
+                # Format: "M:SS\n\n[SPEAKER N]\n\ntext" or "M:SS\n\ntext" (same speaker)
+                ts_b = re.match(r"^(\d{1,2}:\d{2}(?::\d{2})?)$", b0)
+                if ts_b:
+                    hms = ts_b.group(1)
+                    if hms.count(":") == 1:
+                        hms = "0:" + hms  # M:SS → 0:MM:SS
+                    # Check if b1 is a speaker label
+                    if re.match(r"^(SPEAKER\s*\d+)$", b1) and bi + 2 < len(blocks):
+                        block_segments.append({"speaker": b1, "hms": hms, "text": b2})
+                        bi += 3
+                        continue
+                    # No speaker label → text directly after timestamp, reuse last speaker
+                    elif len(b1) > 20 and not re.match(r"^\d{1,2}:\d{2}", b1):
+                        last_speaker = block_segments[-1]["speaker"] if block_segments else "Unknown"
+                        block_segments.append({"speaker": last_speaker, "hms": hms, "text": b1})
+                        bi += 2
+                        continue
+                bi += 1
+
+            if len(block_segments) >= 3:
+                return _format_segments(block_segments)
+
+            # Strategy 3: dialogue lines "Speaker Name: text" (Substack/Dwarkesh style)
+            dialogue_pattern = re.compile(
+                r"^([A-Z][a-zA-Z\u00C0-\u024F'.\-]+(?: [A-Z][a-zA-Z\u00C0-\u024F'.\-]+){0,3}):\s+(.+)"
+            )
+            dialogue_segments = []
+            for line in lines:
+                m = dialogue_pattern.match(line)
+                if m:
+                    dialogue_segments.append({"speaker": m.group(1), "text": m.group(2).strip()})
+
+            # Require ≥10 segments with ≥2 distinct speakers to avoid false positives
+            # from navigation text like "Site Name: Subtitle"
+            dialogue_speakers = {s["speaker"] for s in dialogue_segments}
+            if len(dialogue_segments) >= 10 and len(dialogue_speakers) >= 2:
+                return _format_segments(dialogue_segments)
+
+            # Strategy 3b: standalone speaker names on their own block
+            # Dwarkesh article format:
+            #   00:00:00 – Chapter title      ← chapter heading
+            #   Speaker Name                  ← standalone block
+            #   Paragraph of dialogue...      ← next block(s) until next speaker
+            # First pass: identify recurring standalone name blocks as speakers
+            standalone_name = re.compile(r"^[A-Z][a-zA-Z\u00C0-\u024F'\-]+(?: [A-Z][a-zA-Z\u00C0-\u024F'\-]+){0,3}$")
+            name_counts = {}
+            for b in blocks:
+                if standalone_name.match(b) and len(b) < 30:
+                    name_counts[b] = name_counts.get(b, 0) + 1
+            # Speakers must appear ≥3 times and there must be ≥2 distinct speakers
+            speaker_names = {n for n, c in name_counts.items() if c >= 3}
+            if len(speaker_names) >= 2:
+                sa_segments = []
+                current_speaker = None
+                current_hms = "0:00:00"
+                # Find transcript start: last "Transcript" heading before actual dialogue
+                tx_start = 0
+                for bi3, b in enumerate(blocks):
+                    if b == "Transcript":
+                        tx_start = bi3 + 1
+
+                for bi3 in range(tx_start, len(blocks)):
+                    b = blocks[bi3]
+                    # Chapter heading
+                    ch_m3 = chapter_pattern.match(b)
+                    if ch_m3:
+                        current_hms = ch_m3.group(1)
+                        if ch_m3.group(1).count(":") == 1:
+                            current_hms = "0:" + current_hms
+                        sa_segments.append({"_chapter": ch_m3.group(2).strip()})
+                        continue
+                    # Speaker name
+                    if b in speaker_names:
+                        current_speaker = b
+                        continue
+                    # UI noise — stop
+                    if _ui_noise_re.match(b):
+                        break
+                    # Skip short noise blocks
+                    if len(b) < 20:
+                        continue
+                    # Dialogue paragraph
+                    if current_speaker:
+                        sa_segments.append({"speaker": current_speaker, "hms": current_hms, "text": b})
+
+                if len(sa_segments) >= 10:
+                    return _format_segments(sa_segments)
+
+            # Strategy 4: "Starting point is HH:MM:SS" blocks (podscripts.co)
+            # In markdown: timestamp and text on separate lines
+            # In HTML:     timestamp and text may be on the same line
+            sp_pattern = re.compile(r"^Starting point is (\d{1,2}:\d{2}:\d{2})\s*(.*)")
+            sp_segments = []
+            current_sp = None
+            for line in lines:
+                m = sp_pattern.match(line)
+                if m:
+                    if current_sp:
+                        sp_segments.append(current_sp)
+                    inline_text = m.group(2).strip()
+                    current_sp = {"hms": m.group(1), "lines": [inline_text] if inline_text else []}
+                elif current_sp and line.strip():
+                    current_sp["lines"].append(line.strip())
+            if current_sp:
+                sp_segments.append(current_sp)
+
+            if len(sp_segments) >= 3:
+                formatted = []
+                for seg in sp_segments:
+                    seg_text = " ".join(seg["lines"])
+                    if not seg_text:
+                        continue
+                    formatted.append({"speaker": "Unknown", "hms": seg["hms"], "text": seg_text})
+                return _format_segments(formatted)
+
+            # Fallback: return all body text if no structured transcript found
+            return text if len(text) > 200 else None
+
+        except Exception:
+            return None
+
     async def download_captions(
         self,
         url: str,
@@ -1066,15 +2287,50 @@ class YouTubeDownloader:
         # Create output directory if it doesn't exist
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        # Extract video ID and check for existing caption files
+        # Extract video ID
         video_id = self.extract_video_id(url)
+
+        # --- Phase 1: External transcript (high-quality, with speaker labels) ---
+        # Always attempt; result is stored for later return but does NOT skip YT download.
+        external_transcript_path = None
+        try:
+            transcript_md = target_dir / f"{video_id}.transcript.md"
+            if transcript_md.exists() and not force_overwrite:
+                self.logger.info(f"✅ Found existing external transcript: {transcript_md}")
+                external_transcript_path = str(transcript_md)
+            else:
+                info = await self.get_video_info(url)
+                description = info.get("description", "")
+                transcript_url = self._extract_transcript_url_from_description(description)
+                if transcript_url:
+                    self.logger.info(f"🔗 Found transcript URL in description: {transcript_url}")
+                    ext_path = await self._download_external_transcript(
+                        transcript_url, output_dir, video_id, youtube_url=url, video_info=info
+                    )
+                    if ext_path:
+                        external_transcript_path = ext_path
+        except Exception as e:
+            self.logger.debug(f"External transcript check skipped: {e}")
+
+        # --- Phase 2: YouTube captions (accurate timestamps) ---
+        # Always download YT captions so both sources are available on disk.
+        yt_caption_exists = False
         if not force_overwrite:
             existing_files = FileExistenceManager.check_existing_files(
                 video_id, str(target_dir), caption_formats=CAPTION_FORMATS
             )
+            if existing_files["caption"]:
+                yt_caption_exists = True
+                self.logger.info(f"🔍 Found existing YT caption: {existing_files['caption'][0]}")
 
-            # Handle existing caption files
-            if existing_files["caption"] and not force_overwrite:
+        # If external transcript exists and YT captions already on disk, return transcript
+        if external_transcript_path and yt_caption_exists:
+            self.logger.info(f"✅ Both sources available. Using external transcript: {external_transcript_path}")
+            return external_transcript_path
+
+        # If YT captions exist but no external transcript, use YT captions
+        if yt_caption_exists and not external_transcript_path:
+            if not force_overwrite:
                 if FileExistenceManager.is_interactive_mode():
                     user_choice = FileExistenceManager.prompt_user_confirmation(
                         {"caption": existing_files["caption"]}, "caption download", transcriber_name=transcriber_name
@@ -1083,28 +2339,43 @@ class YouTubeDownloader:
                     if user_choice == "cancel":
                         raise RuntimeError("Caption download cancelled by user")
                     elif user_choice == "overwrite":
-                        # Continue with download
-                        pass
+                        pass  # Continue with download below
                     elif user_choice == TRANSCRIBE_CHOICE:
                         return TRANSCRIBE_CHOICE
                     elif user_choice in existing_files["caption"]:
-                        # User selected a specific file
                         caption_file = Path(user_choice)
                         self.logger.info(f"✅ Using selected caption file: {caption_file}")
                         return str(caption_file)
                     else:
-                        # Fallback: use first file
                         caption_file = Path(existing_files["caption"][0])
                         self.logger.info(f"✅ Using existing caption file: {caption_file}")
                         return str(caption_file)
                 else:
                     caption_file = Path(existing_files["caption"][0])
-                    self.logger.info(f"🔍 Found existing caption: {caption_file}")
                     return str(caption_file)
 
         self.logger.info(f"📥 Downloading caption for: {url}")
         if source_lang:
             self.logger.info(f"🎯 Targeting specific caption track: {source_lang}")
+
+        # Auto-detect original language from video info when source_lang is not specified
+        if not source_lang:
+            try:
+                info = await self.get_video_info(url)
+                # Prefer manually created subtitles keys as the most reliable signal
+                manual_subs = info.get("subtitles", {})
+                video_lang = info.get("language")
+
+                if manual_subs:
+                    # Use all manually created subtitle languages
+                    sub_langs = list(manual_subs.keys())
+                    source_lang = ",".join(sub_langs)
+                    self.logger.info(f"🌐 Auto-detected manual caption languages: {sub_langs}")
+                elif video_lang:
+                    source_lang = video_lang
+                    self.logger.info(f"🌐 Auto-detected video language: {source_lang}")
+            except Exception as e:
+                self.logger.debug(f"Language auto-detection skipped: {e}")
 
         output_template = str(target_dir / f"{video_id}.%(ext)s")
 
@@ -1119,9 +2390,9 @@ class YouTubeDownloader:
             "no_warnings": True,
         }
 
-        # Add caption language selection if specified
+        # Add caption language selection if specified (or auto-detected)
         if source_lang:
-            opts["subtitleslangs"] = [f"{source_lang}*"]
+            opts["subtitleslangs"] = [f"{lang}*" for lang in source_lang.split(",")]
 
         try:
             # Run in thread pool to avoid blocking
@@ -1151,7 +2422,7 @@ class YouTubeDownloader:
         except Exception as e:
             self.logger.error(f"Failed to download transcript: {str(e)}")
 
-        # Find the downloaded transcript file
+        # Find the downloaded YT caption files
         caption_patterns = [
             f"{video_id}.*vtt",
             f"{video_id}.*srt",
@@ -1165,17 +2436,24 @@ class YouTubeDownloader:
         for pattern in caption_patterns:
             _caption_files = list(target_dir.glob(pattern))
             for caption_file in _caption_files:
-                self.logger.info(f"📥 Downloaded caption: {caption_file}")
+                self.logger.info(f"📥 YT caption on disk: {caption_file}")
             caption_files.extend(_caption_files)
 
-        # If only one caption file, return it directly
+        # --- Phase 3: Choose best source ---
+        # External transcript (speaker labels + metadata) is preferred over YT captions
+        if external_transcript_path:
+            if caption_files:
+                self.logger.info(f"✅ Both sources available: external transcript + {len(caption_files)} YT caption(s)")
+            self.logger.info(f"✅ Using external transcript: {external_transcript_path}")
+            return external_transcript_path
+
+        # No external transcript — fall back to YT captions
         if len(caption_files) == 1:
-            self.logger.info(f"✅ Using caption: {caption_files[0]}")
+            self.logger.info(f"✅ Using YT caption: {caption_files[0]}")
             return str(caption_files[0])
 
-        # Multiple caption files found, let user choose
-        if FileExistenceManager.is_interactive_mode():
-            self.logger.info(f"📋 Found {len(caption_files)} caption files")
+        if caption_files and FileExistenceManager.is_interactive_mode():
+            self.logger.info(f"📋 Found {len(caption_files)} YT caption files")
             caption_choice = FileExistenceManager.prompt_file_selection(
                 file_type="caption",
                 files=[str(f) for f in caption_files],
@@ -1190,16 +2468,11 @@ class YouTubeDownloader:
             elif caption_choice:
                 self.logger.info(f"✅ Selected caption: {caption_choice}")
                 return caption_choice
-            elif caption_files:
-                # Fallback to first file
+            else:
                 self.logger.info(f"✅ Using first caption: {caption_files[0]}")
                 return str(caption_files[0])
-            else:
-                self.logger.warning("No caption files available after download")
-                return None
         elif caption_files:
-            # Non-interactive mode: use first file
-            self.logger.info(f"✅ Using first caption: {caption_files[0]}")
+            self.logger.info(f"✅ Using first YT caption: {caption_files[0]}")
             return str(caption_files[0])
         else:
             self.logger.warning("No caption files available after download")

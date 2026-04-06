@@ -59,6 +59,10 @@ class CaptionConfig:
     When None with word_level=True, outputs word-per-segment instead of karaoke styling.
     When provided, karaoke.enabled controls whether karaoke styling is applied."""
 
+    translation_first: bool = False
+    """Place translation text above original text in bilingual output.
+    When True: translation appears on the first line, original on the second line."""
+
     encoding: str = "utf-8"
     """Character encoding for reading/writing caption files (default: utf-8)."""
 

@@ -68,7 +68,18 @@ class LattifAIDiarizer:
             num_speakers=num_speakers,
             min_speakers=min_speakers,
             max_speakers=max_speakers,
+            segmentation_step=self.config.segmentation_step,
         )
+
+    def _build_speaker_infer_fn(self):
+        """Build LLM speaker name inference callback from config, or None if disabled."""
+        if not self.config.infer_speakers:
+            return None
+
+        from lattifai.diarization.speaker import SpeakerNameInferrer
+
+        llm_client = self.config.llm.create_client()
+        return SpeakerNameInferrer(llm_client=llm_client, model=self.config.llm.model_name)
 
     def diarize_with_alignments(
         self,
@@ -78,11 +89,11 @@ class LattifAIDiarizer:
         num_speakers: Optional[int] = None,
         min_speakers: Optional[int] = None,
         max_speakers: Optional[int] = None,
-        alignment_fn: Optional[Callable] = None,
+        alignment_fn: Optional[Tuple[Callable, Callable]] = None,
         transcribe_fn: Optional[Callable] = None,
         separate_fn: Optional[Callable] = None,
-        debug: bool = False,
         output_path: Optional[str] = None,
+        speaker_context: Optional[str] = None,
     ) -> Tuple[DiarizationOutput, List[Supervision]]:
         """Diarize the given media input and return alignments with refined speaker labels."""
         return self.diarizer.diarize_with_alignments(
@@ -93,8 +104,13 @@ class LattifAIDiarizer:
             min_speakers=min_speakers,
             max_speakers=max_speakers,
             alignment_fn=alignment_fn,
+            segmentation_step=self.config.segmentation_step,
             transcribe_fn=transcribe_fn,
             separate_fn=separate_fn,
-            debug=debug,
             output_path=output_path,
+            debug=self.config.debug,
+            min_claim_duration=self.config.min_claim_duration,
+            min_claim_count=self.config.min_claim_count,
+            speaker_name_infer_fn=self._build_speaker_infer_fn(),
+            speaker_context=speaker_context,
         )

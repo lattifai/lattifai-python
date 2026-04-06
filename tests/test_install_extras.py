@@ -77,9 +77,9 @@ class TestBaseInstall:
 
     def test_k2py(self):
         """k2py should be available."""
-        import k2
+        import k2py
 
-        assert k2 is not None
+        assert k2py is not None
 
     def test_onnxruntime(self):
         """onnxruntime should be available."""

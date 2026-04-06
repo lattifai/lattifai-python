@@ -1,8 +1,9 @@
 """Base transcriber abstractions for LattifAI."""
 
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 import numpy as np
 
@@ -11,6 +12,11 @@ from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.data import Caption
 from lattifai.logging import get_logger
+
+if TYPE_CHECKING:
+    from lattifai_core.event import LEDOutput
+
+logger = logging.getLogger(__name__)
 
 
 class BaseTranscriber(ABC):
@@ -26,6 +32,8 @@ class BaseTranscriber(ABC):
     file_suffix: str = ".txt"
     supports_url: bool = True
     """Whether this transcriber supports direct URL transcription."""
+    needs_vad: bool = False
+    """Whether this transcriber needs VAD segmentation via event_detector."""
 
     def __init__(self, config: Optional[TranscriptionConfig] = None):
         """
@@ -40,6 +48,7 @@ class BaseTranscriber(ABC):
 
         self.config = config
         self.logger = get_logger("transcription")
+        self.event_detector = None  # Injected by mixin for VAD segmentation
 
     @property
     @abstractmethod
@@ -126,6 +135,33 @@ class BaseTranscriber(ABC):
         """
         Persist transcript text to disk and return the file path.
         """
+
+    def _vad_segment(
+        self, audio: AudioData, vad_chunk_size: float = 30.0, vad_max_gap: float = 4.0
+    ) -> Tuple[List[Tuple[float, float]], Optional["LEDOutput"]]:
+        """Run VAD via event_detector to split audio into speech segments.
+
+        Args:
+            audio: AudioData to analyze.
+            vad_chunk_size: Maximum chunk size in seconds for VAD processing.
+            vad_max_gap: Maximum gap in seconds to merge adjacent segments.
+
+        Returns:
+            Tuple of (segments, led_output). segments is a list of (start, end) tuples.
+            Both are empty/None if event_detector is unavailable or VAD fails.
+        """
+        if self.event_detector is None:
+            return [], None
+
+        led = self.event_detector.detect(audio, fast_mode=True, vad_chunk_size=vad_chunk_size, vad_max_gap=vad_max_gap)
+        segments = [(ev.start_time, ev.end_time) for ev in led.audio_events.get_tier_by_name("VAD")]
+        logger.info("VAD detected %d speech segments (total %.1fs audio)", len(segments), audio.duration)
+        return segments, led
+
+    @staticmethod
+    def _slice_audio_by_segments(audio: AudioData, segments: List[Tuple[float, float]]) -> List[np.ndarray]:
+        """Slice AudioData into numpy chunks based on VAD segments."""
+        return [audio.ndarray[0, int(s * audio.sampling_rate) : int(e * audio.sampling_rate)] for s, e in segments]
 
     @staticmethod
     def _is_url(value: str) -> bool:

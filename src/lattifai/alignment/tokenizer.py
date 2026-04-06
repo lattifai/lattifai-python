@@ -14,6 +14,8 @@ from lattifai.errors import (
     ModelLoadError,
     QuotaExceededError,
 )
+from lattifai.theme import theme
+from lattifai.utils import safe_print
 
 from .punctuation import PUNCTUATION, PUNCTUATION_SPACE
 from .text_align import TextAlignResult
@@ -87,7 +89,7 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True, attach_punct
     # - \u00C0-\u00FF: Latin-1 Supplement (À-ÿ)
     # - \u0100-\u017F: Latin Extended-A
     # - \u0180-\u024F: Latin Extended-B
-    pattern = re.compile(r"(\[[A-Z_]+\]|[a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
+    pattern = re.compile(r"(\[[^\]]+\]|[a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
 
     # filter(None, ...) removes any empty strings from re.findall results
     tokens = list(filter(None, pattern.findall(text)))
@@ -261,6 +263,7 @@ class LatticeTokenizer:
         boost: float = 0.0,
         transition_penalty: Optional[float] = 0.0,
         metadata: Optional[dict] = None,
+        skip_duplicate_prompt: bool = False,
     ) -> Tuple[str, Dict[str, Any]]:
         client_info = self._get_client_info()
 
@@ -268,18 +271,67 @@ class LatticeTokenizer:
             if split_sentence:
                 supervisions = self.split_sentences(supervisions)
 
+            # Detect nearby duplicate blocks before sending to backend
+            from lattifai.alignment.text_align import detect_duplicate_blocks
+
+            dup_blocks = detect_duplicate_blocks(supervisions)
+            if dup_blocks and not skip_duplicate_prompt:
+
+                def _ts(s):
+                    h, rem = divmod(s, 3600)
+                    m, sec = divmod(rem, 60)
+                    return f"{int(h):02d}:{int(m):02d}:{sec:06.3f}"
+
+                safe_print(theme.warn(f"⚠️  Detected {len(dup_blocks)} duplicate text block(s):"))
+                for dup in dup_blocks:
+                    first_start, first_end = dup.first
+                    second_start, second_end = dup.second
+                    first_text = " ".join(supervisions[i].text for i in range(first_start, first_end + 1))
+                    second_text = " ".join(supervisions[i].text for i in range(second_start, second_end + 1))
+                    first_ts = f"{_ts(supervisions[first_start].start)}-{_ts(supervisions[first_end].end)}"
+                    second_ts = f"{_ts(supervisions[second_start].start)}-{_ts(supervisions[second_end].end)}"
+                    safe_print(
+                        theme.warn(
+                            f"         [{first_ts}]: {first_text[:100]}...\n"
+                            f"         [{second_ts}]: {second_text[:100]}..."
+                        )
+                    )
+                import sys
+
+                safe_print(
+                    theme.step(
+                        "   Auto-optimization handles duplicates with high accuracy (recommended).\n"
+                        "   Continue with alignment? [Y/n] (auto-yes in 10s) "
+                    ),
+                    end="",
+                    flush=True,
+                )
+                if sys.stdin.isatty():
+                    import select
+
+                    try:
+                        ready, _, _ = select.select([sys.stdin], [], [], 10.0)
+                        answer = sys.stdin.readline().strip().lower() if ready else ""
+                    except (EOFError, KeyboardInterrupt):
+                        answer = ""
+                    if answer in ("n", "no"):
+                        raise Exception("Aborted: please fix duplicate blocks in the subtitle file and retry.")
+                    print()  # newline after prompt
+                else:
+                    print()  # newline for non-interactive
+
             pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions])
-            response = self.client_wrapper.post(
-                "tokenize",
-                json={
-                    "model_name": self.model_name,
-                    "supervisions": [s.to_dict() for s in supervisions],
-                    "pronunciation_dictionaries": pronunciation_dictionaries,
-                    **client_info,
-                    "transition_penalty": transition_penalty,
-                    "metadata": metadata,
-                },
-            )
+            request_body = {
+                "model_name": self.model_name,
+                "supervisions": [s.to_dict() for s in supervisions],
+                "pronunciation_dictionaries": pronunciation_dictionaries,
+                **client_info,
+                "transition_penalty": transition_penalty,
+                "metadata": metadata,
+            }
+            if dup_blocks:
+                request_body["duplicate_blocks"] = [dup._asdict() for dup in dup_blocks]
+            response = self.client_wrapper.post("tokenize", json=request_body)
         else:
             pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions[0]])
             pronunciation_dictionaries.update(self.prenormalize([s.text for s in supervisions[1]]))
@@ -303,10 +355,13 @@ class LatticeTokenizer:
             raise Exception(f"Failed to tokenize texts: {response.text}")
         result = response.json()
         lattice_id = result["id"]
+        # Backend signals diff_detokenize when it built a diff graph; fallback to supervision type
+        diff_detokenize = result.get("diff_detokenize", not isinstance(supervisions[0], Supervision))
         return (
             supervisions,
             lattice_id,
             (result["lattice_graph"], result["final_state"], result.get("acoustic_scale", 1.0)),
+            diff_detokenize,
         )
 
     def detokenize(
@@ -315,48 +370,29 @@ class LatticeTokenizer:
         lattice_results: Tuple[np.ndarray, Any, Any, float, float],
         supervisions: Union[List[Supervision], TextAlignResult],
         return_details: bool = False,
-        start_margin: float = 0.08,
-        end_margin: float = 0.20,
+        start_margin: float = 0.10,
+        end_margin: float = 0.10,
         check_sanity: bool = True,
+        diff_detokenize: bool = False,
     ) -> List[Supervision]:
         emission_stats, results, labels, frame_shift, offset, channel = lattice_results  # noqa: F841
         # emission_stats is a dict with 'max_probs' and 'aligned_probs' (unified for batch and streaming)
-        if isinstance(supervisions[0], Supervision):
-            response = self.client_wrapper.post(
-                "detokenize",
-                json={
-                    "model_name": self.model_name,
-                    "lattice_id": lattice_id,
-                    "frame_shift": frame_shift,
-                    "results": [t.to_dict() for t in results[0]],
-                    "labels": labels[0],
-                    "offset": offset,
-                    "channel": channel,
-                    "return_details": False if return_details is None else return_details,
-                    "destroy_lattice": True,
-                    "start_margin": start_margin,
-                    "end_margin": end_margin,
-                    "check_sanity": check_sanity,
-                },
-            )
-        else:
-            response = self.client_wrapper.post(
-                "diffdetokenize",
-                json={
-                    "model_name": self.model_name,
-                    "lattice_id": lattice_id,
-                    "frame_shift": frame_shift,
-                    "results": [t.to_dict() for t in results[0]],
-                    "labels": labels[0],
-                    "offset": offset,
-                    "channel": channel,
-                    "return_details": False if return_details is None else return_details,
-                    "destroy_lattice": True,
-                    "start_margin": start_margin,
-                    "end_margin": end_margin,
-                    "check_sanity": check_sanity,
-                },
-            )
+        detokenize_body = {
+            "model_name": self.model_name,
+            "lattice_id": lattice_id,
+            "frame_shift": frame_shift,
+            "results": [t.to_dict() for t in results[0]],
+            "labels": labels[0],
+            "offset": offset,
+            "channel": channel,
+            "return_details": False if return_details is None else return_details,
+            "destroy_lattice": True,
+            "start_margin": start_margin,
+            "end_margin": end_margin,
+            "check_sanity": check_sanity,
+        }
+        endpoint = "diffdetokenize" if diff_detokenize else "detokenize"
+        response = self.client_wrapper.post(endpoint, json=detokenize_body)
 
         if response.status_code == 400:
             raise LatticeDecodingError(
@@ -373,11 +409,20 @@ class LatticeTokenizer:
             raise Exception("Failed to detokenize the alignment results.")
 
         alignments = [Supervision.from_dict(s) for s in result["supervisions"]]
+        if return_details:
+            word_ratio = sum(len(s.get("alignment", {}).get("word", [])) for s in alignments) / len(alignments)
+            if word_ratio < 0.5:
+                safe_print(
+                    theme.warn(
+                        f"⚠️  Low word-level alignment ratio ({word_ratio:.2%} of segments have word alignments). "
+                    )
+                )
+                raise Warning("Low word-level alignment ratio, results may be unreliable.")
 
         # Add emission confidence scores for segments and word-level alignments
         _add_confidence_scores(alignments, emission_stats, frame_shift, offset)
 
-        if isinstance(supervisions[0], Supervision):
+        if isinstance(supervisions[0], Supervision) and not diff_detokenize:
             alignments = _update_alignments_speaker(supervisions, alignments)
         else:
             # NOTE: Text Diff Alignment >> speaker has been handled in the backend service

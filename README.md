@@ -21,6 +21,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
+  - [Translation](#lai-translate-run)
 - [Python SDK](#python-sdk)
 - [Advanced Features](#advanced-features)
 - [Text Processing](#text-processing)
@@ -35,8 +36,9 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 | Feature | Description |
 |---------|-------------|
 | **Forced Alignment** | Word-level and segment-level audio-text synchronization powered by [Lattice-1](https://huggingface.co/LattifAI/Lattice-1) |
-| **Multi-Model Transcription** | Gemini (100+ languages), Parakeet (24 languages), SenseVoice (5 languages) |
+| **Multi-Model Transcription** | Gemini, Parakeet, SenseVoice, Fun-ASR, Qwen3-ASR, Whisper, and any vLLM/SGLang-served model |
 | **Speaker Diarization** | Multi-speaker identification with label preservation |
+| **Caption Translation** | LLM-powered translation with terminology consistency and bilingual output |
 | **Streaming Mode** | Process audio up to 20 hours with minimal memory |
 | **Universal Format Support** | 30+ caption/subtitle formats |
 
@@ -65,23 +67,32 @@ client = LattifAI(alignment_config=AlignmentConfig(model_hub="modelscope"))
 
 ## Installation
 
+> **Requires Python 3.10 – 3.14**
+
 ### Using uv (Recommended)
 
-[uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip). **No extra configuration needed** - uv automatically uses our package index.
+[uv](https://github.com/astral-sh/uv) is a fast Python package manager (10-100x faster than pip).
 
 ```bash
 # Install uv (skip if already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
-# Create a new project and add lattifai
-uv init my-project && cd my-project
-uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+**As a CLI tool** (recommended for most users):
 
-# Or add to an existing project
-uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
+```bash
+# Install globally — lai command available everywhere
+uv tool install "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
 
-# Run CLI without installing (quick test)
+# Quick test without installing
 uvx --from lattifai --extra-index-url https://lattifai.github.io/pypi/simple/ lai --help
+```
+
+**As a project dependency** (for Python SDK usage):
+
+```bash
+# Add to an existing project
+uv add "lattifai[all]" --extra-index-url https://lattifai.github.io/pypi/simple/
 ```
 
 ### Using pip
@@ -104,10 +115,11 @@ extra-index-url = https://lattifai.github.io/pypi/simple/
 | Extra | Includes |
 |-------|----------|
 | (base) | Forced alignment, Gemini transcription, YouTube, captions |
-| `transcription` | Local ASR models (Parakeet, SenseVoice) |
+| `transcription` | Local ASR models (Parakeet, SenseVoice, Fun-ASR) |
 | `diarization` | Speaker diarization (NeMo, pyannote) |
+| `translation` | LLM-powered caption translation (OpenAI-compatible) |
 | `event` | Audio event detection |
-| `all` | Base + transcription + diarization + event |
+| `all` | Base + transcription + diarization + translation + event |
 
 **Note:** Base installation includes alignment, Gemini transcription, and YouTube. Use `[all]` for local ASR models and all optional features.
 
@@ -147,6 +159,9 @@ lai alignment align audio.wav subtitle.srt output.srt
 
 # YouTube video
 lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
+
+# Start local browser playground (4 tabs)
+lai serve run
 ```
 
 ### Python SDK
@@ -172,8 +187,13 @@ caption = client.alignment(
 | `lai alignment youtube` | Download & align YouTube | `lai alignment youtube "https://youtube.com/watch?v=ID"` |
 | `lai transcribe run` | Transcribe audio/video | `lai transcribe run audio.wav output.srt` |
 | `lai transcribe align` | Transcribe and align | `lai transcribe align audio.wav output.srt` |
+| `lai translate run` | Translate captions | `lai translate run input.srt output.srt translation.target_lang=zh` |
 | `lai caption convert` | Convert caption formats | `lai caption convert input.srt output.vtt` |
 | `lai caption shift` | Shift timestamps | `lai caption shift input.srt output.srt 2.0` |
+| `lai serve run` | Start local web UI playground | `lai serve run` |
+| `lai doctor` | Run environment diagnostics | `lai doctor` |
+| `lai update` | Update to latest version | `lai update` or `lai update --force` |
+| `lai config` | Manage API keys & settings | `lai config set lattifai_api_key lf_xxx` |
 
 ### Common Options
 
@@ -186,7 +206,7 @@ caption.split_sentence=true    # Smart sentence splitting
 caption.word_level=true        # Word-level timestamps
 
 # Streaming for long audio
-media.streaming_chunk_secs=600
+media.streaming_chunk_secs=300
 
 # Channel selection
 media.channel_selector=left    # left, right, average, or index
@@ -194,15 +214,36 @@ media.channel_selector=left    # left, right, average, or index
 
 ### Transcription Models
 
+LattifAI supports a wide range of ASR models — from cloud APIs to local inference to self-hosted servers:
+
+| Model | Type | Languages | Install Extra |
+|-------|------|-----------|---------------|
+| [Gemini 2.5 Pro/Flash](https://ai.google.dev/) | Cloud API | 100+ | (base) |
+| [NVIDIA Parakeet](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3) | Local | 24 (European) | `[transcription]` |
+| [SenseVoice](https://huggingface.co/iic/SenseVoiceSmall) | Local | zh, en, ja, ko, yue | `[transcription]` |
+| [Fun-ASR-Nano](https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512) | Local | 31 (incl. zh dialects) | `[transcription]` |
+| [Fun-ASR-MLT-Nano](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512) | Local | 31 (incl. zh dialects) | `[transcription]` |
+| [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | Local / vLLM/SGLang | 52 (30 lang + 22 zh dialects) | `[transcription]` |
+| [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) | vLLM/SGLang | 99 | — |
+| [Voxtral](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | vLLM/SGLang | 13 (European) | — |
+| [Voxtral Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | vLLM (realtime) | 13 (European) | — |
+| [Gemma-3n](https://huggingface.co/google/gemma-3n-E4B-it) | vLLM (chat) | 140+ | — ⚠️ |
+
+> ⚠️ **Gemma-3n** is a general-purpose multimodal LLM, not a dedicated ASR model. It has a [hard 30s audio encoder limit](https://huggingface.co/google/gemma-3n-E4B-it/discussions/37), ~3x higher WER than Whisper, and weaker multilingual transcription. Best suited for transcription + downstream understanding (summarization, translation) rather than pure ASR accuracy.
+
 ```bash
-# Gemini (100+ languages, included in base install, requires GEMINI_API_KEY)
+# Gemini (cloud API, requires GEMINI_API_KEY)
 transcription.model_name=gemini-2.5-pro
 
-# Parakeet (24 European languages, requires [transcription] extra)
+# Local models (requires [transcription] extra)
 transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
-
-# SenseVoice (zh, en, ja, ko, yue, requires [transcription] extra)
 transcription.model_name=iic/SenseVoiceSmall
+transcription.model_name=FunAudioLLM/Fun-ASR-MLT-Nano-2512
+transcription.model_name=Qwen/Qwen3-ASR-1.7B
+
+# vLLM/SGLang-served models (requires a running vLLM server)
+transcription.model_name=Qwen/Qwen3-ASR-1.7B \
+    transcription.api_base_url=http://localhost:8081/v1
 ```
 
 ### lai transcribe run
@@ -243,6 +284,91 @@ lai transcribe align audio.wav output.srt \
     caption.split_sentence=true \
     caption.word_level=true
 ```
+
+### lai translate run
+
+Translate caption files to any target language using LLM providers (Gemini, OpenAI-compatible).
+
+Three translation modes with increasing quality:
+
+| Mode | Pipeline | LLM Calls | Use Case |
+|------|----------|-----------|----------|
+| `quick` | Translate | ~1x | Quick draft, informal review |
+| `normal` | Analyze → Translate | ~2x | Default — terminology-consistent, context-aware |
+| `refined` | Analyze → Translate → Review → Revise | ~3x | Publication-quality professional subtitles |
+
+**What each stage does:**
+
+- **Analyze** (`normal`/`refined`): Scans source text to identify domain, terminology, speaker style, and tone. Extracts a glossary of key terms with recommended translations, ensuring consistency across all segments (e.g., "forced alignment" → "强制对齐" everywhere).
+- **Translate**: Batch-translates segments with context windows (surrounding lines for coherence). In `quick` mode, uses only the raw text. In `normal`/`refined`, the translation prompt includes the analysis results and glossary.
+- **Review** (`refined` only): A separate reviewer pass compares each translation against the original, checking for mistranslations, omissions, tone shifts, and glossary violations. Outputs per-segment critiques.
+- **Revise** (`refined` only): Applies reviewer feedback to produce a polished final version. All intermediate artifacts (analysis, prompts, drafts, critiques, revisions) can be saved with `save_artifacts=true`.
+
+```bash
+# Basic (default: normal mode, bilingual, target=zh)
+lai translate caption input.srt output.srt
+
+# Quick mode to English
+lai translate caption input.srt output.srt \
+    translation.target_lang=en \
+    translation.mode=quick
+
+# Refined mode with artifacts saved
+lai translate caption input.srt output.srt \
+    translation.target_lang=ja \
+    translation.mode=refined \
+    translation.save_artifacts=true
+
+# Bilingual output with translation on top
+lai translate caption input.srt output.srt \
+    translation.target_lang=zh \
+    caption.translation_first=true
+
+# OpenAI-compatible API (local or third-party)
+lai translate caption input.srt output.srt \
+    translation.llm.provider=openai \
+    translation.llm.api_base_url=http://localhost:8000/v1 \
+    translation.llm.model=qwen3
+
+# With custom glossary
+lai translate caption input.srt output.srt \
+    translation.glossary_file=glossary.yaml
+```
+
+**TranslationConfig Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `target_lang` | `zh` | Target language code (see [supported languages](#translation-language-support)) |
+| `source_lang` | auto | Source language (auto-detected if not set) |
+| `approach` | `rewrite` | `rewrite`: natural expression, idiom adaptation; `translate`: accuracy, source fidelity |
+| `mode` | `normal` | Translation mode: `quick`, `normal`, `refined` |
+| `bilingual` | `true` | Output bilingual captions (original + translation) |
+| `style` | `technical` | Style hint: `storytelling`, `formal`, `casual`, `technical` |
+| `llm.model` | `gemini-3-flash-preview` | LLM model name |
+| `llm.provider` | `gemini` | LLM provider: `gemini` or `openai` |
+| `llm.api_base_url` | — | Base URL for OpenAI-compatible endpoint (vLLM, SGLang, Ollama) |
+| `batch_size` | `30` | Segments per API call |
+| `max_concurrent` | `5` | Max concurrent batch requests |
+| `glossary_file` | — | Path to custom glossary (YAML or Markdown) |
+| `save_artifacts` | `false` | Save intermediate files (analysis, prompts, critiques, revisions) |
+
+#### Translation Language Support
+
+55+ languages supported. Common codes:
+
+| Region | Languages |
+|--------|-----------|
+| East Asian | `zh` Chinese (Simplified), `zh-TW` Traditional, `ja` Japanese, `ko` Korean |
+| South/SE Asian | `hi` Hindi, `bn` Bengali, `th` Thai, `vi` Vietnamese, `id` Indonesian, `ms` Malay |
+| Western European | `en` English, `es` Spanish, `fr` French, `de` German, `pt` Portuguese, `it` Italian, `nl` Dutch |
+| Northern European | `sv` Swedish, `da` Danish, `no` Norwegian, `fi` Finnish |
+| Eastern European | `ru` Russian, `uk` Ukrainian, `pl` Polish, `cs` Czech, `ro` Romanian, `hu` Hungarian |
+| Middle Eastern | `ar` Arabic, `fa` Persian, `he` Hebrew, `tr` Turkish |
+
+Full list: `lattifai.languages.SUPPORTED_LANGUAGES`
+
+> Translation approach inspired by [宝玉's AI translation methodology](https://x.com/dotey/status/2029969547927658673).
 
 ---
 
@@ -295,6 +421,7 @@ caption = client.youtube(
 | `word_level` | `False` | Include word-level timestamps in output |
 | `normalize_text` | `True` | Clean HTML entities and special characters |
 | `include_speaker_in_text` | `True` | Include speaker labels in text output |
+| `translation_first` | `False` | Place translation above original in bilingual output |
 
 ```python
 from lattifai.client import LattifAI
@@ -322,7 +449,7 @@ Process audio up to 20 hours with minimal memory:
 caption = client.alignment(
     input_media="long_audio.wav",
     input_caption="subtitle.srt",
-    streaming_chunk_secs=600.0,  # 10-minute chunks
+    streaming_chunk_secs=300.0,  # 5-minute chunks
 )
 ```
 
@@ -373,11 +500,43 @@ for segment in caption.supervisions:
     print(f"[{segment.speaker}] {segment.text}")
 ```
 
+**LLM Speaker Name Inference:**
+
+When speakers remain as `SPEAKER_XX` after acoustic diarization, enable LLM inference to identify real names from dialogue content:
+
+```python
+DiarizationConfig(
+    enabled=True,
+    infer_speakers=True,              # Use LLM to infer speaker names
+    speaker_context="podcast, host is Alice, guest is Bob",  # Optional hint
+    infer_model="gemini-2.5-flash",   # LLM model (default)
+)
+```
+
+**DiarizationConfig Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `False` | Enable speaker diarization |
+| `device` | `auto` | `cpu`, `cuda`, `mps`, or `auto` |
+| `num_speakers` | — | Exact number of speakers (overrides min/max) |
+| `min_speakers` | — | Minimum speakers to detect |
+| `max_speakers` | — | Maximum speakers to detect |
+| `infer_speakers` | `False` | Use LLM to infer real names from dialogue |
+| `speaker_context` | — | Context hint for LLM inference |
+| `infer_model` | `gemini-2.5-flash` | Model for speaker name inference |
+
 **CLI:**
 ```bash
 lai alignment align audio.wav subtitle.srt output.srt \
     diarization.enabled=true \
     diarization.device=cuda
+
+# With LLM speaker name inference
+lai alignment align audio.wav subtitle.srt output.srt \
+    diarization.enabled=true \
+    diarization.infer_speakers=true \
+    diarization.speaker_context="interview with Dr. Smith"
 ```
 
 ### Data Flow
@@ -499,7 +658,7 @@ WEBVTT
 **Writing**: Use `word_level=True` with `karaoke_config` to output YouTube VTT style:
 
 ```python
-from lattifai.caption import Caption
+from lattifai.data import Caption
 from lattifai.caption.config import KaraokeConfig
 
 caption = Caption.read("input.vtt")
@@ -544,6 +703,95 @@ English, Chinese (Mandarin & Cantonese), Spanish, French, German, Italian, Portu
 
 Chinese/Mandarin (zh), English (en), Japanese (ja), Korean (ko), Cantonese (yue)
 
+#### FunAudioLLM Fun-ASR-Nano (31 Languages)
+
+**Models**: [`FunAudioLLM/Fun-ASR-Nano-2512`](https://huggingface.co/FunAudioLLM/Fun-ASR-Nano-2512), [`FunAudioLLM/Fun-ASR-MLT-Nano-2512`](https://huggingface.co/FunAudioLLM/Fun-ASR-MLT-Nano-2512)
+
+800M parameter end-to-end ASR model from Tongyi Lab, excelling at far-field, high-noise, dialect/accent, and music lyric recognition.
+
+| Region | Languages |
+|--------|-----------|
+| East Asia | Chinese (+ 7 dialects, 26 accents), Japanese, Korean, Cantonese |
+| Southeast Asia | Vietnamese, Indonesian, Thai, Malay, Filipino |
+| South Asia | Hindi |
+| Middle East | Arabic |
+| Europe | English, Bulgarian, Croatian, Czech, Danish, Dutch, Estonian, Finnish, Greek, Hungarian, Irish, Latvian, Lithuanian, Maltese, Polish, Portuguese, Romanian, Slovak, Slovenian, Swedish |
+
+```bash
+# Use ModelScope (default for China)
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=FunAudioLLM/Fun-ASR-MLT-Nano-2512 \
+    transcription.model_hub=modelscope
+
+# Use HuggingFace
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=FunAudioLLM/Fun-ASR-MLT-Nano-2512 \
+    transcription.model_hub=huggingface
+```
+
+#### vLLM/SGLang (Any ASR Model)
+
+Any ASR model served via [vLLM](https://docs.vllm.ai) or [SGLang](https://sgl-project.github.io/) with an OpenAI-compatible API.
+
+**Supported models and limitations:**
+
+| Model | Audio tok/s | Max Audio | API Mode | Batch | Notes |
+|-------|-------------|-----------|----------|-------|-------|
+| [Qwen3-ASR](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) (0.6B/1.7B) | 25 | auto | transcriptions | Yes | Best for zh/en/ja/ko |
+| [Whisper](https://huggingface.co/openai/whisper-large-v3-turbo) | 50 | **30s** | transcriptions | Yes | Fixed 30s context window |
+| [Voxtral](https://huggingface.co/mistralai/Voxtral-Mini-3B-2507) | 12.5 | auto | transcriptions | Yes | European languages |
+| [Voxtral Realtime](https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602) | 12.5 | auto | realtime | Yes | WebSocket, <500ms latency |
+| [Ultravox](https://huggingface.co/fixie-ai/ultravox-v0_5) | 6.25 | auto | transcriptions | Yes | Confirmed in vLLM source |
+| [Gemma-3n](https://huggingface.co/google/gemma-3n-E4B-it) | 6.25 | **30s** | chat (auto) | **No** | Not a dedicated ASR model (~3x Whisper WER), [30s encoder limit](https://huggingface.co/google/gemma-3n-E4B-it/discussions/37), no concurrent requests |
+
+- **Max Audio**: "auto" = estimated from `max_model_len`; bold values are hard encoder limits
+- **Batch**: Whether `batch_size>1` concurrent requests are supported
+- **API Mode**: `transcriptions` is the default; general-purpose LLMs auto-switch to `chat`
+
+**API modes:**
+
+| Mode | Endpoint | Use Case |
+|------|----------|----------|
+| `transcriptions` (default) | `/v1/audio/transcriptions` | Dedicated ASR models (Qwen3-ASR, Whisper, GLM-ASR, etc.) |
+| `chat` | `/v1/chat/completions` | General-purpose LLMs (Gemma-3n, etc.) — auto-selected for non-ASR models |
+| `realtime` | `/v1/realtime` (WebSocket) | Voxtral Realtime |
+
+```bash
+# 1. Install vLLM with audio support (requires CUDA GPU)
+pip install vllm "vllm[audio]"
+
+# 2. Start vLLM server on a Linux GPU machine (auto-downloads the model)
+vllm serve Qwen/Qwen3-ASR-1.7B --gpu-memory-utilization 0.8 --host 0.0.0.0 --port 8081
+# Other models:
+#   vllm serve openai/whisper-large-v3-turbo
+#   vllm serve google/gemma-3n-E4B-it --max-model-len 32000 --enforce-eager
+
+# 3. Transcribe (default: transcriptions mode)
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=Qwen/Qwen3-ASR-1.7B \
+    transcription.api_base_url=http://localhost:8081/v1
+
+# Batch mode for faster processing (4 concurrent requests)
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=Qwen/Qwen3-ASR-1.7B \
+    transcription.api_base_url=http://localhost:8081/v1 \
+    transcription.batch_size=4
+
+# General-purpose LLM (auto-switches to chat mode with ASR system prompt)
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=google/gemma-3n-E4B-it \
+    transcription.api_base_url=http://localhost:8084/v1 \
+    transcription.language=zh
+
+# Voxtral Realtime (streaming WebSocket, <500ms latency)
+# Server: VLLM_DISABLE_COMPILE_CACHE=1 vllm serve mistralai/Voxtral-Mini-4B-Realtime-2602 \
+#   --host 0.0.0.0 --port 8086 --compilation_config '{"cudagraph_mode": "PIECEWISE"}'
+lai transcribe run audio.wav output.srt \
+    transcription.model_name=mistralai/Voxtral-Mini-4B-Realtime-2602 \
+    transcription.api_base_url=http://localhost:8086/v1 \
+    transcription.api_mode=realtime
+```
+
 ---
 
 ## Roadmap
@@ -554,7 +802,7 @@ Visit [lattifai.com/roadmap](https://lattifai.com/roadmap) for updates.
 |------|---------|----------|
 | **Oct 2025** | Lattice-1-Alpha | ✅ English forced alignment, multi-format support |
 | **Nov 2025** | Lattice-1 | ✅ EN+ZH+DE, speaker diarization, multi-model transcription |
-| **Q1 2026** | Lattice-2 | ✅ Streaming mode, 🔮 40+ languages, real-time alignment |
+| **Q2 2026**  | Lattice-2 | ✅ Streaming mode, 🔮 40+ languages, real-time alignment |
 
 ---
 

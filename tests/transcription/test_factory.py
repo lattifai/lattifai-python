@@ -18,12 +18,13 @@ def test_create_gemini_transcriber_explicit():
 
 
 def test_create_gemini_transcriber_preview():
-    """Test creating Gemini transcriber with preview model."""
+    """Test creating Gemini transcriber with preview model (auto-upgraded)."""
     config = TranscriptionConfig(model_name="gemini-3-pro-preview", gemini_api_key="test_key")
     transcriber = create_transcriber(config)
 
     assert isinstance(transcriber, GeminiTranscriber)
-    assert transcriber.config.model_name == "gemini-3-pro-preview"
+    # gemini-3-pro-preview is deprecated and auto-switches to gemini-3.1-pro-preview
+    assert transcriber.config.model_name == "gemini-3.1-pro-preview"
 
 
 def test_create_lattifai_transcriber_nvidia():
@@ -82,6 +83,24 @@ def test_create_transcriber_supports_url_flag():
     lattifai_config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3")
     lattifai = create_transcriber(lattifai_config)
     assert lattifai.supports_url is False
+
+
+def test_create_qwen_transcriber():
+    """Test creating LattifAI transcriber with Qwen3-ASR-1.7B."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-1.7B")
+    transcriber = create_transcriber(config)
+
+    assert isinstance(transcriber, LattifAITranscriber)
+    assert transcriber.config.model_name == "Qwen/Qwen3-ASR-1.7B"
+
+
+def test_create_qwen_transcriber_0_6b():
+    """Test creating LattifAI transcriber with Qwen3-ASR-0.6B."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-0.6B")
+    transcriber = create_transcriber(config)
+
+    assert isinstance(transcriber, LattifAITranscriber)
+    assert transcriber.config.model_name == "Qwen/Qwen3-ASR-0.6B"
 
 
 if __name__ == "__main__":

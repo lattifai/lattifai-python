@@ -1,12 +1,11 @@
 """Alignment CLI entry point with nemo_run."""
 
-import sys
 from typing import Optional
 
 import nemo_run as run
 from typing_extensions import Annotated
 
-from lattifai.client import LattifAI
+from lattifai.cli._shared import build_lattifai_client, resolve_caption_paths, resolve_media_input, run_youtube_workflow
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -16,8 +15,6 @@ from lattifai.config import (
     MediaConfig,
     TranscriptionConfig,
 )
-from lattifai.errors import LattifAIError
-from lattifai.types import Pathlike
 
 __all__ = ["align"]
 
@@ -87,61 +84,40 @@ def align(
             alignment.device=mps \\
             alignment.model_name=LattifAI/Lattice-1-Alpha
     """
-    media_config = media or MediaConfig()
-
-    # Validate that input_media and media_config.input_path are not both provided
-    if input_media and media_config.input_path:
-        raise ValueError(
-            "Cannot specify both positional input_media and media.input_path. "
-            "Use either positional argument or config, not both."
-        )
-
-    # Assign input_media to media_config.input_path if provided
-    if input_media:
-        media_config.set_input_path(input_media)
-
-    if not media_config.input_path:
-        raise ValueError("Input media path must be specified via positional argument input_media= or media.input_path=")
-
-    caption_config = caption or CaptionConfig()
-
-    # Validate that output_caption_path and caption_config.output_path are not both provided
-    if output_caption and caption_config.output_path:
-        raise ValueError(
-            "Cannot specify both positional output_caption and caption.output_path. "
-            "Use either positional argument or config, not both."
-        )
-
-    # Assign paths to caption_config if provided
-    if input_caption:
-        caption_config.set_input_path(input_caption)
-
-    if output_caption:
-        caption_config.set_output_path(output_caption)
-
-    client = LattifAI(
-        client_config=client,
-        alignment_config=alignment,
-        caption_config=caption_config,
-        transcription_config=transcription,
-        diarization_config=diarization,
-        event_config=event,
+    media_config = resolve_media_input(
+        media,
+        input_media,
+        positional_name="input_media",
+        required_message="Input media path must be specified via positional argument input_media= or media.input_path=",
+    )
+    caption_config = resolve_caption_paths(
+        caption,
+        input_path=input_caption,
+        output_path=output_caption,
     )
 
     is_url = media_config.input_path.startswith(("http://", "https://"))
     if is_url:
-        # Call the client's youtube method
-        return client.youtube(
-            url=media_config.input_path,
-            output_dir=media_config.output_dir,
-            output_caption_path=caption_config.output_path,
-            media_format=media_config.normalize_format() if media_config.output_format else None,
-            force_overwrite=media_config.force_overwrite,
-            split_sentence=caption_config.split_sentence,
-            channel_selector=media_config.channel_selector,
+        return run_youtube_workflow(
+            media=media_config,
+            caption=caption_config,
+            client=client,
+            alignment=alignment,
+            transcription=transcription,
+            diarization=diarization,
+            event=event,
         )
 
-    return client.alignment(
+    client_instance = build_lattifai_client(
+        client=client,
+        alignment=alignment,
+        caption=caption_config,
+        transcription=transcription,
+        diarization=diarization,
+        event=event,
+    )
+
+    return client_instance.alignment(
         input_media=media_config.input_path,
         input_caption=caption_config.input_path,
         input_caption_format=caption_config.input_format,

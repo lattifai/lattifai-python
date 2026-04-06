@@ -83,7 +83,7 @@ tests/data/SA1.TextGrid
 benchmark/data/*.TextGrid
 benchmark/data/*.txt
 checkpoints/
-tests/test_cli_commands.sh
+tests/test_cli_commands*.sh
 tests/data/AG*
 tests/data/Sh*
 tests/data/lVG*
@@ -92,3 +92,8 @@ tests/data/memray-flamegraph*
 tests/data/SA1.vtt
 tests/data/SA1.srt
 tests/data/SA1.LattifAI.srt
+.claude/worktrees/
+scripts/
+debug/
+debug
+url-to-markdown/

@@ -54,7 +54,6 @@ class TestCLIIntegration:
         if result is not None and result.returncode == 0:
             help_text = result.stdout + result.stderr
             assert "align" in help_text, help_text
-            assert "youtube" in help_text
 
         # Test caption command
         result = run_cli_command("caption", ["--help"])
@@ -62,3 +61,9 @@ class TestCLIIntegration:
             help_text = result.stdout + result.stderr
             assert "convert" in help_text
             assert "normalize" in help_text
+
+        # Test youtube command (moved to its own namespace)
+        result = run_cli_command("youtube", ["--help"])
+        if result is not None and result.returncode == 0:
+            help_text = result.stdout + result.stderr
+            assert "run" in help_text or "download" in help_text, help_text

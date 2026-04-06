@@ -1,12 +1,12 @@
 """Alignment configuration for LattifAI."""
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, Literal, Optional
+from typing import TYPE_CHECKING, Dict, Literal, Optional, Union
 
 from ..utils import _select_device
 
 if TYPE_CHECKING:
-    from ..base_client import SyncAPIClient
+    from ..client import SyncAPIClient
 
 
 @dataclass
@@ -72,7 +72,7 @@ class AlignmentConfig:
     Default: 80. Typical range: 10-200.
     """
 
-    min_active_states: int = 400
+    min_active_states: int = 1000
     """Minimum number of active states during decoding. Controls memory and search space.
     Default: 400. Typical range: 30-1000.
     """
@@ -83,14 +83,14 @@ class AlignmentConfig:
     """
 
     # Alignment timing configuration
-    start_margin: float = 0.08
+    start_margin: float = 0.10
     """Maximum start time margin (in seconds) to extend segment boundaries at the beginning.
-    Default: 0.08. Typical range: 0.0-0.5.
+    Default: 0.10. Typical range: 0.0-0.5.
     """
 
-    end_margin: float = 0.20
+    end_margin: float = 0.10
     """Maximum end time margin (in seconds) to extend segment boundaries at the end.
-    Default: 0.20. Typical range: 0.0-0.5.
+    Default: 0.10. Typical range: 0.0-0.5.
     """
 
     boost: float = 5.0
@@ -105,6 +105,18 @@ class AlignmentConfig:
     A negative value penalizes transitions (moving to next token), making the model prefer
     self-loops (staying on current token longer). This helps prevent spurious short-duration alignments.
     Default: 0.0 (no penalty). Typical range: -1.0 to 0.0 (e.g., -0.5).
+    """
+
+    normalize_volume: bool = True
+    """Enable RMS-based volume normalization before ONNX inference.
+    Boosts quiet audio to improve alignment quality. Default: True."""
+
+    flush_interval: Union[int, Literal["auto"]] = "auto"
+    """Flush interval for streaming alignment (every N chunks).
+    - 'auto': auto-decide based on audio duration and chunk size (default)
+    - 0: never flush (O(total) memory, globally optimal)
+    - N (positive int): flush every N chunks (higher N = better quality, more memory)
+      e.g. flush_interval=1 flushes every chunk, flush_interval=5 accumulates 5 chunks before flushing
     """
 
     check_sanity: bool = True
