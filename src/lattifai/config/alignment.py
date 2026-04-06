@@ -17,6 +17,8 @@ class AlignmentConfig:
     Defines model selection, decoding behavior, and API settings for forced alignment.
     """
 
+    _toml_section = "alignment"
+
     # Alignment configuration
     model_name: str = "LattifAI/Lattice-1"
     """Model identifier or path to local model directory (e.g., 'LattifAI/Lattice-1')."""

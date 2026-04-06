@@ -579,7 +579,9 @@ class VLLMTranscriber(BaseTranscriber):
         """Write transcription to file. Format is auto-detected from file extension."""
         output_file = Path(output_file)
         if isinstance(transcript, Caption):
-            transcript.write(output_file, include_speaker_in_text=False)
+            from lattifai.caption.config import OutputBehavior
+
+            transcript.write(output_file, behavior=OutputBehavior(include_speaker_in_text=False))
         else:
             output_file.write_text(transcript, encoding=encoding)
         if cache_event and isinstance(transcript, Caption) and transcript.event:

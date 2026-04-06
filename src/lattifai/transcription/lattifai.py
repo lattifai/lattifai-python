@@ -268,12 +268,16 @@ class LattifAITranscriber(BaseTranscriber):
 
             elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
                 # Qwen3-ASR: native batch inference via qwen_asr package
+                # qwen_asr.prepare_audio accepts str or tuple(ndarray, sample_rate),
+                # NOT bare ndarray. Wrap numpy arrays as (array, 16000) tuples.
                 if isinstance(audio, np.ndarray):
                     audio_inputs = [audio]
                 elif isinstance(audio, list):
                     audio_inputs = audio
                 else:
                     audio_inputs = [audio]
+
+                audio_inputs = [(a, _ASR_SAMPLE_RATE) if isinstance(a, np.ndarray) else a for a in audio_inputs]
 
                 lang_list = [language] * len(audio_inputs) if language else [None] * len(audio_inputs)
 
@@ -282,7 +286,9 @@ class LattifAITranscriber(BaseTranscriber):
                 hypotheses = []
                 for i, r in enumerate(results):
                     inp = audio_inputs[i]
-                    dur = inp.shape[-1] / _ASR_SAMPLE_RATE if isinstance(inp, np.ndarray) else 0.0
+                    # inp may be (ndarray, sr) tuple or bare ndarray
+                    arr = inp[0] if isinstance(inp, tuple) else inp
+                    dur = arr.shape[-1] / _ASR_SAMPLE_RATE if isinstance(arr, np.ndarray) else 0.0
                     hypotheses.append(
                         Supervision(
                             text=r.text,
@@ -383,7 +389,9 @@ class LattifAITranscriber(BaseTranscriber):
 
     def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_event: bool = False) -> Path:
         """Persist transcript text to disk and return the file path."""
-        transcript.write(output_file, include_speaker_in_text=False)
+        from lattifai.caption.config import OutputBehavior
+
+        transcript.write(output_file, behavior=OutputBehavior(include_speaker_in_text=False))
         if cache_event and transcript.event:
             events_file = output_file.with_suffix(".LED")
             transcript.event.write(events_file)

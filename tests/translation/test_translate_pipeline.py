@@ -23,11 +23,13 @@ class FakeLLMClient(BaseLLMClient):
         return "fake"
 
     async def generate(self, prompt: str, *, model=None, system=None, temperature=None) -> str:  # noqa: ARG002
+        import json as _json
+
         self.prompts.append(prompt)
         if not self._responses:
             raise RuntimeError("No fake responses left for generate()")
         value = self._responses.pop(0)
-        return str(value)
+        return _json.dumps(value) if isinstance(value, (dict, list)) else str(value)
 
     async def generate_json(self, prompt: str, *, model=None, system=None, temperature=None):  # noqa: ARG002
         self.prompts.append(prompt)

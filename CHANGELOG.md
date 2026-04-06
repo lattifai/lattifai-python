@@ -1,7 +1,7 @@
 # CHANGELOG
 
 
-## [1.5.0] - 2026-03-31
+## [1.4.4] - 2026-04-02
 
 ### Features
 - **Translation Module**: Full caption translation pipeline with multi-provider support (Gemini/OpenAI), three modes (quick/normal/refined), glossary management, and bilingual output

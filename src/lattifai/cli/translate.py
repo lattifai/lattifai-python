@@ -8,6 +8,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.cli._shared import ensure_parent_dir, resolve_caption_paths, resolve_media_input, run_youtube_workflow
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -92,7 +93,7 @@ def _translate_caption_in_place(cap, translation_config: TranslationConfig):
         )
 
 
-@run.cli.entrypoint(name="caption", namespace="translate")
+@run.cli.entrypoint(name="caption", namespace="translate", entrypoint_cls=LattifAIEntrypoint)
 def translate(
     input: Optional[str] = None,
     output: Optional[str] = None,
@@ -111,11 +112,13 @@ def translate(
         input: Path to input caption file (positional argument)
         output: Path for output caption file (positional argument)
         translation: Translation configuration.
-            Fields: llm.model_name, llm.provider, llm.api_base_url, target_lang,
+            Fields: llm.model_name, llm.api_base_url, target_lang,
                     mode, bilingual, style, approach, batch_size, glossary_file,
                     save_artifacts, ask_refine_after_normal, auto_refine_after_normal
-        caption: Caption I/O configuration.
-            Fields: input_format, output_format
+        caption: Caption pipeline configuration.
+            Sub-configs: caption.output (format),
+                         caption.behavior (include_speaker_in_text, word_level, translation_first),
+                         caption.ass (font, colors for ASS output)
 
     Examples:
         # Quick mode
@@ -130,11 +133,10 @@ def translate(
             translation.save_artifacts=true \\
             translation.artifacts_dir=/tmp/artifacts
 
-        # Using OpenAI-compatible API
+        # Using OpenAI-compatible API (provider inferred from model_name)
         lai translate caption input.srt output.srt \\
-            translation.llm.provider=openai \\
-            translation.llm.api_base_url=http://localhost:8000/v1 \\
-            translation.llm.model_name=qwen3
+            translation.llm.model_name=qwen3 \\
+            translation.llm.api_base_url=http://localhost:8000/v1
 
         # With custom glossary
         lai translate caption input.srt output.srt \\
@@ -168,19 +170,30 @@ def translate(
         target_lang=translation_config.target_lang,
     )
 
-    if translation_config.save_artifacts and not translation_config.artifacts_dir:
+    # Always set artifacts_dir so checkpoints land next to output, not in cwd
+    if not translation_config.artifacts_dir:
         translation_config.artifacts_dir = str(output_path.parent)
 
     _translate_caption_in_place(cap, translation_config)
     ensure_parent_dir(output_path)
-    cap.write(str(output_path), translation_first=caption_config.translation_first)
+    # Determine format-specific config from output path extension
+    ext = output_path.suffix.lstrip(".").lower()
+    format_config = caption_config.get_format_config(ext)
+
+    cap.write(
+        str(output_path),
+        format_config=format_config,
+        behavior=caption_config.behavior,
+        karaoke=caption_config.karaoke,
+        standardization=caption_config.standardization,
+    )
 
     safe_print(theme.ok(f"Translation saved: {output_path}"))
 
     return cap
 
 
-@run.cli.entrypoint(name="youtube", namespace="translate")
+@run.cli.entrypoint(name="youtube", namespace="translate", entrypoint_cls=LattifAIEntrypoint)
 def translate_youtube(
     yt_url: Optional[str] = None,
     media: Annotated[Optional[MediaConfig], run.Config[MediaConfig]] = None,
@@ -196,7 +209,7 @@ def translate_youtube(
     """
     Download YouTube video, align captions, and translate in one step.
 
-    Combines the youtube alignment workflow with caption translation.
+    Combines the youtube align workflow with caption translation.
     Downloads media, transcribes/downloads captions, performs forced alignment,
     then translates the aligned captions to the target language.
 
@@ -214,7 +227,7 @@ def translate_youtube(
         diarization: Speaker diarization configuration.
         event: Event tracking configuration.
         translation: Translation configuration.
-            Fields: target_lang, mode, bilingual, llm.provider, llm.model_name, glossary_file
+            Fields: target_lang, mode, bilingual, llm.model_name, glossary_file
         use_transcription: Skip YouTube caption download and transcribe directly.
 
     Examples:
@@ -226,7 +239,7 @@ def translate_youtube(
         lai translate youtube "dQw4w9WgXcQ" \\
             translation.target_lang=ja \\
             translation.bilingual=true \\
-            caption.word_level=true
+            caption.behavior.word_level=true
 
         # Refined translation with custom glossary
         lai translate youtube "VIDEO_ID" \\
@@ -234,10 +247,10 @@ def translate_youtube(
             translation.mode=refined \\
             translation.glossary_file=glossary.yaml
 
-        # Using OpenAI-compatible API for translation
+        # Using OpenAI-compatible API for translation (provider inferred from model_name)
         lai translate youtube "VIDEO_ID" \\
             translation.target_lang=ko \\
-            translation.llm.provider=openai \\
+            translation.llm.model_name=qwen3 \\
             translation.llm.api_base_url=http://localhost:8000/v1
     """
     from lattifai.theme import theme
@@ -274,7 +287,18 @@ def translate_youtube(
         target_lang=translation_config.target_lang,
     )
     ensure_parent_dir(output_path)
-    cap.write(str(output_path), translation_first=caption_config.translation_first)
+
+    # Determine format-specific config from output path extension
+    ext = output_path.suffix.lstrip(".").lower()
+    format_config = caption_config.get_format_config(ext)
+
+    cap.write(
+        str(output_path),
+        format_config=format_config,
+        behavior=caption_config.behavior,
+        karaoke=caption_config.karaoke,
+        standardization=caption_config.standardization,
+    )
 
     safe_print(theme.ok(f"🎉 Translation saved: {output_path}"))
     return cap

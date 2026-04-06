@@ -56,7 +56,7 @@ class FileExistenceManager:
 
         # Default formats - combine audio and video formats
         media_formats = media_formats or ["mp3", "wav", "m4a", "aac", "opus", "mp4", "webm", "mkv", "avi"]
-        caption_formats = caption_formats or ["md", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt"]
+        caption_formats = caption_formats or ["md", "srt", "vtt", "sub", "sbv", "txt"]
 
         # Check for media files (audio and video)
         for ext in set(media_formats):  # Remove duplicates
@@ -71,9 +71,9 @@ class FileExistenceManager:
                 if file_path not in existing_files["media"]:
                     existing_files["media"].append(file_path)
 
-        # Check for caption files
+        # Check for caption files (exclude derived outputs like karaoke, bilingual, diarized)
+        _derived_markers = ("karaoke", "bilingual", "diarized", "aligned", "transcript")
         for ext in set(caption_formats):  # Remove duplicates
-            # Check multiple naming patterns for caption files
             # Pattern 1: Simple pattern like {video_id}.vtt
             caption_file = output_path / f"{video_id}.{ext}"
             if caption_file.exists():
@@ -82,6 +82,9 @@ class FileExistenceManager:
             # Pattern 2: With language/track suffix like {video_id}.en-trackid.vtt
             for sub_file in output_path.glob(f"{video_id}*.{ext}"):
                 file_path = str(sub_file)
+                # Skip derived pipeline outputs
+                if any(m in sub_file.stem for m in _derived_markers):
+                    continue
                 if file_path not in existing_files["caption"]:
                     existing_files["caption"].append(file_path)
 

@@ -6,23 +6,25 @@ from lattifai.caption.config import (
     CAPTION_FORMATS,
     INPUT_CAPTION_FORMATS,
     OUTPUT_CAPTION_FORMATS,
+    ASSConfig,
     CaptionFonts,
-    CaptionStyle,
     InputCaptionFormat,
     KaraokeConfig,
+    OutputBehavior,
     OutputCaptionFormat,
     StandardizationConfig,
 )
 
 from .alignment import AlignmentConfig
 
-# CaptionConfig is defined in lattifai-python (workflow config)
-from .caption import CaptionConfig
+# CaptionConfig and sub-configs defined in lattifai-python (workflow config)
+from .caption import CaptionConfig, CaptionInputConfig, CaptionOutputConfig
 from .client import ClientConfig
 from .diarization import DiarizationConfig
 from .event import EventConfig
 from .llm import LLMConfig
 from .media import AUDIO_FORMATS, MEDIA_FORMATS, VIDEO_FORMATS, MediaConfig
+from .summarization import SummarizationConfig
 from .transcription import TranscriptionConfig
 from .translation import TranslationConfig
 
@@ -31,8 +33,11 @@ __all__ = [
     "ClientConfig",
     "AlignmentConfig",
     "CaptionConfig",
+    "CaptionInputConfig",
+    "CaptionOutputConfig",
+    "ASSConfig",
     "CaptionFonts",
-    "CaptionStyle",
+    "OutputBehavior",
     "KaraokeConfig",
     "StandardizationConfig",
     "InputCaptionFormat",
@@ -48,5 +53,6 @@ __all__ = [
     "AUDIO_FORMATS",
     "VIDEO_FORMATS",
     "MEDIA_FORMATS",
+    "SummarizationConfig",
     "TranslationConfig",
 ]

@@ -7,7 +7,7 @@ import pytest
 
 from lattifai.caption import Caption
 from lattifai.client import LattifAI
-from lattifai.config import CaptionConfig, TranscriptionConfig
+from lattifai.config import CaptionConfig, CaptionInputConfig, TranscriptionConfig
 from lattifai.mixin import LattifAIClientMixin
 from lattifai.transcription.gemini import GeminiTranscriber
 from lattifai.youtube import YouTubeDownloader
@@ -23,7 +23,7 @@ class TestSourceLangInCaptionConfig:
 
     def test_source_lang_initialization(self):
         """Test source_lang can be set during initialization."""
-        config = CaptionConfig(source_lang="en")
+        config = CaptionConfig(input=CaptionInputConfig(source_lang="en"))
         assert config.source_lang == "en"
 
     @pytest.mark.parametrize(
@@ -32,15 +32,15 @@ class TestSourceLangInCaptionConfig:
     )
     def test_source_lang_various_languages(self, lang_code):
         """Test source_lang with various language codes."""
-        config = CaptionConfig(source_lang=lang_code)
+        config = CaptionConfig(input=CaptionInputConfig(source_lang=lang_code))
         assert config.source_lang == lang_code
 
     def test_source_lang_with_region_code(self):
         """Test source_lang with region-specific codes."""
-        config = CaptionConfig(source_lang="en-US")
+        config = CaptionConfig(input=CaptionInputConfig(source_lang="en-US"))
         assert config.source_lang == "en-US"
 
-        config = CaptionConfig(source_lang="zh-CN")
+        config = CaptionConfig(input=CaptionInputConfig(source_lang="zh-CN"))
         assert config.source_lang == "zh-CN"
 
     def test_source_lang_can_be_modified(self):
@@ -167,7 +167,7 @@ class TestSourceLangIntegration:
 
     def test_source_lang_config_to_youtube_workflow(self):
         """Test source_lang flows from config to youtube workflow."""
-        caption_config = CaptionConfig(source_lang="en")
+        caption_config = CaptionConfig(input=CaptionInputConfig(source_lang="en"))
         client = LattifAI(caption_config=caption_config)
 
         assert client.caption_config.source_lang == "en"
@@ -175,7 +175,7 @@ class TestSourceLangIntegration:
     def test_source_lang_parameter_overrides_config(self):
         """Test that source_lang parameter overrides config value."""
         # Set default in config
-        caption_config = CaptionConfig(source_lang="en")
+        caption_config = CaptionConfig(input=CaptionInputConfig(source_lang="en"))
         client = LattifAI(caption_config=caption_config)
 
         # Mock all the necessary components
@@ -205,7 +205,7 @@ class TestSourceLangIntegration:
 
     def test_source_lang_none_uses_config_default(self):
         """Test that None source_lang uses config default."""
-        caption_config = CaptionConfig(source_lang="fr")
+        caption_config = CaptionConfig(input=CaptionInputConfig(source_lang="fr"))
         client = LattifAI(caption_config=caption_config)
 
         with (
@@ -237,21 +237,21 @@ class TestSourceLangEdgeCases:
 
     def test_empty_string_source_lang(self):
         """Test behavior with empty string source_lang."""
-        config = CaptionConfig(source_lang="")
+        config = CaptionConfig(input=CaptionInputConfig(source_lang=""))
         assert config.source_lang == ""
 
     def test_source_lang_with_special_characters(self):
         """Test source_lang with special characters."""
         # Some YouTube videos have tracks like 'en-orig', 'en-GB', etc.
-        config = CaptionConfig(source_lang="en-orig")
+        config = CaptionConfig(input=CaptionInputConfig(source_lang="en-orig"))
         assert config.source_lang == "en-orig"
 
     def test_source_lang_case_sensitivity(self):
         """Test that source_lang preserves case."""
-        config = CaptionConfig(source_lang="EN")
+        config = CaptionConfig(input=CaptionInputConfig(source_lang="EN"))
         assert config.source_lang == "EN"
 
-        config = CaptionConfig(source_lang="en")
+        config = CaptionConfig(input=CaptionInputConfig(source_lang="en"))
         assert config.source_lang == "en"
 
     @pytest.mark.parametrize(
@@ -261,7 +261,7 @@ class TestSourceLangEdgeCases:
     def test_invalid_source_lang_handling(self, invalid_lang):
         """Test that invalid source_lang values don't crash initialization."""
         # Should not raise an error - validation happens at usage time
-        config = CaptionConfig(source_lang=invalid_lang)
+        config = CaptionConfig(input=CaptionInputConfig(source_lang=invalid_lang))
         assert config.source_lang == invalid_lang
 
 

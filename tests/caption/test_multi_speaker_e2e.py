@@ -19,6 +19,7 @@ import pytest
 from dotenv import find_dotenv, load_dotenv
 
 from lattifai.caption import Caption, Supervision
+from lattifai.caption.config import OutputBehavior
 
 load_dotenv(find_dotenv(usecwd=True))
 
@@ -110,7 +111,7 @@ class TestMultiSpeakerRoundtrip:
         original_speakers = [sup.speaker for sup in caption.supervisions]
 
         # Write output with speaker in text
-        caption.write(output_file, include_speaker_in_text=True)
+        caption.write(output_file)
 
         # Read back
         caption_read = Caption.read(output_file)
@@ -147,7 +148,7 @@ class TestMultiSpeakerRoundtrip:
         caption = Caption.read(input_file)
 
         # Write output WITHOUT speaker in text
-        caption.write(output_file, include_speaker_in_text=False)
+        caption.write(output_file, behavior=OutputBehavior(include_speaker_in_text=False))
 
         # Read back
         caption_read = Caption.read(output_file)
@@ -183,7 +184,7 @@ class TestMultiSpeakerRoundtrip:
 
         # Step 2: Write without speakers
         no_speaker_file = tmp_path / "no_speaker.srt"
-        caption.write(no_speaker_file, include_speaker_in_text=False)
+        caption.write(no_speaker_file, behavior=OutputBehavior(include_speaker_in_text=False))
 
         # Step 3: Read back - should have no speakers
         caption_no_speaker = Caption.read(no_speaker_file)
@@ -196,7 +197,7 @@ class TestMultiSpeakerRoundtrip:
 
         # Step 4: Write WITH speakers again
         with_speaker_file = tmp_path / "with_speaker.srt"
-        caption_no_speaker.write(with_speaker_file, include_speaker_in_text=True)
+        caption_no_speaker.write(with_speaker_file)
 
         # Step 5: Read back - should still have no speakers (they were lost)
         caption_final = Caption.read(with_speaker_file)
@@ -211,7 +212,7 @@ class TestMultiSpeakerRoundtrip:
 
         # Write without speakers
         output_file = tmp_path / "output.srt"
-        caption.write(output_file, include_speaker_in_text=False)
+        caption.write(output_file, behavior=OutputBehavior(include_speaker_in_text=False))
 
         # Read back and verify text is exactly the expected text
         caption_read = Caption.read(output_file)
@@ -304,7 +305,7 @@ class TestMultiSpeakerCLI:
             str(MULTI_SPEAKER_AUDIO),
             str(MULTI_SPEAKER_VTT),
             str(output_file),
-            "caption.include_speaker_in_text=false",
+            "caption.behavior.include_speaker_in_text=false",
             "-Y",
             "alignment.model_hub=modelscope",  # Skip confirmation prompt
         ]
@@ -382,7 +383,7 @@ class TestMultiSpeakerCLI:
             str(MULTI_SPEAKER_AUDIO),
             str(MULTI_SPEAKER_VTT),
             str(output_file),
-            f"caption.include_speaker_in_text={str(include_speaker).lower()}",
+            f"caption.behavior.include_speaker_in_text={str(include_speaker).lower()}",
             "-Y",
             "alignment.model_hub=modelscope",  # Skip confirmation prompt
         ]
@@ -424,7 +425,7 @@ class TestMultiSpeakerEdgeCases:
 
         # Write and read back
         output_file = tmp_path / "output.srt"
-        caption.write(output_file, include_speaker_in_text=True)
+        caption.write(output_file)
         caption_read = Caption.read(output_file)
 
         # Verify empty speakers are preserved
@@ -441,7 +442,7 @@ class TestMultiSpeakerEdgeCases:
 
         # Write and read back
         output_file = tmp_path / "output.vtt"
-        caption.write(output_file, include_speaker_in_text=True)
+        caption.write(output_file)
         caption_read = Caption.read(output_file)
 
         # Verify both still have BOB:
@@ -458,7 +459,7 @@ class TestMultiSpeakerEdgeCases:
 
         # Write and read back
         output_file = tmp_path / "output.srt"
-        caption.write(output_file, include_speaker_in_text=True)
+        caption.write(output_file)
         caption_read = Caption.read(output_file)
 
         # Verify ALICE preserved at both positions

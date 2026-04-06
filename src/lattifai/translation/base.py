@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -43,9 +44,16 @@ class BaseTranslator:
         return f"{self.client.provider_name}:{self.config.llm.model_name}"
 
     async def _call_llm(self, prompt: str) -> str:
-        """Send a prompt to the LLM and return raw JSON text response."""
-        result = await self.client.generate_json(prompt, model=self.config.llm.model_name)
-        # generate_json returns parsed object; re-serialize for backward compat
+        """Send a prompt to the LLM and return raw JSON text response.
+
+        Uses generate() instead of generate_json() because json_mode=True
+        causes some models (e.g. Qwen3.5) to return single objects instead
+        of arrays, ignoring the batch structure in the prompt.
+        """
+        from lattifai.llm.base import parse_json_response
+
+        raw_text = await self.client.generate(prompt, model=self.config.llm.model_name)
+        result = parse_json_response(raw_text)
         return json.dumps(result, ensure_ascii=False)
 
     async def translate_batch(
@@ -80,18 +88,55 @@ class BaseTranslator:
             shared_prompt=shared_prompt,
         )
 
-        response_text = await self._call_llm(prompt)
-        result = json.loads(response_text)
+        # Retry up to 2 times on count mismatch before padding
+        max_count_retries = 2
+        for attempt in range(max_count_retries + 1):
+            response_text = await self._call_llm(prompt)
+            result = self._unwrap_list_response(json.loads(response_text))
 
-        if len(result) != len(texts):
-            logger.warning("Batch size mismatch: expected %d, got %d. Padding/truncating.", len(texts), len(result))
-            if len(result) < len(texts):
-                for i in range(len(result), len(texts)):
-                    result.append({"original": texts[i], "translated": texts[i]} if bilingual else texts[i])
+            if len(result) == len(texts):
+                return result
+
+            if attempt < max_count_retries:
+                logger.warning(
+                    "Batch count mismatch: expected %d, got %d. Retrying (%d/%d)...",
+                    len(texts),
+                    len(result),
+                    attempt + 1,
+                    max_count_retries,
+                )
             else:
-                result = result[: len(texts)]
+                logger.warning(
+                    "Batch count mismatch after %d retries: expected %d, got %d. Padding/truncating.",
+                    max_count_retries,
+                    len(texts),
+                    len(result),
+                )
+
+        # Final fallback: pad or truncate
+        if len(result) < len(texts):
+            for i in range(len(result), len(texts)):
+                result.append({"original": texts[i], "translated": texts[i]} if bilingual else texts[i])
+        else:
+            result = result[: len(texts)]
 
         return result
+
+    @staticmethod
+    def _unwrap_list_response(result) -> list:
+        """Unwrap LLM response that may be wrapped in a dict."""
+        if isinstance(result, list):
+            return result
+        if isinstance(result, dict):
+            for key in ("translations", "results", "data", "to_translate"):
+                if key in result and isinstance(result[key], list):
+                    return result[key]
+            for v in result.values():
+                if isinstance(v, list):
+                    return v
+            logger.warning("LLM returned dict without list value, wrapping as single-item list.")
+            return [result]
+        return [result]
 
     async def translate_captions(
         self,
@@ -114,10 +159,20 @@ class BaseTranslator:
         if not texts:
             return supervisions
 
+        _status = self._status
+
+        total_phases = {"quick": 1, "normal": 2, "refined": 3}.get(cfg.mode, 1)
+        phase = 0
+
+        if cfg.mode in ("normal", "refined"):
+            phase += 1
+            _status(f"[{phase}/{total_phases}] Analyzing content...")
+
         analysis = await self._maybe_analyze(texts, cfg)
         glossary_terms = self._extract_glossary_terms(analysis)
-        merged_glossary = self._load_and_merge_glossaries(cfg, glossary_terms)
+        merged_glossary = self._load_and_merge_glossaries(cfg, glossary_terms) or {}
 
+        _status(f"  Building translation prompt (glossary: {len(merged_glossary)} terms)...")
         shared_prompt = build_shared_translate_prompt(
             target_lang=cfg.target_lang,
             bilingual=cfg.bilingual,
@@ -132,6 +187,9 @@ class BaseTranslator:
                 self._save_artifact(cfg, "01-analysis.json", analysis)
                 self._save_artifact(cfg, "01-analysis.md", self._format_analysis_markdown(analysis))
             self._save_artifact(cfg, "02-prompt.md", shared_prompt)
+
+        phase += 1
+        _status(f"[{phase}/{total_phases}] Translating {len(texts)} segments...")
 
         checkpoint_path = self._checkpoint_path(cfg)
         translated = await self._translate_all_batches(
@@ -156,6 +214,8 @@ class BaseTranslator:
         )
 
         if cfg.mode == "refined":
+            phase += 1
+            _status(f"[{phase}/{total_phases}] Reviewing & refining translations...")
             revised_texts, _ = await self._review_draft(
                 original_texts=texts,
                 draft_translations=draft_plain,
@@ -203,6 +263,7 @@ class BaseTranslator:
 
         review_analysis = analysis or (state.analysis if state else None)
         if review_analysis is None:
+            self._status("[1/2] Analyzing content...")
             review_analysis = await self._maybe_analyze(original_texts, cfg)
 
         glossary_terms = self._extract_glossary_terms(review_analysis)
@@ -210,6 +271,7 @@ class BaseTranslator:
             glossary or (state.glossary if state else None) or self._load_and_merge_glossaries(cfg, glossary_terms)
         )
 
+        self._status(f"[2/2] Reviewing & refining {len(draft_translations)} segments...")
         revised_texts, _ = await self._review_draft(
             original_texts=original_texts,
             draft_translations=draft_translations,
@@ -314,11 +376,11 @@ class BaseTranslator:
                 raw = json.loads(checkpoint_path.read_text(encoding="utf-8"))
                 completed = {int(k): v for k, v in raw.items()}
                 cached_segs = sum(len(v) for v in completed.values())
-                logger.info(
-                    "Resuming from checkpoint: %d/%d batches (%d segments)", len(completed), total_batches, cached_segs
+                self._status(
+                    f"  Resuming from checkpoint: {len(completed)}/{total_batches} batches ({cached_segs} segments)"
                 )
             except Exception:
-                logger.warning("Corrupt checkpoint, starting fresh")
+                self._status("  Corrupt checkpoint, starting fresh")
                 completed = {}
 
         remaining = [s for s in batch_starts if s not in completed]
@@ -384,11 +446,9 @@ class BaseTranslator:
             self._write_checkpoint(checkpoint_path, completed)
             cached_segs = sum(len(v) for v in completed.values())
             if checkpoint_path:
-                logger.error(
-                    "Translation interrupted — checkpoint saved: %s (%d/%d segments)",
-                    checkpoint_path,
-                    cached_segs,
-                    len(texts),
+                self._status(
+                    f"  Translation interrupted — checkpoint saved: {checkpoint_path}"
+                    f" ({cached_segs}/{len(texts)} segments)"
                 )
             raise
         finally:
@@ -403,6 +463,11 @@ class BaseTranslator:
         for start_idx in batch_starts:
             results.extend(completed[start_idx])
         return results
+
+    @staticmethod
+    def _status(msg: str) -> None:
+        """Print a status message to stderr (visible alongside tqdm progress bars)."""
+        print(msg, file=sys.stderr, flush=True)
 
     @staticmethod
     def _write_checkpoint(path: Optional[Path], data: dict[int, list]) -> None:

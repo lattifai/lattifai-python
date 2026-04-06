@@ -62,9 +62,9 @@ class TestAlignCommand:
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"caption.input_path={sample_caption_file}",
-            f"caption.output_path={output_file}",
-            f"caption.input_format={input_format}",
+            f"caption.input.path={sample_caption_file}",
+            f"caption.output.path={output_file}",
+            f"caption.input.format={input_format}",
             "alignment.device=cpu",
         ]
 
@@ -77,8 +77,8 @@ class TestAlignCommand:
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"caption.input_path={sample_caption_file}",
-            f"caption.output_path={output_file}",
+            f"caption.input.path={sample_caption_file}",
+            f"caption.output.path={output_file}",
             f"alignment.device={device}",
         ]
 
@@ -97,9 +97,9 @@ class TestAlignCommand:
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"caption.input_path={sample_caption_file}",
-            f"caption.output_path={output_file}",
-            "caption.split_sentence=true",
+            f"caption.input.path={sample_caption_file}",
+            f"caption.output.path={output_file}",
+            "caption.input.split_sentence=true",
             "alignment.device=cpu",
         ]
 
@@ -111,8 +111,8 @@ class TestAlignCommand:
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"caption.input_path={sample_caption_file}",
-            f"caption.output_path={output_file}",
+            f"caption.input.path={sample_caption_file}",
+            f"caption.output.path={output_file}",
             "alignment.model_name=LattifAI/Lattice-1-Alpha",
             "alignment.device=cpu",
         ]
@@ -123,8 +123,8 @@ class TestAlignCommand:
         """Test align command with missing input files"""
         args = [
             "media.input_path=nonexistent_audio.wav",
-            "caption.input_path=nonexistent_caption.srt",
-            f"caption.output_path={tmp_path / 'output.srt'}",
+            "caption.input.path=nonexistent_caption.srt",
+            f"caption.output.path={tmp_path / 'output.srt'}",
         ]
         if not LATTIFAI_TESTS_CLI_DRYRUN:
             with pytest.raises(subprocess.CalledProcessError):
@@ -151,9 +151,9 @@ class TestAlignCommand:
 
         args = [
             f"media.input_path={sample_audio_file}",
-            f"caption.input_path={sample_caption_file}",
-            f"caption.output_path={output_file}",
-            "caption.normalize_text=true",
+            f"caption.input.path={sample_caption_file}",
+            f"caption.output.path={output_file}",
+            "caption.input.normalize_text=true",
             "alignment.device=cpu",
         ]
 

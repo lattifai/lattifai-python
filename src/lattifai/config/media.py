@@ -42,6 +42,8 @@ MEDIA_FORMATS = tuple(sorted(set(AUDIO_FORMATS + VIDEO_FORMATS)))
 class MediaConfig:
     """Unified configuration for audio/video input and output handling."""
 
+    _toml_section = "media"
+
     # Input configuration (local filesystem path or URL)
     input_path: Optional[str] = None
     """Local file path or URL to audio/video content."""

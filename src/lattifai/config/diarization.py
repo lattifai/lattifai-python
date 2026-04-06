@@ -12,12 +12,22 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class DiarizationLLMConfig(LLMConfig):
+    """LLM config bound to [diarization.llm] section. Survives nemo_run reconstruction."""
+
+    section: str = "diarization.llm"
+    fallback_model: Optional[str] = "gemini-3-flash-preview"
+
+
+@dataclass
 class DiarizationConfig:
     """
     Speaker diarization configuration.
 
     Settings for speaker diarization operations.
     """
+
+    _toml_section = "diarization"
 
     enabled: bool = False
     """Enable speaker diarization."""
@@ -86,7 +96,7 @@ class DiarizationConfig:
     When enabled, speakers still labeled as SPEAKER_XX after acoustic diarization
     will be identified via LLM analysis of their speech content."""
 
-    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model_name="gemini-2.5-flash"))
+    llm: DiarizationLLMConfig = field(default_factory=DiarizationLLMConfig)
     """LLM provider configuration for speaker name inference."""
 
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
@@ -124,3 +134,5 @@ class DiarizationConfig:
             raise ValueError(
                 f"segmentation_step must be < 1.0 (ratio of window duration), got {self.segmentation_step}"
             )
+
+        pass

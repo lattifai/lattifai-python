@@ -389,12 +389,16 @@ class LattifAIClientMixin:
             CaptionProcessingError: If caption cannot be written
         """
         try:
+            # Determine format-specific config from output path extension
+            ext = Path(str(output_caption_path)).suffix.lstrip(".").lower()
+            format_config = self.caption_config.get_format_config(ext)
+
             result = caption.write(
                 output_caption_path,
-                include_speaker_in_text=self.caption_config.include_speaker_in_text,
-                word_level=self.caption_config.word_level,
-                karaoke_config=self.caption_config.karaoke,
-                translation_first=self.caption_config.translation_first,
+                format_config=format_config,
+                behavior=self.caption_config.behavior,
+                karaoke=self.caption_config.karaoke,
+                standardization=self.caption_config.standardization,
             )
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if not diarization_file.exists() and caption.diarization:

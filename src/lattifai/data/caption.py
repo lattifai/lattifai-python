@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Dict, List, Optional, TypeVar
 
 from lattifai.caption import Caption as BaseCaption
 from lattifai.caption import Pathlike, Supervision
@@ -122,12 +122,10 @@ class Caption(BaseCaption):
     def write(
         self,
         path=None,
-        output_format: Optional[str] = None,
-        include_speaker_in_text: bool = True,
-        word_level: bool = False,
-        karaoke_config=None,
-        metadata: Optional[Dict[str, Any]] = None,
-        translation_first: bool = False,
+        format_config=None,
+        behavior=None,
+        karaoke=None,
+        standardization=None,
     ):
         """
         Write caption to file or return as bytes.
@@ -136,12 +134,10 @@ class Caption(BaseCaption):
 
         Args:
             path: Path to output caption file, BytesIO object, or None to return bytes
-            output_format: Output format (e.g., 'srt', 'vtt', 'ass')
-            include_speaker_in_text: Whether to include speaker labels in text
-            word_level: Use word-level output format if supported
-            karaoke_config: Karaoke configuration
-            metadata: Optional metadata dict to pass to writer
-            translation_first: When True, render translation text above original text
+            format_config: Format-specific configuration (ASSConfig, TTMLConfig, etc.)
+            behavior: OutputBehavior controlling include_speaker, word_level, translation_first
+            karaoke: Karaoke configuration (effect, color_scheme)
+            standardization: Broadcast standardization config
 
         Returns:
             Path to the written file if path is a file path, or bytes if path is BytesIO/None
@@ -157,15 +153,12 @@ class Caption(BaseCaption):
         try:
             result = super().write(
                 path=path,
-                output_format=output_format,
-                include_speaker_in_text=include_speaker_in_text,
-                word_level=word_level,
-                karaoke_config=karaoke_config,
-                metadata=metadata,
-                translation_first=translation_first,
+                format_config=format_config,
+                behavior=behavior,
+                karaoke=karaoke,
+                standardization=standardization,
             )
         finally:
-            # Restore original supervisions
             self.supervisions = original_supervisions
 
         return result

@@ -13,9 +13,14 @@ class ClientConfig:
     Defines model selection, decoding behavior, and API settings for forced alignment.
     """
 
+    _toml_section = "client"
+
     # API configuration
     api_key: Optional[str] = field(default=None)
-    """LattifAI API key. If None, reads from LATTIFAI_API_KEY environment variable."""
+    """LattifAI API key. If None, resolved via lattifai.auth.resolve_api_key()."""
+
+    base_url: Optional[str] = field(default=None)
+    """LattifAI API base URL. If None, resolved via LATTIFAI_BASE_URL env or auth config."""
 
     timeout: float = 120.0
     """Request timeout in seconds."""
@@ -41,23 +46,27 @@ class ClientConfig:
     def __post_init__(self):
         """Validate and auto-populate configuration after initialization."""
 
-        # Load environment variables from .env file
-        from dotenv import find_dotenv, load_dotenv
-
-        # Try to find and load .env file from current directory or parent directories
-        load_dotenv(find_dotenv(usecwd=True))
-
-        # Auto-load API key: env var > config.toml > .env (already loaded above)
+        # Auto-load API key via unified resolver
         if self.api_key is None:
-            env_val = os.environ.get("LATTIFAI_API_KEY")
-            if not env_val:
+            try:
+                from lattifai.auth import resolve_api_key
+
+                object.__setattr__(self, "api_key", resolve_api_key())
+            except ImportError:
+                object.__setattr__(self, "api_key", os.environ.get("LATTIFAI_API_KEY"))
+
+        # Auto-load base URL: env var > config.toml [auth].LATTIFAI_BASE_URL
+        if self.base_url is None:
+            base = os.environ.get("LATTIFAI_BASE_URL")
+            if not base:
                 try:
                     from lattifai.cli.config import get_config_value
 
-                    env_val = get_config_value("lattifai_api_key")
-                except ImportError:
+                    base = get_config_value("auth.LATTIFAI_BASE_URL")
+                except (ImportError, OSError):
                     pass
-            object.__setattr__(self, "api_key", env_val)
+            if base:
+                object.__setattr__(self, "base_url", base)
 
         # Auto-load client version from package if not provided
         if self.client_version is None:

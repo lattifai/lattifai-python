@@ -5,9 +5,12 @@ import pytest
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
+    CaptionInputConfig,
+    CaptionOutputConfig,
     ClientConfig,
     DiarizationConfig,
     MediaConfig,
+    OutputBehavior,
     TranscriptionConfig,
 )
 
@@ -134,11 +137,9 @@ class TestCaptionConfig:
     def test_custom_values(self, tmp_path):
         """Test custom configuration values."""
         config = CaptionConfig(
-            input_format="vtt",
-            output_format="json",
-            normalize_text=True,
-            include_speaker_in_text=False,
-            encoding="utf-16",
+            input=CaptionInputConfig(format="vtt", normalize_text=True, encoding="utf-16"),
+            output=CaptionOutputConfig(format="json"),
+            behavior=OutputBehavior(include_speaker_in_text=False),
         )
         assert config.input_format == "vtt"
         assert config.output_format == "json"
@@ -147,21 +148,23 @@ class TestCaptionConfig:
         assert config.encoding == "utf-16"
 
     def test_invalid_input_format(self):
-        """Test validation of input_format parameter."""
-        with pytest.raises(ValueError, match="input_format must be one of"):
-            CaptionConfig(input_format="invalid")
+        """Test validation of input format."""
+        with pytest.raises(ValueError, match="input format must be one of"):
+            CaptionInputConfig(format="invalid")
 
     def test_invalid_output_format(self):
-        """Test validation of output_format parameter."""
-        with pytest.raises(ValueError, match="output_format must be one of"):
-            CaptionConfig(output_format="invalid")
+        """Test validation of output format."""
+        with pytest.raises(ValueError, match="output format must be one of"):
+            CaptionOutputConfig(format="invalid")
 
 
 class TestTranscriptionConfig:
     """Test TranscriptionConfig class."""
 
-    def test_default_values(self):
+    def test_default_values(self, monkeypatch):
         """Test default configuration values."""
+        # Isolate from user config.toml to test built-in defaults
+        monkeypatch.setattr("lattifai.config.llm.resolve_toml_value", lambda *a, **kw: None)
         config = TranscriptionConfig()
         # Device is auto-selected based on hardware
         assert config.device in ["cpu", "cuda", "mps"]

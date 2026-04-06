@@ -416,8 +416,8 @@ class GeminiTranscriber(BaseTranscriber):
             output_file = Path(output_file)
 
         if isinstance(transcript, Caption):
-            # Caption object - use its write method with markdown format
-            transcript.write(output_file, output_format="markdown")
+            # Caption object - use its write method (format auto-detected from extension)
+            transcript.write(output_file)
         else:
             # Raw string from transcription
             output_file.write_text(transcript, encoding=encoding)

@@ -114,9 +114,22 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
     if m:
         channel = m.group(1).strip()
         if not re.search(
-            r"(?:podcast|show|radio|channel|talk|street|播客|节目|频道|Priors|Space|MLST)", channel, re.IGNORECASE
+            r"(?:podcast|show|radio|channel|talk|street|clips|shorts|highlights|播客|节目|频道|Priors|Space|MLST)",
+            channel,
+            re.IGNORECASE,
         ):
             _add("host", channel)
+        else:
+            # Strip common sub-channel suffixes to recover host name
+            # e.g. "Dwarkesh Clips" → "Dwarkesh", "Lex Fridman Clips" → "Lex Fridman"
+            stripped = re.sub(
+                r"\s+(?:Clips|Shorts|Highlights|Podcast|Show|Channel|Radio|TV)$",
+                "",
+                channel,
+                flags=re.IGNORECASE,
+            ).strip()
+            if stripped and stripped != channel and _looks_like_person_name(stripped):
+                _add("host", stripped)
 
     # 2. Title pattern: "Guest Name — topic" or "topic — Guest Name"
     m = re.search(r"Title:\s*(.+?)(?:\n|$)", context)
@@ -440,3 +453,57 @@ class SpeakerNameInferrer:
             )
 
         return "\n".join(parts)
+
+
+def infer_speaker_names(
+    supervisions: list,
+    context: Optional[str] = None,
+    llm_client: Optional[BaseLLMClient] = None,
+    model: Optional[str] = None,
+    voting_rounds: int = 1,
+) -> Dict[str, str]:
+    """Infer speaker names from diarized caption supervisions.
+
+    Standalone entry point that extracts speaker_texts and dialogue_turns
+    from supervisions, then delegates to SpeakerNameInferrer.
+
+    Args:
+        supervisions: List of Supervision objects with speaker labels.
+        context: Optional metadata context (title, channel, description).
+        llm_client: LLM client instance. If None, auto-created from config.
+        model: Override LLM model name.
+        voting_rounds: Number of inference passes for majority voting.
+
+    Returns:
+        Mapping from speaker label (e.g. "SPEAKER_00") to inferred name.
+    """
+    from collections import defaultdict
+
+    # Build speaker_texts and dialogue_turns from supervisions
+    speaker_texts: Dict[str, List[str]] = defaultdict(list)
+    dialogue_turns: List[tuple] = []
+
+    for sup in supervisions:
+        label = sup.speaker or "UNKNOWN"
+        text = sup.text or ""
+        if not text.strip():
+            continue
+        speaker_texts[label].append(text)
+        dialogue_turns.append((label, text))
+
+    speaker_texts = dict(speaker_texts)
+
+    if not speaker_texts:
+        return {}
+
+    # Auto-create LLM client if not provided
+    if llm_client is None:
+        from lattifai.config.diarization import DiarizationLLMConfig
+
+        llm_config = DiarizationLLMConfig()
+        if model:
+            llm_config.model_name = model
+        llm_client = llm_config.create_client()
+
+    inferrer = SpeakerNameInferrer(llm_client, model=model, voting_rounds=voting_rounds)
+    return inferrer(speaker_texts, context=context, dialogue_turns=dialogue_turns)

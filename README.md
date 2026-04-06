@@ -129,23 +129,38 @@ Caption/subtitle format parsing is provided by [lattifai-captions](https://githu
 
 ### API Keys
 
-**LattifAI API Key (Required)** - Get your free key at [lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys)
-
-```bash
-export LATTIFAI_API_KEY="lf_your_api_key_here"
-```
+**LattifAI API Key (Required)** - Get your free key at [lattifai.com/dashboard/api-keys](https://lattifai.com/dashboard/api-keys), or try instantly with `lai auth trial`.
 
 **Gemini API Key (Optional)** - For transcription with Gemini models, get key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 
+#### Configuration Priority
+
+Keys and URLs are resolved in this order (first match wins):
+
+1. **Environment variable** — `export LATTIFAI_API_KEY=lf_xxx`
+2. **CLI session** (`~/.lattifai/config.toml`) — written by `lai auth login` / `lai auth trial`, device-bound obfuscated storage
+3. **`.env` file** — auto-discovered from current directory upward
+
 ```bash
+# Option 1: Environment variable
+export LATTIFAI_API_KEY="lf_your_api_key_here"
 export GEMINI_API_KEY="your_gemini_api_key_here"
+
+# Option 2: CLI login (opens browser, stores key securely)
+lai auth login
+
+# Option 3: Free trial (no sign-up, 120 minutes)
+lai auth trial
+
+# Option 4: .env file in project root
+cat > .env <<EOF
+LATTIFAI_API_KEY=lf_your_api_key_here
+LATTIFAI_BASE_URL=https://api.lattifai.com/v1
+GEMINI_API_KEY=your_gemini_api_key_here
+EOF
 ```
 
-Or use a `.env` file:
-```bash
-LATTIFAI_API_KEY=lf_your_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
-```
+The same resolution order applies to `LATTIFAI_BASE_URL` and `LATTIFAI_SITE_URL`.
 
 ---
 
@@ -422,6 +437,7 @@ caption = client.youtube(
 | `normalize_text` | `True` | Clean HTML entities and special characters |
 | `include_speaker_in_text` | `True` | Include speaker labels in text output |
 | `translation_first` | `False` | Place translation above original in bilingual output |
+| `speaker_color` | `""` | Speaker name color in ASS output: `""` (off), `"auto"` (10-color palette), `"#RRGGBB"`, or comma-separated list |
 
 ```python
 from lattifai.client import LattifAI
@@ -508,8 +524,14 @@ When speakers remain as `SPEAKER_XX` after acoustic diarization, enable LLM infe
 DiarizationConfig(
     enabled=True,
     infer_speakers=True,              # Use LLM to infer speaker names
+)
+
+# Pass context as a per-call parameter to speaker_diarization()
+client.speaker_diarization(
+    input_media=audio,
+    caption=caption,
+    output_caption_path="output.srt",
     speaker_context="podcast, host is Alice, guest is Bob",  # Optional hint
-    infer_model="gemini-2.5-flash",   # LLM model (default)
 )
 ```
 
@@ -523,8 +545,6 @@ DiarizationConfig(
 | `min_speakers` | — | Minimum speakers to detect |
 | `max_speakers` | — | Maximum speakers to detect |
 | `infer_speakers` | `False` | Use LLM to infer real names from dialogue |
-| `speaker_context` | — | Context hint for LLM inference |
-| `infer_model` | `gemini-2.5-flash` | Model for speaker name inference |
 
 **CLI:**
 ```bash
@@ -535,8 +555,11 @@ lai alignment align audio.wav subtitle.srt output.srt \
 # With LLM speaker name inference
 lai alignment align audio.wav subtitle.srt output.srt \
     diarization.enabled=true \
-    diarization.infer_speakers=true \
-    diarization.speaker_context="interview with Dr. Smith"
+    diarization.infer_speakers=true
+
+# Diarize subcommand with speaker context
+lai diarize run audio.wav subtitle.srt output.srt \
+    --context "interview with Dr. Smith"
 ```
 
 ### Data Flow
@@ -641,6 +664,48 @@ JSON is the most flexible format for storing caption data with full word-level t
 | **ASS** | One word per segment | `{\kf}` karaoke tags (sweep effect) |
 | **LRC** | One word per line | Enhanced `<timestamp>` tags |
 | **TTML** | One word per `<p>` element | `<span>` with `itunes:timing="Word"` |
+
+#### Speaker Colors
+
+The `speaker_color` option colorizes speaker names in ASS output (works with both karaoke and non-karaoke modes):
+
+| Value | Behavior |
+|-------|----------|
+| `""` (default) | No speaker coloring |
+| `"auto"` | Assigns from a built-in 10-color palette |
+| `"#RRGGBB"` | Single color for all speakers |
+| `"#RRGGBB,#00BFFF,..."` | Comma-separated list, one per speaker (cycles if more speakers than colors) |
+
+![Speaker Palette](docs/speaker-palette-en.png)
+
+```bash
+# Auto-color speakers in ASS output
+lai caption convert input.json output.ass \
+    include_speaker_in_text=true \
+    speaker_color=auto
+
+# Custom single color
+lai caption convert input.json output.ass \
+    include_speaker_in_text=true \
+    speaker_color="#1387C0"
+```
+
+#### Karaoke Color Schemes
+
+Use `karaoke.color_scheme` to apply a predefined color scheme for karaoke ASS output. Each scheme sets `primary_color`, `secondary_color`, `outline_color`, and `back_color`.
+
+12 schemes available: `azure-gold`, `sakura-purple`, `mint-ocean`, `gardenia-green`, `sunset-warm`, `prussian-elegant`, `burgundy-classic`, `langgan-spring`, `mars-teal`, `spring-field`, `navy-pink`, `apricot-dark`
+
+![Karaoke Color Schemes](docs/karaoke-presets-en.png)
+
+```bash
+# Karaoke with color scheme + auto speaker colors
+lai caption convert input.json output.ass \
+    word_level=true \
+    karaoke.enabled=true \
+    karaoke.color_scheme=azure-gold \
+    speaker_color=auto
+```
 
 ### VTT Format (YouTube VTT Support)
 

@@ -7,6 +7,14 @@ from lattifai.config.llm import LLMConfig
 
 
 @dataclass
+class TranslationLLMConfig(LLMConfig):
+    """LLM config bound to [translation.llm] section. Survives nemo_run reconstruction."""
+
+    section: str = "translation.llm"
+    fallback_model: Optional[str] = "gemini-3-flash-preview"
+
+
+@dataclass
 class TranslationConfig:
     """
     Translation service configuration.
@@ -14,8 +22,10 @@ class TranslationConfig:
     Settings for caption translation using various LLM providers.
     """
 
-    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model_name="gemini-3-flash-preview"))
-    """LLM provider configuration (provider, model, api_key, api_base_url)."""
+    _toml_section = "translation"
+
+    llm: TranslationLLMConfig = field(default_factory=TranslationLLMConfig)
+    """LLM provider configuration. Reads defaults from config.toml [translation]."""
 
     target_lang: str = "zh"
     """Target language code (BCP 47 / ISO 639-1).

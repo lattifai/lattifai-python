@@ -6,6 +6,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.cli.alignment import align as alignment_align
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -18,7 +19,7 @@ from lattifai.config import (
 from lattifai.utils import _resolve_model_path
 
 
-@run.cli.entrypoint(name="run", namespace="transcribe")
+@run.cli.entrypoint(name="run", namespace="transcribe", entrypoint_cls=LattifAIEntrypoint)
 def transcribe(
     input: Optional[str] = None,
     output_caption: Optional[str] = None,
@@ -176,7 +177,7 @@ def transcribe(
     return transcript
 
 
-@run.cli.entrypoint(name="align", namespace="transcribe")
+@run.cli.entrypoint(name="align", namespace="transcribe", entrypoint_cls=LattifAIEntrypoint)
 def transcribe_align(
     input_media: Optional[str] = None,
     output_caption: Optional[str] = None,

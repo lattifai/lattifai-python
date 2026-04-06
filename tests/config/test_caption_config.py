@@ -1,40 +1,44 @@
-"""Unit tests for CaptionConfig."""
+"""Unit tests for CaptionConfig and sub-configs."""
 
 import pytest
 
-from lattifai.config import CaptionConfig
+from lattifai.config import CaptionConfig, CaptionInputConfig, CaptionOutputConfig
 
 
-class TestCaptionConfigValidation:
-    """Test CaptionConfig validation."""
+class TestCaptionInputConfigValidation:
+    """Test CaptionInputConfig validation."""
 
-    def test_invalid_input_format_raises_error(self):
+    def test_invalid_format_raises_error(self):
         """Test that invalid input format raises ValueError."""
-        with pytest.raises(ValueError, match="input_format must be one of"):
-            CaptionConfig(input_format="invalid")
+        with pytest.raises(ValueError, match="input format must be one of"):
+            CaptionInputConfig(format="invalid")
 
-    def test_invalid_output_format_raises_error(self):
-        """Test that invalid output format raises ValueError."""
-        with pytest.raises(ValueError, match="output_format must be one of"):
-            CaptionConfig(output_format="invalid")
-
-    def test_valid_input_formats(self):
+    def test_valid_formats(self):
         """Test that all valid input formats are accepted."""
         valid_formats = ["auto", "srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "gemini"]
         for fmt in valid_formats:
-            config = CaptionConfig(input_format=fmt)
-            assert config.input_format == fmt
+            config = CaptionInputConfig(format=fmt)
+            assert config.format == fmt
 
-    def test_valid_output_formats(self):
+
+class TestCaptionOutputConfigValidation:
+    """Test CaptionOutputConfig validation."""
+
+    def test_invalid_format_raises_error(self):
+        """Test that invalid output format raises ValueError."""
+        with pytest.raises(ValueError, match="output format must be one of"):
+            CaptionOutputConfig(format="invalid")
+
+    def test_valid_formats(self):
         """Test that all valid output formats are accepted."""
         valid_formats = ["srt", "vtt", "ass", "ssa", "sub", "sbv", "txt", "textgrid", "json"]
         for fmt in valid_formats:
-            config = CaptionConfig(output_format=fmt)
-            assert config.output_format == fmt
+            config = CaptionOutputConfig(format=fmt)
+            assert config.format == fmt
 
 
 class TestCaptionConfigPaths:
-    """Test CaptionConfig path handling."""
+    """Test CaptionConfig path handling via sub-configs."""
 
     def test_set_input_path_with_valid_file(self, tmp_path):
         """Test setting input path with existing file."""
@@ -45,7 +49,7 @@ class TestCaptionConfigPaths:
         result = config.set_input_path(test_file)
 
         assert result.exists()
-        assert config.input_path == str(result)
+        assert config.input.path == str(result)
 
     def test_set_input_path_with_nonexistent_file_raises_error(self, tmp_path):
         """Test that setting input path to nonexistent file raises FileNotFoundError."""
@@ -63,25 +67,24 @@ class TestCaptionConfigPaths:
         result = config.set_output_path(output_file)
 
         assert result.parent.exists()
-        assert config.output_path == str(result)
+        assert config.output.path == str(result)
 
     def test_path_expansion_in_post_init(self, tmp_path):
         """Test that paths are expanded in __post_init__."""
         test_file = tmp_path / "test.srt"
         test_file.touch()
 
-        # Use relative path with ~
-        config = CaptionConfig(input_path=str(test_file))
-        assert config.input_path == str(test_file)
+        config = CaptionInputConfig(path=str(test_file))
+        assert config.path == str(test_file)
 
 
 class TestCaptionConfigMethods:
     """Test CaptionConfig utility methods."""
 
     def test_check_input_sanity_with_no_input_raises_error(self):
-        """Test that check_input_sanity raises error when input_path is None."""
+        """Test that check_input_sanity raises error when input path is None."""
         config = CaptionConfig()
-        with pytest.raises(ValueError, match="input_path is required"):
+        with pytest.raises(ValueError, match="input path is required"):
             config.check_input_sanity()
 
     def test_check_input_sanity_with_valid_file(self, tmp_path):
@@ -89,12 +92,11 @@ class TestCaptionConfigMethods:
         test_file = tmp_path / "test.srt"
         test_file.touch()
 
-        config = CaptionConfig(input_path=str(test_file))
-        # Should not raise any error
+        config = CaptionConfig(input=CaptionInputConfig(path=str(test_file)))
         config.check_input_sanity()
 
     def test_is_input_path_existed_returns_false_for_none(self):
-        """Test is_input_path_existed returns False when input_path is None."""
+        """Test is_input_path_existed returns False when input path is None."""
         config = CaptionConfig()
         assert config.is_input_path_existed() is False
 
@@ -103,15 +105,27 @@ class TestCaptionConfigMethods:
         test_file = tmp_path / "test.srt"
         test_file.touch()
 
-        config = CaptionConfig(input_path=str(test_file))
+        config = CaptionConfig(input=CaptionInputConfig(path=str(test_file)))
         assert config.is_input_path_existed() is True
 
 
 class TestCaptionConfigDefaults:
-    """Test CaptionConfig default values."""
+    """Test CaptionConfig default values via sub-configs."""
 
     def test_default_values(self):
         """Test that default configuration values are set correctly."""
+        config = CaptionConfig()
+
+        assert config.input.format == "auto"
+        assert config.output.format == "srt"
+        assert config.behavior.include_speaker_in_text is True
+        assert config.input.normalize_text is True
+        assert config.input.split_sentence is False
+        assert config.behavior.word_level is False
+        assert config.input.encoding == "utf-8"
+
+    def test_backward_compat_properties(self):
+        """Test backward-compatible property accessors."""
         config = CaptionConfig()
 
         assert config.input_format == "auto"
@@ -122,16 +136,42 @@ class TestCaptionConfigDefaults:
         assert config.word_level is False
         assert config.encoding == "utf-8"
 
-    def test_custom_values_override_defaults(self):
+    def test_custom_values(self):
         """Test that custom values override defaults."""
+        from lattifai.caption.config import OutputBehavior
+
         config = CaptionConfig(
-            input_format="vtt",
-            output_format="json",
-            normalize_text=True,
-            word_level=True,
+            input=CaptionInputConfig(format="vtt", normalize_text=True),
+            output=CaptionOutputConfig(format="json"),
+            behavior=OutputBehavior(word_level=True),
         )
 
-        assert config.input_format == "vtt"
-        assert config.output_format == "json"
-        assert config.normalize_text is True
-        assert config.word_level is True
+        assert config.input.format == "vtt"
+        assert config.output.format == "json"
+        assert config.input.normalize_text is True
+        assert config.behavior.word_level is True
+
+
+class TestCaptionConfigStructure:
+    """Test CaptionConfig structure."""
+
+    def test_sub_configs(self):
+        """CaptionConfig should have core sub-config fields."""
+        config = CaptionConfig()
+        assert hasattr(config, "input")
+        assert hasattr(config, "output")
+        assert hasattr(config, "behavior")
+        assert hasattr(config, "karaoke")
+        assert hasattr(config, "standardization")
+        assert hasattr(config, "ass")
+        assert hasattr(config, "ttml")
+        assert hasattr(config, "fcpxml")
+        assert hasattr(config, "premiere")
+
+    def test_speaker_color_in_ass(self):
+        """speaker_color should be in ASSConfig, not a top-level field."""
+        from lattifai.caption.config import ASSConfig
+
+        config = CaptionConfig(ass=ASSConfig(speaker_color="auto"))
+        assert config.ass.speaker_color == "auto"
+        assert config.speaker_color == "auto"  # backward compat property

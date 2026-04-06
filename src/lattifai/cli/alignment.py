@@ -6,6 +6,7 @@ import nemo_run as run
 from typing_extensions import Annotated
 
 from lattifai.cli._shared import build_lattifai_client, resolve_caption_paths, resolve_media_input, run_youtube_workflow
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -19,7 +20,7 @@ from lattifai.config import (
 __all__ = ["align"]
 
 
-@run.cli.entrypoint(name="align", namespace="alignment")
+@run.cli.entrypoint(name="align", namespace="alignment", entrypoint_cls=LattifAIEntrypoint)
 def align(
     input_media: Optional[str] = None,
     input_caption: Optional[str] = None,
@@ -51,10 +52,12 @@ def align(
             Fields: api_key, timeout, max_retries, default_headers
         alignment: Alignment configuration (model selection and inference settings).
             Fields: model_name, device, batch_size
-        caption: Caption I/O configuration (file reading/writing and formatting).
-            Fields: input_format, input_path, output_format, output_path,
-                    normalize_text, split_sentence, word_level,
-                    include_speaker_in_text, encoding
+        caption: Caption pipeline configuration (input/output/behavior/karaoke).
+            Sub-configs: caption.input (path, format, normalize_text, split_sentence),
+                         caption.output (path, format),
+                         caption.behavior (include_speaker_in_text, word_level, translation_first),
+                         caption.ass (font, colors, speaker_color, background_color),
+                         caption.karaoke (enabled, effect, color_scheme)
 
     Examples:
         # Basic usage with positional arguments
@@ -63,11 +66,11 @@ def align(
         # Mixing positional and keyword arguments
         lai alignment align audio.mp4 caption.srt output.json \\
             alignment.device=cuda \\
-            caption.word_level=true
+            caption.behavior.word_level=true
 
         # Smart sentence splitting with custom output format
         lai alignment align audio.wav caption.srt output.vtt \\
-            caption.split_sentence=true
+            caption.input.split_sentence=true
 
         # Using keyword arguments (traditional syntax)
         lai alignment align \\
@@ -78,9 +81,9 @@ def align(
         # Full configuration with nested config objects
         lai alignment align audio.wav caption.srt aligned.json \\
             media.output_dir=/tmp/output \\
-            caption.split_sentence=true \\
-            caption.word_level=true \\
-            caption.normalize_text=true \\
+            caption.input.split_sentence=true \\
+            caption.behavior.word_level=true \\
+            caption.input.normalize_text=true \\
             alignment.device=mps \\
             alignment.model_name=LattifAI/Lattice-1-Alpha
     """

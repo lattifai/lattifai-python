@@ -59,8 +59,12 @@ class TranslationReviewer:
         if len(original_texts) != len(translated_texts):
             raise ValueError("original_texts and translated_texts must have the same length")
 
+        from tqdm import tqdm
+
         all_revised: list[str] = []
         all_critiques: list[str] = []
+
+        pbar = tqdm(total=len(original_texts), desc="Reviewing", unit="seg")
 
         # Process in batches to avoid token limits
         for i in range(0, len(original_texts), REVIEW_BATCH_SIZE):
@@ -93,12 +97,15 @@ class TranslationReviewer:
 
                 all_revised.extend(revised[: len(batch_originals)])
                 all_critiques.extend(critiques[: len(batch_originals)])
+                pbar.update(len(batch_originals))
 
             except Exception as e:
                 logger.warning("Review failed for batch %d (keeping original translations): %s", i, e)
                 all_revised.extend(batch_translations)
                 all_critiques.extend(["Review failed; kept draft translation."] * len(batch_translations))
+                pbar.update(len(batch_translations))
 
+        pbar.close()
         logger.info("Translation review complete: %d segments", len(all_revised))
         return ReviewOutcome(revised_texts=all_revised, critiques=all_critiques)
 

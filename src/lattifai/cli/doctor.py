@@ -16,6 +16,74 @@ from lattifai.theme import _Theme as T
 console = Console()
 
 
+def _get_editable_source_dir() -> Path | None:
+    """Return the source directory if lattifai is installed in editable mode, else None.
+
+    Detection strategy (ordered by reliability):
+    1. ``direct_url.json`` in dist metadata — standard PEP 610 marker.
+    2. ``direct_url.json`` on disk in the .dist-info directory — some
+       importlib.metadata backends fail to resolve it via ``read_text``.
+    3. ``_path`` pointing to a ``.egg-info`` directory outside site-packages
+       — legacy editable installs place egg-info in the project root.
+    """
+    try:
+        import json
+        import site
+
+        dist = importlib.metadata.distribution("lattifai")
+
+        # Strategy 1: PEP 610 direct_url.json via metadata API
+        direct_url_text = dist.read_text("direct_url.json")
+
+        # Strategy 2: fall back to reading from dist-info directory on disk
+        if not direct_url_text:
+            dist_path = getattr(dist, "_path", None)
+            if dist_path:
+                resolved = Path(dist_path).resolve()
+                du_file = resolved / "direct_url.json"
+                if du_file.exists():
+                    direct_url_text = du_file.read_text()
+
+        if direct_url_text:
+            url_info = json.loads(direct_url_text)
+            if url_info.get("dir_info", {}).get("editable", False):
+                url = url_info.get("url", "")
+                if url.startswith("file://"):
+                    return Path(url[7:])
+
+        # Strategy 3: egg-info in project root (not in site-packages)
+        dist_path = getattr(dist, "_path", None)
+        if dist_path:
+            resolved = Path(dist_path).resolve()
+            if resolved.name.endswith(".egg-info"):
+                site_dirs = set(site.getsitepackages() + [site.getusersitepackages()])
+                if not any(str(resolved).startswith(s) for s in site_dirs):
+                    return resolved.parent
+    except Exception:
+        pass
+    return None
+
+
+def _get_source_version(source_dir: Path) -> str | None:
+    """Read the version from pyproject.toml in the source directory."""
+    pyproject_path = source_dir / "pyproject.toml"
+    if not pyproject_path.exists():
+        return None
+    try:
+        import tomllib
+    except ImportError:
+        try:
+            import tomli as tomllib  # type: ignore[no-redef]
+        except ImportError:
+            return None
+    try:
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+        return data.get("project", {}).get("version")
+    except Exception:
+        return None
+
+
 def _check_package_version() -> tuple[str, str, str]:
     """Check installed vs latest PyPI version."""
     try:
@@ -40,6 +108,77 @@ def _check_package_version() -> tuple[str, str, str]:
     except ImportError:
         return ("Package version", f"[{T.RICH_WARN}]{current} (packaging not installed)[/{T.RICH_WARN}]", "WARN")
     return ("Package version", f"[{T.RICH_WARN}]{current} (PyPI check failed)[/{T.RICH_WARN}]", "WARN")
+
+
+def _find_stale_egg_info() -> list[Path]:
+    """Find stale .egg-info directories that shadow the current editable install.
+
+    When multiple metadata directories exist (e.g. an old egg-info at project
+    root plus a newer dist-info in site-packages), importlib.metadata picks
+    whichever appears first on sys.path — often the stale one.
+    """
+    versions: dict[str, list[Path]] = {}
+    for dist in importlib.metadata.distributions():
+        if dist.name == "lattifai":
+            p = Path(getattr(dist, "_path", "")).resolve()
+            versions.setdefault(dist.version, []).append(p)
+
+    if len(versions) <= 1:
+        return []
+
+    # The latest version is correct; older versions are stale
+    from packaging import version as v_parse
+
+    sorted_versions = sorted(versions.keys(), key=v_parse.parse, reverse=True)
+    stale_paths = []
+    for v in sorted_versions[1:]:
+        stale_paths.extend(versions[v])
+    return stale_paths
+
+
+def _check_editable_install() -> tuple[str, str, str]:
+    """Check if editable install metadata is in sync with source pyproject.toml."""
+    source_dir = _get_editable_source_dir()
+    if source_dir is None:
+        # Not an editable install — nothing to check
+        return ("Editable install", f"[{T.RICH_DIM}]N/A (release install)[/{T.RICH_DIM}]", "OK")
+
+    source_version = _get_source_version(source_dir)
+    if source_version is None:
+        return (
+            "Editable install",
+            f"[{T.RICH_WARN}]Cannot read source version from {source_dir}[/{T.RICH_WARN}]",
+            "WARN",
+        )
+
+    # Check for stale metadata shadowing the current install
+    stale = _find_stale_egg_info()
+    if stale:
+        stale_str = ", ".join(str(p) for p in stale)
+        return (
+            "Editable install",
+            f"[{T.RICH_ERR}]Stale metadata found: {stale_str}. " f"Run: lai update[/{T.RICH_ERR}]",
+            "FAIL",
+        )
+
+    # Compare installed version with source
+    try:
+        installed = importlib.metadata.version("lattifai")
+    except importlib.metadata.PackageNotFoundError:
+        return ("Editable install", f"[{T.RICH_ERR}]Package not found[/{T.RICH_ERR}]", "FAIL")
+
+    if installed == source_version:
+        return (
+            "Editable install",
+            f"[{T.RICH_OK}]{installed} (editable, in sync)[/{T.RICH_OK}]",
+            "OK",
+        )
+
+    return (
+        "Editable install",
+        f"[{T.RICH_ERR}]Stale: installed={installed}, source={source_version}. " f"Run: lai update[/{T.RICH_ERR}]",
+        "FAIL",
+    )
 
 
 def _check_os() -> tuple[str, str, str]:
@@ -139,11 +278,31 @@ def _check_model_cache() -> tuple[str, str, str]:
 
 
 def _check_api_key() -> tuple[str, str, str]:
-    """Check LATTIFAI_API_KEY environment variable."""
+    """Check LATTIFAI_API_KEY: env var > config.toml [auth] > .env."""
     key = os.environ.get("LATTIFAI_API_KEY", "")
+    source = "env"
+
+    if not key:
+        try:
+            from lattifai.cli.config import get_auth_value
+
+            key = get_auth_value("LATTIFAI_API_KEY") or ""
+            source = "config.toml"
+        except (ImportError, OSError):
+            pass
+
+    if not key:
+        try:
+            from dotenv import dotenv_values
+
+            key = dotenv_values().get("LATTIFAI_API_KEY", "")
+            source = ".env"
+        except ImportError:
+            pass
+
     if key:
         masked = f"...{key[-4:]}" if len(key) > 4 else "***"
-        return ("API key", f"[{T.RICH_OK}]Set ({masked})[/{T.RICH_OK}]", "OK")
+        return ("API key", f"[{T.RICH_OK}]Set ({masked}) [{source}][/{T.RICH_OK}]", "OK")
     return ("API key", f"[{T.RICH_WARN}]LATTIFAI_API_KEY not set[/{T.RICH_WARN}]", "WARN")
 
 
@@ -239,6 +398,7 @@ STATUS_ICONS = {
 CHECKS = [
     _check_os,
     _check_package_version,
+    _check_editable_install,
     _check_python_version,
     _check_gpu,
     _check_model_cache,
@@ -249,6 +409,7 @@ CHECKS = [
 
 _CHECK_HINTS = {
     "_check_package_version": "Run 'lai update' to upgrade.",
+    "_check_editable_install": "Run 'lai update' or 'pip install --no-deps -e .' to re-sync.",
     "_check_python_version": "Install Python 3.10–3.14.",
     "_check_gpu": "Install onnxruntime with GPU support.",
     "_check_model_cache": "Run an alignment to auto-download the model.",

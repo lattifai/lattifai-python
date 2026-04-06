@@ -1,11 +1,12 @@
 """Caption CLI entry point with nemo_run."""
 
 import re
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
 import nemo_run as run
 
-from lattifai.caption.config import KaraokeConfig
+from lattifai.caption.config import ASSConfig, KaraokeConfig, OutputBehavior, StandardizationConfig
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
 
@@ -135,75 +136,65 @@ def align_timestamps_from_ref(
     return results
 
 
-@run.cli.entrypoint(name="convert", namespace="caption")
+@run.cli.entrypoint(name="convert", namespace="caption", entrypoint_cls=LattifAIEntrypoint)
 def convert(
     input_path: Pathlike,
     output_path: Pathlike,
     reference: Optional[Pathlike] = None,
     input_format: Optional[str] = None,
-    include_speaker_in_text: bool = False,
     normalize_text: bool = False,
-    word_level: bool = False,
-    karaoke: bool = False,
-    translation_first: bool = False,
+    behavior: Annotated[Optional[OutputBehavior], run.Config[OutputBehavior]] = None,
+    ass: Annotated[Optional[ASSConfig], run.Config[ASSConfig]] = None,
+    karaoke: Annotated[Optional[KaraokeConfig], run.Config[KaraokeConfig]] = None,
+    standardization: Annotated[Optional[StandardizationConfig], run.Config[StandardizationConfig]] = None,
 ):
     """
     Convert caption file to another format.
-
-    This command reads a caption file from one format and writes it to another format,
-    preserving all timing information, text content, and speaker labels (if present).
-    Supports common caption formats including SRT, VTT, JSON, and Praat TextGrid.
-
-    When ``reference`` is provided, timestamps are aligned from the reference caption
-    via text matching. This is useful for combining human-edited text (with coarse
-    timestamps) with ASR subtitles (with accurate timestamps).
 
     Shortcut: invoking ``laisub-convert`` is equivalent to running ``lai caption convert``.
 
     Args:
         input_path: Path to input caption file (supports SRT, VTT, JSON, TextGrid formats)
         output_path: Path to output caption file (format determined by file extension)
-        reference: Optional reference caption for timestamp alignment.
-        input_format: Explicitly specify input format (e.g., 'markdown', 'srt').
-            If None (default), auto-detect from file extension/content.
-            When provided, timestamps are matched from the reference via text similarity.
-            Input keeps its text and speaker labels; only timestamps are updated.
-        include_speaker_in_text: Preserve speaker labels in caption text content.
-        normalize_text: Whether to normalize caption text during conversion.
-            This applies text cleaning such as removing HTML tags, decoding entities,
-            collapsing whitespace, and standardizing punctuation.
-        word_level: Use word-level output format if supported.
-            When True without karaoke: outputs word-per-segment (each word as separate segment).
-            JSON format will include a 'words' field with word-level timestamps.
-        karaoke: Enable karaoke styling (requires word_level=True).
-            When True: outputs karaoke format (ASS \\kf tags, enhanced LRC, etc.).
-        translation_first: Place translation text above original text in bilingual output.
-            When True: translation appears on the first line, original on the second line.
+        reference: Optional reference caption for timestamp alignment
+        input_format: Explicitly specify input format (e.g., 'markdown', 'srt')
+        normalize_text: Clean HTML entities and normalize whitespace
+        behavior: Output behavior (nemo_run Config).
+            behavior.include_speaker_in_text, behavior.word_level,
+            behavior.translation_first
+        ass: ASS format configuration (nemo_run Config).
+            ass.font_name, ass.font_size, ass.background_color,
+            ass.speaker_color, ass.primary_color, ass.outline_color
+        karaoke: Karaoke configuration (nemo_run Config).
+            karaoke.enabled, karaoke.effect (sweep/instant/outline),
+            karaoke.color_scheme (overrides ASS colors)
 
     Examples:
-        # Basic format conversion (positional arguments)
+        # Basic format conversion
         lai caption convert input.srt output.vtt
 
-        # Convert with text normalization
-        lai caption convert input.srt output.json normalize_text=true
+        # Custom font, background box, speaker coloring, word-level
+        lai caption convert input.json output.ass \\
+            ass.font_name="PingFang SC" ass.font_size=24 \\
+            ass.background_color="#00000080" ass.speaker_color=auto \\
+            behavior.word_level=true
 
-        # Align timestamps from a reference subtitle
-        lai caption convert transcript.md output.srt reference=youtube.en.srt
-
-        # Convert to karaoke format (ASS with \\kf tags)
-        lai caption convert input.json output.ass word_level=true karaoke=true
-
-        # Using keyword arguments (traditional syntax)
-        lai caption convert \\
-            input_path=input.srt \\
-            output_path=output.TextGrid
+        # Karaoke with color scheme
+        lai caption convert input.json output.ass \\
+            behavior.word_level=true ass.speaker_color=auto \\
+            karaoke.color_scheme=azure-gold
     """
     from pathlib import Path
 
     from lattifai.data import Caption
 
-    # Create karaoke_config if karaoke flag is set
-    karaoke_config = KaraokeConfig(enabled=True) if karaoke else None
+    # Auto-enable karaoke if any karaoke.* field is set (e.g., karaoke.color_scheme=xxx)
+    karaoke_config = None
+    if karaoke is not None:
+        if not karaoke.enabled and (karaoke.color_scheme or karaoke.effect != "sweep"):
+            karaoke.enabled = True
+        if karaoke.enabled:
+            karaoke_config = karaoke
 
     try:
         caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
@@ -234,17 +225,17 @@ def convert(
 
     caption.write(
         output_path,
-        include_speaker_in_text=include_speaker_in_text,
-        word_level=word_level,
-        karaoke_config=karaoke_config,
-        translation_first=translation_first,
+        format_config=ass,
+        behavior=behavior,
+        karaoke=karaoke_config,
+        standardization=standardization,
     )
 
     safe_print(f"Converted {input_path} -> {output_path}")
     return output_path
 
 
-@run.cli.entrypoint(name="normalize", namespace="caption")
+@run.cli.entrypoint(name="normalize", namespace="caption", entrypoint_cls=LattifAIEntrypoint)
 def normalize(
     input_path: Pathlike,
     output_path: Pathlike,
@@ -286,7 +277,7 @@ def normalize(
     output_path = Path(output_path).expanduser()
 
     caption_obj = Caption.read(input_path, normalize_text=True)
-    caption_obj.write(output_path, include_speaker_in_text=True)
+    caption_obj.write(output_path)
 
     if output_path == input_path:
         safe_print(f"✅ Normalized {input_path} (in-place)")
@@ -296,7 +287,7 @@ def normalize(
     return output_path
 
 
-@run.cli.entrypoint(name="shift", namespace="caption")
+@run.cli.entrypoint(name="shift", namespace="caption", entrypoint_cls=LattifAIEntrypoint)
 def shift(
     input_path: Pathlike,
     output_path: Pathlike,
@@ -347,7 +338,7 @@ def shift(
     shifted_caption = caption_obj.shift_time(seconds)
 
     # Write shifted captions
-    shifted_caption.write(output_path, include_speaker_in_text=True)
+    shifted_caption.write(output_path)
 
     if seconds >= 0:
         direction = f"delayed by {seconds}s"
@@ -362,7 +353,7 @@ def shift(
     return output_path
 
 
-@run.cli.entrypoint(name="diff", namespace="caption")
+@run.cli.entrypoint(name="diff", namespace="caption", entrypoint_cls=LattifAIEntrypoint)
 def diff(
     reference: Pathlike,
     hyp_path: Pathlike,

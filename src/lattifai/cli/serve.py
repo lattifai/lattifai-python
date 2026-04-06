@@ -19,10 +19,18 @@ from uuid import uuid4
 import nemo_run as run
 
 from lattifai.cli.caption import convert as caption_convert
+from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.cli.transcribe import transcribe as transcribe_run
 from lattifai.cli.translate import translate as translate_run
 from lattifai.client import LattifAI
-from lattifai.config import AlignmentConfig, CaptionConfig, EventConfig, TranscriptionConfig
+from lattifai.config import (
+    AlignmentConfig,
+    CaptionConfig,
+    CaptionInputConfig,
+    EventConfig,
+    OutputBehavior,
+    TranscriptionConfig,
+)
 from lattifai.config.llm import LLMConfig
 from lattifai.config.translation import TranslationConfig
 
@@ -137,7 +145,6 @@ OUTPUT_SUFFIX = {
 }
 
 ALLOWED_DEVICES = {"auto", "cpu", "cuda", "mps"}
-ALLOWED_PROVIDERS = {"gemini", "openai"}
 ALLOWED_TRANSLATION_MODES = {"quick", "normal", "refined"}
 
 
@@ -334,7 +341,10 @@ class ServeHandler(BaseHTTPRequestHandler):
 
         client = LattifAI(
             alignment_config=AlignmentConfig(device=device),
-            caption_config=CaptionConfig(split_sentence=split_sentence, word_level=word_level),
+            caption_config=CaptionConfig(
+                input=CaptionInputConfig(split_sentence=split_sentence),
+                behavior=OutputBehavior(word_level=word_level),
+            ),
         )
         client.alignment(
             input_media=str(media_file),
@@ -384,22 +394,22 @@ class ServeHandler(BaseHTTPRequestHandler):
         if karaoke:
             word_level = True
 
+        from lattifai.caption.config import KaraokeConfig
+
         caption_convert(
             input_path=str(caption_file),
             output_path=str(output_path),
-            include_speaker_in_text=include_speaker,
             normalize_text=normalize_text,
-            word_level=word_level,
-            karaoke=karaoke,
+            behavior=OutputBehavior(
+                include_speaker_in_text=include_speaker,
+                word_level=word_level,
+            ),
+            karaoke=KaraokeConfig(enabled=True) if karaoke else None,
         )
         return output_path
 
     def _run_translate(self, form: FormData, run_dir: Path) -> Path:
         caption_file = self._save_uploaded_file(form, "caption_file", run_dir, "caption.srt")
-
-        provider = (self._field_value(form, "provider", "gemini") or "gemini").strip().lower()
-        if provider not in ALLOWED_PROVIDERS:
-            raise ValueError(f"Unsupported provider: {provider}")
 
         mode = (self._field_value(form, "mode", "normal") or "normal").strip().lower()
         if mode not in ALLOWED_TRANSLATION_MODES:
@@ -412,13 +422,16 @@ class ServeHandler(BaseHTTPRequestHandler):
         )
         output_path = run_dir / f"{caption_file.stem}_{target_lang}{output_suffix}"
 
-        default_model = "gemini-3-flash-preview" if provider == "gemini" else "gpt-4.1-mini"
-        model_name = (self._field_value(form, "model_name", default_model) or default_model).strip()
+        # model_name is the primary parameter; legacy "provider" hint selects default model
+        model_name = (self._field_value(form, "model_name") or "").strip()
+        if not model_name:
+            provider_hint = (self._field_value(form, "provider") or "").strip().lower()
+            model_name = "gpt-4.1-mini" if provider_hint == "openai" else "gemini-3-flash-preview"
         api_key = (self._field_value(form, "api_key") or "").strip() or None
         api_base_url = (self._field_value(form, "api_base_url") or "").strip() or None
         bilingual = parse_bool(self._field_value(form, "bilingual"), default=False)
 
-        llm_config = LLMConfig(provider=provider, model_name=model_name, api_key=api_key, api_base_url=api_base_url)
+        llm_config = LLMConfig(model_name=model_name, api_key=api_key, api_base_url=api_base_url)
         translation_config = TranslationConfig(
             llm=llm_config,
             target_lang=target_lang,
@@ -448,7 +461,7 @@ def _build_browser_url(host: str, port: int) -> str:
     return f"http://{host}:{port}/"
 
 
-@run.cli.entrypoint(name="run", namespace="serve")
+@run.cli.entrypoint(name="run", namespace="serve", entrypoint_cls=LattifAIEntrypoint)
 def serve(
     host: str = "127.0.0.1",
     port: int = 8765,

@@ -21,6 +21,7 @@ class AutoUpdater:
 
     The private mirror (index_url) is the authoritative source for releases.
     PyPI JSON API is used only for version *discovery*, not installation.
+    For editable installs, refreshes metadata via ``pip install --no-deps -e``.
     """
 
     def __init__(self, package_name="lattifai"):
@@ -43,6 +44,16 @@ class AutoUpdater:
             return None
         return None
 
+    def _get_editable_source_dir(self) -> str | None:
+        """Return source directory if package is an editable install, else None."""
+        try:
+            from lattifai.cli.doctor import _get_editable_source_dir
+
+            source_dir = _get_editable_source_dir()
+            return str(source_dir) if source_dir else None
+        except ImportError:
+            return None
+
     def run(self, force: bool = False) -> int:
         """Execute the full automation update flow. Returns exit code."""
         console.print(f"[{T.RICH_STEP}]Checking for LattifAI updates...[/{T.RICH_STEP}]")
@@ -52,6 +63,11 @@ class AutoUpdater:
         except importlib.metadata.PackageNotFoundError:
             console.print(f"[{T.RICH_ERR}]Package '{self.package_name}' not found.[/{T.RICH_ERR}]")
             return 1
+
+        # Editable install: refresh metadata from source instead of PyPI
+        editable_dir = self._get_editable_source_dir()
+        if editable_dir:
+            return self._refresh_editable(editable_dir, current_v)
 
         latest_v = self.get_latest_version()
 
@@ -84,6 +100,63 @@ class AutoUpdater:
                 console.print(f"[{T.RICH_STEP}]Reinstalling version {current_v} as requested...[/{T.RICH_STEP}]")
 
         return self._pip_install(force=force)
+
+    def _refresh_editable(self, source_dir: str, current_v: str) -> int:
+        """Re-sync an editable install: clean stale metadata, then reinstall.
+
+        This removes stale ``.egg-info`` directories that shadow the current
+        install, then runs ``pip install --no-deps -e`` to refresh entry point
+        scripts and package metadata.
+        """
+        import shutil
+        from pathlib import Path
+
+        from lattifai.cli.doctor import _find_stale_egg_info, _get_source_version
+
+        source_version = _get_source_version(Path(source_dir))
+        stale = _find_stale_egg_info()
+
+        if not stale and source_version and source_version == current_v:
+            console.print(f"[{T.RICH_OK}]Editable install is in sync ({current_v}).[/{T.RICH_OK}]")
+            return 0
+
+        # Clean up stale egg-info directories
+        if stale:
+            for p in stale:
+                console.print(f"[{T.RICH_STEP}]Removing stale metadata: {p}[/{T.RICH_STEP}]")
+                try:
+                    shutil.rmtree(p)
+                except OSError as exc:
+                    console.print(f"[{T.RICH_WARN}]Cannot remove {p}: {exc}[/{T.RICH_WARN}]")
+
+        label = f"{current_v} -> {source_version}" if source_version and source_version != current_v else current_v
+        console.print(f"[{T.RICH_STEP}]Refreshing editable install ({label})...[/{T.RICH_STEP}]")
+
+        pip_args = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--no-deps",
+            "-e",
+            source_dir,
+        ]
+        try:
+            result = subprocess.run(pip_args, capture_output=True, text=True, timeout=_PIP_TIMEOUT_SECS)
+            if result.returncode != 0:
+                console.print(f"[{T.RICH_ERR}]Refresh failed (exit code {result.returncode}).[/{T.RICH_ERR}]")
+                if result.stderr:
+                    for line in result.stderr.strip().splitlines()[-10:]:
+                        console.print(f"  [{T.RICH_DIM}]{line}[/{T.RICH_DIM}]")
+                return 1
+            console.print(f"[{T.RICH_OK}]Editable install refreshed successfully![/{T.RICH_OK}]")
+            return 0
+        except subprocess.TimeoutExpired:
+            console.print(f"[{T.RICH_ERR}]pip timed out after {_PIP_TIMEOUT_SECS}s.[/{T.RICH_ERR}]")
+            return 1
+        except OSError as exc:
+            console.print(f"[{T.RICH_ERR}]Failed to run pip: {exc}[/{T.RICH_ERR}]")
+            return 1
 
     def _pip_install(self, force: bool = False) -> int:
         """Run pip install and stream progress output."""

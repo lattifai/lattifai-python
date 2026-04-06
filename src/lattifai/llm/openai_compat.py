@@ -21,10 +21,12 @@ class OpenAIClient(BaseLLMClient):
         api_key: Optional[str] = None,
         model: Optional[str] = None,
         base_url: Optional[str] = None,
+        reasoning: bool = True,
         **kwargs,
     ):
         super().__init__(api_key=api_key, model=model, **kwargs)
         self._base_url = base_url
+        self._reasoning = reasoning
         self._client = None
 
     @property
@@ -67,6 +69,10 @@ class OpenAIClient(BaseLLMClient):
         content = response.choices[0].message.content
         if not content:
             raise RuntimeError("Empty response from OpenAI-compatible API")
+        if not self._reasoning:
+            reasoning = getattr(response.choices[0].message, "reasoning_content", None)
+            if reasoning:
+                logger.debug("Stripped %d chars of reasoning_content (reasoning=False)", len(reasoning))
         return content
 
     async def generate_json(
@@ -124,10 +130,16 @@ class OpenAIClient(BaseLLMClient):
         if timeout is not None:
             create_kwargs["timeout"] = timeout
 
-        return await asyncio.get_event_loop().run_in_executor(
+        response = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: client.chat.completions.create(**create_kwargs),
         )
+        if not self._reasoning:
+            reasoning = getattr(response.choices[0].message, "reasoning_content", None)
+            if reasoning:
+                logger.debug("Stripped %d chars of reasoning_content (reasoning=False)", len(reasoning))
+                response.choices[0].message.reasoning_content = None
+        return response
 
     async def _call(
         self,

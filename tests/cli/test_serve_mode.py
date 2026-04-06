@@ -303,7 +303,7 @@ class TestPostTranslate:
             {
                 "caption_file": ("test.srt", b"1\n00:00:00,000 --> 00:00:01,000\nHello\n", "application/x-subrip"),
                 "target_lang": "zh",
-                "provider": "gemini",
+                "model_name": "gemini-3-flash-preview",
                 "mode": "normal",
             },
         )
@@ -344,7 +344,16 @@ class TestPostUnknownEndpoints:
 
 class TestParameterValidation:
     @patch.object(_serve_mod, "translate_run")
-    def test_translate_invalid_provider(self, mock_translate: MagicMock, serve_server: ServeHTTPServer) -> None:
+    def test_translate_unknown_provider_falls_back_to_gemini(
+        self, mock_translate: MagicMock, serve_server: ServeHTTPServer
+    ) -> None:
+        """Unknown provider hint gracefully falls back to gemini default model."""
+
+        def fake_translate(**kwargs):
+            Path(kwargs["output"]).write_text("1\n00:00:00,000 --> 00:00:01,000\n你好\n")
+
+        mock_translate.side_effect = fake_translate
+
         status, data = _post_multipart(
             serve_server,
             "/api/translate",
@@ -354,9 +363,8 @@ class TestParameterValidation:
                 "target_lang": "zh",
             },
         )
-        assert status == 400
-        assert data["ok"] is False
-        assert "provider" in data["error"].lower() or "Unsupported" in data["error"]
+        assert status == 200
+        assert data["ok"] is True
 
     @patch.object(_serve_mod, "translate_run")
     def test_translate_invalid_mode(self, mock_translate: MagicMock, serve_server: ServeHTTPServer) -> None:
