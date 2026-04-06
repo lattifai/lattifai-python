@@ -73,10 +73,10 @@ def run_caption_convert(input_path, output_path, word_level=False, karaoke=False
         "-Y",
         f"input_path={input_path}",
         f"output_path={output_path}",
-        f"behavior.word_level={str(word_level).lower()}",
+        f"render.word_level={str(word_level).lower()}",
     ]
     if karaoke:
-        cmd.append("karaoke.enabled=true")
+        cmd.append("ass.karaoke_effect=sweep")
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         print(f"STDOUT: {result.stdout}")

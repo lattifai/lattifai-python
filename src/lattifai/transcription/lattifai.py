@@ -389,9 +389,9 @@ class LattifAITranscriber(BaseTranscriber):
 
     def write(self, transcript: Caption, output_file: Path, encoding: str = "utf-8", cache_event: bool = False) -> Path:
         """Persist transcript text to disk and return the file path."""
-        from lattifai.caption.config import OutputBehavior
+        from lattifai.caption.config import RenderConfig
 
-        transcript.write(output_file, behavior=OutputBehavior(include_speaker_in_text=False))
+        transcript.write(output_file, render=RenderConfig(include_speaker_in_text=False))
         if cache_event and transcript.event:
             events_file = output_file.with_suffix(".LED")
             transcript.event.write(events_file)

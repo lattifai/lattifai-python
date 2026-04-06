@@ -118,10 +118,10 @@ class TestCaptionConfigDefaults:
 
         assert config.input.format == "auto"
         assert config.output.format == "srt"
-        assert config.behavior.include_speaker_in_text is True
+        assert config.render.include_speaker_in_text is True
         assert config.input.normalize_text is True
         assert config.input.split_sentence is False
-        assert config.behavior.word_level is False
+        assert config.render.word_level is False
         assert config.input.encoding == "utf-8"
 
     def test_backward_compat_properties(self):
@@ -138,18 +138,18 @@ class TestCaptionConfigDefaults:
 
     def test_custom_values(self):
         """Test that custom values override defaults."""
-        from lattifai.caption.config import OutputBehavior
+        from lattifai.caption.config import RenderConfig
 
         config = CaptionConfig(
             input=CaptionInputConfig(format="vtt", normalize_text=True),
             output=CaptionOutputConfig(format="json"),
-            behavior=OutputBehavior(word_level=True),
+            render=RenderConfig(word_level=True),
         )
 
         assert config.input.format == "vtt"
         assert config.output.format == "json"
         assert config.input.normalize_text is True
-        assert config.behavior.word_level is True
+        assert config.render.word_level is True
 
 
 class TestCaptionConfigStructure:
@@ -160,10 +160,10 @@ class TestCaptionConfigStructure:
         config = CaptionConfig()
         assert hasattr(config, "input")
         assert hasattr(config, "output")
-        assert hasattr(config, "behavior")
-        assert hasattr(config, "karaoke")
+        assert hasattr(config, "render")
         assert hasattr(config, "standardization")
         assert hasattr(config, "ass")
+        assert hasattr(config, "lrc")
         assert hasattr(config, "ttml")
         assert hasattr(config, "fcpxml")
         assert hasattr(config, "premiere")

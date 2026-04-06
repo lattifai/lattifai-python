@@ -9,9 +9,9 @@ from lattifai.caption.config import (
     ASSConfig,
     CaptionFonts,
     InputCaptionFormat,
-    KaraokeConfig,
-    OutputBehavior,
+    LRCConfig,
     OutputCaptionFormat,
+    RenderConfig,
     StandardizationConfig,
 )
 
@@ -37,8 +37,8 @@ __all__ = [
     "CaptionOutputConfig",
     "ASSConfig",
     "CaptionFonts",
-    "OutputBehavior",
-    "KaraokeConfig",
+    "RenderConfig",
+    "LRCConfig",
     "StandardizationConfig",
     "InputCaptionFormat",
     "OutputCaptionFormat",

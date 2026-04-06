@@ -5,7 +5,7 @@ from typing import Annotated, List, Optional
 
 import nemo_run as run
 
-from lattifai.caption.config import ASSConfig, KaraokeConfig, OutputBehavior, StandardizationConfig
+from lattifai.caption.config import ASSConfig, RenderConfig, StandardizationConfig
 from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
@@ -143,9 +143,8 @@ def convert(
     reference: Optional[Pathlike] = None,
     input_format: Optional[str] = None,
     normalize_text: bool = False,
-    behavior: Annotated[Optional[OutputBehavior], run.Config[OutputBehavior]] = None,
+    render: Annotated[Optional[RenderConfig], run.Config[RenderConfig]] = None,
     ass: Annotated[Optional[ASSConfig], run.Config[ASSConfig]] = None,
-    karaoke: Annotated[Optional[KaraokeConfig], run.Config[KaraokeConfig]] = None,
     standardization: Annotated[Optional[StandardizationConfig], run.Config[StandardizationConfig]] = None,
 ):
     """
@@ -159,15 +158,14 @@ def convert(
         reference: Optional reference caption for timestamp alignment
         input_format: Explicitly specify input format (e.g., 'markdown', 'srt')
         normalize_text: Clean HTML entities and normalize whitespace
-        behavior: Output behavior (nemo_run Config).
-            behavior.include_speaker_in_text, behavior.word_level,
-            behavior.translation_first
+        render: Render configuration (nemo_run Config).
+            render.include_speaker_in_text, render.word_level,
+            render.translation_first
         ass: ASS format configuration (nemo_run Config).
             ass.font_name, ass.font_size, ass.background_color,
-            ass.speaker_color, ass.primary_color, ass.outline_color
-        karaoke: Karaoke configuration (nemo_run Config).
-            karaoke.enabled, karaoke.effect (sweep/instant/outline),
-            karaoke.color_scheme (overrides ASS colors)
+            ass.speaker_color, ass.primary_color, ass.outline_color,
+            ass.karaoke_effect (sweep/instant/outline),
+            ass.karaoke_color_scheme (overrides ASS colors)
 
     Examples:
         # Basic format conversion
@@ -177,24 +175,23 @@ def convert(
         lai caption convert input.json output.ass \\
             ass.font_name="PingFang SC" ass.font_size=24 \\
             ass.background_color="#00000080" ass.speaker_color=auto \\
-            behavior.word_level=true
+            render.word_level=true
 
         # Karaoke with color scheme
         lai caption convert input.json output.ass \\
-            behavior.word_level=true ass.speaker_color=auto \\
-            karaoke.color_scheme=azure-gold
+            render.word_level=true ass.speaker_color=auto \\
+            ass.karaoke_effect=sweep ass.karaoke_color_scheme=azure-gold
     """
     from pathlib import Path
 
     from lattifai.data import Caption
 
-    # Auto-enable karaoke if any karaoke.* field is set (e.g., karaoke.color_scheme=xxx)
-    karaoke_config = None
-    if karaoke is not None:
-        if not karaoke.enabled and (karaoke.color_scheme or karaoke.effect != "sweep"):
-            karaoke.enabled = True
-        if karaoke.enabled:
-            karaoke_config = karaoke
+    # Auto-enable word_level when karaoke effect is set
+    if ass is not None and ass.karaoke_effect is not None:
+        if render is None:
+            render = RenderConfig(word_level=True)
+        else:
+            render.word_level = True
 
     try:
         caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
@@ -226,8 +223,7 @@ def convert(
     caption.write(
         output_path,
         format_config=ass,
-        behavior=behavior,
-        karaoke=karaoke_config,
+        render=render,
         standardization=standardization,
     )
 

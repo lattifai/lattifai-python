@@ -176,17 +176,8 @@ def translate(
 
     _translate_caption_in_place(cap, translation_config)
     ensure_parent_dir(output_path)
-    # Determine format-specific config from output path extension
     ext = output_path.suffix.lstrip(".").lower()
-    format_config = caption_config.get_format_config(ext)
-
-    cap.write(
-        str(output_path),
-        format_config=format_config,
-        behavior=caption_config.behavior,
-        karaoke=caption_config.karaoke,
-        standardization=caption_config.standardization,
-    )
+    cap.write(str(output_path), **caption_config.write_kwargs(ext))
 
     safe_print(theme.ok(f"Translation saved: {output_path}"))
 
@@ -287,18 +278,8 @@ def translate_youtube(
         target_lang=translation_config.target_lang,
     )
     ensure_parent_dir(output_path)
-
-    # Determine format-specific config from output path extension
     ext = output_path.suffix.lstrip(".").lower()
-    format_config = caption_config.get_format_config(ext)
-
-    cap.write(
-        str(output_path),
-        format_config=format_config,
-        behavior=caption_config.behavior,
-        karaoke=caption_config.karaoke,
-        standardization=caption_config.standardization,
-    )
+    cap.write(str(output_path), **caption_config.write_kwargs(ext))
 
     safe_print(theme.ok(f"🎉 Translation saved: {output_path}"))
     return cap

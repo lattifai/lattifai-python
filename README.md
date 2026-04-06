@@ -656,7 +656,7 @@ JSON is the most flexible format for storing caption data with full word-level t
 
 ### Word-Level and Karaoke Output
 
-| Format | `word_level=True` | `word_level=True` + `karaoke=True` |
+| Format | `word_level=True` | `word_level=True` + `karaoke_effect` |
 |--------|-------------------|-----------------------------------|
 | **JSON** | Includes `words` array | Same as word_level=True |
 | **SRT** | One word per segment | One word per segment |
@@ -681,18 +681,18 @@ The `speaker_color` option colorizes speaker names in ASS output (works with bot
 ```bash
 # Auto-color speakers in ASS output
 lai caption convert input.json output.ass \
-    include_speaker_in_text=true \
-    speaker_color=auto
+    render.include_speaker_in_text=true \
+    ass.speaker_color=auto
 
 # Custom single color
 lai caption convert input.json output.ass \
-    include_speaker_in_text=true \
-    speaker_color="#1387C0"
+    render.include_speaker_in_text=true \
+    ass.speaker_color="#1387C0"
 ```
 
 #### Karaoke Color Schemes
 
-Use `karaoke.color_scheme` to apply a predefined color scheme for karaoke ASS output. Each scheme sets `primary_color`, `secondary_color`, `outline_color`, and `back_color`.
+Use `ass.karaoke_color_scheme` to apply a predefined color scheme for karaoke ASS output. Each scheme sets `primary_color`, `secondary_color`, `outline_color`, and `back_color`.
 
 12 schemes available: `azure-gold`, `sakura-purple`, `mint-ocean`, `gardenia-green`, `sunset-warm`, `prussian-elegant`, `burgundy-classic`, `langgan-spring`, `mars-teal`, `spring-field`, `navy-pink`, `apricot-dark`
 
@@ -701,10 +701,9 @@ Use `karaoke.color_scheme` to apply a predefined color scheme for karaoke ASS ou
 ```bash
 # Karaoke with color scheme + auto speaker colors
 lai caption convert input.json output.ass \
-    word_level=true \
-    karaoke.enabled=true \
-    karaoke.color_scheme=azure-gold \
-    speaker_color=auto
+    ass.karaoke_effect=sweep \
+    ass.karaoke_color_scheme=azure-gold \
+    ass.speaker_color=auto
 ```
 
 ### VTT Format (YouTube VTT Support)
@@ -720,25 +719,24 @@ WEBVTT
 <00:00:00.000><c> Hello</c><00:00:00.500><c> world</c>
 ```
 
-**Writing**: Use `word_level=True` with `karaoke_config` to output YouTube VTT style:
+**Writing**: Use `render.word_level=True` to output YouTube VTT style with word timestamps:
 
 ```python
 from lattifai.data import Caption
-from lattifai.caption.config import KaraokeConfig
+from lattifai.caption.config import ASSConfig, RenderConfig
 
 caption = Caption.read("input.vtt")
 caption.write(
-    "output.vtt",
-    word_level=True,
-    karaoke_config=KaraokeConfig(enabled=True)
+    "output.ass",
+    format_config=ASSConfig(karaoke_effect="sweep"),
+    render=RenderConfig(word_level=True),
 )
 ```
 
 ```bash
-# CLI: Convert to YouTube VTT with word-level timestamps
+# CLI: Convert to VTT with word-level timestamps
 lai caption convert input.json output.vtt \
-    caption.word_level=true \
-    caption.karaoke.enabled=true
+    render.word_level=true
 ```
 
 ### Transcription Language Support

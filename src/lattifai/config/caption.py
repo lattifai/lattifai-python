@@ -9,9 +9,9 @@ from lattifai.caption.config import (
     OUTPUT_CAPTION_FORMATS,
     ASSConfig,
     InputCaptionFormat,
-    KaraokeConfig,
-    OutputBehavior,
+    LRCConfig,
     OutputCaptionFormat,
+    RenderConfig,
     StandardizationConfig,
 )
 from lattifai.caption.formats.nle.fcpxml import FCPXMLConfig
@@ -115,8 +115,8 @@ class CaptionInputConfig:
 class CaptionOutputConfig:
     """Caption output: destination and format.
 
-    Output behavior (include_speaker_in_text, word_level, translation_first)
-    is controlled via OutputBehavior, not here.
+    Output rendering (include_speaker_in_text, word_level, translation_first)
+    is controlled via RenderConfig, not here.
     """
 
     path: Optional[str] = None
@@ -180,11 +180,8 @@ class CaptionConfig:
     output: CaptionOutputConfig = field(default_factory=CaptionOutputConfig)
     """Caption output: destination, format, content policy."""
 
-    behavior: OutputBehavior = field(default_factory=OutputBehavior)
-    """Output behavior: include_speaker_in_text, word_level, translation_first."""
-
-    karaoke: Optional[KaraokeConfig] = None
-    """Karaoke behavior: effect type, color scheme, LRC/TTML options."""
+    render: RenderConfig = field(default_factory=RenderConfig)
+    """Rendering: include_speaker_in_text, word_level, translation_first."""
 
     standardization: Optional[StandardizationConfig] = None
     """Broadcast compliance: Netflix/BBC guidelines for segment duration, CPS, etc."""
@@ -192,7 +189,10 @@ class CaptionConfig:
     # ── Format-specific configs ──
 
     ass: Optional[ASSConfig] = None
-    """ASS/SSA format configuration: font, colors, outline, shadow, positioning."""
+    """ASS/SSA format configuration: font, colors, outline, shadow, positioning, karaoke."""
+
+    lrc: Optional[LRCConfig] = None
+    """LRC lyric format configuration: timestamp precision, metadata."""
 
     ttml: Optional[TTMLConfig] = None
     """TTML/IMSC1/EBU-TT-D format configuration: style, region, profile."""
@@ -231,7 +231,7 @@ class CaptionConfig:
 
     @property
     def include_speaker_in_text(self) -> bool:
-        return self.behavior.include_speaker_in_text
+        return self.render.include_speaker_in_text
 
     @property
     def normalize_text(self) -> bool:
@@ -243,15 +243,15 @@ class CaptionConfig:
 
     @property
     def word_level(self) -> bool:
-        return self.behavior.word_level
+        return self.render.word_level
 
     @word_level.setter
     def word_level(self, value: bool) -> None:
-        self.behavior.word_level = value
+        self.render.word_level = value
 
     @property
     def translation_first(self) -> bool:
-        return self.behavior.translation_first
+        return self.render.translation_first
 
     @property
     def encoding(self) -> str:
@@ -291,7 +291,24 @@ class CaptionConfig:
             return self.fcpxml
         elif fmt == "premiere_xml":
             return self.premiere
+        elif fmt == "lrc":
+            return self.lrc
         return None
+
+    def write_kwargs(self, output_format: Optional[str] = None) -> dict:
+        """Build kwargs dict for Caption.write(), centralizing config → write() translation.
+
+        Args:
+            output_format: Override format for format_config lookup (e.g., file extension).
+
+        Returns:
+            Dict with format_config, render, standardization keys.
+        """
+        return {
+            "format_config": self.get_format_config(output_format),
+            "render": self.render,
+            "standardization": self.standardization,
+        }
 
     def need_alignment(self, trust_timestamps: bool) -> bool:
         """Determine if alignment is needed based on configuration."""

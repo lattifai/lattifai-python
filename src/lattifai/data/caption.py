@@ -123,8 +123,7 @@ class Caption(BaseCaption):
         self,
         path=None,
         format_config=None,
-        behavior=None,
-        karaoke=None,
+        render=None,
         standardization=None,
     ):
         """
@@ -134,9 +133,8 @@ class Caption(BaseCaption):
 
         Args:
             path: Path to output caption file, BytesIO object, or None to return bytes
-            format_config: Format-specific configuration (ASSConfig, TTMLConfig, etc.)
-            behavior: OutputBehavior controlling include_speaker, word_level, translation_first
-            karaoke: Karaoke configuration (effect, color_scheme)
+            format_config: Format-specific configuration (ASSConfig, TTMLConfig, LRCConfig, etc.)
+            render: RenderConfig controlling include_speaker, word_level, translation_first
             standardization: Broadcast standardization config
 
         Returns:
@@ -154,8 +152,7 @@ class Caption(BaseCaption):
             result = super().write(
                 path=path,
                 format_config=format_config,
-                behavior=behavior,
-                karaoke=karaoke,
+                render=render,
                 standardization=standardization,
             )
         finally:

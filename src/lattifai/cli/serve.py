@@ -25,10 +25,11 @@ from lattifai.cli.translate import translate as translate_run
 from lattifai.client import LattifAI
 from lattifai.config import (
     AlignmentConfig,
+    ASSConfig,
     CaptionConfig,
     CaptionInputConfig,
     EventConfig,
-    OutputBehavior,
+    RenderConfig,
     TranscriptionConfig,
 )
 from lattifai.config.llm import LLMConfig
@@ -343,7 +344,7 @@ class ServeHandler(BaseHTTPRequestHandler):
             alignment_config=AlignmentConfig(device=device),
             caption_config=CaptionConfig(
                 input=CaptionInputConfig(split_sentence=split_sentence),
-                behavior=OutputBehavior(word_level=word_level),
+                render=RenderConfig(word_level=word_level),
             ),
         )
         client.alignment(
@@ -394,17 +395,15 @@ class ServeHandler(BaseHTTPRequestHandler):
         if karaoke:
             word_level = True
 
-        from lattifai.caption.config import KaraokeConfig
-
         caption_convert(
             input_path=str(caption_file),
             output_path=str(output_path),
             normalize_text=normalize_text,
-            behavior=OutputBehavior(
+            render=RenderConfig(
                 include_speaker_in_text=include_speaker,
                 word_level=word_level,
             ),
-            karaoke=KaraokeConfig(enabled=True) if karaoke else None,
+            ass=ASSConfig(karaoke_effect="sweep") if karaoke else None,
         )
         return output_path
 
