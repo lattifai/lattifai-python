@@ -115,14 +115,14 @@ jobs:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
         run: |
           # modelscope/LattifAI/Lattice-1-Alpha
-          lai alignment align -Y media.input_path=tests/data/SA1.m4a \
-                                 caption.input_path=tests/data/SA1.TXT \
-                                 caption.output_path=tests/data/SA1.TextGrid \
+          lai alignment align -Y input_media=tests/data/SA1.m4a \
+                                 input_caption=tests/data/SA1.TXT \
+                                 output_caption=tests/data/SA1.TextGrid \
                                  alignment.model_name=LattifAI/Lattice-1-Alpha alignment.model_hub=modelscope
           # modelscope/LattifAI/Lattice-1
-          lai alignment align -Y media.input_path=tests/data/SA1.m4a \
-                                 caption.input_path=tests/data/SA1.TXT \
-                                 caption.output_path=tests/data/SA1_Lattice1.TextGrid \
+          lai alignment align -Y input_media=tests/data/SA1.m4a \
+                                 input_caption=tests/data/SA1.TXT \
+                                 output_caption=tests/data/SA1_Lattice1.TextGrid \
                                  alignment.model_name=LattifAI/Lattice-1 alignment.model_hub=modelscope
 
       - name: Test Cli Commands
@@ -133,7 +133,7 @@ jobs:
           # Test lai command
           which lai
           # Test alignment youtube (allow failure due to YouTube restrictions in CI)
-          lai alignment youtube -Y https://www.youtube.com/shorts/zTYymWpptyI caption.split_sentence=true media.output_dir=~/Downloads/lattifai_youtube media.force_overwrite=true || echo "⚠️ YouTube download failed (expected in CI environment)"
+          lai alignment youtube -Y https://www.youtube.com/shorts/zTYymWpptyI caption.input.split_sentence=true media.output_dir=~/Downloads/lattifai_youtube media.force_overwrite=true || echo "⚠️ YouTube download failed (expected in CI environment)"
           # Only test caption conversion if download succeeded
           if [ -f ~/Downloads/lattifai_youtube/zTYymWpptyI_LattifAI.srt ]; then
             laicap-convert -Y ~/Downloads/lattifai_youtube/zTYymWpptyI_LattifAI.srt ~/Downloads/lattifai_youtube/zTYymWpptyI_LattifAI.TextGrid
@@ -148,7 +148,7 @@ jobs:
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=iic/SenseVoiceSmall
           # Event
           lai alignment align -Y -v tests/data/DQacCB9tDaw_16K_First05Mins.mp3 tests/data/DQacCB9tDaw_16K_First05Mins.md \
-              alignment.model_name=LattifAI/Lattice-1 event.enabled=true caption.split_sentence=true caption.input_format=gemini
+              alignment.model_name=LattifAI/Lattice-1 event.enabled=true caption.input.split_sentence=true caption.input.format=gemini
 
   verify-imports:
     runs-on: ubuntu-24.04
