@@ -52,6 +52,21 @@ def test_alignment_method_exists():
 
 
 if __name__ == "__main__":
-    import pytest
-
-    sys.exit(pytest.main([__file__, "-v"]))
+    # Run without pytest dependency for CI wheel smoke tests
+    tests = [
+        test_import,
+        test_package_structure,
+        test_LattifAI_import,
+        test_io_imports,
+        test_client_class_exists,
+        test_alignment_method_exists,
+    ]
+    failed = 0
+    for fn in tests:
+        try:
+            fn()
+            print(f"  PASS  {fn.__name__}")
+        except Exception as e:
+            print(f"  FAIL  {fn.__name__}: {e}")
+            failed += 1
+    sys.exit(failed)
