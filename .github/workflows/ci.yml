@@ -50,6 +50,9 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LATTIFAI_TESTS_CLI_DRYRUN: ${{ secrets.LATTIFAI_TESTS_CLI_DRYRUN }}
         run: |
+          # Fast-fail on config/format regressions first
+          pytest tests/caption/ tests/config/ tests/test_configs.py tests/test_alignment_api.py tests/test_word_level_margin.py -x -q
+          # Full test suite
           pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/parakeet-tdt-0.6b-v3
           lai transcribe align -Y -v tests/data/SA1.wav transcription.model_name=nvidia/canary-1b-v2
