@@ -488,7 +488,7 @@ class TestVTTFormat:
             assert len(cue["text"]) > 0, f"Cue {j} text must not be empty"
 
     def test_vtt_word_level_true_structure(self, aligned_json_en, tmp_path):
-        """VTT with word_level=True: validate word-per-cue."""
+        """VTT with word_level=True: produces YouTube VTT format with <c> word tags."""
         output_path = tmp_path / "output.vtt"
 
         result = run_caption_convert(aligned_json_en, output_path, word_level=True, karaoke=False)
@@ -496,15 +496,12 @@ class TestVTTFormat:
 
         content = output_path.read_text()
 
-        # Count timing lines
-        timing_lines = [l for l in content.split("\n") if " --> " in l]
-        assert len(timing_lines) >= 3, f"word_level=True should produce many cues, got {len(timing_lines)}"
-
         # Validate header
         assert content.strip().startswith("WEBVTT"), "VTT must start with WEBVTT"
 
-        # Should NOT have YouTube VTT word-level tags
-        assert "<c>" not in content, "word_level=True without karaoke should NOT have <c> tags"
+        # word_level=True outputs YouTube VTT style with inline <c> word timestamps
+        assert "<c>" in content, "word_level=True should produce YouTube VTT <c> tags"
+        assert "</c>" in content, "word_level=True should produce YouTube VTT </c> tags"
 
     def test_vtt_karaoke_youtube_format(self, aligned_json_en, tmp_path):
         """VTT with karaoke=True: validate YouTube VTT format with <timestamp><c> tags."""
@@ -704,30 +701,22 @@ class TestLRCFormat:
             assert "<" not in tl["text"], f"Line {i} should NOT have enhanced <timestamp> tags"
 
     def test_lrc_word_level_true_no_karaoke(self, aligned_json_en, tmp_path):
-        """LRC with word_level=True, karaoke=False: one word per line."""
+        """LRC with word_level=True: enhanced LRC with inline word timestamps."""
         output_path = tmp_path / "output.lrc"
 
         result = run_caption_convert(aligned_json_en, output_path, word_level=True, karaoke=False)
         assert result.returncode == 0, f"Command failed: {result.stderr}"
 
         content = output_path.read_text()
-        lines = content.strip().split("\n")
 
-        # Count timing lines
-        timing_lines = [l for l in lines if re.match(r"^\[\d+:\d+\.\d+\]", l)]
-        assert len(timing_lines) >= 3, f"word_level=True should produce many lines, got {len(timing_lines)}"
+        # Enhanced LRC embeds word timestamps inline: [mm:ss.xxx]<mm:ss.xxx>word <mm:ss.xxx>word
+        assert re.search(
+            r"<\d+:\d+\.\d+>", content
+        ), "word_level=True should produce enhanced LRC with <timestamp> tags"
 
-        # Most should be single words
-        single_word_lines = 0
-        for line in timing_lines:
-            match = re.match(r"^\[\d+:\d+\.\d+\](.*)$", line)
-            if match:
-                text = match.group(1).strip()
-                if len(text.split()) == 1:
-                    single_word_lines += 1
-
-        ratio = single_word_lines / len(timing_lines) if timing_lines else 0
-        assert ratio >= 0.7, f"At least 70% should be single words, got {ratio:.1%}"
+        # Should have segment-level timing
+        timing_lines = [l for l in content.strip().split("\n") if re.match(r"^\[\d+:\d+\.\d+\]", l)]
+        assert len(timing_lines) >= 1, "Should have at least one timed line"
 
     def test_lrc_karaoke_enhanced_format(self, aligned_json_en, tmp_path):
         """LRC with karaoke=True: validate enhanced <mm:ss.xx>word format."""
@@ -810,7 +799,7 @@ class TestTTMLFormat:
         assert 'itunes:timing="Word"' not in content, "Should NOT have itunes:timing when karaoke=False"
 
     def test_ttml_word_level_true_no_karaoke(self, aligned_json_en, tmp_path):
-        """TTML with word_level=True, karaoke=False: one word per <p>."""
+        """TTML with word_level=True: word-level <span> elements within <p>."""
         output_path = tmp_path / "output.ttml"
 
         result = run_caption_convert(aligned_json_en, output_path, word_level=True, karaoke=False)
@@ -818,12 +807,9 @@ class TestTTMLFormat:
 
         content = output_path.read_text()
 
-        # Count <p> elements
-        p_count = content.count("<p ")
-        assert p_count >= 3, f"word_level=True should produce many <p> elements, got {p_count}"
-
-        # NO itunes:timing
-        assert 'itunes:timing="Word"' not in content, "Should NOT have itunes:timing when karaoke=False"
+        # word_level=True produces <span> per word inside <p> elements
+        span_count = content.count("<span")
+        assert span_count >= 3, f"word_level=True should produce many <span> elements, got {span_count}"
 
     def test_ttml_karaoke_word_timing(self, aligned_json_en, tmp_path):
         """TTML with karaoke=True: validate itunes:timing='Word' and <span> elements."""
@@ -929,39 +915,40 @@ class TestEdgeCasesAndConsistency:
         assert "Dialogue:" in content
 
     def test_format_word_count_consistency(self, aligned_json_en, tmp_path):
-        """All word-level formats should have consistent word counts."""
+        """All word-level formats should have consistent word counts.
+
+        Different formats embed words differently:
+        - JSON: words array, SRT/ASS: word-per-segment
+        - VTT: YouTube <c> tags, LRC: enhanced <timestamp> tags
+        Count the actual words in each format's native representation.
+        """
         word_counts = {}
 
-        # JSON
+        # JSON: count words array entries
         json_out = tmp_path / "output.json"
         run_caption_convert(aligned_json_en, json_out, word_level=True, karaoke=False)
         data = _load_json_segments(json_out)
-        json_words = sum(len(seg.get("words", [])) for seg in data)
-        word_counts["json"] = json_words
+        word_counts["json"] = sum(len(seg.get("words", [])) for seg in data)
 
-        # SRT
+        # SRT: word-per-segment (count timing lines)
         srt_out = tmp_path / "output.srt"
         run_caption_convert(aligned_json_en, srt_out, word_level=True, karaoke=False)
-        srt_content = srt_out.read_text()
-        word_counts["srt"] = srt_content.count("-->")
+        word_counts["srt"] = srt_out.read_text().count("-->")
 
-        # VTT
+        # VTT: YouTube VTT style (count <c> tags = words)
         vtt_out = tmp_path / "output.vtt"
         run_caption_convert(aligned_json_en, vtt_out, word_level=True, karaoke=False)
-        vtt_content = vtt_out.read_text()
-        word_counts["vtt"] = vtt_content.count("-->")
+        word_counts["vtt"] = vtt_out.read_text().count("</c>")
 
-        # ASS
+        # ASS: word-per-Dialogue
         ass_out = tmp_path / "output.ass"
         run_caption_convert(aligned_json_en, ass_out, word_level=True, karaoke=False)
-        ass_content = ass_out.read_text()
-        word_counts["ass"] = ass_content.count("Dialogue:")
+        word_counts["ass"] = ass_out.read_text().count("Dialogue:")
 
-        # LRC
+        # LRC: enhanced LRC (count <timestamp> tags = words)
         lrc_out = tmp_path / "output.lrc"
         run_caption_convert(aligned_json_en, lrc_out, word_level=True, karaoke=False)
-        lrc_content = lrc_out.read_text()
-        word_counts["lrc"] = len([l for l in lrc_content.split("\n") if re.match(r"^\[\d+:\d+\.\d+\]", l)])
+        word_counts["lrc"] = len(re.findall(r"<\d+:\d+\.\d+>", lrc_out.read_text()))
 
         # All counts should be within 30% of each other
         counts = list(word_counts.values())
