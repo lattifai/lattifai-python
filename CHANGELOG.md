@@ -1,6 +1,37 @@
 # CHANGELOG
 
 
+## [1.5.1] - 2026-04-08
+
+### Fixes
+- Fix 15 bugs from v1.5.0 third-party install test report:
+  - Fix README SDK examples: `CaptionConfig(split_sentence=...)` → `CaptionConfig(input=CaptionInputConfig(...))`
+  - Fix README CLI commands: `lai alignment youtube` → `lai youtube align`, `lai translate run` → `lai translate caption`
+  - Fix `lai-summarize --help` crash (remove `from __future__ import annotations` for nemo_run compat)
+  - Remove false `lhotse` dependency check from `lai doctor`
+  - Add `mock_api_key` fixture for tests constructing `LattifAI()` without real API key
+  - Add `@requires_nemo` skip marker for transcription tests needing `[transcription]` extra
+  - Add `lai --version` via Typer callback
+  - Expose `lattifai.__version__` on namespace package via `_init.py` injection
+  - Fix LICENSE classifier mismatch (Apache → MIT)
+  - Remove non-existent `[youtube]` from `[all]` extra
+  - Fix `laicap-convert` help text typo
+  - Fix auth callback `ValueError` on double `server_close()`
+  - Pin `pytest-asyncio<2.0.0`
+- Fix `qwen-asr` / `transformers` version conflict in `[transcription]` extra (remove `qwen-asr` pip dep, use vendored copy)
+- Skip Gemini 503 errors in transcription save test instead of failing
+- Correct Breaking Changes table in CHANGELOG and RELEASE_NOTES (v1.4.x flat `CaptionConfig`, not intermediate `OutputBehavior`)
+- Fix `lai translate run` → `lai translate caption` in RELEASE_NOTES
+
+### Refactor
+- Format-specific CLI configs for caption convert (ASS, TTML, FCPXML, Premiere, LRC)
+- Shared audio duration limits and VAD-aware chunking for transcription
+
+### Dependencies
+- `lattifai-captions` ≥ 0.4.2 (was ≥ 0.4.0)
+- Remove `qwen-asr` from `[transcription]` extra (vendored)
+
+
 ## [1.5.0] - 2026-04-06
 
 > This release contains **breaking changes** — see migration guide below. Config API overhaul, new auth system, 10 new CLI commands, and major feature additions across transcription, translation, diarization, and YouTube pipelines.

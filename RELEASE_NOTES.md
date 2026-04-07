@@ -1,3 +1,38 @@
+# Release Notes - LattifAI Python v1.5.1
+
+**Release Date:** April 8, 2026
+
+---
+
+## Overview
+
+v1.5.1 is a patch release fixing 15 bugs from the v1.5.0 third-party install test, resolving dependency conflicts, correcting documentation, and trimming 23k lines of dead vendored code.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+### Key Fixes
+- **README SDK examples** now match actual v1.5.0 API (`CaptionInputConfig`, `RenderConfig`)
+- **README CLI commands** corrected (`lai youtube align`, `lai translate caption`)
+- **`lai-summarize --help`** no longer crashes (nemo_run compat fix)
+- **`lai doctor`** no longer reports false missing `lhotse` dependency
+- **`lai --version`** now works
+- **`lattifai.__version__`** accessible on namespace package
+- **Dependency conflict** resolved: removed `qwen-asr` pip dependency (vendored copy used instead)
+- **Vendored `qwen_asr`** trimmed from 776 KB to 268 KB (removed CLI demos, vLLM backend, Korean dict)
+- **Tests** gracefully skip when optional extras or API keys unavailable
+
+### Dependencies
+- `lattifai-captions` ≥ 0.4.2 (was ≥ 0.4.0)
+- Removed `qwen-asr` from `[transcription]` extra
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.0
 
 **Release Date:** April 6, 2026

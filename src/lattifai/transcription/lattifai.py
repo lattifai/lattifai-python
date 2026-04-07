@@ -156,6 +156,12 @@ class LattifAITranscriber(BaseTranscriber):
             return AutoModel(model=model_name, trust_remote_code=True, device=str(device), hub=hub, disable_update=True)
 
         elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
+            raise NotImplementedError(
+                "Qwen3-ASR is not yet implemented in LattifAITranscriber. "
+                "This requires the qwen_asr package with transformers >=5.5 compat fixes. "
+                "Please check the GitHub repository for updates on this feature."
+            )
+
             # Use vendored qwen_asr with transformers >=5.5 compat fixes
             from lattifai.vendor.qwen_asr import Qwen3ASRModel
 
@@ -186,6 +192,12 @@ class LattifAITranscriber(BaseTranscriber):
             return model
 
         elif model_name.startswith("google/gemma-4-"):
+            raise NotImplementedError(
+                "Gemma-4 multimodal transcription is not yet implemented in LattifAITranscriber. "
+                "This requires custom input preparation and output parsing using the Hugging Face transformers library. "  # noqa: E501
+                "Please check the GitHub repository for updates on this feature."
+            )
+
             # Gemma-4: multimodal model with USM audio encoder (30s hard limit per clip).
             # Requires transformers>=5.5.0.
             # https://huggingface.co/google/gemma-4-E2B-it#6-audio
