@@ -148,9 +148,19 @@ def _mask_value(value: str) -> str:
 
 
 def _load_config() -> dict:
-    """Load config from ~/.lattifai/config.toml."""
+    """Load config from ~/.lattifai/config.toml.
+
+    Uses tomlkit for comment-preserving round-trip editing.
+    Falls back to tomllib (read-only) if tomlkit is unavailable.
+    """
     if not CONFIG_FILE.exists():
         return {}
+    try:
+        import tomlkit
+
+        return tomlkit.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except ImportError:
+        pass
     try:
         import tomllib
     except ImportError:
@@ -295,13 +305,34 @@ def _ensure_config_permissions() -> None:
 
 
 def _save_config(data: dict[str, Any]) -> None:
-    """Save config to ~/.lattifai/config.toml."""
-    normalized = _normalize_config(data)
+    """Save config to ~/.lattifai/config.toml.
+
+    If data is a tomlkit document, dumps directly to preserve comments.
+    Otherwise falls back to manual serialization.
+    """
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(CONFIG_DIR, 0o700)
     except OSError:
         pass
+
+    # tomlkit document: dump directly to preserve comments
+    try:
+        import tomlkit
+
+        if isinstance(data, tomlkit.TOMLDocument):
+            file_content = tomlkit.dumps(data)
+            old_umask = os.umask(0o077)
+            try:
+                CONFIG_FILE.write_text(file_content, encoding="utf-8")
+            finally:
+                os.umask(old_umask)
+            return
+    except ImportError:
+        pass
+
+    # Fallback: manual serialization (loses comments)
+    normalized = _normalize_config(data)
 
     lines: list[str] = []
     root_scalars = {key: value for key, value in normalized.items() if not isinstance(value, dict)}

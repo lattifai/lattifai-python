@@ -125,7 +125,6 @@ def _exchange_code(
 
 def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
     """Persist auth metadata into config.toml."""
-    clear_auth()
     set_auth_value("LATTIFAI_API_KEY", obfuscate(api_key))
     if whoami_data.get("user_email"):
         set_auth_value("USER_EMAIL", whoami_data["user_email"])
@@ -136,7 +135,6 @@ def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
 
 def _persist_trial_auth(data: dict[str, Any]) -> None:
     """Persist trial auth metadata into config.toml."""
-    clear_auth()
     set_auth_value("LATTIFAI_API_KEY", obfuscate(data["api_key"]))
     set_auth_value("IS_TRIAL", True)
     set_auth_value("EXPIRES_AT", data["expires_at"])

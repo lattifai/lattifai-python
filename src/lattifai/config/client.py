@@ -61,6 +61,19 @@ class ClientConfig:
             except Exception:
                 object.__setattr__(self, "client_version", "unknown")
 
+        # Inject X-Device-Auth into default_headers for device-bound keys
+        if self.api_key:
+            try:
+                from lattifai_auth import generate_auth_payload
+
+                payload = generate_auth_payload(self.api_key)
+                if self.default_headers is None:
+                    object.__setattr__(self, "default_headers", {"X-Device-Auth": payload})
+                else:
+                    self.default_headers["X-Device-Auth"] = payload
+            except (ImportError, RuntimeError, ValueError):
+                pass
+
         # Validate API parameters
         if self.timeout <= 0:
             raise ValueError("timeout must be greater than 0")
