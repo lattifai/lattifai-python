@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## [1.5.2] - 2026-04-08
+
+### Fixes
+- Auto-inject `X-Device-Auth` header in `ClientConfig` for device-bound API keys
+- Preserve TOML comments in `config.toml` during auth persist (tomlkit round-trip)
+- `_persist_auth` / `_persist_trial_auth` no longer clear existing auth section
+
+### Refactor
+- Trim 23k lines of dead vendored `qwen_asr` code (CLI demos, vLLM backend, Korean dict)
+- Remove `transformers>=5.5.0` and `torch` from `[transcription]` extra (disabled features)
+
+### Tests
+- Add auth tests: X-Device-Auth injection, comment preservation, trial persist
+- Add auth/config tests to CI fast-fail stage
+
+
 ## [1.5.1] - 2026-04-08
 
 ### Fixes

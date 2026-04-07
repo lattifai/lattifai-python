@@ -1,3 +1,22 @@
+# Release Notes - LattifAI Python v1.5.2
+
+**Release Date:** April 8, 2026
+
+---
+
+## Overview
+
+v1.5.2 adds device authentication for API requests, preserves config.toml comments, and cleans up dependencies.
+
+### Key Changes
+- **Device auth**: API requests now include `X-Device-Auth` HMAC signature automatically
+- **Config preservation**: `lai auth login/trial` no longer destroys TOML comments in `config.toml`
+- **Dependency cleanup**: Removed `transformers`, `torch`, `qwen-asr` from `[transcription]` extra; trimmed 23k lines of dead vendored code
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.1
 
 **Release Date:** April 8, 2026
