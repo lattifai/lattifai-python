@@ -126,15 +126,11 @@ class VLLMTranscriber(BaseTranscriber):
         if self._vad_chunk_size is not None:
             return self._vad_chunk_size
 
-        # Models with hard 30s audio encoder limit
-        # - Whisper: fixed 30s context window
-        # - Gemma-3n: USM encoder hard-caps at 30s, audio beyond 30s is silently dropped.
-        #   Ref: https://huggingface.co/google/gemma-3n-E4B-it/discussions/37
-        #   Ref: https://ai.google.dev/gemma/docs/capabilities/audio
-        model_lower = self.config.model_name.lower()
-        if any(k in model_lower for k in ("whisper", "gemma")):
-            self._vad_chunk_size = 30.0
-            return 30.0
+        # Check shared hard audio encoder limits (whisper 30s, gemma 30s, etc.)
+        max_secs = self._get_max_audio_seconds()
+        if max_secs is not None:
+            self._vad_chunk_size = max_secs
+            return max_secs
 
         # Try to query /v1/models for max_model_len
         try:

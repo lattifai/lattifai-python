@@ -188,16 +188,36 @@ class LattifAITranscriber(BaseTranscriber):
         elif model_name.startswith("google/gemma-4-"):
             # Gemma-4: multimodal model with USM audio encoder (30s hard limit per clip).
             # Requires transformers>=5.5.0.
-            from transformers import AutoModelForImageTextToText, AutoProcessor
+            # https://huggingface.co/google/gemma-4-E2B-it#6-audio
+            from transformers import AutoConfig, AutoModelForMultimodalLM, AutoProcessor
 
             device_str = str(device)
-            device_map = "cuda:0" if device_str == "cuda" else device_str
-            dtype = torch.bfloat16 if "cuda" in device_map else torch.float32
 
+            # ASR context budget: 30s audio × 25 tok/s = 750 audio tokens + ~512 output.
+            # Default 128K context pre-allocates massive KV cache; cap it for ASR.
+            _ASR_MAX_CONTEXT = 2048
+            config = AutoConfig.from_pretrained(model_name)
+            if hasattr(config, "max_position_embeddings"):
+                config.max_position_embeddings = _ASR_MAX_CONTEXT
+            if hasattr(config, "text_config") and hasattr(config.text_config, "max_position_embeddings"):
+                config.text_config.max_position_embeddings = _ASR_MAX_CONTEXT
+
+            # device_map="auto" requires accelerate + CUDA; on MPS/CPU load explicitly.
+            if device_str in ("mps", "cpu") or device_str.startswith("cuda:"):
+                if device_str.startswith("cuda"):
+                    dtype = torch.bfloat16
+                elif device_str == "mps":
+                    dtype = torch.float16  # MPS doesn't support bfloat16
+                else:
+                    dtype = torch.float32
+                model = AutoModelForMultimodalLM.from_pretrained(model_name, config=config, dtype=dtype).to(device_str)
+            else:
+                # CUDA with auto-dispatch
+                model = AutoModelForMultimodalLM.from_pretrained(
+                    model_name, config=config, dtype="auto", device_map="auto"
+                )
             processor = AutoProcessor.from_pretrained(model_name)
-            model = AutoModelForImageTextToText.from_pretrained(model_name, torch_dtype=dtype, device_map=device_map)
-            logger.info("Loaded %s on %s (dtype=%s)", model_name, device_map, dtype)
-            # Return (model, processor) tuple — unpacked in _transcribe_impl
+            logger.info("Loaded %s on %s", model_name, model.device)
             return (model, processor)
 
         else:
@@ -235,7 +255,11 @@ class LattifAITranscriber(BaseTranscriber):
                 assert audio.ndarray.ndim == 2, "AudioData.ndarray must be 2D (channels, samples)"
                 assert audio.ndarray.shape[0] == 1, "AudioData.ndarray must have 1 channel for transcription"
 
-                segments, led = self._vad_segment(audio)
+                max_secs = self._get_max_audio_seconds()
+                segments, led = self._vad_segment(audio, vad_chunk_size=max_secs or 30.0)
+                # Enforce hard audio encoder limits — split any segments still exceeding the cap
+                if max_secs and segments:
+                    segments = self._split_long_segments(segments, max_secs)
                 if segments:
                     audio = self._slice_audio_by_segments(audio, segments)
 
@@ -373,23 +397,28 @@ class LattifAITranscriber(BaseTranscriber):
 
                 iterable = tqdm(audio_inputs, desc="Transcribing", unit="seg") if progress_bar else audio_inputs
                 for inp in iterable:
+                    # Compute duration and prepare audio for the processor.
+                    # apply_chat_template accepts file paths, URLs, or raw numpy arrays.
                     if isinstance(inp, np.ndarray):
                         dur = inp.shape[-1] / _ASR_SAMPLE_RATE
-                        # Ensure 1D float32 for processor
                         if inp.ndim == 2:
                             inp = inp.squeeze(0)
                         inp = inp.astype(np.float32)
                     elif isinstance(inp, torch.Tensor):
                         dur = inp.shape[-1] / _ASR_SAMPLE_RATE
                         inp = inp.squeeze(0).cpu().numpy().astype(np.float32)
+                    elif isinstance(inp, str):
+                        dur = 0.0  # duration computed later from output
                     else:
                         dur = 0.0
 
+                    # Audio before text per official best practice
+                    # https://huggingface.co/google/gemma-4-E2B-it#6-audio
                     messages = [
                         {
                             "role": "user",
                             "content": [
-                                {"type": "audio", "audio": inp, "sample_rate": _ASR_SAMPLE_RATE},
+                                {"type": "audio", "audio": inp},
                                 {"type": "text", "text": prompt_text},
                             ],
                         }
@@ -397,16 +426,16 @@ class LattifAITranscriber(BaseTranscriber):
                     inputs = processor.apply_chat_template(
                         messages,
                         tokenize=True,
-                        return_tensors="pt",
                         return_dict=True,
+                        return_tensors="pt",
                         add_generation_prompt=True,
-                    )
-                    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+                    ).to(model.device)
                     input_len = inputs["input_ids"].shape[-1]
 
                     output_ids = model.generate(**inputs, max_new_tokens=512)
-                    text = processor.batch_decode(output_ids[:, input_len:], skip_special_tokens=True)[0].strip()
-                    hypotheses.append(Supervision(text=text, duration=dur))
+                    response = processor.decode(output_ids[0][input_len:], skip_special_tokens=False)
+                    text = processor.parse_response(response)
+                    hypotheses.append(Supervision(text=str(text).strip(), duration=dur))
 
             else:
                 raise ValueError(f"Unsupported model_name: {model_name}")

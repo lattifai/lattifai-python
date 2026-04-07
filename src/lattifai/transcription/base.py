@@ -35,6 +35,26 @@ class BaseTranscriber(ABC):
     needs_vad: bool = False
     """Whether this transcriber needs VAD segmentation via event_detector."""
 
+    # Maximum audio chunk duration (seconds) per model family.
+    # Matched by keyword in model_name (case-insensitive, first match wins).
+    # Sources: official model cards, tech reports, and HuggingFace docs.
+    _MAX_AUDIO_SECONDS = {
+        # Hard encoder limits — audio beyond this is silently truncated
+        "whisper": 30.0,  # Fixed 30s encoder context window
+        "gemma": 30.0,  # USM encoder hard 30s (gemma-3n, gemma-4)
+        "sensevoice": 30.0,  # SenseVoice encoder, 30s per segment
+        # ultravox: Whisper encoder chunks 30s internally but concatenates embeddings.
+        # Effective limit depends on max_model_len — computed dynamically in VLLMTranscriber.
+        "canary": 40.0,  # NeMo Canary, 40s per chunk (auto-chunking for longer)
+        # Verified large context — native long-form support
+        "qwen3-asr": 1200.0,  # 20 min native (arXiv 2601.21337 Table 1)
+        "parakeet": 1440.0,  # 24 min full-attention on A100 (model card)
+        "voxtral": 2400.0,  # 40 min, 32K context at 12.5 Hz (arXiv 2507.13264)
+        # Unverified — conservative defaults based on architecture
+        "fun-asr": 30.0,  # Paraformer encoder, recommended with VAD at 30s
+        "glm": 30.0,  # GLM-ASR, processes in 30s chunks internally
+    }
+
     def __init__(self, config: Optional[TranscriptionConfig] = None):
         """
         Initialize base transcriber.
@@ -136,6 +156,18 @@ class BaseTranscriber(ABC):
         Persist transcript text to disk and return the file path.
         """
 
+    def _get_max_audio_seconds(self) -> Optional[float]:
+        """Get the hard audio duration limit for this model (seconds).
+
+        Returns None if the model has no known hard limit.
+        Subclasses can override for model-specific logic.
+        """
+        model_lower = self.config.model_name.lower()
+        for keyword, limit in self._MAX_AUDIO_SECONDS.items():
+            if keyword in model_lower:
+                return limit
+        return None
+
     def _vad_segment(
         self, audio: AudioData, vad_chunk_size: float = 30.0, vad_max_gap: float = 4.0
     ) -> Tuple[List[Tuple[float, float]], Optional["LEDOutput"]]:
@@ -157,6 +189,32 @@ class BaseTranscriber(ABC):
         segments = [(ev.start_time, ev.end_time) for ev in led.audio_events.get_tier_by_name("VAD")]
         logger.info("VAD detected %d speech segments (total %.1fs audio)", len(segments), audio.duration)
         return segments, led
+
+    @staticmethod
+    def _split_long_segments(segments: List[Tuple[float, float]], max_seconds: float) -> List[Tuple[float, float]]:
+        """Split segments exceeding max_seconds into smaller chunks.
+
+        Protects models with hard audio encoder limits (e.g. Whisper 30s, Gemma USM 30s)
+        from silently dropping audio beyond the limit.
+        """
+        result = []
+        for start, end in segments:
+            if end - start <= max_seconds:
+                result.append((start, end))
+            else:
+                pos = start
+                while pos < end:
+                    chunk_end = min(pos + max_seconds, end)
+                    result.append((pos, chunk_end))
+                    pos = chunk_end
+        if len(result) > len(segments):
+            logger.info(
+                "Split %d oversized segments → %d chunks (max %.0fs each)",
+                len(result) - len(segments),
+                len(result),
+                max_seconds,
+            )
+        return result
 
     @staticmethod
     def _slice_audio_by_segments(audio: AudioData, segments: List[Tuple[float, float]]) -> List[np.ndarray]:

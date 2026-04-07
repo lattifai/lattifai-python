@@ -121,6 +121,83 @@ class TestGemma4TranscriberFactory:
 
 
 # ---------------------------------------------------------------------------
+# 2b. Shared audio limits & segment splitting
+# ---------------------------------------------------------------------------
+class TestSharedAudioLimits:
+    """Test _MAX_AUDIO_SECONDS, _get_max_audio_seconds, and _split_long_segments."""
+
+    def test_gemma_max_audio_30s(self):
+        """Gemma models should report 30s hard limit."""
+        from lattifai.transcription.lattifai import LattifAITranscriber
+
+        config = TranscriptionConfig(model_name="google/gemma-4-E2B-it", device="cpu")
+        transcriber = LattifAITranscriber(transcription_config=config)
+        assert transcriber._get_max_audio_seconds() == 30.0
+
+    @pytest.mark.parametrize(
+        "model_name,expected",
+        [
+            ("nvidia/parakeet-tdt-0.6b-v3", 1440.0),  # 24 min (model card)
+            ("iic/SenseVoiceSmall", 30.0),  # 30s encoder
+            ("Qwen/Qwen3-ASR-0.6B", 1200.0),  # 20 min (tech report)
+            ("Qwen/Qwen3-ASR-1.7B", 1200.0),  # 20 min (tech report)
+        ],
+    )
+    def test_model_audio_limits(self, model_name, expected):
+        """Each model should have its verified audio limit."""
+        from lattifai.transcription.lattifai import LattifAITranscriber
+
+        config = TranscriptionConfig(model_name=model_name, device="cpu")
+        transcriber = LattifAITranscriber(transcription_config=config)
+        assert transcriber._get_max_audio_seconds() == expected
+
+    def test_split_long_segments_no_split_needed(self):
+        """Segments within limit should pass through unchanged."""
+        from lattifai.transcription.base import BaseTranscriber
+
+        segments = [(0.0, 25.0), (30.0, 55.0)]
+        result = BaseTranscriber._split_long_segments(segments, 30.0)
+        assert result == segments
+
+    def test_split_long_segments_splits_oversized(self):
+        """A 90s segment should be split into 3 x 30s chunks."""
+        from lattifai.transcription.base import BaseTranscriber
+
+        segments = [(0.0, 90.0)]
+        result = BaseTranscriber._split_long_segments(segments, 30.0)
+        assert result == [(0.0, 30.0), (30.0, 60.0), (60.0, 90.0)]
+
+    def test_split_long_segments_remainder(self):
+        """A 50s segment should be split into 30s + 20s."""
+        from lattifai.transcription.base import BaseTranscriber
+
+        segments = [(10.0, 60.0)]
+        result = BaseTranscriber._split_long_segments(segments, 30.0)
+        assert result == [(10.0, 40.0), (40.0, 60.0)]
+
+    def test_split_mixed_segments(self):
+        """Mix of short and long segments."""
+        from lattifai.transcription.base import BaseTranscriber
+
+        segments = [(0.0, 20.0), (25.0, 80.0), (85.0, 100.0)]
+        result = BaseTranscriber._split_long_segments(segments, 30.0)
+        assert result == [(0.0, 20.0), (25.0, 55.0), (55.0, 80.0), (85.0, 100.0)]
+
+    def test_vllm_uses_shared_limit(self):
+        """VLLMTranscriber._get_vad_chunk_size should use shared _MAX_AUDIO_SECONDS."""
+        from lattifai.transcription.vllm import VLLMTranscriber
+
+        config = TranscriptionConfig(
+            model_name="google/gemma-4-E4B-it",
+            api_base_url="http://localhost:8000/v1",
+        )
+        transcriber = VLLMTranscriber(transcription_config=config)
+        assert transcriber._get_vad_chunk_size() == 30.0
+        # Should come from the shared _MAX_AUDIO_SECONDS, not hardcoded
+        assert transcriber._get_max_audio_seconds() == 30.0
+
+
+# ---------------------------------------------------------------------------
 # 3. LattifAITranscriber model loading (mocked)
 # ---------------------------------------------------------------------------
 class TestGemma4ModelLoading:
@@ -168,8 +245,12 @@ class TestGemma4ModelLoading:
         mock_model.generate.return_value = torch.tensor([[0] * 10 + [1, 2, 3]])
 
         mock_processor = MagicMock()
-        mock_processor.apply_chat_template.return_value = {"input_ids": MagicMock(shape=(1, 10))}
-        mock_processor.batch_decode.return_value = ["Test output"]
+        mock_inputs = MagicMock()
+        mock_inputs.to.return_value = mock_inputs
+        mock_inputs.__getitem__ = lambda s, k: torch.tensor([[0] * 10]) if k == "input_ids" else torch.ones(1, 10)
+        mock_processor.apply_chat_template.return_value = mock_inputs
+        mock_processor.decode.return_value = "Test output"
+        mock_processor.parse_response.return_value = "Test output"
 
         # Inject directly (bypass _load_asr_model)
         transcriber._asr_model = (mock_model, mock_processor)
@@ -196,17 +277,19 @@ class TestGemma4Transcription:
         mock_model.generate.return_value = MagicMock()
 
         mock_processor = MagicMock()
-        # apply_chat_template returns dict-like with input_ids
-        mock_inputs = {"input_ids": MagicMock(shape=(1, 10))}
-        mock_inputs["input_ids"].to = MagicMock(return_value=mock_inputs["input_ids"])
-        mock_processor.apply_chat_template.return_value = mock_inputs
-
-        # batch_decode returns transcribed text
-        mock_processor.batch_decode.return_value = ["She had your dark suit in greasy wash water all year."]
-
-        # generate returns token ids
+        # apply_chat_template returns a BatchEncoding-like object with .to()
         import torch
 
+        mock_inputs = MagicMock()
+        mock_inputs.__getitem__ = lambda self, k: torch.tensor([[0] * 10]) if k == "input_ids" else torch.ones(1, 10)
+        mock_inputs.to.return_value = mock_inputs
+        mock_processor.apply_chat_template.return_value = mock_inputs
+
+        # decode + parse_response returns transcribed text
+        mock_processor.decode.return_value = "She had your dark suit in greasy wash water all year."
+        mock_processor.parse_response.return_value = "She had your dark suit in greasy wash water all year."
+
+        # generate returns token ids
         mock_model.generate.return_value = torch.tensor([[0] * 10 + [1, 2, 3, 4, 5]])
 
         config = TranscriptionConfig(model_name=model_name, device="cpu")
