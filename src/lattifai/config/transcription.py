@@ -24,6 +24,10 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "FunAudioLLM/Fun-ASR-MLT-Nano-2512",
     "Qwen/Qwen3-ASR-0.6B",
     "Qwen/Qwen3-ASR-1.7B",
+    "google/gemma-4-E2B",
+    "google/gemma-4-E2B-it",
+    "google/gemma-4-E4B",
+    "google/gemma-4-E4B-it",
     # Any model served via vLLM/SGLang with api_base_url is also supported
     # (Whisper, Qwen3-ASR, GLM-ASR, VibeVoice, Voxtral, etc.)
 ]

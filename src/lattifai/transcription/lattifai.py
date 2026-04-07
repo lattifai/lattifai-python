@@ -142,27 +142,63 @@ class LattifAITranscriber(BaseTranscriber):
             from funasr import AutoModel
 
             # funasr's fun_asr_nano uses bare `from ctc import CTC` which needs the
-            # package's own directory on sys.path
+            # package's own directory on sys.path.  Without this, funasr silently
+            # swallows the ImportError and FunASRNano never gets registered.
+            # See: https://github.com/FunAudioLLM/Fun-ASR/issues/84
             nano_dir = os.path.join(os.path.dirname(funasr.__file__), "models", "fun_asr_nano")
             if nano_dir not in sys.path:
                 sys.path.insert(0, nano_dir)
+
+            # Explicitly import the model module to trigger @tables.register
+            import funasr.models.fun_asr_nano.model  # noqa: F401
 
             hub = self.config.model_hub  # "huggingface" or "modelscope"
             return AutoModel(model=model_name, trust_remote_code=True, device=str(device), hub=hub, disable_update=True)
 
         elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
-            from qwen_asr import Qwen3ASRModel
+            # Use vendored qwen_asr with transformers >=5.5 compat fixes
+            from lattifai.vendor.qwen_asr import Qwen3ASRModel
 
-            # Map LattifAI device to qwen_asr device_map
+            # Map LattifAI device to qwen_asr device_map.
+            # MPS is not supported (MRoPE matmul dimension mismatch) — fall back to CPU.
             device_str = str(device)
-            device_map = "cuda:0" if device_str == "cuda" else device_str
+            if device_str == "mps":
+                logger.warning("Qwen3-ASR does not support MPS; falling back to CPU")
+                device_map = "cpu"
+            elif device_str == "cuda":
+                device_map = "cuda:0"
+            else:
+                device_map = device_str
 
-            # bfloat16 for CUDA, float32 for CPU/MPS
+            # bfloat16 for CUDA, float32 for CPU
             dtype = torch.bfloat16 if "cuda" in device_map else torch.float32
 
-            model = Qwen3ASRModel.from_pretrained(model_name, dtype=dtype, device_map=device_map, max_new_tokens=256)
+            # Force eager attention — transformers >=5.5 sdpa returns a shape
+            # incompatible with qwen_asr's custom reshape logic.
+            model = Qwen3ASRModel.from_pretrained(
+                model_name,
+                dtype=dtype,
+                device_map=device_map,
+                max_new_tokens=256,
+                attn_implementation="eager",
+            )
             logger.info("Loaded %s on %s", model_name, device_map)
             return model
+
+        elif model_name.startswith("google/gemma-4-"):
+            # Gemma-4: multimodal model with USM audio encoder (30s hard limit per clip).
+            # Requires transformers>=5.5.0.
+            from transformers import AutoModelForImageTextToText, AutoProcessor
+
+            device_str = str(device)
+            device_map = "cuda:0" if device_str == "cuda" else device_str
+            dtype = torch.bfloat16 if "cuda" in device_map else torch.float32
+
+            processor = AutoProcessor.from_pretrained(model_name)
+            model = AutoModelForImageTextToText.from_pretrained(model_name, torch_dtype=dtype, device_map=device_map)
+            logger.info("Loaded %s on %s (dtype=%s)", model_name, device_map, dtype)
+            # Return (model, processor) tuple — unpacked in _transcribe_impl
+            return (model, processor)
 
         else:
             raise ValueError(f"Unsupported model_name: {model_name}")
@@ -296,6 +332,81 @@ class LattifAITranscriber(BaseTranscriber):
                             language=getattr(r, "language", language),
                         )
                     )
+
+            elif model_name.startswith("google/gemma-4-"):
+                # Gemma-4: multimodal transcription via transformers.
+                # USM encoder has a hard 30s limit — audio beyond 30s is silently dropped.
+                # VAD segmentation (needs_vad=True) handles chunking automatically.
+                model, processor = asr_model  # Unpack (model, processor) tuple
+
+                if isinstance(audio, np.ndarray):
+                    audio_inputs = [audio]
+                elif isinstance(audio, list):
+                    audio_inputs = audio
+                else:
+                    audio_inputs = [audio]
+
+                hypotheses = []
+                if self.config.prompt:
+                    prompt_text = self.config.prompt
+                else:
+                    # Official Gemma-4 ASR prompt template
+                    from lattifai.languages import get_language_name
+
+                    lang_name = get_language_name(language) if language else None
+                    if lang_name:
+                        prompt_text = (
+                            f"Transcribe the following speech segment in {lang_name} into {lang_name} text.\n\n"
+                            "Follow these specific instructions for formatting the answer:\n"
+                            "* Only output the transcription, with no newlines.\n"
+                            "* When transcribing numbers, write the digits, "
+                            "i.e. write 1.7 and not one point seven, and write 3 instead of three."
+                        )
+                    else:
+                        prompt_text = (
+                            "Transcribe the following speech segment in its original language.\n\n"
+                            "Follow these specific instructions for formatting the answer:\n"
+                            "* Only output the transcription, with no newlines.\n"
+                            "* When transcribing numbers, write the digits, "
+                            "i.e. write 1.7 and not one point seven, and write 3 instead of three."
+                        )
+
+                iterable = tqdm(audio_inputs, desc="Transcribing", unit="seg") if progress_bar else audio_inputs
+                for inp in iterable:
+                    if isinstance(inp, np.ndarray):
+                        dur = inp.shape[-1] / _ASR_SAMPLE_RATE
+                        # Ensure 1D float32 for processor
+                        if inp.ndim == 2:
+                            inp = inp.squeeze(0)
+                        inp = inp.astype(np.float32)
+                    elif isinstance(inp, torch.Tensor):
+                        dur = inp.shape[-1] / _ASR_SAMPLE_RATE
+                        inp = inp.squeeze(0).cpu().numpy().astype(np.float32)
+                    else:
+                        dur = 0.0
+
+                    messages = [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "audio", "audio": inp, "sample_rate": _ASR_SAMPLE_RATE},
+                                {"type": "text", "text": prompt_text},
+                            ],
+                        }
+                    ]
+                    inputs = processor.apply_chat_template(
+                        messages,
+                        tokenize=True,
+                        return_tensors="pt",
+                        return_dict=True,
+                        add_generation_prompt=True,
+                    )
+                    inputs = {k: v.to(model.device) for k, v in inputs.items()}
+                    input_len = inputs["input_ids"].shape[-1]
+
+                    output_ids = model.generate(**inputs, max_new_tokens=512)
+                    text = processor.batch_decode(output_ids[:, input_len:], skip_special_tokens=True)[0].strip()
+                    hypotheses.append(Supervision(text=text, duration=dur))
 
             else:
                 raise ValueError(f"Unsupported model_name: {model_name}")

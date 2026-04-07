@@ -22,9 +22,11 @@ per-file-ignores =
   src/lattifai/youtube/types.py: F401
   tests/*/*.py: E501, F541, F401, F841, W605, E226, E741
   tests/*.py: F541
+  src/lattifai/vendor/*: E, W, F
 
 exclude =
   .git,
   setup.py,
-  app/
+  app/,
+  src/lattifai/vendor/,
   tests/data/captions/*.vtt

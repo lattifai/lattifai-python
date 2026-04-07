@@ -52,16 +52,18 @@ def create_client(
 
     Both 'gemini' and 'openai' providers return an OpenAIClient.
     Gemini models are accessed via Google's OpenAI-compatible endpoint.
+    'transformers' provider loads models locally via HuggingFace transformers.
 
     Args:
-        provider: Provider name ('gemini' or 'openai').
+        provider: Provider name ('gemini', 'openai', or 'transformers').
         api_key: API key. Falls back to GEMINI_API_KEY or OPENAI_API_KEY env var.
-        model: Default model name.
+        model: Default model name (HuggingFace ID for 'transformers').
         base_url: Base URL override for OpenAI-compatible APIs.
         **kwargs: Extra provider-specific arguments.
+            For 'transformers': device, dtype, max_new_tokens.
 
     Returns:
-        Configured OpenAIClient instance.
+        Configured LLM client instance.
     """
     provider = provider.lower()
 
@@ -72,5 +74,9 @@ def create_client(
     elif provider == "openai":
         api_key = api_key or os.environ.get("OPENAI_API_KEY")
         return OpenAIClient(api_key=api_key, model=model, base_url=base_url, **kwargs)
+    elif provider in ("transformers", "huggingface", "hf"):
+        from lattifai.llm.transformers import TransformersClient
+
+        return TransformersClient(model=model, **kwargs)
     else:
-        raise ValueError(f"Unknown LLM provider: '{provider}'. Supported: 'gemini', 'openai'")
+        raise ValueError(f"Unknown LLM provider: '{provider}'. Supported: 'gemini', 'openai', 'transformers'")
