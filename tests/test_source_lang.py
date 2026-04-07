@@ -137,7 +137,7 @@ class TestSourceLangInYouTubeDownload:
 class TestSourceLangInClientMethods:
     """Test source_lang parameter in client methods."""
 
-    def test_youtube_method_accepts_source_lang(self):
+    def test_youtube_method_accepts_source_lang(self, mock_api_key):
         """Test that youtube() method accepts source_lang parameter."""
         client = LattifAI()
 
@@ -145,7 +145,7 @@ class TestSourceLangInClientMethods:
         sig = inspect.signature(client.youtube)
         assert "source_lang" in sig.parameters
 
-    def test_youtube_method_source_lang_default_none(self):
+    def test_youtube_method_source_lang_default_none(self, mock_api_key):
         """Test that source_lang defaults to None in youtube() method."""
         client = LattifAI()
 
@@ -165,14 +165,14 @@ class TestSourceLangInClientMethods:
 class TestSourceLangIntegration:
     """Integration tests for source_lang parameter flow."""
 
-    def test_source_lang_config_to_youtube_workflow(self):
+    def test_source_lang_config_to_youtube_workflow(self, mock_api_key):
         """Test source_lang flows from config to youtube workflow."""
         caption_config = CaptionConfig(input=CaptionInputConfig(source_lang="en"))
         client = LattifAI(caption_config=caption_config)
 
         assert client.caption_config.source_lang == "en"
 
-    def test_source_lang_parameter_overrides_config(self):
+    def test_source_lang_parameter_overrides_config(self, mock_api_key):
         """Test that source_lang parameter overrides config value."""
         # Set default in config
         caption_config = CaptionConfig(input=CaptionInputConfig(source_lang="en"))
@@ -203,7 +203,7 @@ class TestSourceLangIntegration:
             # source_lang should be 'zh' (overridden), not 'en' (from config)
             assert call_args[0][4] == "zh"
 
-    def test_source_lang_none_uses_config_default(self):
+    def test_source_lang_none_uses_config_default(self, mock_api_key):
         """Test that None source_lang uses config default."""
         caption_config = CaptionConfig(input=CaptionInputConfig(source_lang="fr"))
         client = LattifAI(caption_config=caption_config)

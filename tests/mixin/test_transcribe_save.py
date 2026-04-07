@@ -44,11 +44,16 @@ class TestTranscribeGeminiSave:
 
             # This would trigger TypeError: data must be str, not Caption
             # before the PR #32 fix
-            result = client._transcribe(
-                media_file=audio,
-                source_lang="en",
-                output_dir=output_dir,
-            )
+            try:
+                result = client._transcribe(
+                    media_file=audio,
+                    source_lang="en",
+                    output_dir=output_dir,
+                )
+            except RuntimeError as exc:
+                if "503" in str(exc) or "UNAVAILABLE" in str(exc):
+                    pytest.skip(f"Gemini API temporarily unavailable: {exc}")
+                raise
 
             # Verify result is returned
             assert result is not None

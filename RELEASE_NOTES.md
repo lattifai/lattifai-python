@@ -50,7 +50,7 @@ Full translation pipeline with three quality tiers:
 
 ```bash
 # Translate captions to Chinese with bilingual output
-lai translate run input.srt -o output.srt --target-lang zh --bilingual
+lai translate caption input.srt -o output.srt --target-lang zh --bilingual
 
 # YouTube video → translated captions (one command)
 lai translate youtube "https://youtube.com/watch?v=..." --target-lang ja
@@ -133,11 +133,12 @@ lai caption convert input.json output.ass \
 
 | Before (v1.4.x) | After (v1.5.0) |
 |------------------|----------------|
-| `OutputBehavior(...)` | `RenderConfig(...)` |
-| `KaraokeConfig(enabled=True)` | `ASSConfig(karaoke_effect="sweep")` |
-| `caption.write(behavior=..., karaoke=...)` | `caption.write(render=...)` |
-| `behavior.word_level=true` (CLI) | `render.word_level=true` |
-| `karaoke.enabled=true` (CLI) | `ass.karaoke_effect=sweep` |
+| `CaptionConfig(split_sentence=True)` | `CaptionConfig(input=CaptionInputConfig(split_sentence=True))` |
+| `CaptionConfig(word_level=True)` | `CaptionConfig(render=RenderConfig(word_level=True))` |
+| `CaptionConfig(karaoke=KaraokeConfig(enabled=True))` | `CaptionConfig(ass=ASSConfig(karaoke_effect="sweep"))` |
+| `caption.write(path, word_level=..., karaoke_config=...)` | `caption.write(path, render=..., format_config=...)` |
+| `caption.word_level=true` (CLI) | `render.word_level=true` (CLI) |
+| `caption.karaoke.enabled=true` (CLI) | `ass.karaoke_effect=sweep` (CLI) |
 | `AlignmentConfig(flush=...)` | `AlignmentConfig(flush_interval=...)` |
 
 ---
@@ -151,7 +152,7 @@ lai caption convert input.json output.ass \
 | `lai doctor` | Diagnostics with bundled selftest |
 | `lai update` | Automated SDK updater |
 | `lai serve` | Local web playground |
-| `lai translate run` | Caption translation |
+| `lai translate caption` | Caption translation |
 | `lai translate youtube` | YouTube → translated captions |
 | `lai diarize naming` | LLM-based speaker identification |
 | `lai summarize caption` | Caption summarization |
@@ -165,7 +166,6 @@ lai caption convert input.json output.ass \
 |---------|---------|--------|
 | `lattifai-captions` | ≥ 0.4.0 | Breaking: RenderConfig API |
 | `lattifai-core` | ≥ 0.7.3 | Updated |
-| `lattifai-auth` | ≥ 0.2.1 | **New** required dependency |
 | `lattifai-run` | ≥ 1.0.4 | Updated |
 | `k2py` | 0.4.0 | Upgraded from 0.2.4 |
 

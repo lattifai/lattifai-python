@@ -6,17 +6,29 @@
 > This release contains **breaking changes** — see migration guide below. Config API overhaul, new auth system, 10 new CLI commands, and major feature additions across transcription, translation, diarization, and YouTube pipelines.
 
 ### Breaking Changes
-- **Config API**: `OutputBehavior` renamed to `RenderConfig`; `KaraokeConfig` deleted — replace `KaraokeConfig(enabled=True)` with `ASSConfig(karaoke_effect="sweep")`
-- **Caption.write()**: `behavior=` parameter renamed to `render=`; `karaoke=` parameter removed
-- **CLI args**: `behavior.word_level=true` → `render.word_level=true`; `karaoke.enabled=true` → `ass.karaoke_effect=sweep`
-- **Migration**: find-replace `OutputBehavior` → `RenderConfig`, `behavior=` → `render=`, remove all `karaoke=` kwargs from `write()` calls
-- **AlignmentConfig**: `flush` renamed to `flush_interval`
-- **DiarizationConfig**: `speaker_context` moved to per-call parameter (`context`)
+
+**CaptionConfig restructured** — flat fields split into nested sub-configs:
+
+| Before (v1.4.x) | After (v1.5.0) |
+|------------------|----------------|
+| `CaptionConfig(split_sentence=True)` | `CaptionConfig(input=CaptionInputConfig(split_sentence=True))` |
+| `CaptionConfig(word_level=True)` | `CaptionConfig(render=RenderConfig(word_level=True))` |
+| `CaptionConfig(karaoke=KaraokeConfig(enabled=True))` | `CaptionConfig(ass=ASSConfig(karaoke_effect="sweep"))` |
+| `caption.write(path, word_level=..., karaoke_config=...)` | `caption.write(path, render=..., format_config=...)` |
+| `caption.word_level=true` (CLI) | `render.word_level=true` (CLI) |
+| `caption.karaoke.enabled=true` (CLI) | `ass.karaoke_effect=sweep` (CLI) |
+| `AlignmentConfig(flush=...)` | `AlignmentConfig(flush_interval=...)` |
+
+**Migration steps:**
+1. `CaptionConfig(split_sentence=..., normalize_text=...)` → wrap with `input=CaptionInputConfig(...)`
+2. `CaptionConfig(word_level=..., include_speaker_in_text=..., translation_first=...)` → wrap with `render=RenderConfig(...)`
+3. `CaptionConfig(karaoke=KaraokeConfig(...))` → replace with `ass=ASSConfig(karaoke_effect="sweep")`
+4. `caption.write(path, word_level=..., karaoke_config=...)` → `caption.write(path, render=..., format_config=...)`
+5. `AlignmentConfig(flush=N)` → `AlignmentConfig(flush_interval=N)`
 
 ### Features
 
 #### Authentication
-- Device-bound credential storage via `lattifai-auth` (HMAC-SHA256 device fingerprinting)
 - New CLI commands: `lai auth login`, `lai auth logout`, `lai auth whoami`
 - `lai auth trial` — no-signup quick start with auto-provisioned trial key
 
@@ -90,7 +102,6 @@
 ### Dependencies
 - `lattifai-captions` ≥ 0.4.0 (breaking: RenderConfig API)
 - `lattifai-core` ≥ 0.7.3
-- `lattifai-auth` ≥ 0.2.1 (new required dependency)
 - `lattifai-run` ≥ 1.0.4
 - `k2py` 0.4.0 (upgraded from 0.2.4)
 - Replaced `cgi.FieldStorage` with stdlib-only multipart parser (Python 3.13 ready)

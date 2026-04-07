@@ -75,7 +75,7 @@ class TestTranscribeUnit:
             diarization=None,
         )
 
-    def test_transcribe_run_missing_input(self):
+    def test_transcribe_run_missing_input(self, mock_api_key):
         from lattifai.cli.transcribe import transcribe
 
         with pytest.raises(ValueError, match="Input is required"):

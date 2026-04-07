@@ -21,7 +21,7 @@ Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](h
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [CLI Reference](#cli-reference)
-  - [Translation](#lai-translate-run)
+  - [Translation](#lai-translate-caption)
 - [Python SDK](#python-sdk)
 - [Advanced Features](#advanced-features)
 - [Text Processing](#text-processing)
@@ -173,7 +173,7 @@ The same resolution order applies to `LATTIFAI_BASE_URL` and `LATTIFAI_SITE_URL`
 lai alignment align audio.wav subtitle.srt output.srt
 
 # YouTube video
-lai alignment youtube "https://youtube.com/watch?v=VIDEO_ID"
+lai youtube align "https://youtube.com/watch?v=VIDEO_ID"
 
 # Start local browser playground (4 tabs)
 lai serve run
@@ -199,10 +199,10 @@ caption = client.alignment(
 | Command | Description | Example |
 |---------|-------------|---------|
 | `lai alignment align` | Align audio/video with caption | `lai alignment align audio.wav caption.srt output.srt` |
-| `lai alignment youtube` | Download & align YouTube | `lai alignment youtube "https://youtube.com/watch?v=ID"` |
+| `lai youtube align` | Download & align YouTube | `lai youtube align "https://youtube.com/watch?v=ID"` |
 | `lai transcribe run` | Transcribe audio/video | `lai transcribe run audio.wav output.srt` |
 | `lai transcribe align` | Transcribe and align | `lai transcribe align audio.wav output.srt` |
-| `lai translate run` | Translate captions | `lai translate run input.srt output.srt translation.target_lang=zh` |
+| `lai translate caption` | Translate captions | `lai translate caption input.srt output.srt translation.target_lang=zh` |
 | `lai caption convert` | Convert caption formats | `lai caption convert input.srt output.vtt` |
 | `lai caption shift` | Shift timestamps | `lai caption shift input.srt output.srt 2.0` |
 | `lai serve run` | Start local web UI playground | `lai serve run` |
@@ -300,7 +300,7 @@ lai transcribe align audio.wav output.srt \
     caption.word_level=true
 ```
 
-### lai translate run
+### lai translate caption
 
 Translate caption files to any target language using LLM providers (Gemini, OpenAI-compatible).
 
@@ -397,14 +397,19 @@ from lattifai.config import (
     ClientConfig,
     AlignmentConfig,
     CaptionConfig,
+    CaptionInputConfig,
     DiarizationConfig,
     MediaConfig,
+    RenderConfig,
 )
 
 client = LattifAI(
     client_config=ClientConfig(api_key="lf_xxx", timeout=60.0),
     alignment_config=AlignmentConfig(device="cuda"),
-    caption_config=CaptionConfig(split_sentence=True, word_level=True),
+    caption_config=CaptionConfig(
+        input=CaptionInputConfig(split_sentence=True),
+        render=RenderConfig(word_level=True),
+    ),
 )
 
 caption = client.alignment(
@@ -430,25 +435,24 @@ caption = client.youtube(
 
 ### CaptionConfig Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `split_sentence` | `False` | Smart sentence splitting, separates non-speech elements |
-| `word_level` | `False` | Include word-level timestamps in output |
-| `normalize_text` | `True` | Clean HTML entities and special characters |
-| `include_speaker_in_text` | `True` | Include speaker labels in text output |
-| `translation_first` | `False` | Place translation above original in bilingual output |
-| `speaker_color` | `""` | Speaker name color in ASS output: `""` (off), `"auto"` (10-color palette), `"#RRGGBB"`, or comma-separated list |
+| Sub-config | Option | Default | Description |
+|------------|--------|---------|-------------|
+| `input` | `split_sentence` | `False` | Smart sentence splitting, separates non-speech elements |
+| `input` | `normalize_text` | `True` | Clean HTML entities and special characters |
+| `input` | `source_lang` | `None` | Source language code (e.g., `"en"`, `"zh"`) |
+| `render` | `word_level` | `False` | Include word-level timestamps in output |
+| `render` | `include_speaker_in_text` | `True` | Include speaker labels in text output |
+| `render` | `translation_first` | `False` | Place translation above original in bilingual output |
+| `ass` | `speaker_color` | `""` | Speaker name color in ASS output: `""` (off), `"auto"` (10-color palette), `"#RRGGBB"`, or comma-separated list |
 
 ```python
 from lattifai.client import LattifAI
-from lattifai.config import CaptionConfig
+from lattifai.config import CaptionConfig, CaptionInputConfig, RenderConfig
 
 client = LattifAI(
     caption_config=CaptionConfig(
-        split_sentence=True,
-        word_level=True,
-        normalize_text=True,
-        include_speaker_in_text=False,
+        input=CaptionInputConfig(split_sentence=True, normalize_text=True),
+        render=RenderConfig(word_level=True, include_speaker_in_text=False),
     )
 )
 ```
@@ -473,9 +477,9 @@ caption = client.alignment(
 
 ```python
 from lattifai.client import LattifAI
-from lattifai.config import CaptionConfig
+from lattifai.config import CaptionConfig, RenderConfig
 
-client = LattifAI(caption_config=CaptionConfig(word_level=True))
+client = LattifAI(caption_config=CaptionConfig(render=RenderConfig(word_level=True)))
 caption = client.alignment(
     input_media="audio.wav",
     input_caption="subtitle.srt",

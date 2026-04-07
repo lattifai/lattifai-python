@@ -308,7 +308,7 @@ def _check_api_key() -> tuple[str, str, str]:
 
 def _check_dependencies() -> tuple[str, str, str]:
     """Check critical dependencies are importable."""
-    deps = {"k2py": "k2py", "lhotse": "lhotse", "onnxruntime": "onnxruntime", "lattifai-core": "lattifai_core"}
+    deps = {"k2py": "k2py", "onnxruntime": "onnxruntime", "lattifai-core": "lattifai_core"}
     missing = []
     for pkg_name, module_name in deps.items():
         if importlib.util.find_spec(module_name) is None:

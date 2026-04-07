@@ -135,13 +135,16 @@ def test_chunking_with_tail_frames():
 
 def test_streaming_alignment_with_real_data():
     """Test streaming alignment with real data if available."""
+    import os
+
     data_dir = Path(__file__).parent.parent / "data"
     media_path = data_dir / "SA1.mp4"
     caption_path = data_dir / "SA1.TXT"
 
     if not media_path.exists():
-        print(f"Skipping test: {media_path} not found")
-        return
+        pytest.skip(f"Test data not found: {media_path}")
+    if not os.environ.get("LATTIFAI_API_KEY"):
+        pytest.skip("LATTIFAI_API_KEY not set")
 
     client = LattifAI(alignment_config=AlignmentConfig(device="cpu"))
 

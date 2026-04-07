@@ -11,7 +11,15 @@ from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.transcription import create_transcriber
 from lattifai.transcription.gemini import GeminiTranscriber
-from lattifai.transcription.lattifai import LattifAITranscriber
+
+try:
+    from lattifai.transcription.lattifai import LattifAITranscriber
+
+    _has_nemo = True
+except (ImportError, ModuleNotFoundError):
+    _has_nemo = False
+
+requires_nemo = pytest.mark.skipif(not _has_nemo, reason="requires [transcription] extra (nemo)")
 
 
 class MockClientWrapper:
@@ -39,6 +47,7 @@ def audio_list(sample_audio):
     return [sample_audio, sample_audio * 0.9, sample_audio * 0.8]
 
 
+@requires_nemo
 def test_lattifai_transcribe_numpy_mono(sample_audio):
     """Test LattifAI transcriber with mono audio numpy array."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")
@@ -54,6 +63,7 @@ def test_lattifai_transcribe_numpy_mono(sample_audio):
     assert supervision.start == 0.0
 
 
+@requires_nemo
 def test_lattifai_transcribe_numpy_batch(audio_list):
     """Test LattifAI transcriber with batch of audio arrays."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")
@@ -69,6 +79,7 @@ def test_lattifai_transcribe_numpy_batch(audio_list):
         assert supervision.duration > 0
 
 
+@requires_nemo
 def test_lattifai_transcribe_numpy_returns_supervision(sample_audio):
     """Test that LattifAI transcriber returns proper Supervision object."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")
@@ -135,6 +146,7 @@ def test_gemini_transcriber_instance():
     assert hasattr(transcriber, "transcribe_numpy")
 
 
+@requires_nemo
 def test_lattifai_transcriber_instance():
     """Test that LattifAI transcriber can be instantiated."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")
@@ -145,6 +157,7 @@ def test_lattifai_transcriber_instance():
     assert hasattr(transcriber, "transcribe_numpy")
 
 
+@requires_nemo
 def test_transcribe_numpy_invalid_shape():
     """Test that transcribe_numpy raises error for invalid audio shape."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")
@@ -159,6 +172,7 @@ def test_transcribe_numpy_invalid_shape():
         transcriber.transcribe_numpy(invalid_audio, language="en")
 
 
+@requires_nemo
 def test_transcribe_numpy_short_audio():
     """Test transcribe_numpy with very short audio arrays (1, 10, 100 samples)."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")
@@ -176,6 +190,7 @@ def test_transcribe_numpy_short_audio():
             pass
 
 
+@requires_nemo
 def test_transcribe_numpy_language_parameter(sample_audio):
     """Test that language parameter is passed correctly."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")
@@ -188,6 +203,7 @@ def test_transcribe_numpy_language_parameter(sample_audio):
     del supervision_en, supervision_zh  # Just ensure no errors
 
 
+@requires_nemo
 def test_transcribe_numpy_batch(sample_audio):
     """Test that single audio and batch of one audio produce similar results."""
     config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", lattice_model_path="disabled")

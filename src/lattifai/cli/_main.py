@@ -4,12 +4,21 @@ This wraps nemo_run's Typer app and registers doctor/update as top-level
 commands (no namespace subcommand required).
 """
 
+import importlib.metadata
+
 import typer
 from nemo_run.cli.api import create_cli
 
 
+def _version_callback(value: bool) -> None:
+    """Print version and exit."""
+    if value:
+        typer.echo(importlib.metadata.version("lattifai"))
+        raise typer.Exit()
+
+
 def _register_direct_commands(app: typer.Typer) -> None:
-    """Add doctor, update, auth, and config as top-level commands."""
+    """Add doctor, update, auth, config, and --version as top-level commands."""
     from lattifai.cli.auth import login, logout, trial, whoami
     from lattifai.cli.config import app as config_app
 
@@ -40,4 +49,13 @@ def _register_direct_commands(app: typer.Typer) -> None:
 def main():
     app = create_cli()
     _register_direct_commands(app)
+
+    @app.callback()
+    def _callback(
+        version: bool = typer.Option(
+            False, "--version", callback=_version_callback, is_eager=True, help="Show version and exit."
+        ),
+    ):
+        """LattifAI CLI — precision alignment, transcription, and subtitle tools."""
+
     app()

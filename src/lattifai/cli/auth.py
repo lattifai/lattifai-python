@@ -245,8 +245,10 @@ class LocalCallbackServer:
         if self._server is not None:
             try:
                 self._server.server_close()
-            except OSError:
+            except (OSError, ValueError):
+                # ValueError: Invalid file descriptor: -1 — socket already closed
                 pass
+            self._server = None
 
     def _create_server(self) -> HTTPServer:
         """Create an HTTP server bound to a port in the dynamic range."""

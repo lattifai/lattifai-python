@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Optional, Union
 
 from lattifai_core.client import SyncAPIClient
 
+import lattifai._init  # noqa: F401 — suppress warnings and expose __version__
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.caption import InputCaptionFormat

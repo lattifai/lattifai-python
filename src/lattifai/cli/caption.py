@@ -157,7 +157,7 @@ def convert(
     """
     Convert caption file to another format.
 
-    Shortcut: invoking ``laisub-convert`` is equivalent to running ``lai caption convert``.
+    Shortcut: invoking ``laicap-convert`` is equivalent to running ``lai caption convert``.
 
     Args:
         input_path: Path to input caption file (supports SRT, VTT, JSON, TextGrid formats)

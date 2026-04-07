@@ -1,7 +1,5 @@
 """Summarisation CLI entry point with nemo_run."""
 
-from __future__ import annotations
-
 import asyncio
 from pathlib import Path
 from typing import Optional
