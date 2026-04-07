@@ -5,7 +5,10 @@ from typing import Annotated, List, Optional
 
 import nemo_run as run
 
-from lattifai.caption.config import ASSConfig, RenderConfig, StandardizationConfig
+from lattifai.caption.config import ASSConfig, LRCConfig, RenderConfig, StandardizationConfig
+from lattifai.caption.formats.nle.fcpxml import FCPXMLConfig
+from lattifai.caption.formats.nle.premiere import PremiereXMLConfig
+from lattifai.caption.formats.ttml import TTMLConfig
 from lattifai.cli.entrypoint import LattifAIEntrypoint
 from lattifai.types import Pathlike
 from lattifai.utils import safe_print
@@ -144,9 +147,13 @@ def convert(
     input_format: Optional[str] = None,
     normalize_text: bool = False,
     render: Annotated[Optional[RenderConfig], run.Config[RenderConfig]] = None,
-    ass: Annotated[Optional[ASSConfig], run.Config[ASSConfig]] = None,
     standardization: Annotated[Optional[StandardizationConfig], run.Config[StandardizationConfig]] = None,
-):
+    ass: Annotated[Optional[ASSConfig], run.Config[ASSConfig]] = None,
+    lrc: Annotated[Optional[LRCConfig], run.Config[LRCConfig]] = None,
+    ttml: Annotated[Optional[TTMLConfig], run.Config[TTMLConfig]] = None,
+    fcpxml: Annotated[Optional[FCPXMLConfig], run.Config[FCPXMLConfig]] = None,
+    premiere: Annotated[Optional[PremiereXMLConfig], run.Config[PremiereXMLConfig]] = None,
+) -> Pathlike:
     """
     Convert caption file to another format.
 
@@ -166,6 +173,10 @@ def convert(
             ass.speaker_color, ass.primary_color, ass.outline_color,
             ass.karaoke_effect (sweep/instant/outline),
             ass.karaoke_color_scheme (overrides ASS colors)
+        lrc: LRC lyric format configuration: timestamp precision, metadata.
+        ttml: TTML/IMSC1/EBU-TT-D format configuration: style, region, profile.
+        fcpxml: Final Cut Pro XML format configuration: fps, roles, styles.
+        premiere: Premiere Pro XML format configuration: fps, resolution, tracks.
 
     Examples:
         # Basic format conversion
@@ -193,36 +204,30 @@ def convert(
         else:
             render.word_level = True
 
-    try:
-        caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
-    except Exception:
-        caption = Caption()
-
-    # Fallback: if .md file yields 0 supervisions, try _parse_transcript_html
-    if not caption.supervisions and str(input_path).endswith(".md"):
-        try:
-            from lattifai.youtube.client import YouTubeDownloader
-
-            md_text = Path(input_path).read_text(encoding="utf-8")
-            parsed = YouTubeDownloader._parse_transcript_html(md_text)
-            if parsed:
-                caption = Caption.from_string(parsed, format="markdown")
-                # Strip markdown links [text](url) → text from supervisions
-                _md_link = re.compile(r"\[([^\]]+)\]\([^)]+\)")
-                for sup in caption.supervisions:
-                    sup.text = _md_link.sub(r"\1", sup.text)
-                safe_print(f"   Parsed transcript markdown ({len(caption.supervisions)} segments)")
-        except Exception:
-            pass
-
+    caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
     # Align timestamps from reference if provided
     if reference:
         ref_caption = Caption.read(reference)
         caption.supervisions = align_timestamps_from_ref(caption.supervisions, ref_caption.supervisions)
 
+    # Select format-specific config based on output extension
+    ext = Path(output_path).suffix.lstrip(".").lower()
+    format_config = {
+        "ass": ass,
+        "ssa": ass,
+        "ttml": ttml,
+        "imsc1": ttml,
+        "ebu_tt_d": ttml,
+        "fcpxml": fcpxml,
+        "premiere_xml": premiere,
+        "lrc": lrc,
+    }.get(
+        ext, ass
+    )  # fallback to ass for backward compatibility
+
     caption.write(
         output_path,
-        format_config=ass,
+        format_config=format_config,
         render=render,
         standardization=standardization,
     )
@@ -235,7 +240,7 @@ def convert(
 def normalize(
     input_path: Pathlike,
     output_path: Pathlike,
-):
+) -> Pathlike:
     """
     Normalize caption text by cleaning HTML entities and whitespace.
 
@@ -288,7 +293,7 @@ def shift(
     input_path: Pathlike,
     output_path: Pathlike,
     seconds: float,
-):
+) -> Pathlike:
     """
     Shift caption timestamps by a specified number of seconds.
 
@@ -355,7 +360,7 @@ def diff(
     hyp_path: Pathlike,
     split_sentence: bool = True,
     verbose: bool = True,
-):
+) -> list:
     """
     Compare and align caption supervisions with transcription segments.
 
