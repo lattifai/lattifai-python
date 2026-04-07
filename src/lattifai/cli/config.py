@@ -380,8 +380,23 @@ def get_auth_value(key: str) -> Optional[str]:
 
 
 def set_auth_value(key: str, value: Any) -> None:
-    """Write a value into the [auth] section."""
-    config = _normalize_config(_load_config())
+    """Write a value into the [auth] section.
+
+    Uses tomlkit document directly when available to preserve comments.
+    """
+    config = _load_config()
+    try:
+        import tomlkit
+
+        if isinstance(config, tomlkit.TOMLDocument):
+            if "auth" not in config:
+                config.add("auth", tomlkit.table())
+            config["auth"][key] = value
+            _save_config(config)
+            return
+    except ImportError:
+        pass
+    config = _normalize_config(config)
     auth = config.setdefault("auth", {})
     auth[key] = value
     _save_config(config)
@@ -389,7 +404,17 @@ def set_auth_value(key: str, value: Any) -> None:
 
 def clear_auth() -> None:
     """Remove the entire [auth] section."""
-    config = _normalize_config(_load_config())
+    config = _load_config()
+    try:
+        import tomlkit
+
+        if isinstance(config, tomlkit.TOMLDocument) and "auth" in config:
+            del config["auth"]
+            _save_config(config)
+            return
+    except ImportError:
+        pass
+    config = _normalize_config(config)
     config.pop("auth", None)
     _save_config(config)
 

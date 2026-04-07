@@ -108,6 +108,26 @@ class TestConfigInternals:
             clear_auth()
             assert get_auth_value("LATTIFAI_API_KEY") is None
 
+    def test_tomlkit_preserves_comments(self, tmp_path):
+        """Config round-trip via tomlkit should preserve TOML comments."""
+        config_file = tmp_path / "config.toml"
+        config_dir = tmp_path
+        config_file.write_text(
+            '# Global comment\n[auth]\n# old key backup\nLATTIFAI_API_KEY = "old"\n\n[transcription]\nmodel_name = "gemini"\n'
+        )
+        with (
+            patch("lattifai.cli.config.CONFIG_FILE", config_file),
+            patch("lattifai.cli.config.CONFIG_DIR", config_dir),
+        ):
+            from lattifai.cli.config import set_auth_value
+
+            set_auth_value("LATTIFAI_API_KEY", "new-key")
+            content = config_file.read_text()
+            assert "# Global comment" in content, "Top-level comment lost"
+            assert "# old key backup" in content, "Section comment lost"
+            assert '"new-key"' in content, "Value not updated"
+            assert "model_name" in content, "Other section lost"
+
 
 class TestSectionKeyDiscovery:
     """Verify auto-discovery of section keys from Config dataclasses."""

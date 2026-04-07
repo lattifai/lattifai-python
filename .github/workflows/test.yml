@@ -106,7 +106,8 @@ jobs:
         run: |
           pip install -e ".[all,dev]" --extra-index-url https://lattifai.github.io/pypi/simple/
           python tests/test_basic.py  # Run basic tests
-          # Run caption/karaoke/alignment tests first (fast-fail on config/format regressions)
+          # Auth, config, caption tests first (fast-fail on regressions)
+          pytest tests/cli/test_auth_command.py tests/cli/test_config_command.py -x -q
           pytest tests/caption/ tests/config/ tests/test_configs.py tests/test_alignment_api.py tests/test_word_level_margin.py -x -q
           pytest ./tests/streaming
           bash tests/test_audio_formats.sh  # Run audio format tests
