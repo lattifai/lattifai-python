@@ -47,15 +47,6 @@ from .utils import (
     validate_language,
 )
 
-try:
-    from vllm import ModelRegistry
-
-    from ..core.vllm_backend import Qwen3ASRForConditionalGeneration
-
-    ModelRegistry.register_model("Qwen3ASRForConditionalGeneration", Qwen3ASRForConditionalGeneration)
-except:
-    pass
-
 
 @dataclass
 class ASRTranscription:

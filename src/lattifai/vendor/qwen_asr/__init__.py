@@ -21,4 +21,4 @@ from .inference.qwen3_asr import Qwen3ASRModel
 from .inference.qwen3_forced_aligner import Qwen3ForcedAligner
 from .inference.utils import parse_asr_output
 
-__all__ = ["__version__"]
+__all__ = ["Qwen3ASRModel", "Qwen3ForcedAligner", "parse_asr_output"]

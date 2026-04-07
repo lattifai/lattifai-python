@@ -36,16 +36,7 @@ from .utils import (
 
 class Qwen3ForceAlignProcessor:
     def __init__(self):
-        ko_dict_path = os.path.join(os.path.dirname(__file__), "assets", "korean_dict_jieba.dict")
-        ko_scores = {}
-        with open(ko_dict_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                word = line.split()[0]
-                ko_scores[word] = 1.0
-        self.ko_score = ko_scores
+        self.ko_score = {}
         self.ko_tokenizer = None
 
     def is_kept_char(self, ch: str) -> bool:
