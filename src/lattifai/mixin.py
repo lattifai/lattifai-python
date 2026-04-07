@@ -280,17 +280,21 @@ class LattifAIClientMixin:
         input_caption: Union[Pathlike, Caption],
         input_caption_format: Optional[str] = None,
         normalize_text: Optional[bool] = None,
+        encoding: Optional[str] = None,
         verbose: bool = True,
     ) -> Caption:
         """
         Read caption file or return Caption object directly.
 
         Args:
-            input_caption: Path to caption file or Caption object
+            input_caption: Path to caption file, stream (BytesIO/StringIO), or Caption object
             input_caption_format: Optional format hint for parsing
+            normalize_text: Override text normalization (default: from config)
+            encoding: Character encoding (default: from config, typically utf-8)
+            verbose: Print progress messages
 
         Returns:
-            Caption object
+            Caption object with optional diarization and event data
 
         Raises:
             CaptionProcessingError: If caption cannot be read
@@ -305,7 +309,11 @@ class LattifAIClientMixin:
                 input_caption,
                 format=input_caption_format,
                 normalize_text=normalize_text if normalize_text is not None else self.caption_config.normalize_text,
+                encoding=encoding or self.caption_config.input.encoding,
             )
+            # Propagate source language from config if not detected
+            if not caption.language and self.caption_config.source_lang:
+                caption.language = self.caption_config.source_lang
             diarization_file = Path(str(input_caption)).with_suffix(".Diarization")
             if diarization_file.exists():
                 if verbose:
@@ -378,6 +386,9 @@ class LattifAIClientMixin:
         """
         Write caption to file.
 
+        Automatically halves max_chars_per_line for CJK languages when
+        standardization is enabled (full-width characters take ~2x space).
+
         Args:
             caption: Caption object to write
             output_caption_path: Output file path
@@ -390,10 +401,17 @@ class LattifAIClientMixin:
         """
         try:
             ext = Path(str(output_caption_path)).suffix.lstrip(".").lower()
-            result = caption.write(
-                output_caption_path,
-                **self.caption_config.write_kwargs(ext),
-            )
+            write_kwargs = self.caption_config.write_kwargs(ext)
+
+            # CJK auto-reduction: full-width chars take ~2x space
+            std = write_kwargs.get("standardization")
+            lang = (caption.language or "").lower()
+            if std and lang[:2] in ("zh", "ja", "ko"):
+                from dataclasses import replace
+
+                write_kwargs["standardization"] = replace(std, max_chars_per_line=round(std.max_chars_per_line / 2))
+
+            result = caption.write(output_caption_path, **write_kwargs)
             diarization_file = Path(str(output_caption_path)).with_suffix(".SpkDiar")
             if not diarization_file.exists() and caption.diarization:
                 safe_print(theme.ok(f"    Writing speaker diarization to: {diarization_file}"))
