@@ -90,7 +90,7 @@ class TestWordLevelMarginLocal:
         client = LattifAI()
         caption = client.alignment(
             input_media="tests/data/SA1.mp3",
-            input_caption="tests/data/SA1.srt",
+            input_caption="tests/data/SA1.vtt",
             word_level=True,
             split_sentence=True,
         )
