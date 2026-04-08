@@ -83,9 +83,9 @@ dev = [
 translation = ["openai>=2.26.0"]
 # MLX: Apple Silicon in-process inference (macOS only, separate from transcription due to protobuf conflict)
 mlx = [
-    "mlx-audio>=0.4.2",
-    "mlx-vlm>=0.4.4",
-    "webrtcvad",
+    "mlx-audio>=0.4.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "mlx-vlm>=0.4.4; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "webrtcvad; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 all = [
     "lattifai[event]",
