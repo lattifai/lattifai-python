@@ -82,6 +82,11 @@ dev = [
 ]
 # All: install everything
 translation = ["openai>=2.26.0"]
+# MLX: Apple Silicon in-process inference (macOS only)
+mlx = [
+    "mlx-audio>=0.2",
+    "mlx-vlm>=0.1",
+]
 all = [
     "lattifai[event]",
     "lattifai[diarization]",
