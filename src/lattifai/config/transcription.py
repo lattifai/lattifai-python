@@ -57,7 +57,7 @@ class TranscriptionConfig:
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device for transcription models."""
 
-    max_retries: int = 0
+    max_retries: int = 2
     """Maximum number of retry attempts for failed transcription requests."""
 
     force_overwrite: bool = False

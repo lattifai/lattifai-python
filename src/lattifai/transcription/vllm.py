@@ -15,6 +15,7 @@ Works with any ASR model served by vLLM or SGLang, including:
 
 import asyncio
 import base64
+import io
 import json
 import logging
 import re
@@ -232,10 +233,11 @@ class VLLMTranscriber(BaseTranscriber):
         return self._transcribe_via_transcriptions(file_path, language=language)
 
     def _transcribe_via_transcriptions(
-        self, file_path: Path, language: Optional[str] = None
+        self, file_or_buf: Union[Path, io.BytesIO], language: Optional[str] = None
     ) -> Tuple[List[Supervision], Optional[str]]:
-        """Send audio file to /v1/audio/transcriptions.
+        """Send audio to /v1/audio/transcriptions.
 
+        Accepts a file path or an in-memory BytesIO buffer (for VAD chunks).
         Tries verbose_json first for segment-level timestamps; falls back to
         plain JSON when the model doesn't support verbose_json (e.g. Qwen3-ASR).
 
@@ -245,8 +247,15 @@ class VLLMTranscriber(BaseTranscriber):
         import httpx
 
         url = f"{self._api_base_url}/audio/transcriptions"
-        mime_type = self._MIME_TYPES.get(file_path.suffix.lower(), "audio/wav")
         lang = language or self.config.language
+
+        # Resolve file name and mime type
+        if isinstance(file_or_buf, Path):
+            file_name = file_or_buf.name
+            mime_type = self._MIME_TYPES.get(file_or_buf.suffix.lower(), "audio/wav")
+        else:
+            file_name = "chunk.mp3"
+            mime_type = "audio/mpeg"
 
         data: dict = {"model": self.config.model_name}
         if lang:
@@ -262,12 +271,21 @@ class VLLMTranscriber(BaseTranscriber):
         else:
             data["response_format"] = "json"
 
-        with open(file_path, "rb") as f:
-            files = {"file": (file_path.name, f, mime_type)}
-            resp = httpx.post(url, files=files, data=data, timeout=120.0)
+        def _post(buf: Union[io.BytesIO, "io.BufferedReader"]) -> httpx.Response:
+            files = {"file": (file_name, buf, mime_type)}
+            return httpx.post(url, files=files, data=data, timeout=120.0)
+
+        def _open_and_post() -> httpx.Response:
+            if isinstance(file_or_buf, Path):
+                with open(file_or_buf, "rb") as f:
+                    return _post(f)
+            else:
+                file_or_buf.seek(0)
+                return _post(file_or_buf)
+
+        resp = _open_and_post()
 
         if resp.status_code == 400 and "verbose_json" in resp.text:
-            # Model doesn't support verbose_json — remember and retry with json
             from lattifai.theme import theme
             from lattifai.utils import safe_print
 
@@ -275,9 +293,7 @@ class VLLMTranscriber(BaseTranscriber):
             self._supports_verbose_json = False
             data.pop("timestamp_granularities[]", None)
             data["response_format"] = "json"
-            with open(file_path, "rb") as f:
-                files = {"file": (file_path.name, f, mime_type)}
-                resp = httpx.post(url, files=files, data=data, timeout=120.0)
+            resp = _open_and_post()
 
         if resp.status_code != 200:
             import logging
@@ -310,9 +326,13 @@ class VLLMTranscriber(BaseTranscriber):
             raw_text = result.get("text", "")
             parsed_lang, cleaned = _parse_asr_output(raw_text)
             detected_lang = parsed_lang or detected_lang
-            info = sf.info(str(file_path))
+            if isinstance(file_or_buf, Path):
+                duration = sf.info(str(file_or_buf)).duration
+            else:
+                file_or_buf.seek(0)
+                duration = sf.info(file_or_buf).duration
             supervisions = [
-                Supervision(text=cleaned, start=0.0, duration=info.duration, language=detected_lang, speaker=None)
+                Supervision(text=cleaned, start=0.0, duration=duration, language=detected_lang, speaker=None)
             ]
 
         return supervisions, detected_lang
@@ -484,10 +504,21 @@ class VLLMTranscriber(BaseTranscriber):
     def _transcribe_numpy_chunk(
         self, audio: np.ndarray, sr: int, language: Optional[str] = None
     ) -> Tuple[List[Supervision], Optional[str]]:
-        """Save numpy array to temp wav and transcribe. Returns (supervisions, language)."""
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            sf.write(f.name, audio, sr)
-            return self._transcribe_audio_file(Path(f.name), language=language)
+        """Encode numpy array to MP3 and transcribe.
+
+        For transcriptions API: uses in-memory BytesIO (no disk I/O).
+        For chat/realtime API: writes temp file (chat requires file path for base64 encoding).
+        MP3 reduces size ~10x vs WAV, avoiding vLLM's 25MB limit.
+        """
+        if self.config.api_mode == "transcriptions":
+            buf = io.BytesIO()
+            sf.write(buf, audio, sr, format="MP3")
+            buf.seek(0)
+            return self._transcribe_via_transcriptions(buf, language=language)
+        else:
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as f:
+                sf.write(f.name, audio, sr)
+                return self._transcribe_audio_file(Path(f.name), language=language)
 
     # ------------------------------------------------------------------
     # Transcription methods
