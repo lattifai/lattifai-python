@@ -12,12 +12,16 @@ from lattifai.config import TranscriptionConfig
 from lattifai.transcription import create_transcriber
 from lattifai.transcription.gemini import GeminiTranscriber
 
+_has_nemo = False
 try:
-    from lattifai.transcription.lattifai import LattifAITranscriber
+    import nemo.collections.asr.models  # noqa: F401
 
     _has_nemo = True
 except (ImportError, ModuleNotFoundError):
-    _has_nemo = False
+    pass
+
+if _has_nemo:
+    from lattifai.transcription.lattifai import LattifAITranscriber
 
 requires_nemo = pytest.mark.skipif(not _has_nemo, reason="requires [transcription] extra (nemo)")
 

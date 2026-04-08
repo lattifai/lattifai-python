@@ -133,6 +133,9 @@ class TestTranscriptionInstall:
 
         assert google.genai is not None
 
+    @pytest.mark.skipif(
+        not _can_import("nemo.collections.asr"), reason="nemo not installed (requires [transcription] extra)"
+    )
     def test_nemo_asr(self):
         """nemo_toolkit_asr should be available."""
         import nemo.collections.asr
@@ -212,6 +215,9 @@ class TestDiarizationInstall:
 
         assert pyannote.audio is not None
 
+    @pytest.mark.skipif(
+        not _can_import("nemo.collections.asr"), reason="nemo not installed (requires [diarization] extra)"
+    )
     def test_nemo_asr(self):
         """nemo_toolkit_asr should be available."""
         import nemo.collections.asr

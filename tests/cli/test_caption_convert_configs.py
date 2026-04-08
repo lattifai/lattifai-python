@@ -1,17 +1,19 @@
 """Tests for caption convert format-config dispatch and type annotations."""
 
+import importlib.resources
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+import lattifai.data.selftest as _selftest
 from lattifai.caption.config import ASSConfig, LRCConfig, RenderConfig, StandardizationConfig
 from lattifai.caption.formats.nle.fcpxml import FCPXMLConfig
 from lattifai.caption.formats.nle.premiere import PremiereXMLConfig
 from lattifai.caption.formats.ttml import TTMLConfig
 from lattifai.cli.caption import convert
 
-SAMPLE_SRT = "tests/data/SA1.srt"
+SAMPLE_SRT = str(importlib.resources.files(_selftest) / "test.srt")
 
 
 @pytest.fixture

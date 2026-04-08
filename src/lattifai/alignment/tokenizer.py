@@ -10,6 +10,7 @@ from lattifai.caption import SentenceSplitter, Supervision
 from lattifai.caption import normalize_text as normalize_html_text
 from lattifai.errors import (
     LATTICE_DECODING_FAILURE_HELP,
+    AuthenticationError,
     LatticeDecodingError,
     ModelLoadError,
     QuotaExceededError,
@@ -349,6 +350,14 @@ class LatticeTokenizer:
                 },
             )
 
+        if response.status_code == 401:
+            error_detail = response.text
+            raise AuthenticationError(
+                "Authentication failed. Your API key may not have permission for this operation.\n"
+                "  - Trial keys: alignment requires a full account -> lai auth login\n"
+                "  - Expired session: re-authenticate -> lai auth login\n"
+                f"  Server response: {error_detail}"
+            )
         if response.status_code == 402:
             raise QuotaExceededError(response.json().get("detail", "Quota exceeded"))
         if response.status_code != 200:
@@ -398,6 +407,14 @@ class LatticeTokenizer:
             raise LatticeDecodingError(
                 lattice_id,
                 original_error=Exception(LATTICE_DECODING_FAILURE_HELP),
+            )
+        if response.status_code == 401:
+            error_detail = response.text
+            raise AuthenticationError(
+                "Authentication failed. Your API key may not have permission for this operation.\n"
+                "  - Trial keys: alignment requires a full account -> lai auth login\n"
+                "  - Expired session: re-authenticate -> lai auth login\n"
+                f"  Server response: {error_detail}"
             )
         if response.status_code == 402:
             raise QuotaExceededError(response.json().get("detail", "Quota exceeded"))

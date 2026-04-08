@@ -265,6 +265,13 @@ class ConfigurationError(LattifAIError):
         super().__init__(message, **kwargs)
 
 
+class AuthenticationError(APIError):
+    """Error when API key is invalid, expired, or lacks permission."""
+
+    def __init__(self, message: str, **kwargs):
+        super().__init__(message, status_code=401, **kwargs)
+
+
 class QuotaExceededError(APIError):
     """Error when user quota or API key limit is exceeded."""
 
