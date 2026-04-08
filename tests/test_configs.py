@@ -168,7 +168,7 @@ class TestTranscriptionConfig:
         config = TranscriptionConfig()
         # Device is auto-selected based on hardware
         assert config.device in ["cpu", "cuda", "mps"]
-        assert config.max_retries == 0
+        assert config.max_retries == 2
         assert config.force_overwrite is False
         assert config.verbose is False
         assert config.language is None

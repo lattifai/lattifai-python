@@ -71,7 +71,9 @@ transcription = [
     "OmniSenseVoice>=0.4.2",
     "funasr>=1.3.1",
     "zhconv",
-    "openai-whisper>=20250625",
+    "mlx-audio>=0.4.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "mlx-vlm>=0.4.4; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "webrtcvad; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 # Development
 dev = [
@@ -82,11 +84,6 @@ dev = [
 ]
 # All: install everything
 translation = ["openai>=2.26.0"]
-# MLX: Apple Silicon in-process inference (macOS only)
-mlx = [
-    "mlx-audio>=0.2",
-    "mlx-vlm>=0.1",
-]
 all = [
     "lattifai[event]",
     "lattifai[diarization]",

@@ -62,19 +62,29 @@ class TestGemma4TranscriberFactory:
     @pytest.mark.parametrize(
         "model_name", ["google/gemma-4-E2B", "google/gemma-4-E2B-it", "google/gemma-4-E4B", "google/gemma-4-E4B-it"]
     )
-    def test_routes_to_lattifai_transcriber(self, model_name):
-        """Without api_base_url, gemma-4 should route to LattifAITranscriber."""
+    def test_routes_to_mlx_or_lattifai_transcriber(self, model_name):
+        """Without api_base_url, gemma-4 routes based on device and MLX model map."""
         from lattifai.transcription import create_transcriber
         from lattifai.transcription.lattifai import LattifAITranscriber
+        from lattifai.transcription.mlx import MLXTranscriber, _is_mlx_model
 
-        config = TranscriptionConfig(model_name=model_name, lattice_model_path="disabled")
-        # Mock client_wrapper for event detector
-        config.client_wrapper = MagicMock()
-        config.client_wrapper.check_permission = MagicMock()
+        # On mps: -it variants in _MLX_MODEL_MAP → MLXTranscriber, others → LattifAI
+        config_mps = TranscriptionConfig(model_name=model_name, device="mps", lattice_model_path="disabled")
+        config_mps.client_wrapper = MagicMock()
+        config_mps.client_wrapper.check_permission = MagicMock()
+        transcriber_mps = create_transcriber(config_mps)
+        if _is_mlx_model(model_name, "mps"):
+            assert isinstance(transcriber_mps, MLXTranscriber)
+        else:
+            assert isinstance(transcriber_mps, LattifAITranscriber)
 
-        transcriber = create_transcriber(config)
-        assert isinstance(transcriber, LattifAITranscriber)
-        assert transcriber.name == model_name
+        # On cpu → always LattifAITranscriber
+        config_cpu = TranscriptionConfig(model_name=model_name, device="cpu", lattice_model_path="disabled")
+        config_cpu.client_wrapper = MagicMock()
+        config_cpu.client_wrapper.check_permission = MagicMock()
+        transcriber_cpu = create_transcriber(config_cpu)
+        assert isinstance(transcriber_cpu, LattifAITranscriber)
+        assert transcriber_cpu.name == model_name
 
     @pytest.mark.parametrize(
         "model_name", ["google/gemma-4-E2B", "google/gemma-4-E2B-it", "google/gemma-4-E4B", "google/gemma-4-E4B-it"]

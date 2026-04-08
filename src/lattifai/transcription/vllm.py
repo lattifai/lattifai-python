@@ -97,7 +97,6 @@ class VLLMTranscriber(BaseTranscriber):
         "voxtral",
         "parakeet",
         "canary",
-        "gemma",
     )
 
     # Default system prompt for general-purpose LLMs doing ASR via chat mode.
@@ -471,7 +470,14 @@ class VLLMTranscriber(BaseTranscriber):
             temperature = 0.01  # greedy decoding for ASR accuracy
         else:
             temperature = None
-        max_tokens = self.config.max_tokens or 4096
+        max_tokens = self.config.max_tokens or 2048
+
+        # Sampling parameters: top_p passed directly, top_k via extra_body (vLLM extension)
+        chat_kwargs: dict = {}
+        if self.config.top_p is not None:
+            chat_kwargs["top_p"] = self.config.top_p
+        if self.config.top_k is not None:
+            chat_kwargs["extra_body"] = {"top_k": int(self.config.top_k)}
 
         if self.config.verbose:
             import logging
@@ -491,10 +497,18 @@ class VLLMTranscriber(BaseTranscriber):
                 for m in messages
             ]
             _log.info("messages=%s", _redacted)
-            _log.info("temperature=%s, max_tokens=%s", temperature, max_tokens)
+            _log.info(
+                "temperature=%s, max_tokens=%s, top_p=%s, top_k=%s",
+                temperature,
+                max_tokens,
+                self.config.top_p,
+                self.config.top_k,
+            )
 
         response = _run_async(
-            self._llm_client.chat(messages, temperature=temperature, max_tokens=max_tokens, timeout=300.0)
+            self._llm_client.chat(
+                messages, temperature=temperature, max_tokens=max_tokens, timeout=300.0, **chat_kwargs
+            )
         )
 
         raw_text = response.choices[0].message.content
