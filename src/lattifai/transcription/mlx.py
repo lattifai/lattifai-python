@@ -67,6 +67,12 @@ class MLXTranscriber(BaseTranscriber):
     supports_url = False
     needs_vad = True
 
+    # MLX backends (mlx-audio, mlx-vlm) have practical issues with long audio
+    # (OOM, silent truncation, degraded accuracy) even when the underlying model
+    # theoretically supports longer contexts. Cap all models to 30s chunks;
+    # VAD segmentation handles splitting transparently.
+    _MLX_MAX_AUDIO_SECONDS = 30.0
+
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
         self._model = None
@@ -113,6 +119,10 @@ class MLXTranscriber(BaseTranscriber):
 
         # Fallback: use as-is (will likely fail at load time)
         return model_name
+
+    def _get_max_audio_seconds(self) -> float:
+        """Override: cap all MLX models to 30s chunks for reliability."""
+        return self._MLX_MAX_AUDIO_SECONDS
 
     # ------------------------------------------------------------------
     # Model loading (lazy)
