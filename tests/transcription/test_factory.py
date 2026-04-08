@@ -6,6 +6,7 @@ from lattifai.config import TranscriptionConfig
 from lattifai.transcription import create_transcriber
 from lattifai.transcription.gemini import GeminiTranscriber
 from lattifai.transcription.lattifai import LattifAITranscriber
+from lattifai.transcription.mlx import MLXTranscriber
 
 
 def test_create_gemini_transcriber_explicit():
@@ -86,8 +87,8 @@ def test_create_transcriber_supports_url_flag():
 
 
 def test_create_qwen_transcriber():
-    """Test creating LattifAI transcriber with Qwen3-ASR-1.7B."""
-    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-1.7B")
+    """Test creating LattifAI transcriber with Qwen3-ASR-1.7B (non-MLX path)."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-1.7B", device="cpu")
     transcriber = create_transcriber(config)
 
     assert isinstance(transcriber, LattifAITranscriber)
@@ -95,12 +96,57 @@ def test_create_qwen_transcriber():
 
 
 def test_create_qwen_transcriber_0_6b():
-    """Test creating LattifAI transcriber with Qwen3-ASR-0.6B."""
-    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-0.6B")
+    """Test creating LattifAI transcriber with Qwen3-ASR-0.6B (non-MLX path)."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-0.6B", device="cpu")
     transcriber = create_transcriber(config)
 
     assert isinstance(transcriber, LattifAITranscriber)
     assert transcriber.config.model_name == "Qwen/Qwen3-ASR-0.6B"
+
+
+def test_create_mlx_transcriber_qwen_on_mps():
+    """Qwen3-ASR on mps routes to MLXTranscriber."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-0.6B", device="mps")
+    transcriber = create_transcriber(config)
+    assert isinstance(transcriber, MLXTranscriber)
+    assert transcriber._backend == "mlx-audio"
+
+
+def test_create_mlx_transcriber_gemma_on_mps():
+    """Gemma-4 on mps routes to MLXTranscriber."""
+    config = TranscriptionConfig(model_name="google/gemma-4-E2B-it", device="mps")
+    transcriber = create_transcriber(config)
+    assert isinstance(transcriber, MLXTranscriber)
+    assert transcriber._backend == "mlx-vlm"
+
+
+def test_create_mlx_transcriber_voxtral_on_mps():
+    """Voxtral on mps routes to MLXTranscriber."""
+    config = TranscriptionConfig(model_name="mistralai/Voxtral-Mini-4B-2602", device="mps")
+    transcriber = create_transcriber(config)
+    assert isinstance(transcriber, MLXTranscriber)
+    assert transcriber._backend == "mlx-audio"
+
+
+def test_create_mlx_transcriber_mlx_community():
+    """mlx-community/* always routes to MLXTranscriber."""
+    config = TranscriptionConfig(model_name="mlx-community/Qwen3-ASR-0.6B-8bit", device="cpu")
+    transcriber = create_transcriber(config)
+    assert isinstance(transcriber, MLXTranscriber)
+
+
+def test_create_lattifai_transcriber_qwen_on_cpu():
+    """Qwen3-ASR on cpu still routes to LattifAITranscriber (not MLX)."""
+    config = TranscriptionConfig(model_name="Qwen/Qwen3-ASR-0.6B", device="cpu")
+    transcriber = create_transcriber(config)
+    assert isinstance(transcriber, LattifAITranscriber)
+
+
+def test_create_lattifai_transcriber_parakeet_on_mps():
+    """Parakeet on mps still routes to LattifAITranscriber (not MLX)."""
+    config = TranscriptionConfig(model_name="nvidia/parakeet-tdt-0.6b-v3", device="mps")
+    transcriber = create_transcriber(config)
+    assert isinstance(transcriber, LattifAITranscriber)
 
 
 if __name__ == "__main__":

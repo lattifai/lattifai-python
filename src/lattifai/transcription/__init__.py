@@ -35,11 +35,19 @@ def create_transcriber(
     """
     model_name = transcription_config.model_name
 
+    from lattifai.transcription.mlx import _is_mlx_model
+
     # vLLM/SGLang-served models (any model with api_base_url set)
     if transcription_config.api_base_url:
         from .vllm import VLLMTranscriber
 
         transcriber = VLLMTranscriber(transcription_config=transcription_config)
+
+    # MLX models (Apple Silicon in-process inference)
+    elif _is_mlx_model(model_name, transcription_config.device):
+        from .mlx import MLXTranscriber
+
+        transcriber = MLXTranscriber(transcription_config=transcription_config)
 
     # Gemini models (API-based)
     elif "gemini" in model_name:
