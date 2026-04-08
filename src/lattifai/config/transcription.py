@@ -141,6 +141,11 @@ class TranscriptionConfig:
     """Maximum audio chunk size in seconds for VAD segmentation (vLLM/SGLang only).
     If None, auto-estimated from the model's max_model_len and tokens_per_second."""
 
+    mlx_quantization: Literal["4bit", "8bit"] = "8bit"
+    """Quantization level for MLX models (mlx-community).
+    Only applies when auto-mapping original model IDs (e.g. Qwen/Qwen3-ASR-0.6B).
+    Ignored when mlx-community model ID is specified directly."""
+
     client_wrapper: Optional["SyncAPIClient"] = field(default=None, repr=False)
     """Reference to the SyncAPIClient instance. Auto-set during client initialization."""
 
@@ -171,11 +176,17 @@ class TranscriptionConfig:
             self.model_name = replacement
 
         # When api_base_url is set, any model name is valid (forwarded to vLLM/SGLang server)
-        if self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__ and not self.api_base_url:
+        # mlx-community/* model IDs are also allowed (for MLX in-process inference)
+        if (
+            self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__
+            and not self.api_base_url
+            and not self.model_name.startswith("mlx-community/")
+        ):
             raise ValueError(
                 f"Unsupported model_name: '{self.model_name}'. "
                 f"Supported models are: {SUPPORTED_TRANSCRIPTION_MODELS.__args__}. "
-                f"For vLLM/SGLang-served models, set api_base_url to enable any model."
+                f"For vLLM/SGLang-served models, set api_base_url to enable any model. "
+                f"For MLX models, use mlx-community/* model IDs."
             )
 
         # Load environment variables from .env file
