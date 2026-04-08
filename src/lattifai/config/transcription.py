@@ -28,6 +28,7 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "google/gemma-4-E2B-it",
     "google/gemma-4-E4B",
     "google/gemma-4-E4B-it",
+    "mistralai/Voxtral-Mini-4B-2602",
     # Any model served via vLLM/SGLang with api_base_url is also supported
     # (Whisper, Qwen3-ASR, GLM-ASR, VibeVoice, Voxtral, etc.)
 ]
