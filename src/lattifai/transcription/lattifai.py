@@ -157,9 +157,22 @@ class LattifAITranscriber(BaseTranscriber):
 
         elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
             raise NotImplementedError(
-                "Qwen3-ASR is not yet implemented in LattifAITranscriber. "
-                "This requires the qwen_asr package with transformers >=5.5 compat fixes. "
-                "Please check the GitHub repository for updates on this feature."
+                f"Qwen3-ASR local inference is not supported. "
+                f"Please serve {model_name} via an OpenAI-compatible API server and use api_base_url instead.\n"
+                f"\n"
+                f"  # macOS (Apple Silicon) — mlx-audio:\n"
+                f"  pip install mlx-audio        # or: uv pip install mlx-audio\n"
+                f"  mlx_audio.server --host 0.0.0.0 --port 8081\n"
+                f"\n"
+                f"  # Linux (CUDA) — vLLM:\n"
+                f"  pip install vllm             # or: uv pip install vllm\n"
+                f"  vllm serve {model_name} --port 8081\n"
+                f"\n"
+                f"  # Then transcribe:\n"
+                f"  lai transcribe run <audio> <output> \\\n"
+                f"      transcription.model_name={model_name} \\\n"
+                f"      transcription.api_base_url=http://localhost:8081/v1 \\\n"
+                f"      transcription.api_mode=transcriptions"
             )
 
             # Use vendored qwen_asr with transformers >=5.5 compat fixes
@@ -193,9 +206,24 @@ class LattifAITranscriber(BaseTranscriber):
 
         elif model_name.startswith("google/gemma-4-"):
             raise NotImplementedError(
-                "Gemma-4 multimodal transcription is not yet implemented in LattifAITranscriber. "
-                "This requires custom input preparation and output parsing using the Hugging Face transformers library. "  # noqa: E501
-                "Please check the GitHub repository for updates on this feature."
+                f"Gemma-4 local inference is not supported. "
+                f"Please serve {model_name} via an OpenAI-compatible API server and use api_base_url instead.\n"
+                f"\n"
+                f"  # macOS (Apple Silicon) — mlx-vlm:\n"
+                f"  pip install mlx-vlm          # or: uv pip install mlx-vlm\n"
+                f"  mlx_vlm.server --trust-remote-code --port 8082\n"
+                f"\n"
+                f"  # Linux (CUDA) — vLLM:\n"
+                f"  pip install vllm             # or: uv pip install vllm\n"
+                f"  vllm serve {model_name} --port 8082\n"
+                f"\n"
+                f"  # Then transcribe:\n"
+                f"  lai transcribe run <audio> <output> \\\n"
+                f"      transcription.model_name={model_name} \\\n"
+                f"      transcription.api_base_url=http://localhost:8082/v1 \\\n"
+                f"      transcription.api_mode=chat \\\n"
+                f"      transcription.audio_content_type=input_audio  # mlx-vlm\n"
+                f"      # transcription.audio_content_type=audio_url  # vLLM (default)"
             )
 
             # Gemma-4: multimodal model with USM audio encoder (30s hard limit per clip).
@@ -339,6 +367,7 @@ class LattifAITranscriber(BaseTranscriber):
                     hypotheses.append(Supervision(text=text, duration=dur))
 
             elif model_name in ("Qwen/Qwen3-ASR-0.6B", "Qwen/Qwen3-ASR-1.7B"):
+
                 # Qwen3-ASR: native batch inference via qwen_asr package
                 # qwen_asr.prepare_audio accepts str or tuple(ndarray, sample_rate),
                 # NOT bare ndarray. Wrap numpy arrays as (array, 16000) tuples.

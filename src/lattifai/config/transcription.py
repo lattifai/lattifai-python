@@ -69,6 +69,13 @@ class TranscriptionConfig:
     language: Optional[str] = None
     """Target language code for transcription (e.g., 'en', 'zh', 'ja')."""
 
+    system_prompt: Optional[str] = None
+    """System prompt for chat mode (vLLM/SGLang only).
+    Overrides the default ASR system prompt for general-purpose LLMs.
+    If the value is an existing file path, the file contents will be used.
+    Otherwise, the value is used directly as the system prompt text.
+    Set to empty string "" to disable system prompt entirely."""
+
     prompt: Optional[str] = None
     """Custom prompt text or path to prompt file for transcription.
     If the value is an existing file path, the file contents will be used.
@@ -106,6 +113,20 @@ class TranscriptionConfig:
     'transcriptions' (default) uses /v1/audio/transcriptions (multipart upload, best for dedicated ASR models).
     'chat' uses /v1/chat/completions with audio_url (base64, required for general-purpose LLMs like Gemma-3n).
     'realtime' uses /v1/realtime WebSocket endpoint (for Voxtral Realtime models)."""
+
+    audio_content_type: Literal["audio_url", "input_audio", "audio"] = "audio_url"
+    """Audio content type in chat mode messages.
+    'audio_url' (default) sends {"type": "audio_url", "audio_url": {"url": "data:..."}} (vLLM format).
+    'input_audio' sends {"type": "input_audio", "input_audio": {"data": "...", "format": "..."}} (mlx-vlm format).
+    'audio' sends {"type": "audio", "audio": "data:..."} (Google Gemma4 native format)."""
+
+    chat_audio_first: bool = False
+    """Content ordering in chat mode messages.
+    False (default): text before audio [text, audio] (vLLM convention).
+    True: audio before text [audio, text] (Google Gemma4 convention)."""
+
+    verbose: bool = False
+    """Print debug info (messages structure, temperature, max_tokens) for chat mode requests."""
 
     max_tokens: Optional[int] = None
     """Maximum output tokens for chat/realtime API modes (vLLM/SGLang only).

@@ -87,7 +87,17 @@ class VLLMTranscriber(BaseTranscriber):
     _DEFAULT_TOKENS_PER_SECOND = 25.0
 
     # Dedicated ASR models that need no prompt — they transcribe by default.
-    _ASR_MODEL_KEYWORDS = ("whisper", "qwen3-asr", "fun-asr", "glm-asr", "sensevoice", "voxtral", "parakeet", "canary")
+    _ASR_MODEL_KEYWORDS = (
+        "whisper",
+        "qwen3-asr",
+        "fun-asr",
+        "glm-asr",
+        "sensevoice",
+        "voxtral",
+        "parakeet",
+        "canary",
+        "gemma",
+    )
 
     # Default system prompt for general-purpose LLMs doing ASR via chat mode.
     _DEFAULT_ASR_SYSTEM_PROMPT = (
@@ -100,6 +110,26 @@ class VLLMTranscriber(BaseTranscriber):
         """Check if the model is a dedicated ASR model (no prompt needed)."""
         model_lower = self.config.model_name.lower()
         return any(k in model_lower for k in self._ASR_MODEL_KEYWORDS)
+
+    def _resolve_system_prompt(self) -> Optional[str]:
+        """Resolve system prompt: config value > default for general-purpose LLMs > None for ASR models.
+
+        Returns None to skip system message, empty string is treated as explicit disable.
+        """
+        sp = self.config.system_prompt
+        if sp is not None:
+            # Explicit empty string = disable system prompt
+            if sp == "":
+                return None
+            # File path support: if the value is an existing file, read its contents
+            p = Path(sp)
+            if p.is_file():
+                return p.read_text(encoding="utf-8").strip()
+            return sp
+        # No explicit system_prompt — use default for general-purpose LLMs only
+        if not self._is_dedicated_asr_model():
+            return self._DEFAULT_ASR_SYSTEM_PROMPT
+        return None
 
     def __init__(self, transcription_config: TranscriptionConfig):
         super().__init__(config=transcription_config)
@@ -366,7 +396,18 @@ class VLLMTranscriber(BaseTranscriber):
         mime_type = self._MIME_TYPES.get(file_path.suffix.lower(), "audio/wav")
         audio_b64 = base64.b64encode(file_path.read_bytes()).decode("ascii")
 
-        content = [{"type": "audio_url", "audio_url": {"url": f"data:{mime_type};base64,{audio_b64}"}}]
+        audio_data_uri = f"data:{mime_type};base64,{audio_b64}"
+        if self.config.audio_content_type == "input_audio":
+            # mlx-vlm format: {"type": "input_audio", "input_audio": {"data": "<path>", "format": "<ext>"}}
+            # mlx-vlm load_audio expects file path or URL, not base64
+            audio_fmt = file_path.suffix.lstrip(".").lower() or "wav"
+            content = [{"type": "input_audio", "input_audio": {"data": str(file_path.resolve()), "format": audio_fmt}}]
+        elif self.config.audio_content_type == "audio":
+            # Google Gemma4 native format: {"type": "audio", "audio": "data:<mime>;base64,<b64>"}
+            content = [{"type": "audio", "audio": audio_data_uri}]
+        else:
+            # vLLM format (default): {"type": "audio_url", "audio_url": {"url": "data:<mime>;base64,<b64>"}}
+            content = [{"type": "audio_url", "audio_url": {"url": audio_data_uri}}]
 
         # Build user-level text prompt
         user_prompt = self.config.prompt
@@ -388,12 +429,19 @@ class VLLMTranscriber(BaseTranscriber):
             user_prompt = f"Transcribe this audio verbatim in {lang_name}."
 
         if user_prompt:
-            content.insert(0, {"type": "text", "text": user_prompt})
+            text_item = {"type": "text", "text": user_prompt}
+            if self.config.chat_audio_first:
+                # [audio, text] — Google Gemma4 convention
+                content.append(text_item)
+            else:
+                # [text, audio] — vLLM convention (default)
+                content.insert(0, text_item)
 
         # Build messages with system prompt for general-purpose LLMs
         messages = []
-        if not self._is_dedicated_asr_model():
-            messages.append({"role": "system", "content": self._DEFAULT_ASR_SYSTEM_PROMPT})
+        sys_prompt = self._resolve_system_prompt()
+        if sys_prompt:
+            messages.append({"role": "system", "content": sys_prompt})
         messages.append({"role": "user", "content": content})
 
         # Temperature: default to 0.0 (greedy) for non-ASR models for deterministic transcription
@@ -404,6 +452,26 @@ class VLLMTranscriber(BaseTranscriber):
         else:
             temperature = None
         max_tokens = self.config.max_tokens or 4096
+
+        if self.config.verbose:
+            import logging
+
+            _log = logging.getLogger("lattifai.transcription.vllm")
+
+            def _redact(item):
+                t = item.get("type", "")
+                return {"type": t, t: "<redacted>"} if t in ("audio_url", "input_audio", "audio") else item
+
+            _redacted = [
+                (
+                    {"role": m["role"], "content": [_redact(i) for i in m["content"]]}
+                    if isinstance(m.get("content"), list)
+                    else m
+                )
+                for m in messages
+            ]
+            _log.info("messages=%s", _redacted)
+            _log.info("temperature=%s, max_tokens=%s", temperature, max_tokens)
 
         response = _run_async(
             self._llm_client.chat(messages, temperature=temperature, max_tokens=max_tokens, timeout=300.0)
