@@ -79,7 +79,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          uv sync --prerelease=allow --all-extras
+          uv sync --prerelease=allow --extra all --extra dev
 
       - name: Restore model cache
         uses: actions/cache/restore@v4
