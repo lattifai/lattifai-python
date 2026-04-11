@@ -249,14 +249,18 @@ class TestConvertKineticStyle:
             render=RenderConfig(word_level=True),
         )
         content = Path(out).read_text()
-        # Phase 2: word-scope bounce uses metric-safe \bord + \frz only
+        # Phase 2 (revised): word-scope bounce is pure \bord+\blur impact.
+        # \frz was dropped to avoid origin-displacement of off-center words,
+        # and \fscx/\fscy is forbidden in word-scope to prevent line reflow.
+        # Each word's block opens with \bord2\blur0 static reset to break
+        # libass override inheritance from the previous word's animation.
         assert r"\fscx" not in content
         assert r"\fscy" not in content
-        assert r"\bord6" in content
-        assert r"\frz3" in content
+        assert r"\frz" not in content
+        assert r"\bord8\blur4" in content  # impact peak
         # Cumulative word offsets (word 2 starts at 500ms)
-        assert r"\t(0,1,\bord6\frz3)" in content
-        assert r"\t(500,501,\bord6\frz3)" in content
+        assert r"\t(0,1,\bord8\blur4)" in content
+        assert r"\t(500,501,\bord8\blur4)" in content
 
 
 class TestConvertReturnType:
