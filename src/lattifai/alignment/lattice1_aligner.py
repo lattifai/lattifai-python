@@ -9,8 +9,10 @@ from lattifai.caption import Supervision
 from lattifai.config import AlignmentConfig
 from lattifai.errors import (
     AlignmentError,
+    AuthenticationError,
     LatticeDecodingError,
     LatticeEncodingError,
+    QuotaExceededError,
 )
 from lattifai.theme import theme
 from lattifai.utils import _resolve_model_path, safe_print
@@ -177,6 +179,11 @@ class Lattice1Aligner(object):
                 low_score_segments = _find_low_score_segments(alignments)
                 if low_score_segments:
                     safe_print(theme.warn(_format_low_score_warning(low_score_segments)))
+        except (AuthenticationError, QuotaExceededError):
+            # Auth/quota failures are unrelated to lattice decoding — surface them directly
+            # so CLI shows the real cause (e.g. device auth timestamp skew) instead of a
+            # misleading "media-text mismatch" troubleshooting hint.
+            raise
         except LatticeDecodingError as e:
             safe_print(theme.err("         x Failed to decode lattice alignment results"))
             _alignments = self.tokenizer.detokenize(
