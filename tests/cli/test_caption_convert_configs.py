@@ -154,6 +154,81 @@ class TestConvertKaraokeAutoRender:
         assert render.include_speaker_in_text is True
 
 
+class TestConvertKineticStyle:
+    """Verify kinetic_style flows through convert() and auto-enables sweep + word_level."""
+
+    @patch("lattifai.data.Caption")
+    def test_kinetic_alone_auto_enables_sweep_and_word_level(self, mock_caption_cls, tmp_path, sample_srt):
+        mock_caption = MagicMock()
+        mock_caption.supervisions = [MagicMock(text="hello")]
+        mock_caption_cls.read.return_value = mock_caption
+
+        ass_cfg = ASSConfig(kinetic_style="bounce")
+        out = tmp_path / "out.ass"
+        convert(sample_srt, str(out), ass=ass_cfg)
+
+        # word_level must be auto-enabled
+        render = mock_caption.write.call_args[1]["render"]
+        assert render is not None
+        assert render.word_level is True
+        # karaoke_effect must default to sweep so \kf tags carry the \t overrides
+        assert ass_cfg.karaoke_effect == "sweep"
+
+    @patch("lattifai.data.Caption")
+    def test_kinetic_preserves_explicit_effect(self, mock_caption_cls, tmp_path, sample_srt):
+        mock_caption = MagicMock()
+        mock_caption.supervisions = [MagicMock(text="hello")]
+        mock_caption_cls.read.return_value = mock_caption
+
+        ass_cfg = ASSConfig(karaoke_effect="instant", kinetic_style="pop")
+        out = tmp_path / "out.ass"
+        convert(sample_srt, str(out), ass=ass_cfg)
+
+        # Explicit instant is preserved, not overridden to sweep
+        assert ass_cfg.karaoke_effect == "instant"
+
+    def test_kinetic_invalid_rejected_at_config(self):
+        """Fail-fast: unsupported kinetic_style raises at ASSConfig construction."""
+        with pytest.raises(ValueError, match="Unknown kinetic_style"):
+            ASSConfig(kinetic_style="totally_bogus")
+
+    def test_kinetic_e2e_srt_to_ass_no_word_alignment(self, tmp_path, sample_srt):
+        """SRT has no word-level alignment, so kinetic is a no-op — must still produce valid ASS."""
+        out = tmp_path / "out.ass"
+        convert(sample_srt, str(out), ass=ASSConfig(kinetic_style="bounce"))
+        content = Path(out).read_text()
+        assert "[Script Info]" in content
+        # Karaoke style block is defined because sweep got auto-enabled
+        assert "Style: Karaoke" in content
+
+    def test_kinetic_tags_emitted_with_word_alignment(self, tmp_path):
+        """With word-level alignment present, kinetic_style must emit \\t() tags."""
+        from lattifai.caption.caption import Caption
+        from lattifai.caption.supervision import AlignmentItem, Supervision
+
+        sup = Supervision(
+            text="Hello world",
+            start=0.0,
+            duration=1.0,
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="Hello", start=0.0, duration=0.5),
+                    AlignmentItem(symbol="world", start=0.5, duration=0.5),
+                ]
+            },
+        )
+        caption = Caption(supervisions=[sup])
+        src = tmp_path / "in.json"
+        caption.write(str(src))
+
+        out = tmp_path / "out.ass"
+        convert(str(src), str(out), ass=ASSConfig(kinetic_style="bounce"))
+        content = Path(out).read_text()
+        assert r"\fscx120\fscy120" in content
+        assert r"\t(0,1," in content
+        assert r"\t(500,501," in content  # second word at cumulative 500ms offset
+
+
 class TestConvertReturnType:
     """Verify convert() returns a Pathlike value."""
 

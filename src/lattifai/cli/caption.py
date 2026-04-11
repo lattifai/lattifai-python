@@ -172,7 +172,10 @@ def convert(
             ass.font_name, ass.font_size, ass.background_color,
             ass.speaker_color, ass.primary_color, ass.outline_color,
             ass.karaoke_effect (sweep/instant/outline),
-            ass.karaoke_color_scheme (overrides ASS colors)
+            ass.karaoke_color_scheme (overrides ASS colors),
+            ass.kinetic_style (word-level motion preset: bounce/pop/shake/
+            pulse/swing/fade/zoom/rise/typewriter/blur_in/glow/neon/wave/
+            flicker/stagger — composes with karaoke_effect)
         lrc: LRC lyric format configuration: timestamp precision, metadata.
         ttml: TTML/IMSC1/EBU-TT-D format configuration: style, region, profile.
         fcpxml: Final Cut Pro XML format configuration: fps, roles, styles.
@@ -192,17 +195,27 @@ def convert(
         lai caption convert input.json output.ass \\
             render.word_level=true ass.speaker_color=auto \\
             ass.karaoke_effect=sweep ass.karaoke_color_scheme=azure-gold
+
+        # Short-video style with word-level kinetic motion
+        lai caption convert input.json output.ass \\
+            render.word_level=true \\
+            ass.karaoke_effect=sweep ass.karaoke_color_scheme=neon \\
+            ass.kinetic_style=bounce
     """
     from pathlib import Path
 
     from lattifai.data import Caption
 
-    # Auto-enable word_level when karaoke effect is set
-    if ass is not None and ass.karaoke_effect is not None:
+    # Auto-enable word_level when karaoke effect or kinetic_style is set;
+    # kinetic_style without an explicit karaoke_effect defaults to sweep so
+    # the \t animations actually have a per-word \k tag to attach to.
+    if ass is not None and (ass.karaoke_effect is not None or ass.kinetic_style is not None):
         if render is None:
             render = RenderConfig(word_level=True)
         else:
             render.word_level = True
+        if ass.kinetic_style is not None and ass.karaoke_effect is None:
+            ass.karaoke_effect = "sweep"
 
     caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
     # Align timestamps from reference if provided
