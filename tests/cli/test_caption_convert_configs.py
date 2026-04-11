@@ -224,9 +224,12 @@ class TestConvertKineticStyle:
         out = tmp_path / "out.ass"
         convert(str(src), str(out), ass=ASSConfig(kinetic_style="bounce"))
         content = Path(out).read_text()
-        assert r"\fscx120\fscy120" in content
-        assert r"\t(0,1," in content
-        assert r"\t(500,501," in content  # second word at cumulative 500ms offset
+        # Phase 1: bounce is vertical-only (\fscy) to avoid horizontal
+        # advance-width reflow. No \fscx anywhere.
+        assert r"\fscx" not in content
+        assert r"\fscy130" in content
+        assert r"\t(0,1,\fscy130)" in content
+        assert r"\t(500,501,\fscy130)" in content  # second word at cumulative 500ms offset
 
 
 class TestConvertReturnType:
