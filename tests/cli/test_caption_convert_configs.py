@@ -155,23 +155,43 @@ class TestConvertKaraokeAutoRender:
 
 
 class TestConvertKineticStyle:
-    """Verify kinetic_style flows through convert() and auto-enables sweep + word_level."""
+    """Verify kinetic_style flows through convert() with scope-aware behavior.
+
+    Phase 2 architecture: kinetic_style does NOT auto-enable word_level.
+    Line-scope (default) applies at event start; word-scope (explicit) fires
+    per word. See lattifai-captions kinetic.py for the preset registry.
+    """
 
     @patch("lattifai.data.Caption")
-    def test_kinetic_alone_auto_enables_sweep_and_word_level(self, mock_caption_cls, tmp_path, sample_srt):
+    def test_kinetic_alone_does_not_force_word_level(self, mock_caption_cls, tmp_path, sample_srt):
+        """kinetic_style alone gives line-scope behavior; word_level stays default (False)."""
+        mock_caption = MagicMock()
+        mock_caption.supervisions = [MagicMock(text="hello")]
+        mock_caption_cls.read.return_value = mock_caption
+
+        ass_cfg = ASSConfig(kinetic_style="fade")
+        out = tmp_path / "out.ass"
+        convert(sample_srt, str(out), ass=ass_cfg)
+
+        render = mock_caption.write.call_args[1]["render"]
+        # word_level must NOT be auto-enabled
+        assert render is None or render.word_level is False
+        # karaoke_effect stays None — line-scope kinetic does not need it
+        assert ass_cfg.karaoke_effect is None
+
+    @patch("lattifai.data.Caption")
+    def test_kinetic_with_explicit_word_level_auto_enables_sweep(self, mock_caption_cls, tmp_path, sample_srt):
+        """When user sets word_level=True and kinetic_style, karaoke_effect auto-defaults to sweep."""
         mock_caption = MagicMock()
         mock_caption.supervisions = [MagicMock(text="hello")]
         mock_caption_cls.read.return_value = mock_caption
 
         ass_cfg = ASSConfig(kinetic_style="bounce")
+        render_cfg = RenderConfig(word_level=True)
         out = tmp_path / "out.ass"
-        convert(sample_srt, str(out), ass=ass_cfg)
+        convert(sample_srt, str(out), ass=ass_cfg, render=render_cfg)
 
-        # word_level must be auto-enabled
-        render = mock_caption.write.call_args[1]["render"]
-        assert render is not None
-        assert render.word_level is True
-        # karaoke_effect must default to sweep so \kf tags carry the \t overrides
+        # karaoke_effect auto-sweeps so \kf tags exist for kinetic overrides
         assert ass_cfg.karaoke_effect == "sweep"
 
     @patch("lattifai.data.Caption")
@@ -192,17 +212,17 @@ class TestConvertKineticStyle:
         with pytest.raises(ValueError, match="Unknown kinetic_style"):
             ASSConfig(kinetic_style="totally_bogus")
 
-    def test_kinetic_e2e_srt_to_ass_no_word_alignment(self, tmp_path, sample_srt):
-        """SRT has no word-level alignment, so kinetic is a no-op — must still produce valid ASS."""
+    def test_kinetic_line_scope_e2e_srt_to_ass(self, tmp_path, sample_srt):
+        """Line-scope fade applies at event start without needing word alignment."""
         out = tmp_path / "out.ass"
-        convert(sample_srt, str(out), ass=ASSConfig(kinetic_style="bounce"))
+        convert(sample_srt, str(out), ass=ASSConfig(kinetic_style="fade"))
         content = Path(out).read_text()
         assert "[Script Info]" in content
-        # Karaoke style block is defined because sweep got auto-enabled
-        assert "Style: Karaoke" in content
+        # Line-scope fade emits \fad(300,0) as an event-level override
+        assert r"\fad(300,0)" in content
 
-    def test_kinetic_tags_emitted_with_word_alignment(self, tmp_path):
-        """With word-level alignment present, kinetic_style must emit \\t() tags."""
+    def test_kinetic_word_scope_tags_emitted(self, tmp_path):
+        """word_level=True + bounce emits per-word \\bord\\frz overrides (no \\fscy)."""
         from lattifai.caption.caption import Caption
         from lattifai.caption.supervision import AlignmentItem, Supervision
 
@@ -222,14 +242,21 @@ class TestConvertKineticStyle:
         caption.write(str(src))
 
         out = tmp_path / "out.ass"
-        convert(str(src), str(out), ass=ASSConfig(kinetic_style="bounce"))
+        convert(
+            str(src),
+            str(out),
+            ass=ASSConfig(kinetic_style="bounce"),
+            render=RenderConfig(word_level=True),
+        )
         content = Path(out).read_text()
-        # Phase 1: bounce is vertical-only (\fscy) to avoid horizontal
-        # advance-width reflow. No \fscx anywhere.
+        # Phase 2: word-scope bounce uses metric-safe \bord + \frz only
         assert r"\fscx" not in content
-        assert r"\fscy130" in content
-        assert r"\t(0,1,\fscy130)" in content
-        assert r"\t(500,501,\fscy130)" in content  # second word at cumulative 500ms offset
+        assert r"\fscy" not in content
+        assert r"\bord6" in content
+        assert r"\frz3" in content
+        # Cumulative word offsets (word 2 starts at 500ms)
+        assert r"\t(0,1,\bord6\frz3)" in content
+        assert r"\t(500,501,\bord6\frz3)" in content
 
 
 class TestConvertReturnType:

@@ -196,25 +196,35 @@ def convert(
             render.word_level=true ass.speaker_color=auto \\
             ass.karaoke_effect=sweep ass.karaoke_color_scheme=azure-gold
 
-        # Short-video style with word-level kinetic motion
+        # Line-level kinetic entrance (default — whole line fades in)
+        lai caption convert input.json output.ass \\
+            ass.kinetic_style=fade
+
+        # Word-level kinetic (per-word activation) — requires word_level
         lai caption convert input.json output.ass \\
             render.word_level=true \\
-            ass.karaoke_effect=sweep ass.karaoke_color_scheme=neon \\
-            ass.kinetic_style=bounce
+            ass.kinetic_style=bounce ass.karaoke_color_scheme=neon
     """
     from pathlib import Path
 
     from lattifai.data import Caption
 
-    # Auto-enable word_level when karaoke effect or kinetic_style is set;
-    # kinetic_style without an explicit karaoke_effect defaults to sweep so
-    # the \t animations actually have a per-word \k tag to attach to.
-    if ass is not None and (ass.karaoke_effect is not None or ass.kinetic_style is not None):
+    # Auto-enable word_level when karaoke effect is set (karaoke is inherently
+    # per-word). kinetic_style does NOT auto-enable word_level — the caller
+    # controls scope explicitly:
+    #   - word_level=False (default) → line-scope kinetic, whole line animates
+    #   - word_level=True            → word-scope kinetic, per-word animation
+    # If the caller already set word_level=True AND set kinetic_style without
+    # an explicit karaoke_effect, auto-default karaoke_effect=sweep so the
+    # per-word \k tags exist for kinetic overrides to ride on.
+    if ass is not None and ass.karaoke_effect is not None:
         if render is None:
             render = RenderConfig(word_level=True)
         else:
             render.word_level = True
-        if ass.kinetic_style is not None and ass.karaoke_effect is None:
+    if ass is not None and ass.kinetic_style is not None:
+        current_wl = render.word_level if render is not None else False
+        if current_wl and ass.karaoke_effect is None:
             ass.karaoke_effect = "sweep"
 
     caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
