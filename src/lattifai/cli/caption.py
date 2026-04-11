@@ -209,19 +209,21 @@ def convert(
 
     from lattifai.data import Caption
 
-    # Auto-enable word_level when karaoke effect is set (karaoke is inherently
-    # per-word). kinetic_style does NOT auto-enable word_level — the caller
-    # controls scope explicitly:
-    #   - word_level=False (default) → line-scope kinetic, whole line animates
-    #   - word_level=True            → word-scope kinetic, per-word animation
-    # If the caller already set word_level=True AND set kinetic_style without
-    # an explicit karaoke_effect, auto-default karaoke_effect=sweep so the
-    # per-word \k tags exist for kinetic overrides to ride on.
-    if ass is not None and ass.karaoke_effect is not None:
-        if render is None:
-            render = RenderConfig(word_level=True)
-        else:
-            render.word_level = True
+    # Auto-enable word_level only when the user did NOT pass a render config.
+    # If the user explicitly configured render (e.g. render.word_level=false
+    # to request line-scope kinetic even while ass.karaoke_effect is set),
+    # we MUST respect it — otherwise there is no way to render line-scope
+    # output through the CLI when karaoke_effect is also on the command
+    # line. Previously this branch unconditionally clobbered render.word_level
+    # to True, which silently overrode the user's explicit False.
+    #
+    # kinetic_style never auto-enables word_level — the caller controls scope
+    # by setting render.word_level themselves (False → line-scope, True →
+    # word-scope). If the caller set word_level=True and kinetic_style but
+    # omitted karaoke_effect, we default the effect to sweep so \k tags
+    # exist for the per-word kinetic overrides to ride on.
+    if ass is not None and ass.karaoke_effect is not None and render is None:
+        render = RenderConfig(word_level=True)
     if ass is not None and ass.kinetic_style is not None:
         current_wl = render.word_level if render is not None else False
         if current_wl and ass.karaoke_effect is None:

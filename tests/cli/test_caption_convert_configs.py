@@ -195,6 +195,25 @@ class TestConvertKineticStyle:
         assert ass_cfg.karaoke_effect == "sweep"
 
     @patch("lattifai.data.Caption")
+    def test_explicit_word_level_false_is_respected(self, mock_caption_cls, tmp_path, sample_srt):
+        """Regression: passing render.word_level=false with karaoke_effect set
+        must NOT auto-upgrade word_level to True. Previously the CLI would
+        unconditionally clobber render.word_level whenever karaoke_effect was
+        set, which made it impossible to request line-scope kinetic from the
+        command line while still carrying a karaoke_effect argument."""
+        mock_caption = MagicMock()
+        mock_caption.supervisions = [MagicMock(text="hello")]
+        mock_caption_cls.read.return_value = mock_caption
+
+        ass_cfg = ASSConfig(karaoke_effect="sweep", kinetic_style="fade")
+        render_cfg = RenderConfig(word_level=False)
+        out = tmp_path / "out.ass"
+        convert(sample_srt, str(out), ass=ass_cfg, render=render_cfg)
+
+        # Explicit False must survive the auto-enable branch.
+        assert render_cfg.word_level is False
+
+    @patch("lattifai.data.Caption")
     def test_kinetic_preserves_explicit_effect(self, mock_caption_cls, tmp_path, sample_srt):
         mock_caption = MagicMock()
         mock_caption.supervisions = [MagicMock(text="hello")]
