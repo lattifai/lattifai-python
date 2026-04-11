@@ -138,7 +138,15 @@ class TestConvertKaraokeAutoRender:
         assert render.word_level is True
 
     @patch("lattifai.data.Caption")
-    def test_karaoke_sets_word_level_on_existing_render(self, mock_caption_cls, tmp_path, sample_srt):
+    def test_karaoke_respects_user_provided_render_word_level_false(self, mock_caption_cls, tmp_path, sample_srt):
+        """When the user explicitly passes render with word_level=False, the
+        CLI must NOT auto-upgrade it to True — even if karaoke_effect is set.
+        Auto-enable only kicks in when `render` is None (user didn't pass it).
+
+        This is the regression the Phase 3 CLI fix addresses: previously the
+        auto-enable branch unconditionally clobbered render.word_level=True
+        whenever karaoke_effect was set, making line-scope kinetic impossible
+        from the command line while still carrying a karaoke_effect argument."""
         mock_caption = MagicMock()
         mock_caption.supervisions = [MagicMock(text="hello")]
         mock_caption_cls.read.return_value = mock_caption
@@ -150,7 +158,7 @@ class TestConvertKaraokeAutoRender:
 
         call_kwargs = mock_caption.write.call_args
         render = call_kwargs[1]["render"]
-        assert render.word_level is True
+        assert render.word_level is False  # user's explicit value survives
         assert render.include_speaker_in_text is True
 
 
