@@ -119,11 +119,19 @@ class TestConvertFormatConfigDispatch:
         assert call_kwargs[1]["standardization"] is std_cfg
 
 
-class TestConvertKaraokeAutoRender:
-    """Verify karaoke_effect auto-enables word_level in RenderConfig."""
+class TestConvertKaraokeNoAutoRender:
+    """After lattifai-captions decoupled karaoke from word_level, the CLI no
+    longer needs to auto-set RenderConfig when karaoke_effect is configured.
+    karaoke_effect alone is sufficient to trigger ASS karaoke rendering.
+    """
 
     @patch("lattifai.data.Caption")
-    def test_karaoke_creates_render_with_word_level(self, mock_caption_cls, tmp_path, sample_srt):
+    def test_karaoke_does_not_force_render_word_level(self, mock_caption_cls, tmp_path, sample_srt):
+        """karaoke_effect alone must NOT cause the CLI to inject a RenderConfig.
+
+        Regression guard: this used to set render=RenderConfig(word_level=True)
+        as a workaround for an old library coupling that no longer exists.
+        """
         mock_caption = MagicMock()
         mock_caption.supervisions = [MagicMock(text="hello")]
         mock_caption_cls.read.return_value = mock_caption
@@ -133,20 +141,15 @@ class TestConvertKaraokeAutoRender:
         convert(sample_srt, str(out), ass=ass_cfg)
 
         call_kwargs = mock_caption.write.call_args
-        render = call_kwargs[1]["render"]
-        assert render is not None
-        assert render.word_level is True
+        # render passes through as-is (None, since the user did not provide one)
+        assert call_kwargs[1]["render"] is None
 
     @patch("lattifai.data.Caption")
     def test_karaoke_respects_user_provided_render_word_level_false(self, mock_caption_cls, tmp_path, sample_srt):
-        """When the user explicitly passes render with word_level=False, the
-        CLI must NOT auto-upgrade it to True — even if karaoke_effect is set.
-        Auto-enable only kicks in when `render` is None (user didn't pass it).
+        """User-supplied RenderConfig is forwarded untouched.
 
-        This is the regression the Phase 3 CLI fix addresses: previously the
-        auto-enable branch unconditionally clobbered render.word_level=True
-        whenever karaoke_effect was set, making line-scope kinetic impossible
-        from the command line while still carrying a karaoke_effect argument."""
+        Even with ASS karaoke configured, render.word_level=False must reach
+        the writer unchanged so the user can request line-scope output."""
         mock_caption = MagicMock()
         mock_caption.supervisions = [MagicMock(text="hello")]
         mock_caption_cls.read.return_value = mock_caption
@@ -160,6 +163,52 @@ class TestConvertKaraokeAutoRender:
         render = call_kwargs[1]["render"]
         assert render.word_level is False  # user's explicit value survives
         assert render.include_speaker_in_text is True
+
+    @staticmethod
+    def _aligned_caption_src(tmp_path):
+        """Build a tiny JSON caption with word alignment for e2e tests."""
+        from lattifai.caption.caption import Caption
+        from lattifai.caption.supervision import AlignmentItem, Supervision
+
+        sup = Supervision(
+            text="Hello world",
+            start=0.0,
+            duration=1.0,
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="Hello", start=0.0, duration=0.5),
+                    AlignmentItem(symbol="world", start=0.5, duration=0.5),
+                ]
+            },
+        )
+        src = tmp_path / "in.json"
+        Caption(supervisions=[sup]).write(str(src))
+        return src
+
+    def test_karaoke_e2e_emits_k_tags_without_word_level(self, tmp_path):
+        """End-to-end: karaoke_effect alone (no render.word_level) must still
+        produce \\k tags in ASS output. Verifies the underlying lattifai-captions
+        decoupling reaches the CLI path."""
+        src = self._aligned_caption_src(tmp_path)
+        out = tmp_path / "out.ass"
+        convert(str(src), str(out), ass=ASSConfig(karaoke_effect="sweep"))
+        content = Path(out).read_text()
+        assert "\\kf" in content, "karaoke_effect=sweep should emit \\kf tags"
+
+    def test_explicit_word_level_false_disables_karaoke_e2e(self, tmp_path):
+        """End-to-end negative: render.word_level=False + karaoke_effect=sweep
+        must NOT emit \\k tags. The library is responsible for honoring the
+        explicit segment-level request even though karaoke_effect is set."""
+        src = self._aligned_caption_src(tmp_path)
+        out = tmp_path / "out.ass"
+        convert(
+            str(src),
+            str(out),
+            ass=ASSConfig(karaoke_effect="sweep"),
+            render=RenderConfig(word_level=False),
+        )
+        content = Path(out).read_text()
+        assert "\\k" not in content, "render.word_level=False must override karaoke_effect and emit no \\k tags"
 
 
 class TestConvertKineticStyle:
@@ -189,11 +238,14 @@ class TestConvertKineticStyle:
 
     @patch("lattifai.data.Caption")
     def test_kinetic_with_explicit_word_level_auto_enables_sweep(self, mock_caption_cls, tmp_path, sample_srt):
-        """When user sets word_level=True and kinetic_style, karaoke_effect auto-defaults to sweep."""
+        """When user sets word_level=True and a WORD-NATURAL kinetic_style,
+        karaoke_effect auto-defaults to sweep so \\k tags exist for the
+        per-word overrides to ride on."""
         mock_caption = MagicMock()
         mock_caption.supervisions = [MagicMock(text="hello")]
         mock_caption_cls.read.return_value = mock_caption
 
+        # bounce is a word-natural preset
         ass_cfg = ASSConfig(kinetic_style="bounce")
         render_cfg = RenderConfig(word_level=True)
         out = tmp_path / "out.ass"
@@ -201,6 +253,60 @@ class TestConvertKineticStyle:
 
         # karaoke_effect auto-sweeps so \kf tags exist for kinetic overrides
         assert ass_cfg.karaoke_effect == "sweep"
+
+    @patch("lattifai.data.Caption")
+    def test_kinetic_line_natural_does_not_auto_inject_sweep(self, mock_caption_cls, tmp_path, sample_srt):
+        """Regression: line-natural presets (fade/zoom/rise/blur_in/pop) must
+        NOT have karaoke_effect injected even when word_level=True. Otherwise
+        the user gets unrequested karaoke color sweep on top of a line-scope
+        entrance animation."""
+        mock_caption = MagicMock()
+        mock_caption.supervisions = [MagicMock(text="hello")]
+        mock_caption_cls.read.return_value = mock_caption
+
+        for line_natural in ("fade", "zoom", "rise", "blur_in", "pop"):
+            ass_cfg = ASSConfig(kinetic_style=line_natural)
+            render_cfg = RenderConfig(word_level=True)
+            out = tmp_path / f"out_{line_natural}.ass"
+            convert(sample_srt, str(out), ass=ass_cfg, render=render_cfg)
+            assert (
+                ass_cfg.karaoke_effect is None
+            ), f"line-natural preset {line_natural!r} must not auto-inject karaoke_effect"
+
+    def test_kinetic_word_natural_e2e_emits_word_scope_overrides(self, tmp_path):
+        """End-to-end: word_level=True + bounce + no karaoke_effect → CLI shim
+        injects sweep, writer takes the karaoke renderer path, and the output
+        carries word-scope kinetic overrides (\\bord+\\blur impact peak)
+        rather than line-scope fallback."""
+        from lattifai.caption.caption import Caption
+        from lattifai.caption.supervision import AlignmentItem, Supervision
+
+        sup = Supervision(
+            text="Hello world",
+            start=0.0,
+            duration=1.0,
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="Hello", start=0.0, duration=0.5),
+                    AlignmentItem(symbol="world", start=0.5, duration=0.5),
+                ]
+            },
+        )
+        src = tmp_path / "in.json"
+        Caption(supervisions=[sup]).write(str(src))
+
+        out = tmp_path / "out.ass"
+        convert(
+            str(src),
+            str(out),
+            ass=ASSConfig(kinetic_style="bounce"),
+            render=RenderConfig(word_level=True),
+        )
+        content = Path(out).read_text()
+        # \kf appears because the shim injected karaoke_effect="sweep"
+        assert "\\kf" in content
+        # Word-scope bounce signature (impact peak override)
+        assert "\\bord8\\blur4" in content
 
     @patch("lattifai.data.Caption")
     def test_explicit_word_level_false_is_respected(self, mock_caption_cls, tmp_path, sample_srt):

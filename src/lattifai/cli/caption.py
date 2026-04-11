@@ -185,49 +185,55 @@ def convert(
         # Basic format conversion
         lai caption convert input.srt output.vtt
 
-        # Custom font, background box, speaker coloring, word-level
+        # Custom font, background box, speaker coloring, word-level cues
         lai caption convert input.json output.ass \\
             ass.font_name="PingFang SC" ass.font_size=24 \\
             ass.background_color="#00000080" ass.speaker_color=auto \\
             render.word_level=true
 
-        # Karaoke with color scheme
+        # Karaoke with color scheme — karaoke_effect alone is enough,
+        # no need to also pass render.word_level=true
         lai caption convert input.json output.ass \\
-            render.word_level=true ass.speaker_color=auto \\
+            ass.speaker_color=auto \\
             ass.karaoke_effect=sweep ass.karaoke_color_scheme=azure-gold
 
         # Line-level kinetic entrance (default — whole line fades in)
         lai caption convert input.json output.ass \\
             ass.kinetic_style=fade
 
-        # Word-level kinetic (per-word activation) — requires word_level
+        # Word-level kinetic (per-word activation) — requires word_level=true,
+        # CLI auto-defaults karaoke_effect=sweep so \\k tags are emitted as
+        # the kinetic time carrier
         lai caption convert input.json output.ass \\
             render.word_level=true \\
             ass.kinetic_style=bounce ass.karaoke_color_scheme=neon
     """
     from pathlib import Path
 
+    # ASS karaoke is triggered by ASSConfig.karaoke_effect alone — there is
+    # no longer any coupling with RenderConfig.word_level (lattifai-captions
+    # decoupled the two when word_level became tri-state).
+    #
+    # The only CLI helper still pulling its weight is the word-scope kinetic
+    # convenience. word-scope kinetic presets (bounce, shake, glow, stagger,
+    # etc.) need \k karaoke tags as per-word time carriers; without them the
+    # writer either silently degrades to line-scope (dual-scope styles) or
+    # crashes outright (word-only styles). When the user asks for
+    # word_level=True with a word-natural kinetic preset but forgets
+    # karaoke_effect, default it to "sweep". Line-natural presets
+    # (fade/zoom/rise/blur_in/pop) are NOT touched — injecting karaoke would
+    # add an unrequested color sweep.
+    from lattifai.caption.kinetic import is_word_scope_kinetic_style
     from lattifai.data import Caption
 
-    # Auto-enable word_level only when the user did NOT pass a render config.
-    # If the user explicitly configured render (e.g. render.word_level=false
-    # to request line-scope kinetic even while ass.karaoke_effect is set),
-    # we MUST respect it — otherwise there is no way to render line-scope
-    # output through the CLI when karaoke_effect is also on the command
-    # line. Previously this branch unconditionally clobbered render.word_level
-    # to True, which silently overrode the user's explicit False.
-    #
-    # kinetic_style never auto-enables word_level — the caller controls scope
-    # by setting render.word_level themselves (False → line-scope, True →
-    # word-scope). If the caller set word_level=True and kinetic_style but
-    # omitted karaoke_effect, we default the effect to sweep so \k tags
-    # exist for the per-word kinetic overrides to ride on.
-    if ass is not None and ass.karaoke_effect is not None and render is None:
-        render = RenderConfig(word_level=True)
-    if ass is not None and ass.kinetic_style is not None:
-        current_wl = render.word_level if render is not None else False
-        if current_wl and ass.karaoke_effect is None:
-            ass.karaoke_effect = "sweep"
+    if (
+        ass is not None
+        and is_word_scope_kinetic_style(ass.kinetic_style)
+        and ass.karaoke_effect is None
+        and render is not None
+        and render.word_level is True
+    ):
+        ass.karaoke_effect = "sweep"
 
     caption = Caption.read(input_path, normalize_text=normalize_text, format=input_format)
     # Align timestamps from reference if provided
