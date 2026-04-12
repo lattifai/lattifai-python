@@ -151,4 +151,7 @@ def parse_json_response(text: str) -> Any:
             return result
         except json.JSONDecodeError:
             pass
+        # Log a preview of the raw output to help diagnose LLM formatting issues.
+        preview = text[:500] + ("..." if len(text) > 500 else "")
+        logger.error("Failed to parse LLM JSON output. Preview:\n%s", preview)
         raise

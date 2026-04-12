@@ -1,6 +1,7 @@
 """Summarisation CLI entry point with nemo_run."""
 
 import asyncio
+import json
 import re
 from pathlib import Path
 from typing import Any, Optional
@@ -233,10 +234,21 @@ def summarize_caption(
         source_lang=config.source_lang or cap.language,
     )
 
-    # Summarise
+    # Summarise (retry once on JSON parse failure — LLM can produce
+    # malformed JSON on the first attempt)
     client = config.llm.create_client()
     summarizer = ContentSummarizer(config, client)
-    result = asyncio.run(summarizer.summarize(summary_input))
+    max_attempts = 2
+    for attempt in range(1, max_attempts + 1):
+        try:
+            result = asyncio.run(summarizer.summarize(summary_input))
+            break
+        except (json.JSONDecodeError, RuntimeError) as exc:
+            if attempt < max_attempts:
+                safe_print(theme.warning(f"LLM returned invalid JSON, retrying ({attempt}/{max_attempts})..."))
+                continue
+            safe_print(theme.error(f"Summary failed after {max_attempts} attempts: {exc}"))
+            raise
 
     # Carry metadata through to rendered output
     if meta_data.get("channel"):
