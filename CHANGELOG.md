@@ -1,6 +1,29 @@
 # CHANGELOG
 
 
+## [1.5.5] - 2026-04-13
+
+### Features
+- Chapter-based summaries with metadata and notable quotes
+- Surface `kinetic_style` in caption convert CLI with auto-enable for word-level output
+- Add brand-name and no-meta-commentary rules to translation prompts
+
+### Fixes
+- Propagate auth/quota errors from alignment API instead of wrapping as LatticeDecodingError
+- Respect explicit `render.word_level=false` when karaoke mode is set
+- Decouple `kinetic_style` from `word_level` auto-enable
+- Use json-repair for robust LLM JSON parsing (llm module)
+- Retry on LLM JSON failure in summarize, log raw output on parse error
+- Use correct theme methods in summarize CLI (warn/err not warning/error)
+
+### Refactor
+- Drop obsolete karaoke→word_level shim, gate kinetic shim behind explicit flag
+
+### Dependencies
+- Bump lattifai-core to >=0.7.4, lattifai-captions to >=0.4.4
+- Declare mlx/all/transcription/diarization extras as conflicting (protobuf version split)
+
+
 ## [1.5.2] - 2026-04-08
 
 ### Fixes

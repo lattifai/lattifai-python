@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.5.4'
+version = '1.5.5'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -39,8 +39,8 @@ dependencies = [
     "python-dotenv",
     "colorful>=0.5.6",
     "lattifai-run>=1.0.4",
-    "lattifai-core>=0.7.3",
-    "lattifai-captions[splitting]>=0.4.2",
+    "lattifai-core>=0.7.4",
+    "lattifai-captions[splitting]>=0.4.4",
     "g2p-phonemizer>=0.4.0",
     "error-align-fix>=0.1.4",
     "k2py==0.4.0",
@@ -152,3 +152,20 @@ testpaths = ["tests"]
 
 [tool.uv]
 extra-index-url = ["https://lattifai.github.io/pypi/simple/"]
+
+# mlx extra conflicts with all/transcription due to protobuf version mismatch:
+# mlx-audio requires protobuf>=6.33.5, nemo-toolkit-asr requires protobuf<5.30
+conflicts = [
+    [
+        { extra = "mlx" },
+        { extra = "all" },
+    ],
+    [
+        { extra = "mlx" },
+        { extra = "transcription" },
+    ],
+    [
+        { extra = "mlx" },
+        { extra = "diarization" },
+    ],
+]
