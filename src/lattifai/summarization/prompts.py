@@ -12,7 +12,7 @@ from lattifai.summarization.schema import SummaryInput
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = """\
-You are a factual content summarisation engine.
+You are a factual podcast/video content summarisation engine.
 
 Rules:
 1. Be faithful to the source. Never invent facts absent from the input.
@@ -22,15 +22,32 @@ Rules:
 5. Return **valid JSON only** — no markdown, no commentary.
 6. If the source is weak or incomplete, reflect that in the confidence rationale.
 7. Entities must come from the source, not from guesswork.
-8. If there are no genuine actionable insights, return an empty list.
+8. tags must be lowercase English keywords (kebab-case), regardless of output language.
+9. seo_title must be under 60 characters, seo_description under 155 characters.
+10. Chapters are the CORE structure — they ARE the summary. Each chapter must have \
+a narrative paragraph (summary) and optionally 1-2 direct quotes with timestamps.
+11. If chapters are provided in the metadata, use them as the section structure. \
+If none are provided, segment the content into 3-12 coherent topic sections \
+using [MM:SS] timestamps from the source transcript.
+12. Preserve the speaker's voice: include exact short quotes (max 25 words) that \
+capture key insights. Format quotes as: "exact words" [MM:SS]
 
 Return a JSON object with exactly these fields:
 {
   "title": "string",
-  "summary": "string",
-  "key_points": ["string", ...],
+  "overview": "1-2 sentence high-level hook — why should someone listen to this?",
+  "chapters": [
+    {
+      "title": "Chapter title",
+      "start": total_seconds_as_float (e.g. [01:09] = 69.0, [00:30] = 30.0, NOT 1.09),
+      "summary": "1-3 sentence narrative of this section with speaker attribution",
+      "quotes": ["exact words from speaker [MM:SS]"]
+    }
+  ],
   "entities": [{"name": "string", "type": "string", "description": "string"}, ...],
-  "actionable_insights": ["string", ...],
+  "tags": ["lowercase-tag", ...],
+  "seo_title": "string (under 60 chars)",
+  "seo_description": "string (under 155 chars)",
   "confidence": {"score": 0.0-1.0, "rationale": "string"}
 }"""
 
@@ -41,30 +58,51 @@ Return a JSON object with exactly these fields:
 LENGTH_INSTRUCTIONS: dict[str, str] = {
     "short": (
         "Produce a concise summary:\n"
-        "- summary: 2-4 sentences\n"
-        "- key_points: 3-5 items\n"
+        "- overview: 1-2 sentences\n"
+        "- chapters: 2-4 sections, each with 1-2 sentence summary\n"
         "- entities: up to 5\n"
-        "- actionable_insights: 0-3"
+        "- quotes: 0-1 per chapter"
     ),
     "medium": (
         "Produce a moderately detailed summary:\n"
-        "- summary: 1-3 paragraphs\n"
-        "- key_points: 5-8 items\n"
+        "- overview: 2-3 sentences\n"
+        "- chapters: 3-6 sections, each with 2-3 sentence summary\n"
         "- entities: up to 8\n"
-        "- actionable_insights: 2-5"
+        "- quotes: 1 per chapter when available"
     ),
     "long": (
         "Produce a comprehensive summary:\n"
-        "- summary: 3-6 paragraphs\n"
-        "- key_points: 8-12 items\n"
+        "- overview: 3-4 sentences\n"
+        "- chapters: 4-10 sections, each with 3-5 sentence summary\n"
         "- entities: up to 12\n"
-        "- actionable_insights: 3-8"
+        "- quotes: 1-2 per chapter"
     ),
 }
 
 
-def get_length_instruction(length: str) -> str:
-    """Return length-specific guidance for the user prompt."""
+def resolve_auto_length(text_chars: int) -> str:
+    """Pick short/medium/long based on input text length.
+
+    Rough mapping (assuming ~130 chars/min for spoken English):
+      < 10 min (~13k chars) → short
+      10-45 min (~13k-60k)  → medium
+      > 45 min (~60k+)      → long
+    """
+    if text_chars < 13000:
+        return "short"
+    if text_chars < 60000:
+        return "medium"
+    return "long"
+
+
+def get_length_instruction(length: str, *, text_chars: int = 0) -> str:
+    """Return length-specific guidance for the user prompt.
+
+    When *length* is ``"auto"``, resolves to short/medium/long based
+    on *text_chars*.
+    """
+    if length == "auto":
+        length = resolve_auto_length(text_chars)
     return LENGTH_INSTRUCTIONS.get(length, LENGTH_INSTRUCTIONS["medium"])
 
 
@@ -94,7 +132,7 @@ def build_summary_user_prompt(
     parts.append("")
 
     # Length guidance
-    parts.append(get_length_instruction(length))
+    parts.append(get_length_instruction(length, text_chars=len(summary_input.text)))
     parts.append("")
 
     # Chunk context

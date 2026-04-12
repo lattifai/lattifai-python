@@ -23,8 +23,9 @@ class SummarizationConfig:
     """Output language code (BCP 47 / ISO 639-1).
     Common codes: en, zh, ja, ko, es, fr, de."""
 
-    length: Literal["short", "medium", "long"] = "medium"
+    length: Literal["auto", "short", "medium", "long"] = "auto"
     """Summary length preset:
+    - auto: select based on input length (default)
     - short: 2-4 sentence summary, 3-5 key points
     - medium: 1-3 paragraph summary, 5-8 key points
     - long: 3-6 paragraph summary, 8-12 key points"""

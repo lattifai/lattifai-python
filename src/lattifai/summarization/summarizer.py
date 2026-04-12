@@ -7,7 +7,12 @@ from typing import Any
 
 from lattifai.config.summarization import SummarizationConfig
 from lattifai.llm.base import BaseLLMClient
-from lattifai.summarization.prompts import SYSTEM_PROMPT, build_reduce_user_prompt, build_summary_user_prompt
+from lattifai.summarization.prompts import (
+    SYSTEM_PROMPT,
+    build_reduce_user_prompt,
+    build_summary_user_prompt,
+    resolve_auto_length,
+)
 from lattifai.summarization.schema import SummaryConfidence, SummaryInput, SummaryResult, summary_result_from_dict
 
 logger = logging.getLogger(__name__)
@@ -36,6 +41,13 @@ class ContentSummarizer:
 
     async def summarize(self, summary_input: SummaryInput) -> SummaryResult:
         """Summarise *summary_input* and return a validated result."""
+        # Resolve "auto" length once based on input size.
+        if self._config.length == "auto":
+            self._resolved_length = resolve_auto_length(len(summary_input.text))
+            logger.info("Auto length: %d chars → %s", len(summary_input.text), self._resolved_length)
+        else:
+            self._resolved_length = self._config.length
+
         if self._needs_chunking(summary_input.text):
             logger.info("Input exceeds %d chars — using map-reduce", self._config.max_input_chars)
             result = await self._summarize_map_reduce(summary_input)
@@ -57,7 +69,7 @@ class ContentSummarizer:
         prompt = build_summary_user_prompt(
             summary_input,
             lang=self._config.lang,
-            length=self._config.length,
+            length=self._resolved_length,
             include_metadata=self._config.include_metadata,
             include_chapters=self._config.include_chapters,
         )
@@ -86,7 +98,7 @@ class ContentSummarizer:
             prompt = build_summary_user_prompt(
                 chunk_input,
                 lang=self._config.lang,
-                length=self._config.length,
+                length=self._resolved_length,
                 include_metadata=self._config.include_metadata and idx == 0,
                 include_chapters=self._config.include_chapters and idx == 0,
                 chunk_index=idx,
@@ -102,7 +114,7 @@ class ContentSummarizer:
             partial_results,
             title=summary_input.title,
             lang=self._config.lang,
-            length=self._config.length,
+            length=self._resolved_length,
             source_type=summary_input.source_type,
         )
         merged = await self._call_llm(reduce_prompt)

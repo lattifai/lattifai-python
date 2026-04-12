@@ -1,8 +1,9 @@
 """Summarisation CLI entry point with nemo_run."""
 
 import asyncio
+import re
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import nemo_run as run
 from typing_extensions import Annotated
@@ -12,10 +13,99 @@ from lattifai.config import CaptionConfig
 from lattifai.config.summarization import SummarizationConfig
 
 
+def _parse_meta_md(meta_path: Path) -> dict[str, Any]:
+    """Parse YAML frontmatter + body from a .meta.md file.
+
+    Returns a dict with keys: title, channel, duration, upload_date,
+    speakers (list of dicts), chapters (list of dicts with title/start).
+    """
+    import yaml
+
+    content = meta_path.read_text(encoding="utf-8")
+    match = re.match(r"^---\n(.*?)\n---\n?(.*)", content, re.DOTALL)
+    if not match:
+        return {}
+
+    fm = yaml.safe_load(match.group(1)) or {}
+    body = match.group(2) or ""
+
+    result: dict[str, Any] = {}
+    if fm.get("title"):
+        result["title"] = fm["title"]
+    if fm.get("channel"):
+        result["channel"] = fm["channel"]
+    if fm.get("duration"):
+        result["duration"] = str(fm["duration"])
+    if fm.get("upload_date"):
+        result["upload_date"] = str(fm["upload_date"])
+    if fm.get("url"):
+        result["url"] = fm["url"]
+
+    # Speakers
+    speakers = fm.get("speakers")
+    if isinstance(speakers, list) and speakers:
+        result["speakers"] = [
+            {"name": s["name"], **({"role": s["role"]} if s.get("role") else {})}
+            for s in speakers
+            if isinstance(s, dict) and s.get("name")
+        ]
+
+    # YouTube chapters from body text (e.g. "0:00 Intro\n5:30 Topic")
+    chapter_pattern = re.compile(r"^(\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$", re.MULTILINE)
+    matches = chapter_pattern.findall(body)
+    if len(matches) >= 2:
+        chapters = []
+        for ts_str, title in matches:
+            parts = ts_str.split(":")
+            if len(parts) == 3:
+                secs = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+            else:
+                secs = int(parts[0]) * 60 + int(parts[1])
+            chapters.append({"title": title.strip(), "start": float(secs)})
+        result["chapters"] = chapters
+
+    return result
+
+
+def _build_speaker_text(cap: Any) -> str:
+    """Build text with speaker labels and timestamps for richer context.
+
+    Format: [MM:SS] [Speaker] text
+    Falls back to plain text if no speakers or timestamps are present.
+    """
+    lines = []
+    has_speakers = any(getattr(s, "speaker", None) for s in cap.supervisions)
+    has_times = any(getattr(s, "start", None) is not None for s in cap.supervisions)
+
+    if not has_speakers and not has_times:
+        return "\n".join(s.text for s in cap.supervisions if s.text)
+
+    for sup in cap.supervisions:
+        text = sup.text or ""
+        if not text:
+            continue
+
+        parts = []
+        start = getattr(sup, "start", None)
+        if start is not None:
+            m, sec = divmod(int(start), 60)
+            parts.append(f"[{m:02d}:{sec:02d}]")
+
+        speaker = getattr(sup, "speaker", None)
+        if speaker:
+            parts.append(f"[{speaker}]")
+
+        parts.append(text)
+        lines.append(" ".join(parts))
+
+    return "\n".join(lines)
+
+
 @run.cli.entrypoint(name="caption", namespace="summarize", entrypoint_cls=LattifAIEntrypoint)
 def summarize_caption(
     input: Optional[str] = None,
     output: Optional[str] = None,
+    meta: Optional[str] = None,
     summarization: Annotated[Optional[SummarizationConfig], run.Config[SummarizationConfig]] = None,
     caption: Annotated[Optional[CaptionConfig], run.Config[CaptionConfig]] = None,
 ):
@@ -31,6 +121,9 @@ def summarize_caption(
         output: Path for the output summary file.  If omitted the file
             is written next to the input with a ``.summary.<lang>.md``
             suffix.
+        meta: Path to a .meta.md file for video metadata. Populates
+            title, channel, speakers, duration, and YouTube chapters
+            for richer, more accurate summaries.
         summarization: Summarisation configuration.
             Fields: llm.model_name, llm.api_base_url, lang, length,
                     output_format,
@@ -43,6 +136,9 @@ def summarize_caption(
     Examples:
         # Basic summary (Markdown, medium length, English)
         lai summarize caption input.srt
+
+        # With video metadata for richer context
+        lai summarize caption input.json meta=video.meta.md
 
         # Chinese short summary
         lai summarize caption input.srt summarization.lang=zh summarization.length=short
@@ -80,10 +176,29 @@ def summarize_caption(
     if not cap.supervisions:
         raise ValueError(f"No caption segments found in: {input}")
 
-    # Build plain text from supervisions
-    text = "\n".join(sup.text for sup in cap.supervisions if sup.text)
+    # Build text with speaker labels and timestamps when available
+    text = _build_speaker_text(cap)
     if not text.strip():
         raise ValueError("Caption file contains no text content.")
+
+    # Parse .meta.md if provided
+    meta_data: dict[str, Any] = {}
+    chapters: list[dict[str, Any]] = []
+    video_title = input_path.stem
+
+    if meta:
+        meta_path = Path(meta)
+        if meta_path.exists():
+            meta_data = _parse_meta_md(meta_path)
+            safe_print(theme.step(f"Metadata: {meta_path.name}"))
+            if meta_data.get("title"):
+                video_title = meta_data["title"]
+            if meta_data.get("chapters"):
+                chapters = meta_data["chapters"]
+                safe_print(theme.step(f"  Chapters: {len(chapters)} from description"))
+            if meta_data.get("speakers"):
+                names = [s["name"] for s in meta_data["speakers"]]
+                safe_print(theme.step(f"  Speakers: {', '.join(names)}"))
 
     safe_print(
         theme.step(
@@ -92,17 +207,28 @@ def summarize_caption(
         )
     )
 
-    # Build SummaryInput
-    metadata: dict = {}
+    # Build SummaryInput with enriched metadata
+    summary_metadata: dict = {}
     if cap.source_path:
-        metadata["source_file"] = cap.source_path
+        summary_metadata["source_file"] = cap.source_path
     if cap.language:
-        metadata["source_lang"] = cap.language
+        summary_metadata["source_lang"] = cap.language
+    if meta_data.get("channel"):
+        summary_metadata["channel"] = meta_data["channel"]
+    if meta_data.get("url"):
+        summary_metadata["url"] = meta_data["url"]
+    if meta_data.get("duration"):
+        summary_metadata["duration"] = meta_data["duration"]
+    if meta_data.get("speakers"):
+        summary_metadata["speakers"] = ", ".join(
+            f"{s['name']} ({s.get('role', 'speaker')})" for s in meta_data["speakers"]
+        )
 
     summary_input = SummaryInput(
-        title=input_path.stem,
+        title=video_title,
         text=text,
-        metadata=metadata,
+        metadata=summary_metadata,
+        chapters=chapters,
         source_type="captions",
         source_lang=config.source_lang or cap.language,
     )
@@ -111,6 +237,14 @@ def summarize_caption(
     client = config.llm.create_client()
     summarizer = ContentSummarizer(config, client)
     result = asyncio.run(summarizer.summarize(summary_input))
+
+    # Carry metadata through to rendered output
+    if meta_data.get("channel"):
+        result.metadata["channel"] = meta_data["channel"]
+    if meta_data.get("url"):
+        result.metadata["url"] = meta_data["url"]
+    if meta_data.get("duration"):
+        result.metadata["duration"] = meta_data["duration"]
 
     # Render
     rendered = render(result, config.output_format)

@@ -35,16 +35,34 @@ class SummaryInput:
 
 
 @dataclass
+class SummaryChapter:
+    """A topic segment with narrative summary and optional quotes."""
+
+    title: str
+    start: float
+    end: float = 0.0
+    summary: str = ""
+    quotes: list[str] = field(default_factory=list)
+
+
+@dataclass
 class SummaryResult:
     """Structured summary output produced by ContentSummarizer."""
 
     title: str
-    summary: str
-    key_points: list[str] = field(default_factory=list)
+    overview: str = ""
+    chapters: list[SummaryChapter] = field(default_factory=list)
     entities: list[SummaryEntity] = field(default_factory=list)
-    actionable_insights: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    seo_title: str = ""
+    seo_description: str = ""
     confidence: SummaryConfidence | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def summary(self) -> str:
+        """Backward-compatible: join chapter summaries into a flat summary."""
+        return "\n\n".join(ch.summary for ch in self.chapters if ch.summary)
 
 
 # ---------------------------------------------------------------------------
@@ -79,12 +97,36 @@ def summary_result_from_dict(data: dict[str, Any], *, fallback_title: str = "Unt
     elif isinstance(conf_raw, (int, float)):
         confidence = SummaryConfidence(score=float(conf_raw), rationale="")
 
+    # Tags
+    tags_raw = data.get("tags") or []
+    tags = [str(t).lower() for t in tags_raw if isinstance(t, str)]
+
+    # Chapters (now the core structure with narrative content)
+    chapters_raw = data.get("chapters") or []
+    chapters = [
+        SummaryChapter(
+            title=ch.get("title", ""),
+            start=float(ch.get("start", 0)),
+            end=float(ch.get("end", 0)),
+            summary=ch.get("summary", ""),
+            quotes=ch.get("quotes") or [],
+        )
+        for ch in chapters_raw
+        if isinstance(ch, dict)
+    ]
+    # Fill end times: each chapter ends where the next begins
+    for i in range(len(chapters) - 1):
+        if chapters[i].end == 0:
+            chapters[i].end = chapters[i + 1].start
+
     return SummaryResult(
         title=data.get("title") or fallback_title,
-        summary=data.get("summary", ""),
-        key_points=data.get("key_points") or [],
+        overview=data.get("overview", ""),
+        chapters=chapters,
         entities=entities,
-        actionable_insights=data.get("actionable_insights") or [],
+        tags=tags,
+        seo_title=data.get("seo_title") or "",
+        seo_description=data.get("seo_description") or "",
         confidence=confidence,
         metadata=data.get("metadata") or {},
     )
@@ -94,10 +136,21 @@ def summary_result_to_dict(result: SummaryResult) -> dict[str, Any]:
     """Serialise a *SummaryResult* to a plain dict for JSON output."""
     d: dict[str, Any] = {
         "title": result.title,
-        "summary": result.summary,
-        "key_points": result.key_points,
+        "overview": result.overview,
+        "chapters": [
+            {
+                "title": c.title,
+                "start": c.start,
+                "end": c.end,
+                "summary": c.summary,
+                **({"quotes": c.quotes} if c.quotes else {}),
+            }
+            for c in result.chapters
+        ],
         "entities": [{"name": e.name, "type": e.type, "description": e.description} for e in result.entities],
-        "actionable_insights": result.actionable_insights,
+        "tags": result.tags,
+        "seo_title": result.seo_title,
+        "seo_description": result.seo_description,
     }
     if result.confidence:
         d["confidence"] = {
