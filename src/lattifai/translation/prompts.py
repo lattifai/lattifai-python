@@ -97,6 +97,11 @@ _REWRITE_PRINCIPLES = [
     "Keep captions concise -- they must fit limited display space",
     "Maintain conversational tone for spoken content",
     "Keep the exact same order and count as input lines",
+    "Keep well-known technical brand and product names in their original English form "
+    "(e.g. Wolfram Alpha, Mathematica, GitHub, PyTorch) -- do NOT transliterate them",
+    "Output ONLY the translation -- never add translator notes, annotations, or "
+    "meta-commentary such as '(原文可能存在拼写错误)', '(译者注:…)' or '[unclear in source]'; "
+    "if the source is ambiguous, make the most reasonable interpretation and translate directly",
 ]
 
 _TRANSLATE_PRINCIPLES = [
@@ -108,6 +113,11 @@ _TRANSLATE_PRINCIPLES = [
     "Keep captions concise -- they must fit limited display space",
     "Preserve speaker distinctions and conversational markers",
     "Keep the exact same order and count as input lines",
+    "Keep well-known technical brand and product names in their original English form "
+    "(e.g. Wolfram Alpha, Mathematica, GitHub, PyTorch) -- do NOT transliterate them",
+    "Output ONLY the translation -- never add translator notes, annotations, or "
+    "meta-commentary such as '(原文可能存在拼写错误)', '(译者注:…)' or '[unclear in source]'; "
+    "if the source is ambiguous, make the most reasonable interpretation and translate directly",
 ]
 
 
