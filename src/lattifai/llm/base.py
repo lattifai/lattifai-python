@@ -104,23 +104,23 @@ def _run_async(coro):
 
 
 def _repair_json(text: str) -> str:
-    """Attempt to repair common JSON errors from LLM output.
+    """Repair malformed JSON from LLM output using json-repair.
 
-    Handles:
-    - Trailing commas before ] or }
-    - Missing commas between array elements (}{)
-    - Truncated arrays (missing closing ])
+    Falls back to basic regex fixes if json-repair is not installed.
     """
-    # Trailing commas: ,] or ,}
-    text = re.sub(r",\s*([}\]])", r"\1", text)
-    # Missing commas between objects: }{ or }\n{
-    text = re.sub(r"}\s*{", "},{", text)
-    # Truncated array: ensure closing ]
-    if text.lstrip().startswith("[") and not text.rstrip().endswith("]"):
-        last_brace = text.rfind("}")
-        if last_brace > 0:
-            text = text[: last_brace + 1] + "]"
-    return text
+    try:
+        from json_repair import repair_json
+
+        return repair_json(text, return_objects=False)
+    except ImportError:
+        # Fallback: basic regex repairs
+        text = re.sub(r",\s*([}\]])", r"\1", text)
+        text = re.sub(r"}\s*{", "},{", text)
+        if text.lstrip().startswith("[") and not text.rstrip().endswith("]"):
+            last_brace = text.rfind("}")
+            if last_brace > 0:
+                text = text[: last_brace + 1] + "]"
+        return text
 
 
 def parse_json_response(text: str) -> Any:
