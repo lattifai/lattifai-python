@@ -13,7 +13,13 @@ from lattifai.summarization.prompts import (
     build_summary_user_prompt,
     resolve_auto_length,
 )
-from lattifai.summarization.schema import SummaryConfidence, SummaryInput, SummaryResult, summary_result_from_dict
+from lattifai.summarization.schema import (
+    SummaryChapter,
+    SummaryConfidence,
+    SummaryInput,
+    SummaryResult,
+    summary_result_from_dict,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +60,11 @@ class ContentSummarizer:
         else:
             result = await self._summarize_single(summary_input)
 
+        # Hard-lock chapters when meta provided them and honor_meta_chapters is on.
+        # Runs AFTER the LLM call so even if the model still drifts, we pin the
+        # canonical chapter list and only keep the model's summary+quotes text.
+        result = self._apply_locked_chapters(result, summary_input)
+
         return self._adjust_confidence(
             result,
             source_type=summary_input.source_type,
@@ -66,12 +77,14 @@ class ContentSummarizer:
     # ------------------------------------------------------------------
 
     async def _summarize_single(self, summary_input: SummaryInput) -> SummaryResult:
+        lock = self._should_lock_chapters(summary_input)
         prompt = build_summary_user_prompt(
             summary_input,
             lang=self._config.lang,
             length=self._resolved_length,
             include_metadata=self._config.include_metadata,
             include_chapters=self._config.include_chapters,
+            lock_chapters=lock,
         )
         data = await self._call_llm(prompt)
         return summary_result_from_dict(data, fallback_title=summary_input.title)
@@ -84,6 +97,7 @@ class ContentSummarizer:
         chunks = self._split_text(summary_input.text)
         total = len(chunks)
         logger.info("Split into %d chunks (chunk_chars=%d)", total, self._config.chunk_chars)
+        lock = self._should_lock_chapters(summary_input)
 
         partial_results: list[dict[str, Any]] = []
         for idx, chunk_text in enumerate(chunks):
@@ -95,12 +109,16 @@ class ContentSummarizer:
                 source_type=summary_input.source_type,
                 source_lang=summary_input.source_lang,
             )
+            # Map phase: chapters are suggested (non-locked) even when locking
+            # overall, since each chunk only covers a slice of the timeline.
+            # The reduce phase is where lock applies.
             prompt = build_summary_user_prompt(
                 chunk_input,
                 lang=self._config.lang,
                 length=self._resolved_length,
                 include_metadata=self._config.include_metadata and idx == 0,
                 include_chapters=self._config.include_chapters and idx == 0,
+                lock_chapters=False,
                 chunk_index=idx,
                 total_chunks=total,
             )
@@ -109,18 +127,91 @@ class ContentSummarizer:
             if self._config.verbose:
                 logger.info("Chunk %d/%d summarised", idx + 1, total)
 
-        # Reduce
+        # Reduce — lock chapters here when requested.
         reduce_prompt = build_reduce_user_prompt(
             partial_results,
             title=summary_input.title,
             lang=self._config.lang,
             length=self._resolved_length,
             source_type=summary_input.source_type,
+            locked_chapters=summary_input.chapters if lock else None,
         )
         merged = await self._call_llm(reduce_prompt)
         result = summary_result_from_dict(merged, fallback_title=summary_input.title)
         result.metadata["chunked"] = True
         result.metadata["chunks_used"] = total
+        return result
+
+    # ------------------------------------------------------------------
+    # Chapter locking (meta.md.chapters as hard constraint)
+    # ------------------------------------------------------------------
+
+    def _should_lock_chapters(self, summary_input: SummaryInput) -> bool:
+        """True iff caller asked to honor meta chapters AND chapters exist."""
+        return bool(getattr(self._config, "honor_meta_chapters", True) and summary_input.chapters)
+
+    def _apply_locked_chapters(self, result: SummaryResult, summary_input: SummaryInput) -> SummaryResult:
+        """Enforce meta-provided chapter structure, discarding LLM drift.
+
+        For each locked chapter (by index), we keep its title + start verbatim
+        and attempt to port over the LLM-produced `summary` and `quotes` from
+        the closest matching chapter in the model output (matched by start
+        time, with a fallback to index). If no match is found, the summary is
+        left empty — the caller can spot-check or re-run.
+        """
+        if not self._should_lock_chapters(summary_input):
+            return result
+
+        locked = summary_input.chapters
+        model_chapters = result.chapters or []
+
+        # Index model chapters by their start for best-effort content transfer.
+        # We keep the LLM's narrative text when its start aligns closely with a
+        # locked chapter; otherwise we fall back to positional matching.
+        def pick_for(lock_idx: int, lock_start: float) -> tuple[str, list[str]]:
+            # 1) exact/near-start match
+            for mc in model_chapters:
+                try:
+                    if abs(float(mc.start) - float(lock_start)) < 1.0:
+                        return mc.summary or "", list(mc.quotes or [])
+                except (TypeError, ValueError):
+                    continue
+            # 2) positional fallback
+            if lock_idx < len(model_chapters):
+                mc = model_chapters[lock_idx]
+                return mc.summary or "", list(mc.quotes or [])
+            return "", []
+
+        new_chapters: list[SummaryChapter] = []
+        for i, ch in enumerate(locked):
+            start = float(ch.get("start", 0.0))
+            end = float(ch.get("end", 0.0)) if ch.get("end") is not None else 0.0
+            summary, quotes = pick_for(i, start)
+            new_chapters.append(
+                SummaryChapter(
+                    title=str(ch.get("title", "")),
+                    start=start,
+                    end=end,
+                    summary=summary,
+                    quotes=quotes,
+                )
+            )
+        # Fill end time: each chapter ends where the next begins (if not given).
+        for i in range(len(new_chapters) - 1):
+            if new_chapters[i].end == 0:
+                new_chapters[i].end = new_chapters[i + 1].start
+
+        drift = len(model_chapters) != len(locked)
+        result.chapters = new_chapters
+        result.metadata["chapters_locked"] = True
+        result.metadata["chapters_locked_count"] = len(locked)
+        if drift:
+            logger.info(
+                "honor_meta_chapters: LLM produced %d chapters, locked to meta's %d",
+                len(model_chapters),
+                len(locked),
+            )
+            result.metadata["chapters_drift_before_lock"] = len(model_chapters)
         return result
 
     # ------------------------------------------------------------------

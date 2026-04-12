@@ -51,6 +51,17 @@ class SummarizationConfig:
     include_chapters: bool = True
     """Inject chapter information into the prompt when available."""
 
+    honor_meta_chapters: bool = True
+    """When chapters are provided (e.g. from meta.md frontmatter or YouTube
+    description), lock them as a HARD CONSTRAINT:
+
+    - Output chapters[] count/order/title/start are copied verbatim from input.
+    - LLM only generates per-chapter `summary` + `quotes` content.
+    - LLM's own chapter segmentation is discarded in post-process.
+
+    When False (legacy behaviour), meta chapters are only a soft suggestion and
+    the LLM may merge, rename, or re-segment them."""
+
     include_metadata: bool = True
     """Inject source metadata (title, channel, duration) into the prompt."""
 

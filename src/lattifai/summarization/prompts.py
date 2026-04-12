@@ -26,9 +26,15 @@ Rules:
 9. seo_title must be under 60 characters, seo_description under 155 characters.
 10. Chapters are the CORE structure — they ARE the summary. Each chapter must have \
 a narrative paragraph (summary) and optionally 1-2 direct quotes with timestamps.
-11. If chapters are provided in the metadata, use them as the section structure. \
-If none are provided, segment the content into 3-12 coherent topic sections \
-using [MM:SS] timestamps from the source transcript.
+11. CHAPTER STRUCTURE RULES:
+    - If the user prompt contains a "LOCKED CHAPTERS" section, you MUST output \
+exactly those chapters in the SAME ORDER with IDENTICAL title and start values \
+copied verbatim. Do NOT merge, split, rename, reorder, or drop any chapter. \
+Generate ONLY the `summary` and `quotes` for each locked chapter.
+    - If chapters are provided as plain "Chapters:" (not locked), use them as the \
+suggested section structure.
+    - If no chapters are provided, segment the content into 3-12 coherent topic \
+sections using [MM:SS] timestamps from the source transcript.
 12. Preserve the speaker's voice: include exact short quotes (max 25 words) that \
 capture key insights. Format quotes as: "exact words" [MM:SS]
 
@@ -118,10 +124,15 @@ def build_summary_user_prompt(
     length: str,
     include_metadata: bool = True,
     include_chapters: bool = True,
+    lock_chapters: bool = False,
     chunk_index: int | None = None,
     total_chunks: int | None = None,
 ) -> str:
-    """Assemble the user prompt for a single summarisation call."""
+    """Assemble the user prompt for a single summarisation call.
+
+    When *lock_chapters* is True and chapters are present, renders them as a
+    "LOCKED CHAPTERS" block the model is required to preserve verbatim.
+    """
     parts: list[str] = []
 
     parts.append("Summarise the following content.\n")
@@ -152,14 +163,28 @@ def build_summary_user_prompt(
             parts.extend(meta_lines)
             parts.append("")
 
-    # Chapters
+    # Chapters — either LOCKED (hard constraint) or suggested
     if include_chapters and summary_input.chapters:
-        parts.append("Chapters:")
-        for ch in summary_input.chapters:
-            title = ch.get("title", "")
-            start = ch.get("start", "")
-            parts.append(f"  - [{start}] {title}")
-        parts.append("")
+        if lock_chapters:
+            parts.append("LOCKED CHAPTERS (REQUIRED — copy verbatim, do NOT modify count/order/title/start):")
+            for ch in summary_input.chapters:
+                title = ch.get("title", "")
+                start = ch.get("start", "")
+                parts.append(f"  - start={start}  title={title!r}")
+            parts.append("")
+            parts.append(
+                "You MUST output exactly these chapters in the same order, "
+                "with identical `title` and `start` values. Generate only the "
+                "`summary` and `quotes` for each chapter."
+            )
+            parts.append("")
+        else:
+            parts.append("Chapters:")
+            for ch in summary_input.chapters:
+                title = ch.get("title", "")
+                start = ch.get("start", "")
+                parts.append(f"  - [{start}] {title}")
+            parts.append("")
 
     # Content
     parts.append("Source content:")
@@ -180,8 +205,14 @@ def build_reduce_user_prompt(
     lang: str,
     length: str,
     source_type: str,
+    locked_chapters: list[dict[str, Any]] | None = None,
 ) -> str:
-    """Assemble the user prompt for the map-reduce merge step."""
+    """Assemble the user prompt for the map-reduce merge step.
+
+    When *locked_chapters* is provided, the reduce step must output exactly
+    that chapter list (count/order/title/start copied verbatim); it only
+    fills in summary + quotes from the partials.
+    """
     parts: list[str] = [
         "Merge the following partial summaries into one final structured JSON summary.\n",
         f"Output language: {lang}",
@@ -190,13 +221,32 @@ def build_reduce_user_prompt(
         "",
         get_length_instruction(length),
         "",
-        "Rules:",
-        "1. Deduplicate repeated points.",
-        "2. Preserve facts that appear consistently across chunks.",
-        "3. If chunks conflict, prefer the more cautious phrasing.",
-        "4. Keep the final result faithful and concise.",
-        "5. Return valid JSON only.\n",
-        "Partial summaries:",
-        json.dumps(partial_results, ensure_ascii=False, indent=2),
     ]
+
+    if locked_chapters:
+        parts.append("LOCKED CHAPTERS (REQUIRED — copy verbatim, do NOT modify count/order/title/start):")
+        for ch in locked_chapters:
+            title_val = ch.get("title", "")
+            start_val = ch.get("start", "")
+            parts.append(f"  - start={start_val}  title={title_val!r}")
+        parts.append("")
+        parts.append(
+            "Your merged output MUST contain exactly these chapters in the same "
+            "order, with identical `title` and `start` values. Synthesise the "
+            "`summary` and `quotes` for each chapter from the partial summaries."
+        )
+        parts.append("")
+
+    parts.extend(
+        [
+            "Rules:",
+            "1. Deduplicate repeated points.",
+            "2. Preserve facts that appear consistently across chunks.",
+            "3. If chunks conflict, prefer the more cautious phrasing.",
+            "4. Keep the final result faithful and concise.",
+            "5. Return valid JSON only.\n",
+            "Partial summaries:",
+            json.dumps(partial_results, ensure_ascii=False, indent=2),
+        ]
+    )
     return "\n".join(parts)
