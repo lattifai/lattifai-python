@@ -243,11 +243,11 @@ def summarize_caption(
         try:
             result = asyncio.run(summarizer.summarize(summary_input))
             break
-        except (json.JSONDecodeError, RuntimeError) as exc:
+        except (json.JSONDecodeError, RuntimeError, Exception) as exc:
             if attempt < max_attempts:
-                safe_print(theme.warning(f"LLM returned invalid JSON, retrying ({attempt}/{max_attempts})..."))
+                safe_print(theme.warn(f"LLM returned invalid JSON, retrying ({attempt}/{max_attempts})..."))
                 continue
-            safe_print(theme.error(f"Summary failed after {max_attempts} attempts: {exc}"))
+            safe_print(theme.err(f"Summary failed after {max_attempts} attempts: {exc}"))
             raise
 
     # Carry metadata through to rendered output
