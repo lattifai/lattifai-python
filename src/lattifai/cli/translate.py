@@ -117,7 +117,7 @@ def translate(
                     save_artifacts, ask_refine_after_normal, auto_refine_after_normal
         caption: Caption pipeline configuration.
             Sub-configs: caption.output (format),
-                         caption.behavior (include_speaker_in_text, word_level, translation_first),
+                         caption.render (include_speaker_in_text, word_level, translation_first),
                          caption.ass (font, colors for ASS output)
 
     Examples:
@@ -230,7 +230,7 @@ def translate_youtube(
         lai translate youtube "dQw4w9WgXcQ" \\
             translation.target_lang=ja \\
             translation.bilingual=true \\
-            caption.behavior.word_level=true
+            caption.render.word_level=true
 
         # Refined translation with custom glossary
         lai translate youtube "VIDEO_ID" \\

@@ -121,7 +121,7 @@ class TestCaptionConfigDefaults:
         assert config.render.include_speaker_in_text is True
         assert config.input.normalize_text is True
         assert config.input.split_sentence is False
-        assert config.render.word_level is False
+        assert config.render.word_level is None  # tri-state: None=per-format default
         assert config.input.encoding == "utf-8"
 
     def test_backward_compat_properties(self):
@@ -133,7 +133,7 @@ class TestCaptionConfigDefaults:
         assert config.include_speaker_in_text is True
         assert config.normalize_text is True
         assert config.split_sentence is False
-        assert config.word_level is False
+        assert config.word_level is None  # tri-state: None=per-format default
         assert config.encoding == "utf-8"
 
     def test_custom_values(self):

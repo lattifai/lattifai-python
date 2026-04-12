@@ -169,9 +169,15 @@ def convert(
             render.include_speaker_in_text, render.word_level,
             render.translation_first
         ass: ASS format configuration (nemo_run Config).
-            ass.font_name, ass.font_size, ass.background_color,
-            ass.speaker_color, ass.primary_color, ass.outline_color,
-            ass.karaoke_effect (sweep/instant/outline),
+            ass.font_name, ass.font_size, ass.bold, ass.italic,
+            ass.underline, ass.strikeout,
+            ass.primary_color, ass.outline_color, ass.back_color,
+            ass.background_color (triggers borderstyle=3 opaque box),
+            ass.borderstyle (1=outline+shadow, 3=opaque box, None=auto),
+            ass.outline_width, ass.shadow_depth,
+            ass.scalex, ass.scaley (text scaling %),
+            ass.spacing (inter-character px), ass.angle (rotation degrees),
+            ass.speaker_color, ass.karaoke_effect (sweep/instant/outline),
             ass.karaoke_color_scheme (overrides ASS colors),
             ass.kinetic_style (word-level motion preset: bounce/pop/shake/
             pulse/swing/fade/zoom/rise/typewriter/blur_in/glow/neon/wave/
