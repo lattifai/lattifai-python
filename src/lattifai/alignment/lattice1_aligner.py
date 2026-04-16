@@ -212,6 +212,16 @@ class Lattice1Aligner(object):
             safe_print(theme.err("         x Failed to decode lattice alignment results"))
             raise LatticeDecodingError(lattice_id, original_error=e)
 
+        # Preserve input Supervision.id on the 1:1 alignment output.
+        # The backend ``detokenize`` endpoint rebuilds Supervision objects and
+        # drops ids; we repopulate them when sentence splitting is disabled and
+        # the sizes still match. Skipped for diff-tokenize (TextAlignResult) and
+        # for size mismatches (defensive: any shape change invalidates the map).
+        if not split_sentence and isinstance(supervisions, list) and len(supervisions) == len(alignments):
+            for src, dst in zip(supervisions, alignments):
+                if isinstance(src, Supervision) and src.id:
+                    dst.id = src.id
+
         return (supervisions, alignments)
 
     def profile(self) -> None:
