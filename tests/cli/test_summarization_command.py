@@ -83,7 +83,7 @@ class TestSummarizeCLIUnit:
     def test_summarize_caption_success_mocked(self, tmp_path):
         from lattifai.cli.summarize import summarize_caption
         from lattifai.config.summarization import SummarizationConfig
-        from lattifai.summarization.schema import SummaryConfidence, SummaryResult
+        from lattifai.summarization.schema import SummaryChapter, SummaryConfidence, SummaryResult
 
         input_path = tmp_path / "input.srt"
         input_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
@@ -99,8 +99,8 @@ class TestSummarizeCLIUnit:
         fake_summarizer.summarize = AsyncMock(
             return_value=SummaryResult(
                 title="input",
-                summary="Short summary",
-                key_points=["Point 1"],
+                overview="Short overview.",
+                chapters=[SummaryChapter(title="Intro", start=0.0, summary="Chapter body")],
                 confidence=SummaryConfidence(score=0.8, rationale="good"),
             )
         )
@@ -114,13 +114,14 @@ class TestSummarizeCLIUnit:
         output_file = Path(output_path)
         assert output_file.exists()
         content = output_file.read_text(encoding="utf-8")
-        assert "## Summary" in content
-        assert "Short summary" in content
+        assert "Short overview." in content
+        assert "## [00:00] Intro" in content
+        assert "Chapter body" in content
 
     def test_summarize_caption_json_output(self, tmp_path):
         from lattifai.cli.summarize import summarize_caption
         from lattifai.config.summarization import SummarizationConfig
-        from lattifai.summarization.schema import SummaryResult
+        from lattifai.summarization.schema import SummaryChapter, SummaryResult
 
         input_path = tmp_path / "input.srt"
         input_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello\n", encoding="utf-8")
@@ -132,7 +133,13 @@ class TestSummarizeCLIUnit:
         config = SummarizationConfig(lang="zh", output_format="json")
         config.llm.create_client = Mock(return_value=object())
         fake_summarizer = Mock()
-        fake_summarizer.summarize = AsyncMock(return_value=SummaryResult(title="input", summary="JSON summary"))
+        fake_summarizer.summarize = AsyncMock(
+            return_value=SummaryResult(
+                title="input",
+                overview="JSON overview",
+                chapters=[SummaryChapter(title="Ch1", start=0.0, summary="JSON body")],
+            )
+        )
 
         with (
             patch("lattifai.caption.Caption.read", return_value=cap),
@@ -143,7 +150,8 @@ class TestSummarizeCLIUnit:
         output_file = Path(output_path)
         assert output_file.suffix == ".json"
         parsed = json.loads(output_file.read_text(encoding="utf-8"))
-        assert parsed["summary"] == "JSON summary"
+        assert parsed["overview"] == "JSON overview"
+        assert parsed["chapters"][0]["summary"] == "JSON body"
 
 
 class TestSummarizationUnit:
@@ -154,16 +162,25 @@ class TestSummarizationUnit:
 
         data = {
             "title": "Test Video",
-            "summary": "This is a test summary.",
-            "key_points": ["Point 1", "Point 2"],
+            "overview": "Hook sentence.",
+            "chapters": [
+                {"title": "Intro", "start": 0, "summary": "This is a test summary.", "quotes": ["hi [00:00]"]},
+                {"title": "Outro", "start": 30, "summary": "Wrap up."},
+            ],
             "entities": [{"name": "Python", "type": "language", "description": "Programming language"}],
-            "actionable_insights": ["Learn Python"],
+            "tags": ["Tech", "Python"],
             "confidence": {"score": 0.85, "rationale": "Good source"},
         }
         result = summary_result_from_dict(data)
         assert result.title == "Test Video"
-        assert result.summary == "This is a test summary."
-        assert len(result.key_points) == 2
+        assert result.overview == "Hook sentence."
+        assert len(result.chapters) == 2
+        assert result.chapters[0].summary == "This is a test summary."
+        assert result.chapters[0].end == 30  # auto-filled from next chapter's start
+        assert result.chapters[0].quotes == ["hi [00:00]"]
+        # Backward-compatible `summary` property joins chapter summaries
+        assert result.summary == "This is a test summary.\n\nWrap up."
+        assert result.tags == ["tech", "python"]  # lowercased
         assert len(result.entities) == 1
         assert result.entities[0].name == "Python"
         assert result.confidence.score == 0.85
@@ -173,9 +190,10 @@ class TestSummarizationUnit:
 
         result = summary_result_from_dict({})
         assert result.title == "Untitled"
-        assert result.summary == ""
-        assert result.key_points == []
+        assert result.overview == ""
+        assert result.chapters == []
         assert result.entities == []
+        assert result.tags == []
 
     def test_summary_result_from_dict_scalar_confidence(self):
         from lattifai.summarization.schema import summary_result_from_dict
@@ -185,6 +203,7 @@ class TestSummarizationUnit:
 
     def test_summary_result_to_dict(self):
         from lattifai.summarization.schema import (
+            SummaryChapter,
             SummaryConfidence,
             SummaryEntity,
             SummaryResult,
@@ -193,32 +212,35 @@ class TestSummarizationUnit:
 
         result = SummaryResult(
             title="Test",
-            summary="Summary text",
-            key_points=["A"],
+            overview="Overview text",
+            chapters=[SummaryChapter(title="Ch1", start=0.0, summary="Body", quotes=["q [00:00]"])],
             entities=[SummaryEntity(name="X", type="concept")],
             confidence=SummaryConfidence(score=0.8, rationale="test"),
         )
         d = summary_result_to_dict(result)
         assert d["title"] == "Test"
+        assert d["overview"] == "Overview text"
+        assert d["chapters"][0]["summary"] == "Body"
+        assert d["chapters"][0]["quotes"] == ["q [00:00]"]
         assert d["confidence"]["score"] == 0.8
         assert len(d["entities"]) == 1
 
     def test_render_markdown(self):
         from lattifai.summarization.renderer import render_markdown
-        from lattifai.summarization.schema import SummaryConfidence, SummaryResult
+        from lattifai.summarization.schema import SummaryChapter, SummaryConfidence, SummaryResult
 
         result = SummaryResult(
             title="Test Title",
-            summary="A summary.",
-            key_points=["Point 1"],
+            overview="High-level hook.",
+            chapters=[SummaryChapter(title="Topic A", start=65.0, summary="Body here.", quotes=["q [01:05]"])],
             confidence=SummaryConfidence(score=0.85, rationale="Good", source_quality="high"),
         )
         md = render_markdown(result)
-        assert "## Summary" in md
-        assert "## Key Points" in md
-        assert "A summary." in md
-        assert "Point 1" in md
-        assert "0.85" in md
+        assert "High-level hook." in md
+        assert "## [01:05] Topic A" in md
+        assert "Body here." in md
+        assert "*q [01:05]*" in md
+        assert "confidence: 0.85" in md
 
     def test_render_json(self):
         import json
@@ -226,17 +248,24 @@ class TestSummarizationUnit:
         from lattifai.summarization.renderer import render_json
         from lattifai.summarization.schema import SummaryResult
 
-        result = SummaryResult(title="Test", summary="Summary")
+        result = SummaryResult(title="Test", overview="Summary")
         output = render_json(result)
         parsed = json.loads(output)
         assert parsed["title"] == "Test"
+        assert parsed["overview"] == "Summary"
 
     def test_render_dispatch(self):
         from lattifai.summarization.renderer import render
-        from lattifai.summarization.schema import SummaryResult
+        from lattifai.summarization.schema import SummaryChapter, SummaryResult
 
-        result = SummaryResult(title="Test", summary="Summary")
-        assert "## Summary" in render(result, "markdown")
+        result = SummaryResult(
+            title="Test",
+            overview="Summary",
+            chapters=[SummaryChapter(title="Ch", start=0.0, summary="Body")],
+        )
+        md = render(result, "markdown")
+        assert "Summary" in md
+        assert "## [00:00] Ch" in md
         assert '"title"' in render(result, "json")
 
     def test_prompt_builder(self):
@@ -253,7 +282,8 @@ class TestSummarizationUnit:
         assert "Output language: en" in prompt
         assert "Source type: captions" in prompt
         assert "Hello world" in prompt
-        assert "2-4 sentences" in prompt
+        # "short" length instruction wording
+        assert "overview: 1-2 sentences" in prompt
 
     def test_prompt_builder_chunk(self):
         from lattifai.summarization.prompts import build_summary_user_prompt
@@ -290,7 +320,7 @@ class TestSummarizationUnit:
 
         config = SummarizationConfig()
         assert config.lang == "en"
-        assert config.length == "medium"
+        assert config.length == "auto"
         assert config.output_format == "markdown"
         assert config.temperature == 0.2
 
@@ -322,7 +352,7 @@ class TestSummarizationUnit:
 
         config = SummarizationConfig()
         summarizer = ContentSummarizer(config, client=None)
-        result = SummaryResult(title="Test", summary="Summary")
+        result = SummaryResult(title="Test", overview="Summary")
 
         adjusted = summarizer._adjust_confidence(result, source_type="captions", text_length=1000, used_chunking=False)
         assert adjusted.confidence.score == 0.85
