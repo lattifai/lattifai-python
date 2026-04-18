@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## [1.5.6] - 2026-04-18
+
+### Features
+- Add `honor_meta_chapters` hard constraint to summarize (preserves meta chapters verbatim) with tests
+
+### Fixes
+- Preserve input `Supervision.id` when `split_sentence=False` in alignment
+- Update stale `caption.behavior` refs to `caption.render` in CLI
+
+### Dependencies
+- Bump `lattifai-core` to >=0.7.5, `lattifai-captions` to >=0.4.6
+
+
 ## [1.5.5] - 2026-04-13
 
 ### Features

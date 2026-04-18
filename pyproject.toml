@@ -4,7 +4,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'lattifai'
-version = '1.5.5'
+version = '1.5.6'
 description = "Lattifai Python SDK: Seamless Integration with Lattifai's Speech and Video AI Services"
 keywords = ['lattifai', 'speech recognition', 'video analysis', 'ai', 'sdk', 'api client']
 readme = 'README.md'
@@ -39,8 +39,8 @@ dependencies = [
     "python-dotenv",
     "colorful>=0.5.6",
     "lattifai-run>=1.0.4",
-    "lattifai-core>=0.7.4",
-    "lattifai-captions[splitting]>=0.4.4",
+    "lattifai-core>=0.7.5",
+    "lattifai-captions[splitting]>=0.4.6",
     "g2p-phonemizer>=0.4.0",
     "error-align-fix>=0.1.4",
     "k2py==0.4.0",
@@ -59,11 +59,11 @@ dependencies = [
 [project.optional-dependencies]
 # Event
 event = [
-    "lattifai-core[event]>=0.7.3",
+    "lattifai-core[event]>=0.7.5",
 ]
 # Diarization
 diarization = [
-    "lattifai-core[diarization]>=0.7.3",
+    "lattifai-core[diarization]>=0.7.5",
 ]
 # Transcription: ASR models (NeMo/SenseVoice/FunASR, Linux/CUDA focused)
 transcription = [
