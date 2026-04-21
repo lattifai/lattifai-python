@@ -79,9 +79,31 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True, attach_punct
         ['Hello,', ' ', 'World!']
         >>> tokenize_multilingual_text("[AED], World!", keep_spaces=False, attach_punctuation=True)
         ['[AED],', 'World!']
+        >>> tokenize_multilingual_text("up to $30 billion", keep_spaces=False)
+        ['up', 'to', '$30', 'billion']
+        >>> tokenize_multilingual_text("CoreWeave up to $6.3 billion", keep_spaces=False)
+        ['CoreWeave', 'up', 'to', '$6.3', 'billion']
+        >>> tokenize_multilingual_text("€42 £100 ¥500 ₹300 ₩1,000 ₽50", keep_spaces=False)
+        ['€42', '£100', '¥500', '₹300', '₩1,000', '₽50']
+        >>> tokenize_multilingual_text("revenue up 25% YoY", keep_spaces=False)
+        ['revenue', 'up', '25%', 'YoY']
+        >>> tokenize_multilingual_text("100,000 companies", keep_spaces=False)
+        ['100,000', 'companies']
+        >>> tokenize_multilingual_text("market cap is $1.5T and $30B ARR", keep_spaces=False)
+        ['market', 'cap', 'is', '$1.5T', 'and', '$30B', 'ARR']
     """
-    # Regex pattern:
-    # - \[[A-Z_]+\] matches bracketed annotations like [APPLAUSE], [MUSIC], [SPEAKER_01]
+    # Regex pattern (order matters — earlier alternatives match first):
+    # - \[[^\]]+\] matches bracketed annotations like [APPLAUSE], [MUSIC], [SPEAKER_01]
+    # - Currency + amount (single token):
+    #     [$€£¥￥＄₹₩₽฿₪₺₴₦₫₱₡﷼] + (\d{1,3}(?:,\d{3})+ | \d+) + (.\d+)? + optional K/M/B/T
+    #   Examples: $30, $6.3, $1,000, $1,234,567.89, $30B, $1.5T, €42, ¥500,
+    #             ￥100, ＄8, ₹300, ₩1,000, ₽50
+    #   Must precede the Latin alphanumeric alternative so the `$` is not
+    #   dropped into the trailing `.` fallback.
+    # - Percent amount (single token): 70%, 25.5%, 100%, 1,234%
+    # - Standalone thousands-separator number (single token): 100,000 / 20,000 /
+    #   1,234,567 / 1,234.56 — otherwise the leading group is split off the
+    #   comma and we break amounts like audience sizes / GPU hours.
     # - [a-zA-Z0-9\u00C0-\u024F]+ matches Latin letters (including accented chars like ü, ö, ä, ß, é, etc.)
     # - (?:'[a-zA-Z]{1,2})? optionally matches contractions like 's, 't, 'm, 'll, 're, 've
     # - [\u4e00-\u9fff] matches CJK characters
@@ -90,7 +112,14 @@ def tokenize_multilingual_text(text: str, keep_spaces: bool = True, attach_punct
     # - \u00C0-\u00FF: Latin-1 Supplement (À-ÿ)
     # - \u0100-\u017F: Latin Extended-A
     # - \u0180-\u024F: Latin Extended-B
-    pattern = re.compile(r"(\[[^\]]+\]|[a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?|[\u4e00-\u9fff]|.)")
+    pattern = re.compile(
+        r"(\[[^\]]+\]"
+        r"|[$€£¥￥＄₹₩₽฿₪₺₴₦₫₱₡﷼](?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:[KkMmBbTt]\b)?"
+        r"|(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%"
+        r"|\d{1,3}(?:,\d{3})+(?:\.\d+)?"
+        r"|[a-zA-Z0-9\u00C0-\u024F]+(?:'[a-zA-Z]{1,2})?"
+        r"|[\u4e00-\u9fff]|.)"
+    )
 
     # filter(None, ...) removes any empty strings from re.findall results
     tokens = list(filter(None, pattern.findall(text)))
