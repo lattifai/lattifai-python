@@ -79,6 +79,36 @@ class AudioData(namedtuple("AudioData", ["sampling_rate", "ndarray", "path", "st
         """
         return self.iter_chunks()
 
+    def stats(self, normalize: bool = False) -> dict:
+        """Compute amplitude distribution statistics on the loaded audio.
+
+        Reports percentiles (0/5/10/50/90/95/100) on the real signed sample
+        distribution, plus mean and std. No absolute-value or squared
+        transformations — pure raw distribution.
+
+        Args:
+            normalize: If True, apply RMS volume normalization before stats.
+
+        Returns:
+            Dict with keys: shape, dtype, sampling_rate, duration, normalized,
+            percentiles, mean, std.
+        """
+        arr = normalize_volume(self.ndarray) if normalize else self.ndarray
+        flat = arr.reshape(-1)
+        pcts = [0, 5, 10, 50, 90, 95, 100]
+        values = np.percentile(flat, pcts)
+        keys = [f"{p}%" for p in pcts]
+        return {
+            "shape": tuple(arr.shape),
+            "dtype": str(arr.dtype),
+            "sampling_rate": self.sampling_rate,
+            "duration": self.duration,
+            "normalized": normalize,
+            "percentiles": dict(zip(keys, values.tolist())),
+            "mean": float(np.mean(flat)),
+            "std": float(np.std(flat)),
+        }
+
     def iter_chunks(
         self,
         chunk_secs: Optional[float] = None,
@@ -464,3 +494,48 @@ class AudioLoader:
             streaming_chunk_secs=streaming_chunk_secs,
             overlap_secs=0.0,
         )
+
+
+def _print_stats(path: str, stats: dict) -> None:
+    print(f"File        : {path}")
+    print(f"Shape       : {stats['shape']}  (channels, samples)")
+    print(f"Dtype       : {stats['dtype']}")
+    print(f"Sample rate : {stats['sampling_rate']} Hz")
+    print(f"Duration    : {stats['duration']:.3f} s")
+    print(f"Normalized  : {stats['normalized']}")
+    print()
+    print("Value percentiles (real signed distribution):")
+    for k, v in stats["percentiles"].items():
+        print(f"  {k:>5} = {v:+.6f}")
+    print()
+    print("Summary:")
+    print(f"  mean    = {stats['mean']:+.6f}")
+    print(f"  std     = {stats['std']:.6f}")
+
+
+def _cli() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Audio amplitude stats via AudioLoader")
+    parser.add_argument("audio", type=str, help="Path to audio/video file")
+    parser.add_argument("--sr", type=int, default=16000, help="Target sample rate (default: 16000)")
+    parser.add_argument(
+        "--channel",
+        type=str,
+        default="average",
+        help="Channel selector: 'average', integer index, or 'none' (default: average)",
+    )
+    parser.add_argument("--normalize", action="store_true", help="Apply RMS volume normalization before stats")
+    args = parser.parse_args()
+
+    channel: Optional[ChannelSelectorType] = None if args.channel == "none" else args.channel
+    if isinstance(channel, str) and channel.isdigit():
+        channel = int(channel)
+
+    loader = AudioLoader(device="cpu")
+    audio_data = loader(args.audio, sampling_rate=args.sr, channel_selector=channel)
+    _print_stats(args.audio, audio_data.stats(normalize=args.normalize))
+
+
+if __name__ == "__main__":
+    _cli()
