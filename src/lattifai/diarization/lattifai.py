@@ -11,7 +11,7 @@ from tgt import TextGrid
 from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
 from lattifai.config.diarization import DiarizationConfig
-from lattifai.logging import get_logger
+from lattifai.log import get_logger
 
 formatter = "%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s"
 logging.basicConfig(format=formatter, level=logging.INFO)

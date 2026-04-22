@@ -11,7 +11,7 @@ from lattifai.audio2 import AudioData
 from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.data import Caption
-from lattifai.logging import get_logger
+from lattifai.log import get_logger
 
 if TYPE_CHECKING:
     from lattifai_core.event import LEDOutput

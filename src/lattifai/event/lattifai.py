@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from lattifai.audio2 import AudioData
 from lattifai.config.event import EventConfig
-from lattifai.logging import get_logger
+from lattifai.log import get_logger
 
 if TYPE_CHECKING:
     from lattifai_core.event import LEDOutput

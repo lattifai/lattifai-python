@@ -97,7 +97,7 @@ def set_log_level(level: int) -> None:
         level: Logging level (e.g., logging.DEBUG, logging.INFO)
 
     Examples:
-        >>> from lattifai.logging import set_log_level
+        >>> from lattifai.log import set_log_level
         >>> import logging
         >>> set_log_level(logging.DEBUG)
     """
