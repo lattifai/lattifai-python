@@ -305,6 +305,7 @@ class LatticeTokenizer:
             from lattifai.alignment.text_align import detect_duplicate_blocks
 
             dup_blocks = detect_duplicate_blocks(supervisions)
+            keep_duplicates = False
             if dup_blocks and not skip_duplicate_prompt:
 
                 def _ts(s):
@@ -330,8 +331,10 @@ class LatticeTokenizer:
 
                 safe_print(
                     theme.step(
-                        "   Auto-optimization handles duplicates with high accuracy (recommended).\n"
-                        "   Continue with alignment? [Y/n] (auto-yes in 10s) "
+                        "   Y = auto-optimize duplicates (recommended for editing errors).\n"
+                        "   G = genuine duplicates (e.g. chorus/refrain), keep them and align as-is.\n"
+                        "   n = abort.\n"
+                        "   Continue with alignment? [Y/G/n] (auto-yes in 10s) "
                     ),
                     end="",
                     flush=True,
@@ -346,6 +349,9 @@ class LatticeTokenizer:
                         answer = ""
                     if answer in ("n", "no"):
                         raise Exception("Aborted: please fix duplicate blocks in the subtitle file and retry.")
+                    if answer in ("g", "genuine", "keep"):
+                        keep_duplicates = True
+                        safe_print(theme.step("   Keeping duplicates as-is; skipping auto-optimization."))
                     print()  # newline after prompt
                 else:
                     print()  # newline for non-interactive
@@ -359,7 +365,7 @@ class LatticeTokenizer:
                 "transition_penalty": transition_penalty,
                 "metadata": metadata,
             }
-            if dup_blocks:
+            if dup_blocks and not keep_duplicates:
                 request_body["duplicate_blocks"] = [dup._asdict() for dup in dup_blocks]
             response = self.client_wrapper.post("tokenize", json=request_body)
         else:
