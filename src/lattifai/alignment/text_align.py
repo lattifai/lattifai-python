@@ -550,6 +550,45 @@ def detect_duplicate_blocks(
     return sorted(results, key=lambda x: x.first[0])
 
 
+# Standard song-section markers used to detect lyrics input.
+# Matches `[Verse 1]`, `[Chorus]`, `[Pre-Chorus]`, `[Instrumental Break - ...]`, etc.
+_SONG_SECTION_RE = regex.compile(
+    r"\[\s*"
+    r"(?P<type>(?:pre[-\s]?|post[-\s]?)?"
+    r"(?:verse|chorus|hook|bridge|outro|intro|refrain|interlude|instrumental|coda|drop|breakdown|reprise))"
+    r"\b[^\]]*\]",
+    regex.IGNORECASE,
+)
+
+
+def is_lyrics_supervisions(
+    supervisions: List[Supervision],
+    min_distinct_sections: int = 2,
+) -> bool:
+    """Detect whether supervision text looks like song lyrics.
+
+    Heuristic: scans supervision texts for standard song-section markers such
+    as ``[Verse 1]``, ``[Chorus]``, ``[Pre-Chorus]``, ``[Bridge]``,
+    ``[Outro]``, ``[Instrumental Break ...]``. If the number of distinct
+    section types reaches ``min_distinct_sections``, the input is considered
+    lyrics (chorus/refrain repetitions are intentional, not editing errors).
+
+    Performance directives like ``[whispered]`` or ``[applause]`` are
+    intentionally excluded — they are not song-structure markers.
+    """
+    seen: set = set()
+    for sup in supervisions:
+        text = sup.text or ""
+        if "[" not in text:
+            continue
+        for m in _SONG_SECTION_RE.finditer(text):
+            section_type = m.group("type").lower().replace(" ", "-")
+            seen.add(section_type)
+            if len(seen) >= min_distinct_sections:
+                return True
+    return False
+
+
 def deduplicate_supervisions(
     supervisions: List[Supervision],
 ) -> Tuple[List[Supervision], List[DuplicateBlock]]:

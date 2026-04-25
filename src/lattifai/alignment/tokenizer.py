@@ -302,10 +302,20 @@ class LatticeTokenizer:
                 supervisions = self.split_sentences(supervisions)
 
             # Detect nearby duplicate blocks before sending to backend
-            from lattifai.alignment.text_align import detect_duplicate_blocks
+            from lattifai.alignment.text_align import detect_duplicate_blocks, is_lyrics_supervisions
 
             dup_blocks = detect_duplicate_blocks(supervisions)
             keep_duplicates = False
+            # Lyrics inputs (Verse/Chorus/Bridge/...) repeat the chorus/refrain on purpose.
+            # Suppress duplicate output entirely and align the text as-is.
+            if dup_blocks and is_lyrics_supervisions(supervisions):
+                safe_print(
+                    theme.step(
+                        f"   Detected lyrics; treating {len(dup_blocks)} duplicate block(s) as legitimate "
+                        "(chorus/refrain) and aligning as-is."
+                    )
+                )
+                dup_blocks = []
             if dup_blocks and not skip_duplicate_prompt:
 
                 def _ts(s):

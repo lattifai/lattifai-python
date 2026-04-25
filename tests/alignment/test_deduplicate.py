@@ -6,6 +6,7 @@ from lattifai.alignment.text_align import (
     DuplicateBlock,
     deduplicate_supervisions,
     detect_duplicate_blocks,
+    is_lyrics_supervisions,
 )
 from lattifai.caption import Supervision
 
@@ -199,6 +200,113 @@ class TestDetectDuplicateBlocks:
         assert len(dups) >= 1
         # The detected block should span different supervisions
         assert dups[0].first != dups[0].second
+
+
+# ---------------------------------------------------------------------------
+# is_lyrics_supervisions
+# ---------------------------------------------------------------------------
+
+
+class TestIsLyricsSupervisions:
+    def test_no_markers(self):
+        sups = [_sup(0, 2, "Hello world this is a test"), _sup(2, 2, "Another regular sentence")]
+        assert is_lyrics_supervisions(sups) is False
+
+    def test_empty_input(self):
+        assert is_lyrics_supervisions([]) is False
+
+    def test_verse_and_chorus(self):
+        sups = [
+            _sup(0, 2, "[Verse 1]"),
+            _sup(2, 2, "Some lyric line one"),
+            _sup(4, 2, "[Chorus]"),
+            _sup(6, 2, "Some lyric line two"),
+        ]
+        assert is_lyrics_supervisions(sups) is True
+
+    def test_intro_outro(self):
+        sups = [
+            _sup(0, 2, "[Intro]"),
+            _sup(2, 2, "Opening lyric"),
+            _sup(4, 2, "[Outro]"),
+            _sup(6, 2, "Closing lyric"),
+        ]
+        assert is_lyrics_supervisions(sups) is True
+
+    def test_pre_chorus_and_chorus(self):
+        sups = [
+            _sup(0, 2, "[Pre-Chorus]"),
+            _sup(2, 2, "Build-up lyric"),
+            _sup(4, 2, "[Chorus]"),
+            _sup(6, 2, "Hook lyric"),
+        ]
+        assert is_lyrics_supervisions(sups) is True
+
+    def test_only_chorus_repeated_below_threshold(self):
+        """Only one section type — should not pass the default threshold of 2."""
+        sups = [
+            _sup(0, 2, "[Chorus]"),
+            _sup(2, 2, "Same lyric"),
+            _sup(4, 2, "[Chorus]"),
+            _sup(6, 2, "Same lyric again"),
+        ]
+        assert is_lyrics_supervisions(sups) is False
+
+    def test_min_distinct_one(self):
+        """With min_distinct_sections=1 a single Chorus is enough."""
+        sups = [_sup(0, 2, "[Chorus]"), _sup(2, 2, "Lyric")]
+        assert is_lyrics_supervisions(sups, min_distinct_sections=1) is True
+
+    def test_marker_inline_with_text(self):
+        sups = [
+            _sup(0, 2, "[Verse 1] First line of the verse"),
+            _sup(2, 2, "[Chorus] First line of the chorus"),
+        ]
+        assert is_lyrics_supervisions(sups) is True
+
+    def test_instrumental_break_with_description(self):
+        sups = [
+            _sup(0, 2, "[Instrumental Break - Chiptune Synth Melody]"),
+            _sup(2, 2, "[Bridge]"),
+        ]
+        assert is_lyrics_supervisions(sups) is True
+
+    def test_section_with_colon_descriptor(self):
+        """Real-world markers like ``[Intro: Female Vocal]`` and ``[Outro: ...]``."""
+        sups = [
+            _sup(0, 2, "[Intro: Female Vocal]"),
+            _sup(2, 2, "Some opening line"),
+            _sup(4, 2, "[Outro: Female Vocal]"),
+            _sup(6, 2, "Closing line"),
+        ]
+        assert is_lyrics_supervisions(sups) is True
+
+    def test_word_boundary_introduction_not_intro(self):
+        """``[Introduction]`` must not be mistakenly matched as ``intro``."""
+        sups = [
+            _sup(0, 2, "[Introduction]"),
+            _sup(2, 2, "[Conclusion]"),
+        ]
+        assert is_lyrics_supervisions(sups) is False
+
+    def test_non_section_brackets_ignored(self):
+        """Performance directives like [whispered] should not be treated as song sections."""
+        sups = [
+            _sup(0, 2, "[whispered] something quiet"),
+            _sup(2, 2, "[laughter] continues"),
+            _sup(4, 2, "[applause] more text"),
+        ]
+        assert is_lyrics_supervisions(sups) is False
+
+    def test_chinese_lyrics_with_english_markers(self):
+        """Section markers in English are common even when lyrics body is Chinese."""
+        sups = [
+            _sup(0, 2, "[Verse 1]"),
+            _sup(2, 2, "窗外的雨滴落在玻璃上"),
+            _sup(4, 2, "[Chorus]"),
+            _sup(6, 2, "如果时光能够倒流"),
+        ]
+        assert is_lyrics_supervisions(sups) is True
 
 
 # ---------------------------------------------------------------------------
