@@ -26,6 +26,23 @@ if _has_nemo:
 requires_nemo = pytest.mark.skipif(not _has_nemo, reason="requires [transcription] extra (nemo)")
 
 
+def _skip_on_gemini_503(call):
+    """Invoke a Gemini-bound call and skip the test on transient 503 UNAVAILABLE.
+
+    Gemini routinely returns 503 under demand spikes ("high demand", "Spikes in
+    demand are usually temporary"). Treat that as flaky infrastructure rather
+    than a real test failure, so a service blip doesn't block release CI.
+    Real assertion failures and other API errors still propagate.
+    """
+    try:
+        return call()
+    except Exception as exc:
+        msg = str(exc)
+        if "503" in msg and ("UNAVAILABLE" in msg or "high demand" in msg.lower()):
+            pytest.skip(f"Gemini service unavailable: {exc}")
+        raise
+
+
 class MockClientWrapper:
     """Mock client wrapper for testing."""
 
@@ -112,7 +129,7 @@ def test_gemini_transcribe_numpy_mono(sample_audio):
     config = TranscriptionConfig(model_name="gemini-3.1-pro-preview", gemini_api_key=api_key)
     transcriber = create_transcriber(config)
 
-    supervision = transcriber.transcribe_numpy(sample_audio, language="en")
+    supervision = _skip_on_gemini_503(lambda: transcriber.transcribe_numpy(sample_audio, language="en"))
 
     assert isinstance(supervision, Supervision)
     assert supervision.text is not None
@@ -131,7 +148,7 @@ def test_gemini_transcribe_numpy_batch(audio_list):
     config = TranscriptionConfig(model_name="gemini-3.1-pro-preview", gemini_api_key=api_key)
     transcriber = create_transcriber(config)
 
-    supervisions = transcriber.transcribe_numpy(audio_list, language="en")
+    supervisions = _skip_on_gemini_503(lambda: transcriber.transcribe_numpy(audio_list, language="en"))
 
     assert isinstance(supervisions, list)
     assert len(supervisions) == len(audio_list)
