@@ -1,10 +1,22 @@
 """Centralized CLI color theme for LattifAI.
 
-All colors use bright ANSI variants (codes 90-97) for readability
-on both light and dark terminal backgrounds. Zero cyan.
+Uses 256-color ANSI for readability on both light and dark terminal
+backgrounds. Zero cyan. Bright yellow is avoided for warnings because
+it washes out on white backgrounds — we use a dark orange instead,
+matching the ``RICH_WARN = "dark_orange"`` Rich counterpart below.
 """
 
 import colorful
+
+# Enable 256-color mode and register custom palette colors. 256-color is
+# universally supported by modern terminals (iTerm, Terminal.app, vscode,
+# Windows Terminal, tmux) without requiring truecolor.
+colorful.use_256_ansi_colors()
+colorful.update_palette(
+    {
+        "laiWarn": "#D97706",  # dark orange (Tailwind amber-600); maps to ANSI 172
+    }
+)
 
 
 class _Theme:
@@ -13,7 +25,7 @@ class _Theme:
     # ── Core semantic roles ──────────────────────────────────────
     step = colorful.bold_blue  # workflow steps, progress info
     ok = colorful.bold_green  # success, completion
-    warn = colorful.bold_yellow  # warnings, caution
+    warn = colorful.bold & colorful.laiWarn  # warnings, caution (dark orange)
     err = colorful.bold_red  # errors, failures
     dim = colorful.bold_black  # muted text, dividers (bright black = dark gray)
     accent = colorful.bold_magenta  # highlights, special items
