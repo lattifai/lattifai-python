@@ -415,7 +415,14 @@ class TestMultiSpeakerCLI:
 
         # Count non-empty speakers (should be 6: ALICE, BOB, BOB, SPEAKER_02, DAVID, ALICE)
         non_empty = [s for s in speakers if s and s.strip()]
-        assert len(non_empty) == 6, f"Expected 6 non-empty speakers, got {len(non_empty)} in {output_format}"
+        if len(non_empty) != 6:
+            # print(caption.supervisions)
+            for supervision in caption.supervisions:
+                print(f"SPEAKER={supervision.speaker or '':<12s} TEXT={supervision.text}")
+
+        assert (
+            len(non_empty) == 6
+        ), f"Expected 6 non-empty speakers, got {len(non_empty)} in {output_format}: {non_empty} {output_file}"
 
     @pytest.mark.skipif(not os.environ.get("LATTIFAI_API_KEY"), reason="Requires LATTIFAI_API_KEY environment variable")
     @pytest.mark.parametrize("include_speaker", [True, False])
