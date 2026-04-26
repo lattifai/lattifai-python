@@ -1,9 +1,29 @@
 """Summarization service configuration for LattifAI."""
 
+import os
 from dataclasses import dataclass, field
 from typing import Literal, Optional
 
 from lattifai.config.llm import LLMConfig
+
+
+def _summarization_llm_default() -> LLMConfig:
+    """Build the default summarization LLMConfig.
+
+    Resolution order for ``model_name``:
+        1. ``[summarization].model_name`` in config.toml (handled by LLMConfig)
+        2. ``SUMMARIZATION_MODEL_NAME`` env var (covered by ``fallback_model``)
+        3. Hard fallback ``gemini-3-flash-preview``
+
+    API key / base URL resolution is delegated to LLMConfig (which already
+    inspects ``GEMINI_API_KEY`` / ``OPENAI_API_KEY`` /
+    ``OPENAI_API_BASE_URL`` based on the provider inferred from
+    ``model_name``).
+    """
+    return LLMConfig(
+        section="summarization",
+        fallback_model=os.environ.get("SUMMARIZATION_MODEL_NAME") or "gemini-3-flash-preview",
+    )
 
 
 @dataclass
@@ -16,8 +36,13 @@ class SummarizationConfig:
 
     _toml_section = "summarization"
 
-    llm: LLMConfig = field(default_factory=lambda: LLMConfig(model_name="gemini-2.5-flash"))
-    """LLM provider configuration (provider, model, api_key, api_base_url)."""
+    llm: LLMConfig = field(default_factory=_summarization_llm_default)
+    """LLM provider configuration (provider, model, api_key, api_base_url).
+
+    Configure via ``[summarization].model_name`` in config.toml,
+    ``SUMMARIZATION_MODEL_NAME`` env var, or pass an explicit ``LLMConfig``.
+    Provider is inferred from the model name prefix (``gemini*`` → Gemini,
+    everything else → OpenAI-compatible)."""
 
     lang: str = "en"
     """Output language code (BCP 47 / ISO 639-1).

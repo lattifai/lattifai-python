@@ -49,6 +49,13 @@ jobs:
           LATTIFAI_API_KEY: ${{ secrets.LATTIFAI_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           LATTIFAI_TESTS_CLI_DRYRUN: ${{ secrets.LATTIFAI_TESTS_CLI_DRYRUN }}
+          # OpenAI-compatible fallback for summarization tests (e.g. SiliconFlow)
+          # Provider is inferred from SUMMARIZATION_MODEL_NAME — set to a
+          # non-"gemini*" model to switch summarization off Gemini, leave
+          # unset/empty to keep the default Gemini path.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_BASE_URL: ${{ secrets.OPENAI_API_BASE_URL }}
+          SUMMARIZATION_MODEL_NAME: ${{ secrets.SUMMARIZATION_MODEL_NAME }}
         run: |
           # Fast-fail on auth/config/format regressions first
           pytest tests/cli/test_auth_command.py tests/cli/test_config_command.py -x -q
