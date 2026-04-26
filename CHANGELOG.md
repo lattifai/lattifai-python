@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## [1.5.8] - 2026-04-26
+
+### Features
+- CLI pre-flight warns before the stored trial key expires (or has expired), so users see the issue before the backend rejects with 401. Wired into backend-bound subcommands (alignment / youtube / transcribe / summarize / translate / diarize / serve); local-only commands stay silent.
+
+### Tests
+- Drop VTT dedup expectations for explicit speakers in multi-speaker E2E roundtrips (matches `lattifai-captions>=0.4.11` behavior; explicit speaker tags are emitted unconditionally).
+
+
 ## [1.5.7] - 2026-04-26
 
 ### Features
