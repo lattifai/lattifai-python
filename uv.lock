@@ -108,14 +108,14 @@ name = "accelerate"
 version = "1.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "huggingface-hub", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "huggingface-hub" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "packaging", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "psutil", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyyaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "safetensors", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "torch", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
+    { name = "torch" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4a/8e/ac2a9566747a93f8be36ee08532eb0160558b07630a081a6056a9f89bf1d/accelerate-1.12.0.tar.gz", hash = "sha256:70988c352feb481887077d2ab845125024b2a137a5090d6d7a32b57d03a45df6", size = 398399, upload-time = "2025-11-21T11:27:46.973Z" }
 wheels = [
@@ -1370,8 +1370,8 @@ name = "cuda-bindings"
 version = "13.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cuda-pathfinder", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'extra-8-lattifai-all') or (sys_platform == 'win32' and extra == 'extra-8-lattifai-diarization') or (sys_platform == 'win32' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "cuda-pathfinder" },
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/01/cc08a8d66a5c68a8ff1e708930ee3fa1137df491f5aed59aa8a1bfa67ca2/cuda_bindings-13.0.0-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:de13f1d770fa318e1e44a391478270dade22361c6053e5455ee8cb336e5b1505", size = 12230651, upload-time = "2025-08-07T02:40:52.114Z" },
@@ -1448,7 +1448,7 @@ name = "cytoolz"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "toolz", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "toolz" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/bd/d4/16916f3dc20a3f5455b63c35dcb260b3716f59ce27a93586804e70e431d5/cytoolz-1.1.0.tar.gz", hash = "sha256:13a7bf254c3c0d28b12e2290b82aed0f0977a4c2a2bf84854fcdc7796a29f3b0", size = 642510, upload-time = "2025-10-19T00:44:56.174Z" }
 wheels = [
@@ -1611,21 +1611,21 @@ name = "datasets"
 version = "4.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "dill", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "filelock", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "dill" },
+    { name = "filelock" },
     { name = "fsspec", extra = ["http"], marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "httpx", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "huggingface-hub", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "multiprocess", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "httpx" },
+    { name = "huggingface-hub" },
+    { name = "multiprocess" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-mlx') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-mlx') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "packaging", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pandas", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyarrow", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyyaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "requests", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tqdm", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "xxhash", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "tqdm" },
+    { name = "xxhash" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/93/bf/0dae295d6d1ba0b1a200a9dd216838464b5bbd05da01407cb1330b377445/datasets-4.4.1.tar.gz", hash = "sha256:80322699aa8c0bbbdb7caa87906da689c3c2e29523cff698775c67f28fdab1fc", size = 585341, upload-time = "2025-11-05T16:00:38.162Z" }
 wheels = [
@@ -1839,7 +1839,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11' or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -2172,7 +2172,7 @@ name = "gitdb"
 version = "4.0.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "smmap", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "smmap" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/72/94/63b0fc47eb32792c7ba1fe1b694daec9a63620db1e313033d18140c2320a/gitdb-4.0.12.tar.gz", hash = "sha256:5ef71f855d191a3326fcfbc0d5da835f26b13fbcba60c32c21091c349ffdb571", size = 394684, upload-time = "2025-01-02T07:20:46.413Z" }
 wheels = [
@@ -2184,7 +2184,7 @@ name = "gitpython"
 version = "3.1.45"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "gitdb", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "gitdb" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9a/c8/dd58967d119baab745caec2f9d853297cec1989ec1d63f677d3880632b88/gitpython-3.1.45.tar.gz", hash = "sha256:85b0ee964ceddf211c41b9f27a49086010a190fd8132a24e21f362a4b36a791c", size = 215076, upload-time = "2025-07-24T03:45:54.871Z" }
 wheels = [
@@ -2568,9 +2568,9 @@ name = "hydra-core"
 version = "1.3.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "antlr4-python3-runtime", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "omegaconf", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "packaging", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "antlr4-python3-runtime" },
+    { name = "omegaconf" },
+    { name = "packaging" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/6d/8e/07e42bc434a847154083b315779b0a81d567154504624e181caf2c71cd98/hydra-core-1.3.2.tar.gz", hash = "sha256:8a878ed67216997c3e9d88a8e72e7b4767e81af37afb4ea3334b269a4390a824", size = 3263494, upload-time = "2023-02-23T18:33:43.03Z" }
 wheels = [
@@ -2612,8 +2612,8 @@ name = "inflect"
 version = "7.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "more-itertools", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "typeguard", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "more-itertools" },
+    { name = "typeguard" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/78/c6/943357d44a21fd995723d07ccaddd78023eace03c1846049a2645d4324a3/inflect-7.5.0.tar.gz", hash = "sha256:faf19801c3742ed5a05a8ce388e0d8fe1a07f8d095c82201eb904f5d27ad571f", size = 73751, upload-time = "2024-12-28T17:11:18.897Z" }
 wheels = [
@@ -2647,7 +2647,7 @@ name = "intervaltree"
 version = "3.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "sortedcontainers", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "sortedcontainers" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/50/fb/396d568039d21344639db96d940d40eb62befe704ef849b27949ded5c3bb/intervaltree-3.1.0.tar.gz", hash = "sha256:902b1b88936918f9b2a19e0e5eb7ccb430ae45cde4f39ea4b36932920d33952d", size = 32861, upload-time = "2020-08-03T08:01:11.392Z" }
 
@@ -2701,16 +2701,16 @@ resolution-markers = [
     "python_full_version == '3.11.*' and sys_platform != 'linux'",
 ]
 dependencies = [
-    { name = "colorama", marker = "(python_full_version >= '3.11' and sys_platform == 'win32' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and sys_platform == 'win32' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and sys_platform == 'win32' and extra == 'extra-8-lattifai-transcription') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription') or (sys_platform != 'win32' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (sys_platform != 'win32' and extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (sys_platform != 'win32' and extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "decorator", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "ipython-pygments-lexers", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "jedi", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "matplotlib-inline", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "pexpect", marker = "(python_full_version >= '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'extra-8-lattifai-transcription') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription') or (sys_platform == 'emscripten' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (sys_platform == 'emscripten' and extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (sys_platform == 'emscripten' and extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription') or (sys_platform == 'win32' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (sys_platform == 'win32' and extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (sys_platform == 'win32' and extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "prompt-toolkit", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "pygments", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "stack-data", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "traitlets", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "colorama", marker = "python_full_version >= '3.11' and sys_platform == 'win32'" },
+    { name = "decorator", marker = "python_full_version >= '3.11'" },
+    { name = "ipython-pygments-lexers", marker = "python_full_version >= '3.11'" },
+    { name = "jedi", marker = "python_full_version >= '3.11'" },
+    { name = "matplotlib-inline", marker = "python_full_version >= '3.11'" },
+    { name = "pexpect", marker = "python_full_version >= '3.11' and sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "prompt-toolkit", marker = "python_full_version >= '3.11'" },
+    { name = "pygments", marker = "python_full_version >= '3.11'" },
+    { name = "stack-data", marker = "python_full_version >= '3.11'" },
+    { name = "traitlets", marker = "python_full_version >= '3.11'" },
     { name = "typing-extensions", marker = "python_full_version == '3.11.*'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/29/e6/48c74d54039241a456add616464ea28c6ebf782e4110d419411b83dae06f/ipython-9.7.0.tar.gz", hash = "sha256:5f6de88c905a566c6a9d6c400a8fed54a638e1f7543d17aae2551133216b1e4e", size = 4422115, upload-time = "2025-11-05T12:18:54.646Z" }
@@ -2723,7 +2723,7 @@ name = "ipython-pygments-lexers"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pygments", marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "pygments", marker = "python_full_version >= '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ef/4c/5dd1d8af08107f88c7f741ead7a40854b8ac24ddf9ae850afbcf698aa552/ipython_pygments_lexers-1.1.1.tar.gz", hash = "sha256:09c0138009e56b6854f9535736f4171d855c8c08a563a0dcd8022f78355c7e81", size = 8393, upload-time = "2025-01-17T11:24:34.505Z" }
 wheels = [
@@ -2753,7 +2753,7 @@ name = "jedi"
 version = "0.19.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "parso", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "parso" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/72/3a/79a912fbd4d8dd6fbb02bf69afd3bb72cf0c729bb3063c6f4498603db17a/jedi-0.19.2.tar.gz", hash = "sha256:4770dc3de41bde3966b02eb84fbcf557fb33cce26ad23da12c742fb50ecb11f0", size = 1231287, upload-time = "2024-11-11T01:41:42.873Z" }
 wheels = [
@@ -2880,8 +2880,8 @@ name = "jiwer"
 version = "3.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "rapidfuzz", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "click" },
+    { name = "rapidfuzz" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/85/3e/71b95cf0e2179fb5de8744a79fd36c8bd4e02e1803129a16d423884b6654/jiwer-3.1.0.tar.gz", hash = "sha256:dc492d09e570f1baba98c76aba09baf8e09c06e6808a4ba412dd4bde67fb79ac", size = 103187, upload-time = "2025-01-31T12:14:10.86Z" }
 wheels = [
@@ -3147,7 +3147,7 @@ wheels = [
 
 [[package]]
 name = "lattifai"
-version = "1.5.5"
+version = "1.5.8"
 source = { editable = "." }
 dependencies = [
     { name = "av" },
@@ -3221,10 +3221,10 @@ requires-dist = [
     { name = "lattifai", extras = ["transcription"], marker = "extra == 'all'" },
     { name = "lattifai", extras = ["translation"], marker = "extra == 'all'" },
     { name = "lattifai-auth", specifier = ">=0.2.1" },
-    { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.4.4" },
-    { name = "lattifai-core", specifier = ">=0.7.4" },
-    { name = "lattifai-core", extras = ["diarization"], marker = "extra == 'diarization'", specifier = ">=0.7.3" },
-    { name = "lattifai-core", extras = ["event"], marker = "extra == 'event'", specifier = ">=0.7.3" },
+    { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.4.11" },
+    { name = "lattifai-core", specifier = ">=0.7.5" },
+    { name = "lattifai-core", extras = ["diarization"], marker = "extra == 'diarization'", specifier = ">=0.7.5" },
+    { name = "lattifai-core", extras = ["event"], marker = "extra == 'event'", specifier = ">=0.7.5" },
     { name = "lattifai-run", specifier = ">=1.0.4" },
     { name = "mlx-audio", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.4.2" },
     { name = "mlx-vlm", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.4.4" },
@@ -3271,16 +3271,18 @@ wheels = [
 
 [[package]]
 name = "lattifai-captions"
-version = "0.4.4"
+version = "0.4.11"
 source = { registry = "https://lattifai.github.io/pypi/simple/" }
 dependencies = [
+    { name = "lingua-language-detector", version = "2.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "lingua-language-detector", version = "2.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12' or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "praatio" },
     { name = "pysubs2" },
     { name = "tgt" },
 ]
-sdist = { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.4.tar.gz" }
+sdist = { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.11.tar.gz" }
 wheels = [
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.4-py3-none-any.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.11-py3-none-any.whl" },
 ]
 
 [package.optional-dependencies]
@@ -3293,7 +3295,7 @@ splitting = [
 
 [[package]]
 name = "lattifai-core"
-version = "0.7.4"
+version = "0.7.5"
 source = { registry = "https://lattifai.github.io/pypi/simple/" }
 dependencies = [
     { name = "cryptography" },
@@ -3303,30 +3305,30 @@ dependencies = [
     { name = "setuptools" },
 ]
 wheels = [
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp310-cp310-macosx_11_0_universal2.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp310-cp310-win_amd64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp311-cp311-macosx_11_0_universal2.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp311-cp311-win_amd64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp312-cp312-macosx_11_0_universal2.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp312-cp312-win_amd64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp313-cp313-macosx_11_0_universal2.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp313-cp313-win_amd64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp314-cp314-macosx_11_0_universal2.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.4-cp314-cp314-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp310-cp310-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp310-cp310-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp311-cp311-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp311-cp311-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp312-cp312-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp312-cp312-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp313-cp313-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp313-cp313-win_amd64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp314-cp314-macosx_11_0_universal2.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_core-0.7.5-cp314-cp314-win_amd64.whl" },
 ]
 
 [package.optional-dependencies]
 diarization = [
-    { name = "einops", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "lattifai-captions", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "modelscope", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "einops" },
+    { name = "lattifai-captions" },
+    { name = "modelscope" },
     { name = "nemo-toolkit-asr", extra = ["asr"], marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "pyannote-audio", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "pyannote-audio" },
 ]
 event = [
     { name = "einops" },
@@ -3388,19 +3390,19 @@ name = "lhotse"
 version = "1.32.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "audioread", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "click", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "cytoolz", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "intervaltree", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "lilcom", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "audioread" },
+    { name = "click" },
+    { name = "cytoolz" },
+    { name = "intervaltree" },
+    { name = "lilcom" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "packaging", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyyaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "soundfile", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tabulate", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "torch", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tqdm", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "packaging" },
+    { name = "pyyaml" },
+    { name = "soundfile" },
+    { name = "tabulate" },
+    { name = "torch" },
+    { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e0/4c/5bb9a0a5a92b3aca726ec9eeb0f9695a15c448a2c775108a9a066bdaead5/lhotse-1.32.2.tar.gz", hash = "sha256:11a6b86cd12ea2c3781b79ac4d877cffd2885042ca3aae5181b3099ce7770f5b", size = 672691, upload-time = "2026-01-14T15:08:58.015Z" }
 wheels = [
@@ -3566,6 +3568,168 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/bd/02/2c329139ef8615c689f4a402e46c7c9029110eab14ca4685aef7ecf0593f/lilcom-1.8.1-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1267644b383a7b9f64ba5074b459e3f91635363fb36824c81205774f31b6e1c8", size = 98991, upload-time = "2025-04-02T02:53:54.959Z" },
     { url = "https://files.pythonhosted.org/packages/c7/9a/16b944bf1d3c18637e759a059433537d5a54131decc2138a81d5834fc5a3/lilcom-1.8.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bb8b1b76ab81b1c7953d25c80e7880d31c8fbc4b63da2c6375c6151332017da1", size = 93484, upload-time = "2025-04-02T02:53:56.329Z" },
     { url = "https://files.pythonhosted.org/packages/56/5a/eee3e4afd3dcf3c23ff6e9899098abf94a661bc5eb474ca366c57142338f/lilcom-1.8.1-cp313-cp313-win_amd64.whl", hash = "sha256:5af35273eab932a6b84612bd1597863465078654f40b98a9f8e2d6f67d9f6ebc", size = 69719, upload-time = "2025-04-02T02:51:29.651Z" },
+]
+
+[[package]]
+name = "lingua-language-detector"
+version = "2.1.1"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version == '3.11.*' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.11.*' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version < '3.11' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/48/1aae0f9a74ca0d61bd0af6000d436a6af9929482ac5cb44f5c8e7ffe71d8/lingua_language_detector-2.1.1-cp310-cp310-macosx_10_12_x86_64.whl", hash = "sha256:9c195a39f3b9ebeec9af72acf03a0b13132bff09147cd50d99001c060a998eaa", size = 96064810, upload-time = "2025-05-27T20:40:09.879Z" },
+    { url = "https://files.pythonhosted.org/packages/02/f9/6489ce213a2d3d5bad1f0114c22772d3e7a3d93cf66423cc1371c078e777/lingua_language_detector-2.1.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:fbd56b2f830f77819f8f97ecc11bff421133ced2da7c2cf9e05ebfe0e9f625f5", size = 96721535, upload-time = "2025-05-27T20:40:15.988Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/17/f1ccdec51d84a9a39efa1bf184f1e1ea831410d98636bd8bdb0b65273467/lingua_language_detector-2.1.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:07a2447576fabbf7f381b82be6de2336f55f54d7836b0ac6eed721f3b79cabe4", size = 96162140, upload-time = "2025-05-27T20:40:21.738Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/58/9a7c650aa6b068b995106be4c3502a0983122a70e65ec685038e82822d40/lingua_language_detector-2.1.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:deec7c9d5a72d7434144952cd5c3b85923d7a858264baa9c21018cb0e2e929fb", size = 96234399, upload-time = "2025-05-27T20:40:32.124Z" },
+    { url = "https://files.pythonhosted.org/packages/d2/a6/472063fe4884d337525a2591accce55e7a2420cb7e21f35e283cf5e84d4e/lingua_language_detector-2.1.1-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:db18582802ae49d03fe4330d13bbb9285532f157f3e7be291f83ed2ea90ea190", size = 96336857, upload-time = "2025-05-27T20:40:37.209Z" },
+    { url = "https://files.pythonhosted.org/packages/08/94/afba267556509b9bad4f28c86669520a94ff03d73f890840975289f36dd4/lingua_language_detector-2.1.1-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:8230d7a08d0477d136f22ec53cf8eaffaa90b273a7ab616d972298360c2a4090", size = 96405934, upload-time = "2025-05-27T20:40:42.161Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/27/09d7d7bde906297ffc0b1d8fbd599035e8e4d6c17ed568c30b00b4f5761b/lingua_language_detector-2.1.1-cp310-cp310-win_amd64.whl", hash = "sha256:d0429b482e8b3def24ad4e5565eb187a389c35cf0506ac7ed7ef7360e7369ec7", size = 95871563, upload-time = "2025-05-27T20:40:47.241Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/dd/f5ee4e6a07d5871d6c30a1ab6b58843bb87bb8a4a95cfd3de04919a01652/lingua_language_detector-2.1.1-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:cd9f734f67da00d37d93a1354f7c44d86c83b297cc078d7f31f1fd8a7deddef9", size = 96065409, upload-time = "2025-05-27T20:40:52.341Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/f6/1ab95d5bef46cf6e4386892ae8bd417372eb231610d297d4463c4941a70f/lingua_language_detector-2.1.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:7e82bcb924d09e552a52bc79265d5e49a5863b6b7297524adc4fb7c4564ebb5d", size = 96721827, upload-time = "2025-05-27T20:40:58.367Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/81/2598350ecc0133a81c0f2ea63f2e7c4d58645837f37fabbd0c5c5521912f/lingua_language_detector-2.1.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e94ad32a46f04b670a939623b69d7d7008221d15e20b3d975d284304d9d6c788", size = 96161868, upload-time = "2025-05-27T20:41:04.485Z" },
+    { url = "https://files.pythonhosted.org/packages/66/5e/e2a285f299f55532904e5a57985fbcda436396d4e4cb8dde959d9cf0533a/lingua_language_detector-2.1.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2a468c3fc9eaa6db733a347fee768fe171e76fac2c4bc49951e26bc79aec6a2a", size = 96234047, upload-time = "2025-05-27T20:41:10.359Z" },
+    { url = "https://files.pythonhosted.org/packages/56/e7/1d0d145898716438a7ebdc4a57bf6f287bad839eb8ccee1dbb460fff9591/lingua_language_detector-2.1.1-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:430e9e517427070f20d1b9eaff88633614d332cdcd119a519cefcd8c9f3d67e9", size = 96336336, upload-time = "2025-05-27T20:41:15.823Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/ee/13a61cbd2e2d1a3d9ac3d87ed2996e6cb7233e5d39dfb60bf77dc543dcb4/lingua_language_detector-2.1.1-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:69a408fc0bb372a46afec6d0744077b9932c64df7c02ad517bf37c5c7e3734bb", size = 96405574, upload-time = "2025-05-27T20:41:21.232Z" },
+    { url = "https://files.pythonhosted.org/packages/08/79/2b57032c1eee8c95b710a66a3d791bb8c9024def7aa7f1318209f3437bcc/lingua_language_detector-2.1.1-cp311-cp311-win_amd64.whl", hash = "sha256:fa3c9cfe7f7d9dc857ba22f14c2dfc7834e2dac131afaa737f3a59adae3ea553", size = 95870960, upload-time = "2025-05-27T20:41:26.734Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/fe/33eae6e11979278017d2e781d0ea1e2c3cf18f70284c7fce32d1e9a0df5f/lingua_language_detector-2.1.1-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:80acd7652f95ae569e6a03ffcb0cb9522ea3fde2328b9c6fac15b1d24ba382d9", size = 96059493, upload-time = "2025-05-27T20:41:32.018Z" },
+    { url = "https://files.pythonhosted.org/packages/48/bd/fed4a8a1d3d016fb69e9de5bfd03a4eac131f698d8254eb60be1ba67a67e/lingua_language_detector-2.1.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:0a18d3bf0039ef8746f8df391cff885b47e2a3762bb30883eceac3d449fd1fc8", size = 96718240, upload-time = "2025-05-27T20:41:37.576Z" },
+    { url = "https://files.pythonhosted.org/packages/78/0f/e85720ea17dde1463a847b963d24ea7c43c8cc600c6bdd5ff64775f4578a/lingua_language_detector-2.1.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3de2070ab293457a4f0fc1bd87f34de2e98c8348205b40b5667e043485950a64", size = 96161618, upload-time = "2025-05-27T20:41:43.86Z" },
+    { url = "https://files.pythonhosted.org/packages/42/41/22ce56bb34ed8ea418e67ac448f557af3a9a446defb523fb7b85e822e32b/lingua_language_detector-2.1.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6a398e4871fe8e32ff5711eaabb09ebdf4f80420d73e5d646a6cae0468c7c47e", size = 96236811, upload-time = "2025-05-27T20:41:49.737Z" },
+    { url = "https://files.pythonhosted.org/packages/28/88/873a9df437f71ff0b5e58b9d764289c3a9df6d32c706ba3f0f0361eb8f10/lingua_language_detector-2.1.1-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:f9e116206431eb283a4bc9107407a58b7d093870ae9d50ab43e39796db029fc5", size = 96335066, upload-time = "2025-05-27T20:41:55.914Z" },
+    { url = "https://files.pythonhosted.org/packages/09/13/9d618ccf34d70688514336c256af4c7fb861e94b009ed0962cbd72e87567/lingua_language_detector-2.1.1-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:6e1c950dceafd5ee12b6267d9f71987c572a1ee9f18b6465c722fcde9b0d5149", size = 96407990, upload-time = "2025-05-27T20:42:04.39Z" },
+    { url = "https://files.pythonhosted.org/packages/af/56/ec90f90afcdf09b3c1ed52f4c65430d5454e5ef2cc101220b91a37bfb719/lingua_language_detector-2.1.1-cp312-cp312-win_amd64.whl", hash = "sha256:a54d976a1daa8ecb5fd3f36e1ed5d3f9a363beed6edca22e88e49a8af9c4757a", size = 95868446, upload-time = "2025-05-27T20:42:10.226Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/54/f95fe718a889f7b57e507580d2713e29dfc5eaadbe4ad323bfd631fc9490/lingua_language_detector-2.1.1-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:6190e7632d08467dd3d148134743c4c40ccb4c84d6f3313508ffd73a8210c614", size = 96059594, upload-time = "2025-05-27T20:42:15.713Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/f2/61aad0aecf707e112bae4340275934eb4098c6c3040ffe7ae316498ea78f/lingua_language_detector-2.1.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:bbf22f8b1715f577f8cda4758d61ff3c1f5238d48b8cbe035a3c2064edf7b0a5", size = 96718187, upload-time = "2025-05-27T20:42:20.97Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/82/0571a607046a73284e43f46b4ef22f903156799f4ee96aa5b466ace632a8/lingua_language_detector-2.1.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:fe21c948a387fd9aa0b994853eb47cfedcc738a91530193de839ef0977ecc0de", size = 96161005, upload-time = "2025-05-27T20:42:26.985Z" },
+    { url = "https://files.pythonhosted.org/packages/79/27/647e2a112e974d24e98f1168004522960d47991e122f43438e75fd1d06e2/lingua_language_detector-2.1.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d55300513d9e2e0e034f6fd6b8cf111ba9faf49ba20cc060d67b403c3d356148", size = 96236397, upload-time = "2025-05-27T20:42:32.103Z" },
+    { url = "https://files.pythonhosted.org/packages/82/c6/2e9cc80bdd621648e4e27c3d40dc04bd7fc85fbfd5698692217008b15090/lingua_language_detector-2.1.1-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:354040a3c2ac748623966373cc64de34e8f14b0043c09aa334fdccf3456bf5d0", size = 96334444, upload-time = "2025-05-27T20:42:37.381Z" },
+    { url = "https://files.pythonhosted.org/packages/14/ae/5c700dc7b4b7d975df93c67b9d80fe2fd153da703721d1e5faa7c97bd194/lingua_language_detector-2.1.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:17110a40f9346a4c24291b170d0deb815bd615427c4857342a7f513813717148", size = 96407649, upload-time = "2025-05-27T20:42:45.921Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/5d/aec2634a8a54c654e5fb5816d703c72263360a23e682bb7f5a4f77e06e70/lingua_language_detector-2.1.1-cp313-cp313-win_amd64.whl", hash = "sha256:53cc131d9c7be64a88b1e20633d66c62a2779776e11a26e32bac80fb19b43f33", size = 95868425, upload-time = "2025-05-27T20:42:51.148Z" },
+    { url = "https://files.pythonhosted.org/packages/d7/c3/941f5cd8019bcfc049813df8b7ecacf01d059bcdeb9bb9382bd36cd11847/lingua_language_detector-2.1.1-pp310-pypy310_pp73-macosx_10_12_x86_64.whl", hash = "sha256:a857dd48a801f6a492a7832dc812c1a256f83da93725897abff7534321b0b7b1", size = 96067308, upload-time = "2025-05-27T20:42:56.407Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/b5/a299004221cd8c07d74cdbeb12aede65127aa2f3fee78a0fbf093f82f2b8/lingua_language_detector-2.1.1-pp310-pypy310_pp73-macosx_11_0_arm64.whl", hash = "sha256:197b2a394015298b80a12f61294094800560761227dcb27003f957c378059b20", size = 96724123, upload-time = "2025-05-27T20:43:01.221Z" },
+    { url = "https://files.pythonhosted.org/packages/80/e4/2e5cf9426b74fbe3c1b1df961790ad611a97c1191789cfa1bf02b2231d61/lingua_language_detector-2.1.1-pp310-pypy310_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b359f2571ff7ca6b4b998a3fc10fa87f136dbd4e4809af5283bb6b7093e88a07", size = 96163932, upload-time = "2025-05-27T20:43:07.094Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/72/f61f1e9678cc19cfb5141149382104c5885a46a4678e8467a443642e7559/lingua_language_detector-2.1.1-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5a6370392683607a34e941ea05088fde197d5dc37b8abb088fada7a51749ca44", size = 96235568, upload-time = "2025-05-27T20:43:12.299Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/e2/4bc76452c16e238f9cb639de3bc16e8cd511868b43c9d1f76748d4ae2dc8/lingua_language_detector-2.1.1-pp310-pypy310_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:5f0917b9210b59acb0d2c0979a78f3e54dcf9967d54885a4a8d34264d5a07720", size = 96338520, upload-time = "2025-05-27T20:43:17.821Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/9d/f50d27185cce1d040e9c4f33e3ba87daa825bdaf92d7c9285e4476a430c1/lingua_language_detector-2.1.1-pp310-pypy310_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:284077366b7ca3b2c4ecc492f3e40570f6afeaee2bf44153d347fa100137561b", size = 96406159, upload-time = "2025-05-27T20:43:23.444Z" },
+    { url = "https://files.pythonhosted.org/packages/78/5a/d322b6606011ab86ca65a28e357b3fa177fccce704a2523d1607861e195f/lingua_language_detector-2.1.1-pp311-pypy311_pp73-macosx_10_12_x86_64.whl", hash = "sha256:c121e6340bb4cb051e1469adc4575790a94a47f03999155c028fd5cfb4a7516b", size = 96067286, upload-time = "2025-05-27T20:43:31.017Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/49/4647f3e482db0ab61c0f2ca395157062ef0fcf418e7dc0c89d54a53d0504/lingua_language_detector-2.1.1-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:d3790a8761c37d2c4c2aa287c1a6a1f8d3d5d9b0d74c276ffd37243385cc33f0", size = 96724272, upload-time = "2025-05-27T20:43:35.921Z" },
+    { url = "https://files.pythonhosted.org/packages/09/14/8367387fea0ececc36a6cf551d188d83a28411e896d1235f3e24d63f99b3/lingua_language_detector-2.1.1-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:2477f75cc871d20bafdcb56f9d51be25d57c37d9ea5d7301cc592761dc68c963", size = 96163870, upload-time = "2025-05-27T20:43:40.869Z" },
+    { url = "https://files.pythonhosted.org/packages/45/f9/8fc1fa832b596360c64b2ba4771782f53d4bef9f52f5affb438a42a78425/lingua_language_detector-2.1.1-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:98f6128ea7b6122b23dab9168cd447fe85a3cc90d0272b7ea67034453715d306", size = 96235444, upload-time = "2025-05-27T20:43:48.403Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/99/ed79463a1a3cc91cf5f48f4f9083b64b6b642e63d75a42c33f594cd1c942/lingua_language_detector-2.1.1-pp311-pypy311_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:178b65db951cdfbd17d05a2eb629e177e5495e57e2b41b6789e82db4df126ff7", size = 96338252, upload-time = "2025-05-27T20:43:54.834Z" },
+    { url = "https://files.pythonhosted.org/packages/05/56/da535866dac54f9738e49ba7473004d4400ef937c0467e1267f8cd9901b2/lingua_language_detector-2.1.1-pp311-pypy311_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:1703cd369d74bde4fd6df8f21988c66231d8c85589e7ce535c3e251e0d4ee4c5", size = 96406052, upload-time = "2025-05-27T20:44:01.578Z" },
+]
+
+[[package]]
+name = "lingua-language-detector"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux' and extra == 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform == 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and sys_platform != 'linux' and extra != 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version >= '3.14' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.13.*' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+    "python_full_version == '3.12.*' and extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-mlx' and extra != 'extra-8-lattifai-transcription'",
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c7/c5/69636ba575cca9f507dd08ffdd4a2d084fdb193aa8e4246a5335bc077678/lingua_language_detector-2.2.0-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:df29270e5eef3c597e725e11eee778b7111412faab466d390d22ab1d5293bbb8", size = 170204877, upload-time = "2026-03-09T14:24:06.223Z" },
+    { url = "https://files.pythonhosted.org/packages/29/05/32568a1afe29e8d2060e4ffefd9d1a67aa2e423db3ab4abbf4f604c81b39/lingua_language_detector-2.2.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:2fe367f7c112a0445218407e259338a88af770d5c84a550c20ebe11d5053f03d", size = 172495668, upload-time = "2026-03-09T14:24:18.193Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/64/b6212bc0eff72d76dd04649c13452318eb2abeafc397ac597242e47e3e07/lingua_language_detector-2.2.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9ac7453c08ab9699706a92f15480ae3d4b66761c15e1577a1ba31d1635780f3a", size = 170325432, upload-time = "2026-03-09T14:24:29.41Z" },
+    { url = "https://files.pythonhosted.org/packages/44/a0/7322a0c50db8f82836ef40b14986dfcfad17bd837bfa5782562fec143bf0/lingua_language_detector-2.2.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:63d99c7570ba09525f1702e4e4b2362f8f1f7e0a0fba93a3a53d3f322e00659d", size = 170332900, upload-time = "2026-03-09T14:24:40.088Z" },
+    { url = "https://files.pythonhosted.org/packages/47/b5/e6d09c3cf08580088cc85807b1b28ef8b77d8c62d50ed56144a565205787/lingua_language_detector-2.2.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:cd54fe6505b671c0d1e33bf0436e8e9308e8802112eb5ba6fb37d2c5459ab685", size = 170500781, upload-time = "2026-03-09T14:24:51.478Z" },
+    { url = "https://files.pythonhosted.org/packages/e3/f2/ef84cc7f57854838f9b64f1b8aae07ee56827b5538b9609acb72aa6832e5/lingua_language_detector-2.2.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:362fbbc21da68c778f3521f42309d1ed6f54d4bd554a5701bf165419be9cc64b", size = 170586077, upload-time = "2026-03-09T14:25:04.48Z" },
+    { url = "https://files.pythonhosted.org/packages/97/48/bb581e0deda48169a11d25467d9fbe3ef4792b4d5363144bbea08caa9dd2/lingua_language_detector-2.2.0-cp312-cp312-win_amd64.whl", hash = "sha256:98baee0c51e31d0b54a92a4795aca6ca7069de9b99dc783e3456a91abd2ff692", size = 170065705, upload-time = "2026-03-09T14:25:16.796Z" },
+    { url = "https://files.pythonhosted.org/packages/45/a8/197f06b3d2da6ffb580d20e0b46181ef6d34fd750c7930ec04b322767cfb/lingua_language_detector-2.2.0-cp312-cp312-win_arm64.whl", hash = "sha256:581bfb3405dd99863b04753812021f2554545c4c2783d0faa41af44535c759a1", size = 169977215, upload-time = "2026-03-09T14:25:31.373Z" },
+    { url = "https://files.pythonhosted.org/packages/0c/d3/b4647a233d4d8ef411519c7259c5b607b20568cb993d976319ae3f260eea/lingua_language_detector-2.2.0-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:d52dc5a54bb245b1d9df54620810e7b72a247f8ca4276659a9893fe415faff37", size = 170204448, upload-time = "2026-03-09T14:25:41.286Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/cd/248053f61de66faa866bb4eb7190af1c2e67fa363f8193444a5aee5c1706/lingua_language_detector-2.2.0-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:0bb20bfe60b64012cd71f85bfdf5c79fc2e916590a9f69c3a9b01a44fbfd2244", size = 172495363, upload-time = "2026-03-09T14:25:53.585Z" },
+    { url = "https://files.pythonhosted.org/packages/25/88/ad5e9b8b21f4c5eeecd5d08539bf6ec869df87a491d779b8756501db6a71/lingua_language_detector-2.2.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:4ed86c6e803a585853298623d9ee683bd08bcd15c2543c045ef059a090823fc8", size = 170326018, upload-time = "2026-03-09T14:26:04.612Z" },
+    { url = "https://files.pythonhosted.org/packages/53/a5/b93c76728294e4eaf01f442fa7e9da913963d638915ce0aafd0220bc9902/lingua_language_detector-2.2.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4fbf936b47ef4fdd7043ebb4159d4a5f1c3648028e19d6e3c60464abc5f5e195", size = 170332278, upload-time = "2026-03-09T14:26:14.118Z" },
+    { url = "https://files.pythonhosted.org/packages/21/90/7f0f4c131cd0686c0f77157545b599b5023b00fa44ffb4a1c24a4c861cb3/lingua_language_detector-2.2.0-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:126899985870ada7f9630fb984a0763741bb7fde42adfc077e6f415e49e407b5", size = 170500970, upload-time = "2026-03-09T14:26:28.07Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/71/24d9d151ccf35cd001d8570d22dc1d305e632eee7ff1252764be8fb081f3/lingua_language_detector-2.2.0-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:c0961ec8f616897f5e91c7c3a5422d2d3aa48493954f2c425f2fca522a253916", size = 170585841, upload-time = "2026-03-09T14:26:39.904Z" },
+    { url = "https://files.pythonhosted.org/packages/35/a6/e087ba2c47eb86899020915fb6bf47b0f956eda9c61cabc742bc832c1b3c/lingua_language_detector-2.2.0-cp313-cp313-win_amd64.whl", hash = "sha256:250517a581cfa098a451299aa913e9756aee9f738b0b248259fc634eeffeb2cf", size = 170065737, upload-time = "2026-03-09T14:26:53.2Z" },
+    { url = "https://files.pythonhosted.org/packages/81/e7/4ed636d7d7e4605ce170ce70a566b45f70eed79ec9cdb5c9bc821892c1cd/lingua_language_detector-2.2.0-cp313-cp313-win_arm64.whl", hash = "sha256:9fc04412287d254982612dafe2dae2073e1feeedffbee8d4ddff4b961218cb69", size = 169977074, upload-time = "2026-03-09T14:27:04.064Z" },
+    { url = "https://files.pythonhosted.org/packages/0e/53/a7f52e45e7a71c3a749cc77fbc414c8948108ff406c9059197fdc77779e8/lingua_language_detector-2.2.0-cp314-cp314-macosx_10_12_x86_64.whl", hash = "sha256:4cac0e0721425342e1b10cbddfb009a7fdc75e0a79cfd0451bffc29bee0574c1", size = 170208820, upload-time = "2026-03-09T14:27:15.253Z" },
+    { url = "https://files.pythonhosted.org/packages/28/0b/3dd8a1eba4ac0da9987542849bae25344bb107e5b4a153ebe09e0c8feba3/lingua_language_detector-2.2.0-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:066b56ca4e3bd324b4c76a861ab2b747d2d8d4e6eda0a4cf06291c6c039b90f4", size = 172494828, upload-time = "2026-03-09T14:27:27.087Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/89/7367d0f7d3b5bcc89f47e223580ec57032dfc642f27cd2a0d06f40bda147/lingua_language_detector-2.2.0-cp314-cp314-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:b883aa34f03cd5cde7ee606bd2c18496f15b6cbd775be0dfd38311d47d6cf551", size = 170323577, upload-time = "2026-03-09T14:27:38.702Z" },
+    { url = "https://files.pythonhosted.org/packages/58/0f/6dcd9de6f5257ea736693ea92b354dac0073466a1ed32ef1f9873cc4cafe/lingua_language_detector-2.2.0-cp314-cp314-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:83badc377b0d07f349753ec3d35cf1ad74afb3ad0dce3ee672240d437705872b", size = 170331791, upload-time = "2026-03-09T14:27:49.366Z" },
+    { url = "https://files.pythonhosted.org/packages/28/42/efb8119a778f0b8df175f5f79a04a21b019c7b38058042866519953c5be1/lingua_language_detector-2.2.0-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:b7ef23811c8ceacbc10a08dd2f56d71590e7ca6c50e19dfd11a1e142d101199d", size = 170499780, upload-time = "2026-03-09T14:28:04.197Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/89/69ea8b9de230b322ce8b60e9b95463cc4cbeed73476abd9214ab699ade73/lingua_language_detector-2.2.0-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:145a11d7b7f0c8bf666de411585f53011d530c541a2cd55c2f86b3cff499f77e", size = 170584476, upload-time = "2026-03-09T14:28:18.833Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/c1/2e55c62abc6653383917f9d008090820182d32b8e1f19213af1c06e16411/lingua_language_detector-2.2.0-cp314-cp314-win_amd64.whl", hash = "sha256:3423749db1861937443141e1871a726b8d70dc6e7fe4f6584c477eef5b87fc38", size = 170064682, upload-time = "2026-03-09T14:28:31.876Z" },
+    { url = "https://files.pythonhosted.org/packages/44/5e/f73a74fb19c189c4070d66e9b15f1e4a032bf5e5203fb6bb6c622e16f9c0/lingua_language_detector-2.2.0-cp314-cp314-win_arm64.whl", hash = "sha256:0ec27bc67813372baba2e0a3df2b13cd559c64bc45c5af92f6137fe5b153a525", size = 169980726, upload-time = "2026-03-09T14:28:46.047Z" },
 ]
 
 [[package]]
@@ -3931,7 +4095,7 @@ name = "matplotlib-inline"
 version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "traitlets", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "traitlets" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c7/74/97e72a36efd4ae2bccb3463284300f8953f199b5ffbc04cbbb0ec78f74b1/matplotlib_inline-0.2.1.tar.gz", hash = "sha256:e1ee949c340d771fc39e241ea75683deb94762c8fa5f2927ec57c83c4dffa9fe", size = 8110, upload-time = "2025-10-23T09:00:22.126Z" }
 wheels = [
@@ -3954,10 +4118,10 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ipython", version = "8.37.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "ipython", version = "9.7.0", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "matplotlib", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "matplotlib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "pillow", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "pillow" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9e/b2/451be65c13d2d69b7601eded7ddd3f150884486715a9b3a705ffb08d0177/mediapy-1.1.6.tar.gz", hash = "sha256:9f44b760400964d8bea5121a213f94dc9a225d026d6a819901283a695e585634", size = 25459, upload-time = "2023-02-24T13:08:42.429Z" }
 wheels = [
@@ -4390,7 +4554,7 @@ name = "multiprocess"
 version = "0.70.18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "dill", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "dill" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/72/fd/2ae3826f5be24c6ed87266bc4e59c46ea5b059a103f3d7e7eb76a52aeecb/multiprocess-0.70.18.tar.gz", hash = "sha256:f9597128e6b3e67b23956da07cf3d2e5cba79e2f4e0fba8d7903636663ec6d0d", size = 1798503, upload-time = "2025-04-17T03:11:27.742Z" }
 wheels = [
@@ -4422,26 +4586,26 @@ name = "nemo-toolkit-asr"
 version = "2.8.0rc2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cuda-bindings", marker = "(sys_platform != 'darwin' and extra == 'extra-8-lattifai-all') or (sys_platform != 'darwin' and extra == 'extra-8-lattifai-diarization') or (sys_platform != 'darwin' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "fsspec", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "huggingface-hub", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "numba", marker = "(sys_platform == 'darwin' and extra == 'extra-8-lattifai-all') or (sys_platform == 'darwin' and extra == 'extra-8-lattifai-diarization') or (sys_platform == 'darwin' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "numba-cuda", marker = "(sys_platform != 'darwin' and extra == 'extra-8-lattifai-all') or (sys_platform != 'darwin' and extra == 'extra-8-lattifai-diarization') or (sys_platform != 'darwin' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "numexpr", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "cuda-bindings", marker = "sys_platform != 'darwin'" },
+    { name = "fsspec" },
+    { name = "huggingface-hub" },
+    { name = "numba", marker = "sys_platform == 'darwin'" },
+    { name = "numba-cuda", marker = "sys_platform != 'darwin'" },
+    { name = "numexpr" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "onnx", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "protobuf", version = "5.29.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "python-dateutil", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "ruamel-yaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "scikit-learn", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "setuptools", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tensorboard", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "text-unidecode", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "torch", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tqdm", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "wget", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "wrapt", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "onnx" },
+    { name = "protobuf", version = "5.29.5", source = { registry = "https://pypi.org/simple" } },
+    { name = "python-dateutil" },
+    { name = "ruamel-yaml" },
+    { name = "scikit-learn" },
+    { name = "setuptools" },
+    { name = "tensorboard" },
+    { name = "text-unidecode" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "wget" },
+    { name = "wrapt" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1d/ca/e05c6f7a9b370d4027984209d7bf93c1ac187c72109902e41cd72ca3f50a/nemo_toolkit_asr-2.8.0rc2.tar.gz", hash = "sha256:bf62a693b9c41c90d2a0d455290e22306b9cc90e69a1e2f22ccf6d4bcdcef569", size = 4295797, upload-time = "2026-02-09T04:07:50.265Z" }
 wheels = [
@@ -4450,47 +4614,47 @@ wheels = [
 
 [package.optional-dependencies]
 asr = [
-    { name = "braceexpand", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "cloudpickle", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "datasets", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "diskcache", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "editdistance", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "einops", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "fiddle", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "hydra-core", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "inflect", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "jiwer", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "kaldi-python-io", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "kaldialign", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "lhotse", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "librosa", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "lightning", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "marshmallow", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "mediapy", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "nv-one-logger-core", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "nv-one-logger-training-telemetry", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "omegaconf", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "optuna", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "packaging", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pandas", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "peft", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyannote-core", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyannote-metrics", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pydub", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyloudnorm", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "resampy", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "ruamel-yaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "sacrebleu", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "sacremoses", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "scipy", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "sentencepiece", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "soundfile", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "sox", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "torchmetrics", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "transformers", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "wandb", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "webdataset", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "whisper-normalizer", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "braceexpand" },
+    { name = "cloudpickle" },
+    { name = "datasets" },
+    { name = "diskcache" },
+    { name = "editdistance" },
+    { name = "einops" },
+    { name = "fiddle" },
+    { name = "hydra-core" },
+    { name = "inflect" },
+    { name = "jiwer" },
+    { name = "kaldi-python-io" },
+    { name = "kaldialign" },
+    { name = "lhotse" },
+    { name = "librosa" },
+    { name = "lightning" },
+    { name = "marshmallow" },
+    { name = "mediapy" },
+    { name = "nv-one-logger-core" },
+    { name = "nv-one-logger-training-telemetry" },
+    { name = "omegaconf" },
+    { name = "optuna" },
+    { name = "packaging" },
+    { name = "pandas" },
+    { name = "peft" },
+    { name = "pyannote-core" },
+    { name = "pyannote-metrics" },
+    { name = "pydub" },
+    { name = "pyloudnorm" },
+    { name = "resampy" },
+    { name = "ruamel-yaml" },
+    { name = "sacrebleu" },
+    { name = "sacremoses" },
+    { name = "scipy" },
+    { name = "sentencepiece" },
+    { name = "soundfile" },
+    { name = "sox" },
+    { name = "torchmetrics" },
+    { name = "transformers" },
+    { name = "wandb" },
+    { name = "webdataset" },
+    { name = "whisper-normalizer" },
 ]
 
 [[package]]
@@ -4645,7 +4809,7 @@ name = "numba-cuda"
 version = "0.15.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numba", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "numba" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/56/d7/f8dd134b7896b30d69e5b29af27264b1143458d43e088f210abc16cba91e/numba_cuda-0.15.1.tar.gz", hash = "sha256:219771179a396ba2a6911648b908609c1373d2055373d5fb8294f0a1947c4690", size = 491996, upload-time = "2025-06-14T21:34:24.931Z" }
 wheels = [
@@ -4952,11 +5116,11 @@ name = "nv-one-logger-core"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "overrides", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pydantic", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "strenum", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "toml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "typing-extensions", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "overrides" },
+    { name = "pydantic" },
+    { name = "strenum" },
+    { name = "toml" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3b/37/963095797035f371e0db6ea761f5aaccb624fc786af217115b423baeb0e2/nv_one_logger_core-2.3.1.tar.gz", hash = "sha256:cbb2f87604c78b96a302f32d87199902129d76153a73a20f8455a250b3246c1d", size = 52640, upload-time = "2025-10-29T21:11:55.812Z" }
 wheels = [
@@ -4968,9 +5132,9 @@ name = "nv-one-logger-training-telemetry"
 version = "2.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nv-one-logger-core", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "strenum", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "typing-extensions", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "nv-one-logger-core" },
+    { name = "strenum" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c5/21/016fa067967734d52f1ccf5a2a37a1a65216f2d7053bc2b85872cce956ca/nv_one_logger_training_telemetry-2.3.1.tar.gz", hash = "sha256:8c67940ea71799afaf1f46df3ba2f52f93aea26321c6f1c1d54aae02efc2a4af", size = 44435, upload-time = "2025-10-29T21:21:42.035Z" }
 wheels = [
@@ -5022,7 +5186,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.10.2.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "sys_platform == 'linux' or extra == 'extra-8-lattifai-mlx' or (extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-transcription')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/41/e79269ce215c857c935fd86bcfe91a451a584dfc27f1e068f568b9ad1ab7/nvidia_cudnn_cu12-9.10.2.21-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c9132cc3f8958447b4910a1720036d9eff5928cc3179b0a51fb6d167c6cc87d8", size = 705026878, upload-time = "2025-06-06T21:52:51.348Z" },
@@ -5035,7 +5199,7 @@ name = "nvidia-cufft-cu12"
 version = "11.3.3.83"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-nvjitlink-cu12", marker = "sys_platform == 'linux' or extra == 'extra-8-lattifai-mlx' or (extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-transcription')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/60/bc/7771846d3a0272026c416fbb7e5f4c1f146d6d80704534d0b187dd6f4800/nvidia_cufft_cu12-11.3.3.83-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:848ef7224d6305cdb2a4df928759dca7b1201874787083b6e7550dd6765ce69a", size = 193109211, upload-time = "2025-03-07T01:44:56.873Z" },
@@ -5067,9 +5231,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.7.3.90"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12" },
-    { name = "nvidia-cusparse-cu12" },
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-cublas-cu12", marker = "sys_platform == 'linux' or extra == 'extra-8-lattifai-mlx' or (extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-transcription')" },
+    { name = "nvidia-cusparse-cu12", marker = "sys_platform == 'linux' or extra == 'extra-8-lattifai-mlx' or (extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-transcription')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "sys_platform == 'linux' or extra == 'extra-8-lattifai-mlx' or (extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-transcription')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/32/f7cd6ce8a7690544d084ea21c26e910a97e077c9b7f07bf5de623ee19981/nvidia_cusolver_cu12-11.7.3.90-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:db9ed69dbef9715071232caa9b69c52ac7de3a95773c2db65bdba85916e4e5c0", size = 267229841, upload-time = "2025-03-07T01:46:54.356Z" },
@@ -5082,7 +5246,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.5.8.93"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12" },
+    { name = "nvidia-nvjitlink-cu12", marker = "sys_platform == 'linux' or extra == 'extra-8-lattifai-mlx' or (extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-transcription')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/f7/cd777c4109681367721b00a106f491e0d0d15cfa1fd59672ce580ce42a97/nvidia_cusparse_cu12-12.5.8.93-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:9b6c161cb130be1a07a27ea6923df8141f3c295852f4b260c65f18f3e0a091dc", size = 288117129, upload-time = "2025-03-07T01:47:40.407Z" },
@@ -5161,11 +5325,11 @@ name = "onnx"
 version = "1.19.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ml-dtypes", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "ml-dtypes" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "protobuf", version = "5.29.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "typing-extensions", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "protobuf", version = "5.29.5", source = { registry = "https://pypi.org/simple" } },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5b/bf/b0a63ee9f3759dcd177b28c6f2cb22f2aecc6d9b3efecaabc298883caa5f/onnx-1.19.0.tar.gz", hash = "sha256:aa3f70b60f54a29015e41639298ace06adf1dd6b023b9b30f1bca91bb0db9473", size = 11949859, upload-time = "2025-08-27T02:34:27.107Z" }
 wheels = [
@@ -5559,17 +5723,17 @@ name = "peft"
 version = "0.18.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "accelerate", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "huggingface-hub", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "accelerate" },
+    { name = "huggingface-hub" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "packaging", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "psutil", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyyaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "safetensors", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "torch", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tqdm", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "transformers", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "pyyaml" },
+    { name = "safetensors" },
+    { name = "torch" },
+    { name = "tqdm" },
+    { name = "transformers" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/4b/0c/f2938db546ac7fc961ab5917cd50fcf5d0d70b406de93e3faccaa504e152/peft-0.18.0.tar.gz", hash = "sha256:c81c80b2056ab40c23d58ef25f74daab417ac653970718589a11a8af28218588", size = 634141, upload-time = "2025-11-13T11:13:06.603Z" }
 wheels = [
@@ -5581,7 +5745,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -5732,7 +5896,7 @@ name = "portalocker"
 version = "3.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pywin32", marker = "(sys_platform == 'win32' and extra == 'extra-8-lattifai-all') or (sys_platform == 'win32' and extra == 'extra-8-lattifai-diarization') or (sys_platform == 'win32' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5e/77/65b857a69ed876e1951e88aaba60f5ce6120c33703f7cb61a3c894b8c1b6/portalocker-3.2.0.tar.gz", hash = "sha256:1f3002956a54a8c3730586c5c77bf18fae4149e07eaf1c29fc3faf4d5a3f89ac", size = 95644, upload-time = "2025-06-14T13:20:40.03Z" }
 wheels = [
@@ -6403,7 +6567,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-mlx') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-mlx') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "scipy", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-mlx' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "scipy" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/23/00/f915eaa75326f4209941179c2b93ac477f2040e4aeff5bb21d16eb8058f9/pyloudnorm-0.2.0.tar.gz", hash = "sha256:8bf597658ea4e1975c275adf490f6deb5369ea409f2901f939915efa4b681b16", size = 14037, upload-time = "2026-01-04T11:43:35.265Z" }
 wheels = [
@@ -7014,7 +7178,7 @@ name = "resampy"
 version = "0.4.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "numba", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "numba" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
 ]
@@ -7136,13 +7300,13 @@ name = "sacrebleu"
 version = "2.6.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "lxml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "colorama" },
+    { name = "lxml" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "portalocker", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "regex", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tabulate", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "portalocker" },
+    { name = "regex" },
+    { name = "tabulate" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d3/ed/d7acddcff74d690c56fe26a1f7828bdde548262828d0743414ea916c40c1/sacrebleu-2.6.0.tar.gz", hash = "sha256:91499b6cd46138d95154fff1e863c2f9be57e82f0c719d8dd718d0006cf6c566", size = 1893419, upload-time = "2026-01-12T17:17:20.799Z" }
 wheels = [
@@ -7154,10 +7318,10 @@ name = "sacremoses"
 version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "joblib", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "regex", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "tqdm", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "click" },
+    { name = "joblib" },
+    { name = "regex" },
+    { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1d/51/fbdc4af4f6e85d26169e28be3763fe50ddfd0d4bf8b871422b0788dcc4d2/sacremoses-0.1.1.tar.gz", hash = "sha256:b6fd5d3a766b02154ed80b962ddca91e1fd25629c0978c7efba21ebccf663934", size = 883188, upload-time = "2023-10-30T15:56:20.187Z" }
 wheels = [
@@ -7404,9 +7568,9 @@ name = "sentry-sdk"
 version = "3.0.0a7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "certifi", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "opentelemetry-sdk", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "urllib3", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "certifi" },
+    { name = "opentelemetry-sdk" },
+    { name = "urllib3" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/66/a5/747ab268f2cf3f4cb50af521e1a85a959411f74cf4a2ecf47782e1981cee/sentry_sdk-3.0.0a7.tar.gz", hash = "sha256:439a858d409b84407560df6b7ebb760acd9ad3d14e05cd919ae36b204e411cb2", size = 329999, upload-time = "2025-10-20T13:50:38.131Z" }
 wheels = [
@@ -7526,7 +7690,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "typing-extensions", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3d/a2/d8e0d8fd7abf509ead4a2cb0fb24e5758b5330166bf9223d5cb9f98a7e8d/sox-1.5.0.tar.gz", hash = "sha256:12c7be5bb1f548d891fe11e82c08cf5f1a1d74e225298f60082e5aeb2469ada0", size = 63905, upload-time = "2024-03-20T16:59:37.385Z" }
 
@@ -7612,9 +7776,9 @@ name = "stack-data"
 version = "0.6.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "asttokens", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "executing", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pure-eval", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "asttokens" },
+    { name = "executing" },
+    { name = "pure-eval" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/28/e3/55dcc2cfbc3ca9c29519eb6884dd1415ecb53b0e934862d3559ddcb7e20b/stack_data-0.6.3.tar.gz", hash = "sha256:836a778de4fec4dcd1dcd89ed8abff8a221f58308462e1c4aa2a3cf30148f0b9", size = 44707, upload-time = "2023-09-30T13:58:05.479Z" }
 wheels = [
@@ -8129,7 +8293,7 @@ name = "triton"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "setuptools" },
+    { name = "setuptools", marker = "sys_platform == 'linux' or extra == 'extra-8-lattifai-mlx' or (extra != 'extra-8-lattifai-all' and extra != 'extra-8-lattifai-diarization' and extra != 'extra-8-lattifai-transcription')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/62/ee/0ee5f64a87eeda19bbad9bc54ae5ca5b98186ed00055281fd40fb4beb10e/triton-3.4.0-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:7ff2785de9bc02f500e085420273bb5cc9c9bb767584a4aa28d6e360cec70128", size = 155430069, upload-time = "2025-07-30T19:58:21.715Z" },
@@ -8144,7 +8308,7 @@ name = "typeguard"
 version = "4.4.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c7/68/71c1a15b5f65f40e91b65da23b8224dad41349894535a97f63a52e462196/typeguard-4.4.4.tar.gz", hash = "sha256:3a7fd2dffb705d4d0efaed4306a704c89b9dee850b688f060a8b1615a79e5f74", size = 75203, upload-time = "2025-06-18T09:56:07.624Z" }
 wheels = [
@@ -8279,16 +8443,16 @@ name = "wandb"
 version = "0.23.1rc1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "gitpython", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "packaging", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "platformdirs", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "protobuf", version = "5.29.5", source = { registry = "https://pypi.org/simple" }, marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pydantic", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "pyyaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "requests", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "sentry-sdk", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "typing-extensions", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "click" },
+    { name = "gitpython" },
+    { name = "packaging" },
+    { name = "platformdirs" },
+    { name = "protobuf", version = "5.29.5", source = { registry = "https://pypi.org/simple" } },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "sentry-sdk" },
+    { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/3c/1856dcd7b9a10463e828f9fa98ebbab5869eb033a2ff505becbcfcc55017/wandb-0.23.1rc1.tar.gz", hash = "sha256:97ec22acd60fdbf23def0fb5919c4a5c039b95b8385d9eef2b4f9117d09d0255", size = 44567695, upload-time = "2025-11-25T18:59:52.05Z" }
 wheels = [
@@ -8317,10 +8481,10 @@ name = "webdataset"
 version = "1.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "braceexpand", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "braceexpand" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version < '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version < '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "(python_full_version >= '3.11' and extra == 'extra-8-lattifai-all') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-diarization') or (python_full_version >= '3.11' and extra == 'extra-8-lattifai-transcription') or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
-    { name = "pyyaml", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "pyyaml" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5a/3a/68800d92e065cf4750ebecf973b13979c0c929b439e1293012938862038d/webdataset-1.0.2.tar.gz", hash = "sha256:7f0498be827cfa46cc5430a58768a24e2c6a410676a61be1838f53d61afdaab4", size = 80090, upload-time = "2025-06-19T23:26:21.945Z" }
 wheels = [
@@ -8424,9 +8588,9 @@ name = "whisper-normalizer"
 version = "0.1.12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "indic-numtowords", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "more-itertools", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
-    { name = "regex", marker = "extra == 'extra-8-lattifai-all' or extra == 'extra-8-lattifai-diarization' or extra == 'extra-8-lattifai-transcription'" },
+    { name = "indic-numtowords" },
+    { name = "more-itertools" },
+    { name = "regex" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/77/81/d4a23d67e9356f1c2d6fe9aa7e99f42078b5e3845b181412a5582f168af4/whisper_normalizer-0.1.12.tar.gz", hash = "sha256:484dcedbfeba2ee94cf9412d57ab1e66b847e91f80c15ffc4c6ab82ad5484b8c", size = 39630, upload-time = "2025-06-06T19:03:50.75Z" }
 wheels = [
