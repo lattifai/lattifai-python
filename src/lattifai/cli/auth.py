@@ -48,6 +48,57 @@ CALLBACK_PATH = "/callback"
 CALLBACK_TIMEOUT_SECS = 120.0
 PORT_RANGE_START = 49152
 PORT_RANGE_END = 65535
+
+# Trial-expiry pre-flight: print a single warning per process so users
+# discover the issue before the backend rejects the request with 401.
+_EXPIRY_WARNING_SHOWN = False
+_EXPIRY_GRACE_DAYS = 2.0
+
+
+def warn_if_trial_expiring() -> None:
+    """Print a one-shot warning when the stored trial key is expired or expiring soon.
+
+    Idempotent within a process: subsequent calls are no-ops once a warning
+    has been emitted. Silently returns when no trial key is stored or when
+    the stored expiry can't be parsed (no exceptions leak to callers).
+    """
+    global _EXPIRY_WARNING_SHOWN
+    if _EXPIRY_WARNING_SHOWN:
+        return
+
+    is_trial = get_auth_value("IS_TRIAL")
+    expires_at = get_auth_value("EXPIRES_AT")
+    if not (is_trial and expires_at):
+        return
+
+    try:
+        exp = datetime.fromisoformat(str(expires_at).replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return
+
+    now = datetime.now(timezone.utc)
+    seconds_left = (exp - now).total_seconds()
+    days_left = seconds_left / 86400.0
+
+    if seconds_left < 0:
+        days_ago = int(abs(days_left)) + 1
+        console.print(
+            f"[{T.RICH_ERR}]⚠ Your LattifAI trial expired {days_ago} day(s) ago "
+            f"(on {exp.strftime('%Y-%m-%d %H:%M UTC')}).[/{T.RICH_ERR}] "
+            f"Run [bold]lai auth trial[/bold] for a new 14-day trial, or "
+            f"[bold]lai auth login[/bold] for a paid account."
+        )
+        _EXPIRY_WARNING_SHOWN = True
+    elif days_left < _EXPIRY_GRACE_DAYS:
+        hours_left = max(1, int(seconds_left / 3600))
+        console.print(
+            f"[{T.RICH_WARN}]⏰ Your LattifAI trial expires in ~{hours_left}h "
+            f"(on {exp.strftime('%Y-%m-%d %H:%M UTC')}).[/{T.RICH_WARN}] "
+            f"Run [bold]lai auth login[/bold] before that to keep working."
+        )
+        _EXPIRY_WARNING_SHOWN = True
+
+
 SUCCESS_HTML = """<!doctype html>
 <html lang="en">
   <head>

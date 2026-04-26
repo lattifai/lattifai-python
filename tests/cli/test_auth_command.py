@@ -157,6 +157,87 @@ class TestAuthInternals:
             assert get_auth_value("USER_EMAIL") == "existing@test.com"
 
 
+class TestTrialExpiryWarning:
+    """Tests for the warn_if_trial_expiring() pre-flight check."""
+
+    def _reset_warning_flag(self):
+        """Clear the once-per-process guard so each test sees a fresh state."""
+        import lattifai.cli.auth as auth
+
+        auth._EXPIRY_WARNING_SHOWN = False
+
+    def test_silent_when_no_trial(self, capsys):
+        self._reset_warning_flag()
+        with patch("lattifai.cli.auth.get_auth_value", side_effect=lambda k: None):
+            from lattifai.cli.auth import warn_if_trial_expiring
+
+            warn_if_trial_expiring()
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
+
+    def test_silent_when_far_future(self, capsys):
+        self._reset_warning_flag()
+        values = {"IS_TRIAL": True, "EXPIRES_AT": "2099-01-01T00:00:00Z"}
+        with patch("lattifai.cli.auth.get_auth_value", side_effect=lambda k: values.get(k)):
+            from lattifai.cli.auth import warn_if_trial_expiring
+
+            warn_if_trial_expiring()
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
+
+    def _normalize(self, s: str) -> str:
+        """Collapse Rich's word-wrap whitespace so substring asserts survive line breaks."""
+        return " ".join(s.split())
+
+    def test_warns_when_expired(self, capsys):
+        self._reset_warning_flag()
+        values = {"IS_TRIAL": True, "EXPIRES_AT": "2020-01-01T00:00:00Z"}
+        with patch("lattifai.cli.auth.get_auth_value", side_effect=lambda k: values.get(k)):
+            from lattifai.cli.auth import warn_if_trial_expiring
+
+            warn_if_trial_expiring()
+        captured = self._normalize(capsys.readouterr().out)
+        assert "expired" in captured.lower()
+        assert "lai auth trial" in captured
+
+    def test_warns_when_expiring_soon(self, capsys):
+        from datetime import datetime, timedelta, timezone
+
+        self._reset_warning_flag()
+        soon = (datetime.now(timezone.utc) + timedelta(hours=12)).isoformat().replace("+00:00", "Z")
+        values = {"IS_TRIAL": True, "EXPIRES_AT": soon}
+        with patch("lattifai.cli.auth.get_auth_value", side_effect=lambda k: values.get(k)):
+            from lattifai.cli.auth import warn_if_trial_expiring
+
+            warn_if_trial_expiring()
+        captured = self._normalize(capsys.readouterr().out)
+        assert "expires in" in captured.lower()
+        assert "lai auth login" in captured
+
+    def test_warning_is_idempotent(self, capsys):
+        self._reset_warning_flag()
+        values = {"IS_TRIAL": True, "EXPIRES_AT": "2020-01-01T00:00:00Z"}
+        with patch("lattifai.cli.auth.get_auth_value", side_effect=lambda k: values.get(k)):
+            from lattifai.cli.auth import warn_if_trial_expiring
+
+            warn_if_trial_expiring()
+            first = capsys.readouterr().out
+            warn_if_trial_expiring()
+            second = capsys.readouterr().out
+        assert first.strip() != ""
+        assert second == ""  # Second call must be silent
+
+    def test_silent_on_malformed_expiry(self, capsys):
+        self._reset_warning_flag()
+        values = {"IS_TRIAL": True, "EXPIRES_AT": "not-a-date"}
+        with patch("lattifai.cli.auth.get_auth_value", side_effect=lambda k: values.get(k)):
+            from lattifai.cli.auth import warn_if_trial_expiring
+
+            warn_if_trial_expiring()
+        out = capsys.readouterr()
+        assert out.out == "" and out.err == ""
+
+
 class TestDeviceAuthHeaders:
     """Tests for X-Device-Auth header injection in ClientConfig."""
 

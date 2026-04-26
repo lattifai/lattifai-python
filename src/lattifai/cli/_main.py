@@ -9,6 +9,14 @@ import importlib.metadata
 import typer
 from nemo_run.cli.api import create_cli
 
+# Subcommands that hit the LattifAI backend and therefore benefit from a
+# pre-flight trial-expiry warning. Local-only commands (caption format
+# conversion, doctor, auth, config, update) are excluded so trivial
+# invocations stay fast and side-effect free.
+_SUBCOMMANDS_NEEDING_AUTH = frozenset(
+    {"alignment", "youtube", "transcribe", "summarize", "translate", "diarize", "serve"}
+)
+
 
 def _version_callback(value: bool) -> None:
     """Print version and exit."""
@@ -52,10 +60,17 @@ def main():
 
     @app.callback()
     def _callback(
+        ctx: typer.Context,
         version: bool = typer.Option(
             False, "--version", callback=_version_callback, is_eager=True, help="Show version and exit."
         ),
     ):
         """LattifAI CLI — precision alignment, transcription, and subtitle tools."""
+        # Pre-flight trial-expiry warning for commands that hit the backend.
+        # Surfaces a friendly message before users get a 401 from the server.
+        if ctx.invoked_subcommand in _SUBCOMMANDS_NEEDING_AUTH:
+            from lattifai.cli.auth import warn_if_trial_expiring
+
+            warn_if_trial_expiring()
 
     app()
