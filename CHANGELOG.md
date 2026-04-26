@@ -5,9 +5,13 @@
 
 ### Features
 - CLI pre-flight warns before the stored trial key expires (or has expired), so users see the issue before the backend rejects with 401. Wired into backend-bound subcommands (alignment / youtube / transcribe / summarize / translate / diarize / serve); local-only commands stay silent.
+- `SummarizationConfig.llm` now reads the `[summarization]` section of `config.toml` and falls back to the `SUMMARIZATION_MODEL_NAME` env var, so operators can route summarization to any OpenAI-compatible endpoint (SiliconFlow, vLLM, …) without code edits. Default stays Gemini.
 
 ### Tests
 - Drop VTT dedup expectations for explicit speakers in multi-speaker E2E roundtrips (matches `lattifai-captions>=0.4.11` behavior; explicit speaker tags are emitted unconditionally).
+
+### CI
+- Release Tests workflow now plumbs optional `OPENAI_API_KEY` / `OPENAI_API_BASE_URL` / `SUMMARIZATION_MODEL_NAME` secrets to the test environment so the summarization integration suite can avoid Gemini 503 / malformed-JSON flakiness.
 
 
 ## [1.5.7] - 2026-04-26
