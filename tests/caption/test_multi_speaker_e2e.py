@@ -44,30 +44,6 @@ EXPECTED_SPEAKERS = [
 EXPECTED_TEXT = "She had your dark suit in greasy wash water all year."
 
 
-# Formats that suppress consecutive duplicate speaker prefixes on write
-# (VTT standard output is shared between display-readability and roundtrip
-# convenience; lattifai-captions favors the former and drops the prefix on
-# the second cue when the speaker hasn't changed). Test expectations for
-# these formats collapse adjacent duplicates to `None` after the first.
-_DEDUP_OUTPUT_FORMATS = {"vtt"}
-
-
-def _collapse_consecutive_duplicates(speakers):
-    """Return speakers with consecutive duplicates replaced by None.
-
-    Mirrors what a dedup-on-write format produces on read-back.
-    """
-    collapsed = []
-    prev = None
-    for sp in speakers:
-        if sp and sp == prev:
-            collapsed.append(None)
-        else:
-            collapsed.append(sp)
-            prev = sp
-    return collapsed
-
-
 class TestMultiSpeakerParsing:
     """Test that multi-speaker captions are correctly parsed."""
 
@@ -128,9 +104,9 @@ class TestMultiSpeakerRoundtrip:
     def test_speaker_roundtrip_include_speaker_true(self, input_format, output_format, tmp_path):
         """Test speaker labels preserved with include_speaker_in_text=True.
 
-        Formats in ``_DEDUP_OUTPUT_FORMATS`` (VTT) intentionally drop the
-        prefix on consecutive same-speaker cues to reduce visual noise, so
-        the read-back collapses adjacent duplicates to ``None``.
+        Explicitly tagged speakers must survive a write/read roundtrip
+        unchanged for every supported format — including consecutive
+        same-speaker cues (no dedup on explicit input).
         """
         input_file = TEST_DATA_DIR / f"SA1_multi_speaker.{input_format}"
         output_file = tmp_path / f"output.{output_format}"
@@ -138,12 +114,6 @@ class TestMultiSpeakerRoundtrip:
         # Read input
         caption = Caption.read(input_file)
         original_speakers = [sup.speaker for sup in caption.supervisions]
-
-        # Compute expected speakers for this output format
-        if output_format in _DEDUP_OUTPUT_FORMATS:
-            expected_speakers = _collapse_consecutive_duplicates(original_speakers)
-        else:
-            expected_speakers = list(original_speakers)
 
         # Write output with speaker in text
         caption.write(output_file)
@@ -156,8 +126,8 @@ class TestMultiSpeakerRoundtrip:
             original_speakers
         ), f"Speaker count mismatch: {len(caption_read.supervisions)} vs {len(original_speakers)}"
 
-        # Verify each speaker matches format-appropriate expectation
-        for i, (sup, expected) in enumerate(zip(caption_read.supervisions, expected_speakers)):
+        # Verify every speaker survives the roundtrip unchanged
+        for i, (sup, expected) in enumerate(zip(caption_read.supervisions, original_speakers)):
             if expected is None or expected == "":
                 assert (
                     sup.speaker is None or sup.speaker == ""
@@ -487,11 +457,11 @@ class TestMultiSpeakerEdgeCases:
         assert caption_read.supervisions[5].speaker is None or caption_read.supervisions[5].speaker == ""
 
     def test_consecutive_same_speaker_preserved(self, tmp_path):
-        """Test consecutive lines with same speaker on dedup-aware output.
+        """Test consecutive lines with the same explicit speaker survive roundtrips.
 
-        VTT output suppresses the prefix on the second of two consecutive
-        same-speaker cues. Lossless roundtrip requires an output format that
-        does NOT dedup (SRT), so we assert both BOB: survive via SRT.
+        Explicit speaker tags from the source must be emitted unconditionally;
+        consecutive same-speaker cues are NOT deduped. Both BOB: lines must
+        roundtrip through SRT and VTT identically.
         """
         caption = Caption.read(MULTI_SPEAKER_VTT)
 
@@ -499,21 +469,19 @@ class TestMultiSpeakerEdgeCases:
         assert caption.supervisions[2].speaker == caption.supervisions[3].speaker
         assert caption.supervisions[2].speaker == "BOB:"
 
-        # Roundtrip through SRT (no speaker dedup) — both BOB: survive
+        # Roundtrip through SRT — both BOB: survive
         srt_file = tmp_path / "output.srt"
         caption.write(srt_file)
         caption_srt = Caption.read(srt_file)
         assert caption_srt.supervisions[2].speaker == "BOB:"
         assert caption_srt.supervisions[3].speaker == "BOB:"
 
-        # Roundtrip through VTT — dedup drops the second BOB:
+        # Roundtrip through VTT — both BOB: survive (explicit speakers are not deduped)
         vtt_file = tmp_path / "output.vtt"
         caption.write(vtt_file)
         caption_vtt = Caption.read(vtt_file)
         assert caption_vtt.supervisions[2].speaker == "BOB:"
-        assert (
-            caption_vtt.supervisions[3].speaker is None or caption_vtt.supervisions[3].speaker == ""
-        ), "VTT is expected to suppress the prefix on the second consecutive same-speaker cue"
+        assert caption_vtt.supervisions[3].speaker == "BOB:"
 
     def test_speaker_reappearance_preserved(self, tmp_path):
         """Test that a speaker appearing multiple times is handled correctly."""
