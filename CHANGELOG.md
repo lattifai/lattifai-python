@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## [1.5.7] - 2026-04-26
+
+### Features
+- Auto-suppress duplicate output for lyrics input in alignment
+- Add `G` option to keep genuine duplicate blocks during dedup
+- Currency / percent / thousands aware tokenization in alignment
+- `AudioData.stats()` plus CLI for amplitude distribution
+
+### Fixes
+- Use dark orange for `warn` so it stays readable on white-background terminals
+
+### Refactor
+- Rename `logging.py` to `log.py` to avoid shadowing the stdlib `logging` module
+
+### Dependencies
+- Bump `lattifai-captions` to >=0.4.11 (preserves explicit speaker prefix on consecutive VTT cues)
+
+
 ## [1.5.6] - 2026-04-18
 
 ### Features
