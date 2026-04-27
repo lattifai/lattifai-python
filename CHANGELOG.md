@@ -1,6 +1,21 @@
 # CHANGELOG
 
 
+## [1.5.9] - 2026-04-28
+
+### Features
+- Expose `split_sentence` threshold via `CaptionInputConfig.split_threshold`. `LatticeTokenizer.split_sentences` now accepts an explicit `threshold` kwarg, and `AlignmentClient` plumbs `caption.input.split_threshold` through both supervision-level and transcription-segment paths. CLI usage: `lai alignment align ... caption.input.split_sentence=true caption.input.split_threshold=0.10`.
+
+### Refactor
+- Restore `CaptionInputConfig.split_threshold` default to `0.35` (matching `lattifai-captions` library default). An empirical sweep (0.15-0.50) showed `0.20` produced 9 short fragments (filler-only "Um"/"uh", repair-onsets) vs 5 at `0.35`, with identical long-segment subdivision; the extra cuts at `0.20` are uniformly junk and will be addressed by a dedicated post-merge pass instead.
+
+### Tests
+- Skip `test_gemini_transcribe_numpy_mono` / `_batch` on transient `503 UNAVAILABLE` from Gemini API ("high demand, spikes are usually temporary"). Real assertion failures and other API errors still propagate. Mirrors the existing 503-skip pattern in `tests/mixin/test_transcribe_save.py`.
+
+### Dependencies
+- Bump `lattifai-captions` to `>=0.4.14` (preserves SRT inline override tags when whitespace collapses on read; UTF-8 file I/O fixes; one-shot ASS style presets aligned to short-video editor visuals).
+
+
 ## [1.5.8] - 2026-04-26
 
 ### Features

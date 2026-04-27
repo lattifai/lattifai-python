@@ -1,3 +1,34 @@
+# Release Notes - LattifAI Python v1.5.9
+
+**Release Date:** April 28, 2026
+
+---
+
+## Overview
+
+v1.5.9 exposes the sentence-splitting threshold to alignment users, refines the default to match a wider empirical sweep, and bumps `lattifai-captions` to `0.4.14` for SRT inline-tag and UTF-8 fixes.
+
+### Key Changes
+- **`split_threshold` is now a first-class knob**: `CaptionInputConfig.split_threshold` flows through `LatticeTokenizer.split_sentences` and `AlignmentClient` for both supervision-level and transcription-segment paths. Default stays at `0.35` after a 0.15-0.50 sweep showed lower values fragment fillers ("um", "you know") and self-repairs into junk cues without improving long-segment subdivision.
+- **CLI usage**:
+  ```bash
+  lai alignment align ... \
+    caption.input.split_sentence=true \
+    caption.input.split_threshold=0.10
+  ```
+- **`lattifai-captions` >= 0.4.14**: SRT readers now preserve inline override tags when whitespace collapses; UTF-8 encoding is honored on file I/O; ships one-shot ASS style presets aligned to short-video editor visuals.
+- **Test resilience**: `test_gemini_transcribe_numpy_mono` / `_batch` skip cleanly on transient Gemini `503 UNAVAILABLE` instead of failing the whole release suite.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.2
 
 **Release Date:** April 8, 2026

@@ -3147,7 +3147,7 @@ wheels = [
 
 [[package]]
 name = "lattifai"
-version = "1.5.8"
+version = "1.5.9"
 source = { editable = "." }
 dependencies = [
     { name = "av" },
@@ -3221,7 +3221,7 @@ requires-dist = [
     { name = "lattifai", extras = ["transcription"], marker = "extra == 'all'" },
     { name = "lattifai", extras = ["translation"], marker = "extra == 'all'" },
     { name = "lattifai-auth", specifier = ">=0.2.1" },
-    { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.4.11" },
+    { name = "lattifai-captions", extras = ["splitting"], specifier = ">=0.4.14" },
     { name = "lattifai-core", specifier = ">=0.7.5" },
     { name = "lattifai-core", extras = ["diarization"], marker = "extra == 'diarization'", specifier = ">=0.7.5" },
     { name = "lattifai-core", extras = ["event"], marker = "extra == 'event'", specifier = ">=0.7.5" },
@@ -3271,7 +3271,7 @@ wheels = [
 
 [[package]]
 name = "lattifai-captions"
-version = "0.4.11"
+version = "0.4.14"
 source = { registry = "https://lattifai.github.io/pypi/simple/" }
 dependencies = [
     { name = "lingua-language-detector", version = "2.1.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12' or (extra == 'extra-8-lattifai-all' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-diarization' and extra == 'extra-8-lattifai-mlx') or (extra == 'extra-8-lattifai-mlx' and extra == 'extra-8-lattifai-transcription')" },
@@ -3280,9 +3280,9 @@ dependencies = [
     { name = "pysubs2" },
     { name = "tgt" },
 ]
-sdist = { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.11.tar.gz" }
+sdist = { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.14.tar.gz" }
 wheels = [
-    { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.11-py3-none-any.whl" },
+    { url = "https://lattifai.github.io/pypi/wheels/lattifai_captions-0.4.14-py3-none-any.whl" },
 ]
 
 [package.optional-dependencies]
