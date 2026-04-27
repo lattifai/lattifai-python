@@ -38,14 +38,14 @@ def _supervisions():
 class TestSplitSentencesThresholdPassthrough:
     """Threshold flows from caller into the underlying SentenceSplitter."""
 
-    def test_default_threshold_is_0_20(self, tokenizer_with_mock_splitter):
-        """When no threshold is given, tokenizer uses 0.20 (spoken-content tuned)."""
+    def test_default_threshold_is_0_35(self, tokenizer_with_mock_splitter):
+        """When no threshold is given, tokenizer uses 0.35 (library default)."""
         tok, mock_splitter = tokenizer_with_mock_splitter
         tok.split_sentences(_supervisions())
 
         mock_splitter.split_sentences.assert_called_once()
         kwargs = mock_splitter.split_sentences.call_args.kwargs
-        assert kwargs["threshold"] == 0.20
+        assert kwargs["threshold"] == 0.35
 
     def test_custom_threshold_is_passed_through(self, tokenizer_with_mock_splitter):
         """Explicit threshold value reaches SentenceSplitter unchanged."""
@@ -55,13 +55,13 @@ class TestSplitSentencesThresholdPassthrough:
         kwargs = mock_splitter.split_sentences.call_args.kwargs
         assert kwargs["threshold"] == 0.10
 
-    def test_youtube_threshold_0_35_is_supported(self, tokenizer_with_mock_splitter):
-        """Conservative YouTube-tuned 0.35 must remain selectable."""
+    def test_aggressive_threshold_0_20_is_supported(self, tokenizer_with_mock_splitter):
+        """More aggressive 0.20 must remain selectable for dense monologues."""
         tok, mock_splitter = tokenizer_with_mock_splitter
-        tok.split_sentences(_supervisions(), threshold=0.35)
+        tok.split_sentences(_supervisions(), threshold=0.20)
 
         kwargs = mock_splitter.split_sentences.call_args.kwargs
-        assert kwargs["threshold"] == 0.35
+        assert kwargs["threshold"] == 0.20
 
     def test_strip_whitespace_still_passed(self, tokenizer_with_mock_splitter):
         """Existing strip_whitespace kwarg must still flow through."""

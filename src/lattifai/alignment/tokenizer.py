@@ -273,7 +273,7 @@ class LatticeTokenizer:
         self,
         supervisions: List[Supervision],
         strip_whitespace: bool = True,
-        threshold: float = 0.20,
+        threshold: float = 0.35,
     ) -> List[Supervision]:
         """Split supervisions into sentences using the sentence splitter.
 
@@ -283,8 +283,9 @@ class LatticeTokenizer:
             supervisions: Input supervisions to split.
             strip_whitespace: Strip whitespace around split sentences.
             threshold: wtpsplit segmentation threshold. Lower = more cuts.
-                Default 0.20 is tuned for spoken content (podcasts, interviews);
-                use 0.35 for YouTube-style written captions. See
+                Default 0.35 matches the upstream lattifai-captions library
+                and is the empirically validated sweet spot for both
+                ASR-derived and rolling-caption inputs. See
                 ``CaptionInputConfig.split_threshold`` for guidance.
         """
         self.init_sentence_splitter()

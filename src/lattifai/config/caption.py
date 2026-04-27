@@ -49,23 +49,23 @@ class CaptionInputConfig:
     split_sentence: bool = False
     """Re-segment captions intelligently based on punctuation and semantics."""
 
-    split_threshold: float = 0.20
+    split_threshold: float = 0.35
     """wtpsplit segmentation threshold for ``split_sentence``.
 
-    Lower values yield more cuts (more aggressive). 0.20 is tuned for
-    real-world transcripts where filler words ("um", "you know") and
-    self-repairs fuse multiple semantic sentences into a single cue —
-    this covers ASR output, rolling-caption YouTube subtitles, podcast
-    transcripts, interviews, and lectures.
+    Lower values yield more cuts (more aggressive). The default 0.35
+    matches the upstream ``lattifai-captions`` library and was empirically
+    confirmed to dominate the previous 0.20 default on a representative
+    podcast clip: same long-segment subdivision (max ~31s vs ~30s) with
+    fewer junk cuts (5 vs 9 short fragments under 15 chars). Use 0.20
+    only when you genuinely want more aggressive cutting on dense
+    monologue content; values below 0.15 fragment fillers ("um", "now",
+    "you know") into sub-second standalone cues.
 
     Recommended ranges:
-        0.20 (default): spoken / ASR-derived transcripts (the common case)
-        0.35:           input already has clean sentence boundaries (e.g.
-                        proofread bilingual subs) and you only want to
-                        sub-divide the longest cues
-        0.10:           experimental aggressive cutting — may fragment
-                        fillers like "um", "now", "you know" into
-                        sub-second standalone cues
+        0.35 (default): general spoken / ASR / rolling-caption input
+        0.20:           more aggressive cutting; useful for dense monologues
+                        where 0.35 leaves overly long supervisions
+        0.10:           experimental — typically over-fragments fillers
     """
 
     def __post_init__(self):
