@@ -49,6 +49,25 @@ class CaptionInputConfig:
     split_sentence: bool = False
     """Re-segment captions intelligently based on punctuation and semantics."""
 
+    split_threshold: float = 0.20
+    """wtpsplit segmentation threshold for ``split_sentence``.
+
+    Lower values yield more cuts (more aggressive). 0.20 is tuned for
+    real-world transcripts where filler words ("um", "you know") and
+    self-repairs fuse multiple semantic sentences into a single cue —
+    this covers ASR output, rolling-caption YouTube subtitles, podcast
+    transcripts, interviews, and lectures.
+
+    Recommended ranges:
+        0.20 (default): spoken / ASR-derived transcripts (the common case)
+        0.35:           input already has clean sentence boundaries (e.g.
+                        proofread bilingual subs) and you only want to
+                        sub-divide the longest cues
+        0.10:           experimental aggressive cutting — may fragment
+                        fillers like "um", "now", "you know" into
+                        sub-second standalone cues
+    """
+
     def __post_init__(self):
         """Validate input configuration."""
         self._normalize_path()

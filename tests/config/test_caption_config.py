@@ -121,6 +121,7 @@ class TestCaptionConfigDefaults:
         assert config.render.include_speaker_in_text is True
         assert config.input.normalize_text is True
         assert config.input.split_sentence is False
+        assert config.input.split_threshold == 0.20
         assert config.render.word_level is None  # tri-state: None=per-format default
         assert config.input.encoding == "utf-8"
 
@@ -150,6 +151,16 @@ class TestCaptionConfigDefaults:
         assert config.output.format == "json"
         assert config.input.normalize_text is True
         assert config.render.word_level is True
+
+    def test_split_threshold_override(self):
+        """Custom split_threshold should override the 0.20 default."""
+        # Aggressive cutting for experimental use.
+        c1 = CaptionInputConfig(split_sentence=True, split_threshold=0.10)
+        assert c1.split_threshold == 0.10
+
+        # Restore the conservative YouTube-tuned value.
+        c2 = CaptionInputConfig(split_sentence=True, split_threshold=0.35)
+        assert c2.split_threshold == 0.35
 
 
 class TestCaptionConfigStructure:

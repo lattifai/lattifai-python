@@ -269,13 +269,30 @@ class LatticeTokenizer:
 
         return {}
 
-    def split_sentences(self, supervisions: List[Supervision], strip_whitespace=True) -> List[Supervision]:
+    def split_sentences(
+        self,
+        supervisions: List[Supervision],
+        strip_whitespace: bool = True,
+        threshold: float = 0.20,
+    ) -> List[Supervision]:
         """Split supervisions into sentences using the sentence splitter.
 
         Careful about speaker changes.
+
+        Args:
+            supervisions: Input supervisions to split.
+            strip_whitespace: Strip whitespace around split sentences.
+            threshold: wtpsplit segmentation threshold. Lower = more cuts.
+                Default 0.20 is tuned for spoken content (podcasts, interviews);
+                use 0.35 for YouTube-style written captions. See
+                ``CaptionInputConfig.split_threshold`` for guidance.
         """
         self.init_sentence_splitter()
-        return self.sentence_splitter.split_sentences(supervisions, strip_whitespace=strip_whitespace)
+        return self.sentence_splitter.split_sentences(
+            supervisions,
+            strip_whitespace=strip_whitespace,
+            threshold=threshold,
+        )
 
     def _get_client_info(self) -> Dict[str, Optional[str]]:
         """Get client identification info for usage tracking."""

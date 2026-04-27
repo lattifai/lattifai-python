@@ -255,7 +255,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         raise ValueError("Transcription is empty after transcription step.")
 
                     if split_sentence or self.caption_config.split_sentence:
-                        caption.supervisions = self.aligner.tokenizer.split_sentences(caption.supervisions)
+                        caption.supervisions = self.aligner.tokenizer.split_sentences(
+                            caption.supervisions,
+                            threshold=self.caption_config.input.split_threshold,
+                        )
 
                     matches = align_supervisions_and_transcription(
                         caption, max_duration=media_audio.duration, verbose=True
@@ -266,7 +269,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     segments = [(m[3].start[1], m[3].end[1], m, skipalign) for m in matches]
                     for segment in segments:
                         # transcription segments -> sentence splitting
-                        segment[2][1] = self.aligner.tokenizer.split_sentences(segment[2][1])
+                        segment[2][1] = self.aligner.tokenizer.split_sentences(
+                            segment[2][1],
+                            threshold=self.caption_config.input.split_threshold,
+                        )
                 else:
                     if caption.transcription:
                         if "gemini" in self.transcriber.name.lower():
