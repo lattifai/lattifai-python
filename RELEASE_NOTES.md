@@ -1,3 +1,28 @@
+# Release Notes - LattifAI Python v1.5.10
+
+**Release Date:** April 28, 2026
+
+---
+
+## Overview
+
+v1.5.10 hardens summarization against transient Gemini failures. v1.5.9's Release Tests run hit two flaky failures — a malformed-JSON parse error from `summarize` and an `httpx.RemoteProtocolError` mid-`transcribe_numpy` — both Gemini-side infra blips, neither a real regression. This patch fixes both at the source.
+
+### Key Changes
+- **Summarizer retries once on malformed JSON**: `ContentSummarizer._call_llm` now catches `json.JSONDecodeError`, logs a warning, and re-samples the LLM once. Recovers from truncated / missing-delimiter outputs that `json-repair` cannot fix. Non-JSON errors (e.g. wrong return type) still surface immediately without retry.
+- **Broader test-side skip for Gemini infra failures**: The release test helper now treats `httpx.RemoteProtocolError`, `ConnectError`, `ReadError`, "Server disconnected" and the existing `503 UNAVAILABLE` as the same flaky-infrastructure class, applied to both transcription and summarization integration tests.
+- **New retry-path coverage**: `tests/summarization/test_call_llm_retry.py` pins down the contract — success on second attempt, propagation after two failures, no retry on `RuntimeError`.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.9
 
 **Release Date:** April 28, 2026

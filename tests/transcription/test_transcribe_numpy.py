@@ -26,20 +26,32 @@ if _has_nemo:
 requires_nemo = pytest.mark.skipif(not _has_nemo, reason="requires [transcription] extra (nemo)")
 
 
-def _skip_on_gemini_503(call):
-    """Invoke a Gemini-bound call and skip the test on transient 503 UNAVAILABLE.
+def _skip_on_gemini_flaky(call):
+    """Invoke a Gemini-bound call and skip the test on transient infra failures.
 
-    Gemini routinely returns 503 under demand spikes ("high demand", "Spikes in
-    demand are usually temporary"). Treat that as flaky infrastructure rather
-    than a real test failure, so a service blip doesn't block release CI.
-    Real assertion failures and other API errors still propagate.
+    Gemini routinely returns:
+      - ``503 UNAVAILABLE`` ("high demand", "Spikes in demand are usually temporary")
+      - ``httpx.RemoteProtocolError: Server disconnected without sending a response``
+      - Other ``ConnectError`` / ``ReadError`` style transport hiccups
+
+    Treat these as flaky infrastructure rather than real test failures, so a
+    service blip doesn't block release CI. Real assertion failures and
+    non-transient API errors still propagate.
     """
     try:
         return call()
     except Exception as exc:
         msg = str(exc)
-        if "503" in msg and ("UNAVAILABLE" in msg or "high demand" in msg.lower()):
-            pytest.skip(f"Gemini service unavailable: {exc}")
+        exc_name = type(exc).__name__
+        is_503 = "503" in msg and ("UNAVAILABLE" in msg or "high demand" in msg.lower())
+        is_disconnect = (
+            "RemoteProtocolError" in exc_name
+            or "Server disconnected" in msg
+            or "ConnectError" in exc_name
+            or "ReadError" in exc_name
+        )
+        if is_503 or is_disconnect:
+            pytest.skip(f"Gemini transient failure ({exc_name}): {exc}")
         raise
 
 
@@ -129,7 +141,7 @@ def test_gemini_transcribe_numpy_mono(sample_audio):
     config = TranscriptionConfig(model_name="gemini-3.1-pro-preview", gemini_api_key=api_key)
     transcriber = create_transcriber(config)
 
-    supervision = _skip_on_gemini_503(lambda: transcriber.transcribe_numpy(sample_audio, language="en"))
+    supervision = _skip_on_gemini_flaky(lambda: transcriber.transcribe_numpy(sample_audio, language="en"))
 
     assert isinstance(supervision, Supervision)
     assert supervision.text is not None
@@ -148,7 +160,7 @@ def test_gemini_transcribe_numpy_batch(audio_list):
     config = TranscriptionConfig(model_name="gemini-3.1-pro-preview", gemini_api_key=api_key)
     transcriber = create_transcriber(config)
 
-    supervisions = _skip_on_gemini_503(lambda: transcriber.transcribe_numpy(audio_list, language="en"))
+    supervisions = _skip_on_gemini_flaky(lambda: transcriber.transcribe_numpy(audio_list, language="en"))
 
     assert isinstance(supervisions, list)
     assert len(supervisions) == len(audio_list)

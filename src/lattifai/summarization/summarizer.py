@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -219,15 +220,32 @@ class ContentSummarizer:
     # ------------------------------------------------------------------
 
     async def _call_llm(self, prompt: str) -> dict[str, Any]:
-        """Call the LLM and return the parsed JSON dict."""
-        data = await self._client.generate_json(
-            prompt,
-            system=SYSTEM_PROMPT,
-            temperature=self._config.temperature,
-        )
-        if not isinstance(data, dict):
-            raise RuntimeError(f"Expected dict from LLM, got {type(data).__name__}")
-        return data
+        """Call the LLM and return the parsed JSON dict.
+
+        Retries once on ``json.JSONDecodeError``. Gemini occasionally returns
+        malformed JSON (truncated, missing delimiters) that even ``json-repair``
+        cannot recover; a fresh sampling pass usually succeeds.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                data = await self._client.generate_json(
+                    prompt,
+                    system=SYSTEM_PROMPT,
+                    temperature=self._config.temperature,
+                )
+                if not isinstance(data, dict):
+                    raise RuntimeError(f"Expected dict from LLM, got {type(data).__name__}")
+                return data
+            except json.JSONDecodeError as exc:
+                last_exc = exc
+                if attempt == 0:
+                    logger.warning("LLM returned malformed JSON (%s); retrying once.", exc)
+                    continue
+                raise
+        # Unreachable — loop either returns or re-raises on the second attempt.
+        assert last_exc is not None
+        raise last_exc
 
     # ------------------------------------------------------------------
     # Chunking

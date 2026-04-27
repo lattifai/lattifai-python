@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## [1.5.10] - 2026-04-28
+
+### Fixes
+- `ContentSummarizer._call_llm` now retries once on `json.JSONDecodeError`. Gemini occasionally returns malformed JSON (truncated, missing delimiters) that even `json-repair` cannot recover; a second sampling pass usually succeeds. Fixes intermittent `test_disable_flag_allows_drift` failures in Release Tests.
+
+### Tests
+- Extend the Gemini "transient infra failure" skip helper to also cover `httpx.RemoteProtocolError: Server disconnected without sending a response` and other transport-layer hiccups (`ConnectError`, `ReadError`). Renamed `_skip_on_gemini_503` → `_skip_on_gemini_flaky`.
+- Apply the same skip helper to `TestHonorMetaChaptersIntegration` so a Gemini service blip during `summarize` does not block release CI.
+- Add `tests/summarization/test_call_llm_retry.py` covering the new retry path (success on second attempt, propagation after two failures, no retry on non-JSON `RuntimeError`).
+
+
 ## [1.5.9] - 2026-04-28
 
 ### Features

@@ -36,6 +36,35 @@ from lattifai.summarization.schema import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
+def _skip_on_gemini_flaky(call):
+    """Run *call* and skip the test on transient Gemini infra failures.
+
+    Catches:
+      - ``503 UNAVAILABLE`` ("high demand", "Spikes in demand are temporary")
+      - ``httpx.RemoteProtocolError`` ("Server disconnected without sending a response")
+      - ``ConnectError`` / ``ReadError`` style transport hiccups
+
+    Real assertion failures and non-transient API errors still propagate.
+    Mirrors the same helper in ``tests/transcription/test_transcribe_numpy.py``.
+    """
+    try:
+        return call()
+    except Exception as exc:
+        msg = str(exc)
+        exc_name = type(exc).__name__
+        is_503 = "503" in msg and ("UNAVAILABLE" in msg or "high demand" in msg.lower())
+        is_disconnect = (
+            "RemoteProtocolError" in exc_name
+            or "Server disconnected" in msg
+            or "ConnectError" in exc_name
+            or "ReadError" in exc_name
+        )
+        if is_503 or is_disconnect:
+            pytest.skip(f"Gemini transient failure ({exc_name}): {exc}")
+        raise
+
+
 META_CHAPTERS = [
     {"title": "Intro", "start": 0.0},
     {"title": "Topic A", "start": 60.0},
@@ -373,7 +402,7 @@ class TestHonorMetaChaptersIntegration:
             source_type="captions",
             source_lang="en",
         )
-        result = asyncio.run(summariser.summarize(si))
+        result = _skip_on_gemini_flaky(lambda: asyncio.run(summariser.summarize(si)))
         # Locked: count + titles + starts match meta exactly
         assert len(result.chapters) == len(meta)
         assert [c.title for c in result.chapters] == [m["title"] for m in meta]
@@ -387,7 +416,7 @@ class TestHonorMetaChaptersIntegration:
             source_type="captions",
             source_lang="en",
         )
-        result = asyncio.run(summariser.summarize(si))
+        result = _skip_on_gemini_flaky(lambda: asyncio.run(summariser.summarize(si)))
         # No lock → LLM picks its own count. Just assert it produced something.
         assert len(result.chapters) >= 1
         assert "chapters_locked" not in result.metadata
@@ -407,7 +436,7 @@ class TestHonorMetaChaptersIntegration:
             source_type="captions",
             source_lang="en",
         )
-        result = asyncio.run(s.summarize(si))
+        result = _skip_on_gemini_flaky(lambda: asyncio.run(s.summarize(si)))
         # No lock metadata present — drift is allowed
         assert "chapters_locked" not in result.metadata
 
