@@ -118,7 +118,11 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
             channel,
             re.IGNORECASE,
         ):
-            _add("host", channel)
+            # Validate looks like a person name to reject descriptive channel
+            # names that don't trigger the show-keyword blacklist (e.g.
+            # "The Diary Of A CEO", "Apolas").
+            if _looks_like_person_name(channel):
+                _add("host", channel)
         else:
             # Strip common sub-channel suffixes to recover host name
             # e.g. "Dwarkesh Clips" → "Dwarkesh", "Lex Fridman Clips" → "Lex Fridman"

@@ -87,6 +87,23 @@ class TestExtractCandidateNames:
         result = extract_candidate_names(ctx)
         assert "host" not in result
 
+    def test_channel_rejected_descriptive_name(self):
+        """Descriptive channel names that look like phrases, not person names,
+        should be rejected even without a show-keyword suffix.
+
+        Regression for TheDiaryOfACEO case where "The Diary Of A CEO" was
+        incorrectly assigned as the host name (the actual host is Steven Bartlett).
+        """
+        ctx = "Channel/Host: The Diary Of A CEO\n"
+        result = extract_candidate_names(ctx)
+        assert "host" not in result
+
+    def test_channel_single_word_rejected(self):
+        """Single-word channel handles (not a real person name) should be rejected."""
+        ctx = "Channel/Host: Apolas\n"
+        result = extract_candidate_names(ctx)
+        assert "host" not in result
+
     def test_title_guest_dash(self):
         ctx = "Title: Li Si — Deep Learning Advances\n"
         result = extract_candidate_names(ctx)
@@ -244,8 +261,10 @@ class TestSpeakerNameInferrer:
 
     def test_prompt_with_candidates(self, speaker_texts):
         """When candidates exist, prompt should mention 'candidate list'."""
-        context = "Channel/Host: Alice\nTitle: Bob — Topic\n"
-        llm = FakeLLMClient([{"SPEAKER_00": "Alice", "SPEAKER_01": "Bob"}])
+        # Use multi-word names so both Channel/Host and Title pass
+        # _looks_like_person_name (single-word handles are rejected).
+        context = "Channel/Host: Alice Smith\nTitle: Bob Jones — Topic\n"
+        llm = FakeLLMClient([{"SPEAKER_00": "Alice Smith", "SPEAKER_01": "Bob Jones"}])
         inferrer = SpeakerNameInferrer(llm_client=llm)
         inferrer(speaker_texts, context=context)
         assert "candidate list" in llm.prompts[0]
