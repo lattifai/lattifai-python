@@ -3,9 +3,11 @@ YouTube client for metadata extraction and media download using yt-dlp
 """
 
 import asyncio
+import atexit
 import logging
 import os
 import re
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -551,6 +553,121 @@ class YouTubeDownloader:
 
         self.logger = setup_workflow_logger("youtube")
         self.logger.info(f"yt-dlp version: {yt_dlp.version.__version__}")
+        # Pre-built auth/proxy opts merged into every YoutubeDL call below.
+        # Without this, lai youtube download bypasses cookies/proxy and gets
+        # bot-walled on Sign-in-to-confirm prompts (YoutubeLoader had this
+        # logic; YouTubeDownloader did not — fixed here).
+        self._auth_opts: Dict[str, Any] = self._load_auth_opts()
+
+    # Default cookie-file locations checked when no env var is set. Order
+    # matters: first hit wins. ~/.lattifai/cookies.txt is the canonical path
+    # advertised in our docs; the other entries cover users who picked
+    # nearby spelling conventions.
+    _DEFAULT_COOKIE_PATHS = (
+        "~/.lattifai/cookies.txt",
+        "~/.lattifai/youtube-cookies.txt",
+        "~/.config/lattifai/cookies.txt",
+    )
+
+    @staticmethod
+    def _make_throwaway_cookie_copy(src: Path) -> str:
+        """Copy the user's cookie file to a per-process tempfile and return
+        its path. The tempfile is auto-deleted at interpreter exit.
+
+        yt-dlp will write its post-run cookie state back into whatever path
+        we pass via `cookiefile`. Passing the original file makes yt-dlp
+        truncate it to a useless subset on the very first run. Throw it the
+        copy instead — the original on disk stays exactly as the user
+        exported it.
+        """
+        # mkstemp returns (fd, path). We close the fd immediately; shutil
+        # will reopen for writing.
+        fd, tmp_path = tempfile.mkstemp(
+            prefix=f"lai-yt-cookies-{os.getpid()}-",
+            suffix=".txt",
+        )
+        os.close(fd)
+        shutil.copyfile(src, tmp_path)
+        atexit.register(lambda p=tmp_path: Path(p).unlink(missing_ok=True))
+        return tmp_path
+
+    # Player clients known to return real (non-SABR, non-storyboard-only) formats
+    # while still respecting cookie auth, as of 2026-05. yt-dlp's default chain
+    # is biased toward web_safari → YouTube forces SABR streaming there and all
+    # https formats get URL-stripped (yt-dlp issue #12482). mweb avoids SABR.
+    # Override via YOUTUBE_PLAYER_CLIENT="mweb,tv_simply" if YouTube tightens
+    # something or this list goes stale.
+    _DEFAULT_PLAYER_CLIENTS = "mweb"
+
+    def _load_auth_opts(self) -> Dict[str, Any]:
+        """Load yt-dlp cookie/proxy/player_client options from environment.
+
+        Cookie source resolution (first match wins):
+            1. YOUTUBE_COOKIE_FILE env       -- explicit path to cookies.txt
+            2. YOUTUBE_COOKIE_BROWSER env    -- browser name ("chrome", ...)
+            3. ~/.lattifai/cookies.txt       -- auto-detected if present
+               (and the other paths in _DEFAULT_COOKIE_PATHS)
+
+        Proxy: YOUTUBE_PROXY env ("http://..." or "socks5://...").
+        Player client: YOUTUBE_PLAYER_CLIENT env (csv list); default "mweb".
+
+        Browser cookies are preferred over file cookies WHEN BOTH ENVS are
+        set, but the auto-detected file path is only used as a fallback when
+        neither env is set — explicit configuration always wins.
+        """
+        opts: Dict[str, Any] = {}
+
+        cookies = os.getenv("YOUTUBE_COOKIE_FILE") or os.getenv("YOUTUBE_COOKIE_BROWSER")
+        # Fallback: scan well-known cookie file locations only when neither
+        # env was set. Logging stays quiet on the "no match" path so we don't
+        # noise up runs that legitimately don't need auth.
+        if not cookies:
+            for candidate in self._DEFAULT_COOKIE_PATHS:
+                candidate_path = Path(candidate).expanduser()
+                if candidate_path.exists():
+                    cookies = str(candidate_path)
+                    self.logger.info(f"🍪 Auto-detected cookie file: {candidate_path}")
+                    break
+
+        if cookies:
+            browser_names = ["chrome", "firefox", "safari", "edge", "opera", "brave"]
+            if cookies.lower() in browser_names:
+                opts["cookiesfrombrowser"] = (cookies.lower(),)
+                self.logger.info(f"🍪 Using cookies from browser: {cookies}")
+            else:
+                cookie_path = Path(cookies).expanduser()
+                if cookie_path.exists():
+                    # yt-dlp treats `cookiefile` as read-write: at end-of-run it
+                    # calls cookiejar.save() which truncates the file back to
+                    # only the cookies it actually touched in this session —
+                    # losing SAPISID / SID / HSID / __Secure-1PSID etc. The
+                    # next run then hits the bot-confirm wall. Hand yt-dlp a
+                    # private throwaway copy so the user's original stays
+                    # intact across runs.
+                    opts["cookiefile"] = self._make_throwaway_cookie_copy(cookie_path)
+                    # Only log when env-driven; auto-detect already logged above.
+                    if os.getenv("YOUTUBE_COOKIE_FILE"):
+                        self.logger.info(f"🍪 Using cookie file: {cookie_path}")
+                else:
+                    self.logger.warning(f"⚠️ Cookie file not found: {cookie_path}")
+        proxy = os.getenv("YOUTUBE_PROXY")
+        if proxy:
+            opts["proxy"] = proxy
+            self.logger.info(f"🌐 Using proxy: {proxy}")
+
+        # Force a non-SABR player client. Without this yt-dlp defaults to
+        # web_safari which YouTube serves with SABR-only streams (no URLs),
+        # and every download fails with "Requested format is not available".
+        # Requires the bgutil-ytdlp-pot-provider plugin to be running for
+        # PO Token generation; without it mweb still gets bot-walled. Also
+        # requires a JS runtime (e.g. deno) for n-signature solving.
+        player_clients = os.getenv("YOUTUBE_PLAYER_CLIENT", self._DEFAULT_PLAYER_CLIENTS)
+        player_client_list = [s.strip() for s in player_clients.split(",") if s.strip()]
+        if player_client_list:
+            opts["extractor_args"] = {"youtube": {"player_client": player_client_list}}
+            self.logger.info(f"🎬 player_client: {','.join(player_client_list)}")
+
+        return opts
 
     def _normalize_audio_quality(self, quality: str) -> str:
         """
@@ -749,7 +866,7 @@ class YouTubeDownloader:
             loop = asyncio.get_event_loop()
 
             def _extract_info():
-                with yt_dlp.YoutubeDL(opts) as ydl:
+                with yt_dlp.YoutubeDL({**self._auth_opts, **opts}) as ydl:
                     return ydl.extract_info(url, download=False)
 
             metadata = await loop.run_in_executor(None, _extract_info)
@@ -795,7 +912,7 @@ class YouTubeDownloader:
                 "extract_flat": True,
                 "playlist_items": "0",
             }
-            with yt_dlp.YoutubeDL(opts) as ydl:
+            with yt_dlp.YoutubeDL({**self._auth_opts, **opts}) as ydl:
                 return ydl.extract_info(channel_url, download=False)
 
         try:
@@ -1126,7 +1243,7 @@ class YouTubeDownloader:
             loop = asyncio.get_event_loop()
 
             def _download():
-                with yt_dlp.YoutubeDL(opts) as ydl:
+                with yt_dlp.YoutubeDL({**self._auth_opts, **opts}) as ydl:
                     ydl.download([url])
 
             await loop.run_in_executor(None, _download)
@@ -2577,7 +2694,7 @@ class YouTubeDownloader:
             loop = asyncio.get_event_loop()
 
             def _download_subs():
-                with yt_dlp.YoutubeDL(opts) as ydl:
+                with yt_dlp.YoutubeDL({**self._auth_opts, **opts}) as ydl:
                     ydl.download([url])
 
             await loop.run_in_executor(None, _download_subs)
@@ -2680,7 +2797,7 @@ class YouTubeDownloader:
             loop = asyncio.get_event_loop()
 
             def _get_info():
-                with yt_dlp.YoutubeDL(opts) as ydl:
+                with yt_dlp.YoutubeDL({**self._auth_opts, **opts}) as ydl:
                     return ydl.extract_info(url, download=False)
 
             info = await loop.run_in_executor(None, _get_info)
