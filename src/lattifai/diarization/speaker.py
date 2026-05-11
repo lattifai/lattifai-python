@@ -52,6 +52,187 @@ _TITLE_ONLY_RE = re.compile(
 )
 
 
+# Role-keyword bank — drives both "which role bucket does this candidate map to"
+# and "what does this role typically say in a transcript". When a guest's role
+# string contains any of the bucket keys, the corresponding signal phrases are
+# used to mine role-revealing samples from that guest's speech, surfaced to the
+# LLM as deterministic evidence. This sidesteps long-context dilution and
+# ordering bias.
+_ROLE_KEYWORDS: Dict[str, List[str]] = {
+    "engineering": [
+        "engineering",
+        "engineer",
+        "infra",
+        "infrastructure",
+        "code",
+        "codebase",
+        "system",
+        "architecture",
+        "stack",
+        "deploy",
+        "build",
+        "review the pr",
+        "reviewing the pr",
+        "pr review",
+        "approve the pr",
+        "merge",
+        "scaling",
+        "latency",
+        "ops",
+        "uptime",
+        "reliability",
+    ],
+    "product": [
+        "product",
+        "users",
+        "user-facing",
+        "customer",
+        "customers",
+        "roadmap",
+        "prioritize",
+        "feature",
+        "release",
+        "ship",
+        "go-to-market",
+        "gtm",
+        "pricing",
+        "positioning",
+        "segment",
+        "use case",
+        "user research",
+    ],
+    "research": [
+        "research",
+        "experiment",
+        "paper",
+        "model training",
+        "training",
+        "rlhf",
+        "eval",
+        "scaling laws",
+        "ablation",
+        "benchmark",
+    ],
+    "design": [
+        "design",
+        "designer",
+        "ux",
+        "ui",
+        "user experience",
+        "wireframe",
+        "mock",
+        "prototype",
+    ],
+    "sales": [
+        "sales",
+        "deal",
+        "pipeline",
+        "enterprise",
+        "account",
+        "quota",
+        "rep",
+        "outbound",
+    ],
+    "marketing": [
+        "marketing",
+        "campaign",
+        "brand",
+        "comms",
+        "pr team",
+        "press",
+        "social",
+        "growth marketing",
+    ],
+    "ceo": [
+        "fundrais",
+        "board",
+        "investor",
+        "strategy",
+        "vision",
+        "hiring",
+        "company-wide",
+        "leadership team",
+    ],
+    "legal": [
+        "legal",
+        "compliance",
+        "contract",
+        "policy",
+        "regulation",
+        "regulatory",
+    ],
+}
+
+
+def _role_bucket(role: str) -> Optional[str]:
+    """Map a free-form role string to a keyword bucket via heuristic match.
+
+    Examples:
+      "head of engineering for the Claude platform" → "engineering"
+      "head of product" → "product"
+      "VP of design" → "design"
+    Returns None if no bucket matches confidently.
+    """
+    if not role:
+        return None
+    lower = role.lower()
+    # Prefer the bucket whose own key appears literally in the role string;
+    # this beats keyword-set overlap when the role itself names the function.
+    for bucket in _ROLE_KEYWORDS:
+        if bucket in lower:
+            return bucket
+    # Soft fallback: longest-keyword-overlap. Helps "VP, infrastructure" map
+    # to "engineering" via the "infrastructure" keyword.
+    best = None
+    best_len = 0
+    for bucket, kws in _ROLE_KEYWORDS.items():
+        for kw in kws:
+            if len(kw) > best_len and kw in lower:
+                best = bucket
+                best_len = len(kw)
+    return best
+
+
+def _mine_role_evidence(
+    speaker_texts: Dict[str, List[str]],
+    candidate_roles: Dict[str, str],
+) -> Dict[str, List[tuple]]:
+    """Mine role-revealing utterances from each speaker.
+
+    Returns {speaker_label: [(role_bucket, snippet), ...]} ranked by signal
+    strength. Empty when no candidate has a recognizable role bucket — keeps
+    the prompt clean for non-role-aware episodes.
+    """
+    # Resolve which role buckets are in play for this episode.
+    active_buckets = {bucket for role in candidate_roles.values() if (bucket := _role_bucket(role)) is not None}
+    if not active_buckets:
+        return {}
+
+    evidence: Dict[str, List[tuple]] = {}
+    for speaker, texts in speaker_texts.items():
+        hits: List[tuple] = []
+        for text in texts:
+            lower = text.lower()
+            for bucket in active_buckets:
+                if any(kw in lower for kw in _ROLE_KEYWORDS[bucket]):
+                    hits.append((bucket, text.strip()))
+                    break  # one bucket per snippet to avoid double-counting
+        if hits:
+            # Dedup by (bucket, first 80 chars of snippet) and cap per speaker.
+            seen = set()
+            ranked: List[tuple] = []
+            for b, s in hits:
+                key = (b, s[:80])
+                if key in seen:
+                    continue
+                seen.add(key)
+                ranked.append((b, s))
+                if len(ranked) >= 8:
+                    break
+            evidence[speaker] = ranked
+    return evidence
+
+
 # Words that never start a person name — articles, pronouns, conjunctions, common verbs
 _NON_NAME_STARTERS = frozenset(
     "the a an we he she it they this that how what why when where who which "
@@ -80,20 +261,41 @@ def _looks_like_person_name(text: str) -> bool:
     return True
 
 
-def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
+def extract_candidate_names(context: Optional[str]) -> Dict[str, object]:
     """Extract candidate host/guest names from metadata context.
 
-    Returns {"host": [...], "guest": [...]} with extracted person names.
+    Returns {"host": [name, ...], "guest": [name, ...], "roles": {name: role}}
+    with extracted person names. The "roles" key is optional and only present
+    when descriptive role text (e.g. "head of product") was captured next to
+    a name — it is the crucial signal that lets the LLM disambiguate multiple
+    guests sharing the same conversation.
+
     Focuses on high-precision extraction — avoids titles, roles, or URLs.
     """
     if not context:
         return {}
 
-    candidates: Dict[str, List[str]] = {"host": [], "guest": []}
+    candidates: Dict[str, object] = {"host": [], "guest": [], "roles": {}}
 
-    def _add(key: str, name: str):
+    def _clean_role(role: str) -> str:
+        role = role.strip().rstrip(".,;:").strip()
+        # Drop trailing connective fragments
+        role = re.sub(r"\s+(?:and|or)$", "", role, flags=re.IGNORECASE).strip()
+        # Cap at a reasonable length so we don't paste a whole sentence.
+        return role[:80]
+
+    def _add(key: str, name: str, role: Optional[str] = None):
         name = name.strip().rstrip("。.，,")
         # Remove parenthetical role suffixes: "Name (Title)"
+        # Preserve the parenthetical content as a role hint when no explicit
+        # role was passed in (e.g. "Angela Jiang (head of product)").
+        paren_match = re.search(r"\s*[（(](.+?)[)）]$", name)
+        paren_role: Optional[str] = None
+        if paren_match:
+            paren_text = paren_match.group(1).strip()
+            # Reject pure handle / URL captures
+            if not paren_text.startswith("@") and "/" not in paren_text and not paren_text.startswith("http"):
+                paren_role = paren_text
         name = re.sub(r"\s*[（(].+?[)）]$", "", name).strip()
         # Strip common title prefixes (CJK: no space needed; English: require space after)
         name = re.sub(r"^(?:教授|博士)", "", name).strip()
@@ -106,8 +308,13 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
         # Reject if what remains is purely a role/title (fullmatch, not search)
         if _TITLE_ONLY_RE.fullmatch(name):
             return
-        if name not in candidates[key]:
-            candidates[key].append(name)
+        if name not in candidates[key]:  # type: ignore[operator]
+            candidates[key].append(name)  # type: ignore[union-attr]
+        chosen_role = role if role else paren_role
+        if chosen_role:
+            cleaned = _clean_role(chosen_role)
+            if cleaned and name not in candidates["roles"]:  # type: ignore[operator]
+                candidates["roles"][name] = cleaned  # type: ignore[index]
 
     # 1. Channel/Host name (often the host for interview podcasts)
     m = re.search(r"Channel/Host:\s*(.+?)(?:\n|$)", context)
@@ -192,6 +399,63 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, List[str]]:
             _add("host", h.strip())
         _add("guest", m.group(2).strip())
 
+    # 5. Free-form host/guest intro with optional role: extracts the speakers
+    #    introduced by a host in narrative prose. This covers podcast
+    #    descriptions like:
+    #      "I talk with Angela Jiang (@angjiang), head of product for the
+    #       Claude platform, and Katelyn Lesse (@katelyn_lesse), head of
+    #       engineering for the Claude platform, about ..."
+    #    Captures (name, role) so the LLM can disambiguate multiple guests
+    #    sharing the same conversation. High precision via require:
+    #      - intro verb (talk/chat/interview/sit down with, joined by ...)
+    #      - capitalized two-word name immediately after
+    #      - optional parenthesized handle/role
+    #      - optional role clause delimited by comma / "—" / colon
+    _INTRO_VERB = (
+        r"(?:talk(?:s|ing|ed)?\s+with|interview(?:s|ing|ed)?\s+(?:with\s+)?|"
+        r"joined\s+by|chat(?:s|ting|ted)?\s+with|sit(?:s|ting|s\s+down)?\s+(?:down\s+)?with|"
+        r"sat\s+down\s+with|spoke?\s+with|speak(?:s|ing)?\s+with)"
+    )
+    _NAME_PAREN_ROLE = (
+        r"(?P<name>[A-Z][a-z'\-]+(?:\s+[A-Z][a-z'\-]+){1,3})"
+        r"(?:\s*\([^)]{1,60}\))?"  # optional handle/short paren
+        r"(?:\s*[,，—–:-]\s*(?P<role>[^,，.\n()]{4,80}?))?"  # optional role
+        r"(?=\s*(?:,|，|\.|\n|$|\s+and\s+|\s+about\s+|\s+on\s+))"
+    )
+    for intro in re.finditer(rf"\b{_INTRO_VERB}\s+", context, re.IGNORECASE):
+        tail = context[intro.end() : intro.end() + 400]
+        # 拆 "and" 把多嘉宾分开
+        for chunk in re.split(r"\s+and\s+(?=[A-Z])", tail, flags=re.IGNORECASE):
+            chunk = chunk.lstrip(", \n").rstrip()
+            mm = re.match(_NAME_PAREN_ROLE, chunk)
+            if not mm:
+                continue
+            nm = mm.group("name").strip()
+            role = (mm.group("role") or "").strip()
+            if not _looks_like_person_name(nm):
+                continue
+            _add("guest", nm, role=role or None)
+
+    # 6. Standalone "Name (role)" — fallback when no intro verb matched.
+    #    Restricted to lines NOT containing URLs / handles to avoid catching
+    #    "@danshipper (host of Every)" style noise. Picks up "head of X" /
+    #    "CTO / founder / VP / ..." role hints.
+    if not candidates["guest"] and not candidates["host"]:  # type: ignore[operator]
+        for mm in re.finditer(
+            r"\b(?P<name>[A-Z][a-z'\-]+(?:\s+[A-Z][a-z'\-]+){1,3})"
+            r"\s*[,，]?\s*"
+            r"(?P<role>(?:head|chief|director|vp|cto|ceo|founder|co-?founder|"
+            r"president|engineer|engineering manager|product manager|"
+            r"senior|staff|principal|lead|host|guest)\b[^.,()\n]{0,60})",
+            context,
+            re.IGNORECASE,
+        ):
+            nm = mm.group("name").strip()
+            role = mm.group("role").strip()
+            if _looks_like_person_name(nm):
+                _add("guest", nm, role=role)
+
+    # Drop empty buckets (legacy contract — callers check `if candidates:`)
     return {k: v for k, v in candidates.items() if v}
 
 
@@ -365,14 +629,52 @@ class SpeakerNameInferrer:
         if context:
             parts.append(f"## Context\n{context}\n")
 
-        # Present candidate names prominently
+        # Present candidate names prominently. When `roles` is available,
+        # render each name with its descriptive role on its own line — this is
+        # the strongest signal for disambiguating multiple guests in the same
+        # conversation (e.g. head of product vs head of engineering).
         if candidates:
             parts.append("## Candidate Names (from metadata)\n")
+            roles = candidates.get("roles") or {}
+
+            def _format_entry(name: str) -> str:
+                role = roles.get(name)
+                return f"{name} — {role}" if role else name
+
             if candidates.get("host"):
-                parts.append(f"- Host(s): {', '.join(candidates['host'])}")
+                if any(roles.get(n) for n in candidates["host"]):
+                    parts.append("- Host(s):")
+                    for n in candidates["host"]:
+                        parts.append(f"  - {_format_entry(n)}")
+                else:
+                    parts.append(f"- Host(s): {', '.join(candidates['host'])}")
             if candidates.get("guest"):
-                parts.append(f"- Guest(s): {', '.join(candidates['guest'])}")
+                if any(roles.get(n) for n in candidates["guest"]):
+                    parts.append("- Guest(s):")
+                    for n in candidates["guest"]:
+                        parts.append(f"  - {_format_entry(n)}")
+                else:
+                    parts.append(f"- Guest(s): {', '.join(candidates['guest'])}")
             parts.append("")
+
+            # Role evidence: mine transcript for role-revealing utterances and
+            # surface them per-speaker. This is the deterministic disambiguator
+            # for multi-guest episodes — without it, the LLM tends to assign
+            # guests in the order they appear in the candidate list.
+            evidence = _mine_role_evidence(speaker_texts, roles)
+            if evidence:
+                parts.append("## Role Evidence by Speaker\n")
+                parts.append(
+                    "These transcript samples contain role-specific signals. "
+                    "Use them to match each speaker to the candidate whose "
+                    "role (above) aligns with their evidence:\n"
+                )
+                for speaker in sorted(evidence.keys()):
+                    parts.append(f"### {speaker}")
+                    for bucket, snippet in evidence[speaker]:
+                        display = snippet[:240] + "…" if len(snippet) > 240 else snippet
+                        parts.append(f"- [{bucket}] {display}")
+                    parts.append("")
 
         # Dialogue turns: show conversation flow for turn-taking and cross-references
         if dialogue_turns:
@@ -443,11 +745,27 @@ class SpeakerNameInferrer:
                 'Do NOT use "Host" or "Guest".'
             )
         elif candidates:
-            parts.append(
+            instr = [
                 "Based on the above, return a JSON object mapping ALL speaker labels "
                 "to their real names from the candidate list. "
                 "The host typically asks shorter questions; the guest gives longer answers."
-            )
+            ]
+            # Multi-guest disambiguation: when 2+ guest candidates share the
+            # same conversation, role hints are the only reliable signal.
+            guest_count = len(candidates.get("guest") or [])
+            has_roles = bool(candidates.get("roles"))
+            if guest_count >= 2 and has_roles:
+                instr.append(
+                    "\nIMPORTANT — multiple guests share this conversation. Each "
+                    "guest's role is listed above. Match each guest to the speaker "
+                    "label whose transcript contains role-specific signals: a 'head "
+                    "of engineering' will talk about systems, code, infrastructure, "
+                    "PR reviews; a 'head of product' will talk about users, "
+                    "roadmap, prioritization, customers. Do NOT assign guests based "
+                    "on speaking order or the order they appear in the candidate "
+                    "list — only on substantive role evidence from the transcript."
+                )
+            parts.append("\n".join(instr))
         else:
             parts.append(
                 "Based on the above, return a JSON object mapping ALL speaker labels "
