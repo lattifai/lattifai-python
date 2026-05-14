@@ -36,34 +36,34 @@ classifiers = [
 ]
 
 dependencies = [
-    "python-dotenv",
-    "colorful>=0.5.6",
+    "python-dotenv>=1.2.2",
+    "colorful>=0.5.8",
     "lattifai-run>=1.0.4",
-    "lattifai-core>=0.7.5",
-    "lattifai-captions[splitting]>=0.4.14",
-    "g2p-phonemizer>=0.4.0",
+    "lattifai-core>=0.7.6",
+    "lattifai-captions[splitting]>=0.4.15",
+    "g2p-phonemizer>=0.4.2",
     "error-align-fix>=0.1.4",
     "k2py==0.4.0",
-    "onnxruntime",
-    "soundfile",
-    "av",
-    "msgpack",
-    "google-genai>=1.22.0",
-    "questionary>=2.0",
+    "onnxruntime>=1.26.0",
+    "soundfile>=0.13.1",
+    "av>=17.0.1",
+    "msgpack>=1.1.2",
+    "google-genai>=2.2.0",
+    "questionary>=2.1.1",
     "yt-dlp>=2026.3.17",
-    "pycryptodome",
-    "tomlkit>=0.13.0",
-    "lattifai-auth>=0.2.1",
+    "pycryptodome>=3.23.0",
+    "tomlkit>=0.15.0",
+    "lattifai-auth>=0.3.0",
 ]
 
 [project.optional-dependencies]
 # Event
 event = [
-    "lattifai-core[event]>=0.7.5",
+    "lattifai-core[event]>=0.7.6",
 ]
 # Diarization
 diarization = [
-    "lattifai-core[diarization]>=0.7.5",
+    "lattifai-core[diarization]>=0.7.6",
 ]
 # Transcription: ASR models (NeMo/SenseVoice/FunASR, Linux/CUDA focused)
 transcription = [
@@ -74,18 +74,18 @@ transcription = [
 ]
 # Development
 dev = [
-    "black",
-    "pytest>=8.0.0",
-    "pytest-cov>=4.1.0",
-    "pytest-asyncio>=0.23.0,<2.0.0",
+    "black>=26.3.1",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-asyncio>=1.3.0,<2.0.0",
 ]
 # All: install everything
-translation = ["openai>=2.26.0"]
+translation = ["openai>=2.36.0"]
 # MLX: Apple Silicon in-process inference (macOS only, separate from transcription due to protobuf conflict)
 mlx = [
-    "mlx-audio>=0.4.2; sys_platform == 'darwin' and platform_machine == 'arm64'",
-    "mlx-vlm>=0.4.4; sys_platform == 'darwin' and platform_machine == 'arm64'",
-    "webrtcvad; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "mlx-audio>=0.4.3; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "mlx-vlm>=0.5.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "webrtcvad>=2.0.10; sys_platform == 'darwin' and platform_machine == 'arm64'",
 ]
 all = [
     "lattifai[event]",
