@@ -29,9 +29,23 @@ __all__ = ["diarize", "naming"]
 _DESCRIPTION_CHAR_CAP = 800
 _DESCRIPTION_SKIP_PREFIXES = ("http", "#", "0:", "00:", "𝐒𝐏𝐎𝐍", "𝐓𝐈𝐌𝐄", "𝐄𝐏𝐈𝐒")
 
+# Hard caps on per-field LLM prompt inflation. A malformed or oversized meta.md
+# must not be able to push the prompt past these limits.
+_MAX_ALIASES_PER_SPEAKER = 8
+_MAX_ALIAS_CHARS = 40
+_MAX_BIO_CHARS = 300
+_MAX_TOPICS = 20
+_MAX_TOPIC_CHARS = 50
+_MAX_PRIOR_EPISODES = 5
+_MAX_PRIOR_EPISODE_CHARS = 200
+
 
 def _filter_description_lines(text: str) -> str:
-    """Drop URL/timestamp/sponsor noise lines, cap at _DESCRIPTION_CHAR_CAP chars."""
+    """Drop URL/timestamp/sponsor noise lines, cap at _DESCRIPTION_CHAR_CAP chars.
+
+    The cap is inclusive of any trailing ellipsis — a truncated output is
+    guaranteed to be no longer than ``_DESCRIPTION_CHAR_CAP`` characters.
+    """
     meaningful: list = []
     used = 0
     for line in text.split("\n"):
@@ -39,7 +53,8 @@ def _filter_description_lines(text: str) -> str:
         if not stripped or stripped.startswith(_DESCRIPTION_SKIP_PREFIXES):
             continue
         if used + len(stripped) + 1 > _DESCRIPTION_CHAR_CAP:
-            remaining = _DESCRIPTION_CHAR_CAP - used
+            # Reserve one char for the ellipsis so the total stays ≤ cap.
+            remaining = _DESCRIPTION_CHAR_CAP - used - 1
             if remaining > 20:
                 meaningful.append(stripped[:remaining].rstrip() + "…")
             break
@@ -82,12 +97,14 @@ def _format_speakers_block(speakers: list) -> str:
             else:
                 alias_list = []
             if alias_list:
-                lines.append(f"  aliases: {', '.join(alias_list)}")
+                # Cap count and per-item length to bound prompt size.
+                bounded = [a[:_MAX_ALIAS_CHARS] for a in alias_list[:_MAX_ALIASES_PER_SPEAKER]]
+                lines.append(f"  aliases: {', '.join(bounded)}")
         bio = str(sp.get("bio") or "").strip()
         if bio:
             # Single-line bio so the line-based parser doesn't split it across entries.
             bio_single = " ".join(bio.split())
-            lines.append(f"  bio: {bio_single[:300]}")
+            lines.append(f"  bio: {bio_single[:_MAX_BIO_CHARS]}")
     return "\n".join(lines) if len(lines) > 1 else ""
 
 
@@ -165,13 +182,15 @@ def _resolve_context(context: Optional[str]) -> Optional[str]:
 
     topics = meta.get("topics")
     if topics and isinstance(topics, list):
-        topic_strs = [str(t).strip() for t in topics if str(t).strip()]
+        topic_strs = [str(t).strip()[:_MAX_TOPIC_CHARS] for t in topics if str(t).strip()]
         if topic_strs:
-            parts.append(f"Topics: {', '.join(topic_strs)}")
+            parts.append(f"Topics: {', '.join(topic_strs[:_MAX_TOPICS])}")
 
     prior_episodes = meta.get("prior_episodes")
     if prior_episodes and isinstance(prior_episodes, list):
-        prior_lines = [f"- {str(ep).strip()}" for ep in prior_episodes if str(ep).strip()]
+        prior_lines = [f"- {str(ep).strip()[:_MAX_PRIOR_EPISODE_CHARS]}" for ep in prior_episodes if str(ep).strip()][
+            :_MAX_PRIOR_EPISODES
+        ]
         if prior_lines:
             parts.append("Prior episodes:\n" + "\n".join(prior_lines))
 

@@ -287,8 +287,14 @@ def _parse_speakers_block(context: str) -> List[Dict[str, object]]:
 
     Returns a list of dicts with keys ``name`` / ``role`` / ``affiliation`` /
     ``aliases`` / ``bio``. Only the parenthetical *role* keywords from
-    ``_STRUCTURED_ROLE_KEYWORDS`` are treated as roles — anything else inside
-    parentheses (e.g. ``Shawn Wang (Swyx)``) is preserved as part of the name.
+    ``_STRUCTURED_ROLE_KEYWORDS`` are treated as roles — any other
+    parenthetical on the name line (e.g. ``Shawn Wang (Swyx)``) is captured
+    as an implicit alias so the LLM can fold short forms back to the legal
+    name without confusing them with a role.
+
+    Block-terminator rule: blank lines are tolerated *between* entries (a
+    common readability pattern). The block only ends when we encounter a
+    non-blank, non-indented line that does not start with ``- ``.
     """
     m = re.search(r"^Speakers:\s*$", context, re.MULTILINE)
     if not m:
@@ -298,6 +304,7 @@ def _parse_speakers_block(context: str) -> List[Dict[str, object]]:
     entries: List[Dict[str, object]] = []
     current: Optional[Dict[str, object]] = None
     role_re = re.compile(rf"\s*\(({'|'.join(_STRUCTURED_ROLE_KEYWORDS)})\)\s*$", re.IGNORECASE)
+    paren_re = re.compile(r"\s*\(([^)]+)\)\s*$")
 
     def _commit() -> None:
         nonlocal current
@@ -307,9 +314,10 @@ def _parse_speakers_block(context: str) -> List[Dict[str, object]]:
 
     for raw in rest.split("\n"):
         if not raw.strip():
+            # Blank lines are readability separators inside the block; commit
+            # the current entry but do NOT terminate — the next non-indented,
+            # non-bullet line is what ends the block.
             _commit()
-            if entries:  # blank line after at least one entry ends the block
-                break
             continue
 
         if raw.startswith("- "):
@@ -325,11 +333,21 @@ def _parse_speakers_block(context: str) -> List[Dict[str, object]]:
             if rm:
                 role = rm.group(1).strip().lower()
                 content = content[: rm.start()].strip()
+            # Any remaining trailing parenthetical on the name is an implicit
+            # alias (e.g. "Shawn Wang (Swyx)"), not a role.
+            implicit_aliases: List[str] = []
+            pm = paren_re.search(content)
+            if pm:
+                aliases_text = pm.group(1).strip()
+                content = content[: pm.start()].strip()
+                # Reject URLs / handles
+                if aliases_text and not aliases_text.startswith(("@", "http")) and "/" not in aliases_text:
+                    implicit_aliases = [a.strip() for a in re.split(r"[，,]", aliases_text) if a.strip()]
             current = {
                 "name": content,
                 "role": role,
                 "affiliation": affiliation,
-                "aliases": [],
+                "aliases": list(implicit_aliases),
                 "bio": "",
             }
             continue
@@ -338,14 +356,23 @@ def _parse_speakers_block(context: str) -> List[Dict[str, object]]:
             sub = raw.strip()
             if sub.lower().startswith("aliases:"):
                 aliases_str = sub.split(":", 1)[1].strip()
-                current["aliases"] = [a.strip() for a in aliases_str.split(",") if a.strip()]
+                explicit = [a.strip() for a in aliases_str.split(",") if a.strip()]
+                # Merge explicit aliases with any implicit alias captured from
+                # the bullet line, preserving order and deduping.
+                seen = set()
+                merged: List[str] = []
+                for a in list(current.get("aliases") or []) + explicit:
+                    if a and a not in seen:
+                        seen.add(a)
+                        merged.append(a)
+                current["aliases"] = merged
             elif sub.lower().startswith("bio:"):
                 current["bio"] = sub.split(":", 1)[1].strip()
             elif current.get("bio"):
                 current["bio"] = f"{current['bio']} {sub}".strip()
             continue
 
-        # Non-indented, non-bullet line — block ended.
+        # Non-indented, non-bullet, non-blank line — block ended.
         _commit()
         break
 

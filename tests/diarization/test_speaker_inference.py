@@ -432,6 +432,177 @@ class TestStructuredSpeakersBlock:
         assert "Alice Chen" in result.get("guest", [])
         assert result["affiliations"]["Alice Chen"] == "Anthropic"
 
+    def test_blank_line_inside_block_does_not_truncate(self):
+        """Regression: blank lines between/within entries must not silently drop
+        the rest of the Speakers block.
+
+        Bug found by Codex review on commit a50039d: the line-scanner ended the
+        block on the first blank line after any committed entry, so a meta.md
+        author who separated speakers with blank lines for readability would
+        lose every entry after the first.
+        """
+        ctx = textwrap.dedent(
+            """\
+            Speakers:
+            - Alice Chen (host) @ Anthropic
+
+            - Bob Smith (guest) @ Stanford
+              bio: PhD in RLHF.
+
+            - Carol Wu (guest) @ DeepMind
+            """
+        )
+        result = extract_candidate_names(ctx)
+        assert "Alice Chen" in result.get("host", [])
+        assert "Bob Smith" in result.get("guest", [])
+        assert "Carol Wu" in result.get("guest", [])
+        assert result["affiliations"]["Bob Smith"] == "Stanford"
+        assert result["affiliations"]["Carol Wu"] == "DeepMind"
+
+    def test_name_alias_paren_preserved_not_treated_as_role(self):
+        """Regression: ``Shawn Wang (Swyx)`` — the non-role parenthetical must
+        survive as an alias, not be mistakenly recorded as the speaker's role.
+
+        Bug found by Codex review on commit a50039d: ``_add()`` ran its generic
+        paren-role handler on names emitted from the structured ``Speakers:``
+        block, so ``Shawn Wang (Swyx)`` ended up with ``roles[Shawn Wang] ==
+        "Swyx"`` and the prompt rendered ``Shawn Wang — Swyx``.
+        """
+        ctx = textwrap.dedent(
+            """\
+            Speakers:
+            - Shawn Wang (Swyx) (guest) @ Smol AI
+            """
+        )
+        result = extract_candidate_names(ctx)
+        assert "Shawn Wang" in result.get("guest", [])
+        # Role must come from the explicit (guest) keyword, NOT from "(Swyx)".
+        assert result.get("roles", {}).get("Shawn Wang") in (None, "guest")
+        # The non-role paren should be preserved as an alias.
+        assert "Swyx" in result.get("aliases", {}).get("Shawn Wang", [])
+
+
+# ===========================================================================
+# D2. _resolve_context — caps on aliases / topics / prior_episodes / description
+# ===========================================================================
+
+
+class TestResolveContextCaps:
+    """Regressions for unbounded-context inflation (Codex review on a50039d)."""
+
+    def test_aliases_capped_in_speakers_block(self, tmp_path: Path):
+        """A pathological aliases list must not bloat the prompt unboundedly."""
+        from lattifai.cli.diarize import _resolve_context
+
+        many_aliases = [f"alias{i}" for i in range(500)]
+        meta_path = tmp_path / "ep.meta.md"
+        meta_path.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                speakers:
+                  - name: Alice Chen
+                    role: host
+                    aliases: {aliases}
+                ---
+                """
+            ).format(aliases=many_aliases),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(meta_path))
+        assert result is not None
+        # Find the aliases line and count items
+        for line in result.split("\n"):
+            if line.strip().startswith("aliases:"):
+                items = [a.strip() for a in line.split(":", 1)[1].split(",") if a.strip()]
+                assert len(items) <= 8, f"aliases unbounded ({len(items)} entries)"
+                break
+        else:
+            pytest.fail("aliases line missing")
+
+    def test_topics_capped(self, tmp_path: Path):
+        from lattifai.cli.diarize import _resolve_context
+
+        many_topics = [f"topic_{i}" for i in range(200)]
+        meta_path = tmp_path / "ep.meta.md"
+        meta_path.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Bloat Test
+                topics: {topics}
+                ---
+                """
+            ).format(topics=many_topics),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(meta_path))
+        assert result is not None
+        # Topics line should be capped
+        for line in result.split("\n"):
+            if line.startswith("Topics:"):
+                items = [t.strip() for t in line[len("Topics:") :].split(",") if t.strip()]
+                assert len(items) <= 20, f"topics unbounded ({len(items)} entries)"
+                break
+        else:
+            pytest.fail("Topics line missing")
+
+    def test_prior_episodes_capped(self, tmp_path: Path):
+        from lattifai.cli.diarize import _resolve_context
+
+        many_eps = [f"Episode {i}: title" for i in range(50)]
+        meta_path = tmp_path / "ep.meta.md"
+        meta_path.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Bloat Test
+                prior_episodes: {eps}
+                ---
+                """
+            ).format(eps=many_eps),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(meta_path))
+        assert result is not None
+        # Count "- Episode" entries under "Prior episodes:"
+        idx = result.find("Prior episodes:\n")
+        assert idx >= 0
+        block_text = result[idx + len("Prior episodes:\n") :]
+        # block ends at next "Description:" or EOF
+        end = block_text.find("\nDescription:")
+        block = block_text[:end] if end >= 0 else block_text
+        entries = [ln for ln in block.split("\n") if ln.strip().startswith("- ")]
+        assert len(entries) <= 5, f"prior_episodes unbounded ({len(entries)} entries)"
+
+    def test_description_cap_exact_800_no_overflow(self, tmp_path: Path):
+        """Regression: description with ellipsis must stay AT or below 800 chars,
+        not 801.
+
+        Bug found by Codex review on commit a50039d.
+        """
+        from lattifai.cli.diarize import _resolve_context
+
+        long_para = "A" * 5000  # one long line
+        meta_path = tmp_path / "ep.meta.md"
+        meta_path.write_text(
+            textwrap.dedent(
+                f"""\
+                ---
+                title: Off-by-one Test
+                ---
+
+                {long_para}
+                """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(meta_path))
+        assert result is not None
+        desc_idx = result.find("Description:\n")
+        desc_body = result[desc_idx + len("Description:\n") :]
+        assert len(desc_body) <= 800, f"description cap overflow: {len(desc_body)} chars"
+
 
 # ===========================================================================
 # E. _build_prompt — Speaker Background section
