@@ -1,5 +1,8 @@
 """Tests for YouTube external transcript URL extraction and parsing"""
 
+import socket
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 from lattifai.youtube.client import YouTubeDownloader
@@ -354,17 +357,31 @@ class TestIsHijackedPage:
 
 
 class TestIsHostReachable:
-    """Test _is_host_reachable static method"""
+    """Test _is_host_reachable static method (mocked: never touches real network).
 
-    def test_reachable_host(self):
-        assert YouTubeDownloader._is_host_reachable("google.com", timeout=5)
+    The previous version of these tests made real TCP/DNS calls (google.com,
+    192.0.2.1, .invalid) which is flaky behind captive portals, transparent
+    proxies, ISP DNS hijacking, or offline CI runners. We mock socket directly
+    to assert the function's contract instead.
+    """
 
-    def test_unreachable_host(self):
-        # RFC 5737 TEST-NET: guaranteed non-routable
-        assert not YouTubeDownloader._is_host_reachable("192.0.2.1", timeout=1)
+    def test_returns_true_when_connection_succeeds(self):
+        mock_sock = MagicMock()
+        with patch("socket.create_connection", return_value=mock_sock) as mock_conn:
+            assert YouTubeDownloader._is_host_reachable("example.com", port=443, timeout=5)
+        mock_conn.assert_called_once_with(("example.com", 443), timeout=5)
 
-    def test_invalid_host(self):
-        assert not YouTubeDownloader._is_host_reachable("this.host.definitely.does.not.exist.invalid", timeout=1)
+    def test_returns_false_on_timeout(self):
+        with patch("socket.create_connection", side_effect=socket.timeout):
+            assert not YouTubeDownloader._is_host_reachable("slow.example.com", timeout=1)
+
+    def test_returns_false_on_connection_refused(self):
+        with patch("socket.create_connection", side_effect=ConnectionRefusedError):
+            assert not YouTubeDownloader._is_host_reachable("127.0.0.1", port=1, timeout=1)
+
+    def test_returns_false_on_dns_failure(self):
+        with patch("socket.create_connection", side_effect=socket.gaierror):
+            assert not YouTubeDownloader._is_host_reachable("nonexistent.invalid", timeout=1)
 
 
 class TestRepairJson:
