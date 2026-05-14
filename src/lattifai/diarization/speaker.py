@@ -24,11 +24,21 @@ infer the real name of each speaker.
 1. **Candidate names from metadata**: If a "Candidate Names" section is
    provided, you MUST assign those names to the matching SPEAKER labels.
    The host/interviewer asks shorter questions; the guest gives longer answers.
-2. **Conversation flow**: If a "Conversation Excerpt" is provided, analyze
+2. **Speaker background match**: If a "Speaker Background" section lists
+   affiliations / aliases / bios, use them as strong identity anchors:
+   - **Affiliation**: a candidate's affiliation (e.g. "Stanford AI Lab") that
+     appears in a speaker's self-introduction ("I work at Stanford", "我在
+     斯坦福") or in their topical references ("in our lab at Stanford") is a
+     strong assignment signal.
+   - **Aliases**: when a speaker is addressed by an alias (e.g. "Swyx"), map
+     that to the candidate's full legal name, not the alias.
+   - **Bio**: episode-specific expertise from the bio aligns with content a
+     speaker brings up (e.g. an RLHF bio → speaker who discusses RLHF).
+3. **Conversation flow**: If a "Conversation Excerpt" is provided, analyze
    turn-taking patterns and how speakers address each other by name.
-3. **Self-introductions**: "I'm Zhang San", "My name is...", "大家好我是..."
-4. **How others address them**: "So Zhang San, what do you think?"
-5. **Role signals**: The speaker who asks questions is typically the host;
+4. **Self-introductions**: "I'm Zhang San", "My name is...", "大家好我是..."
+5. **How others address them**: "So Zhang San, what do you think?"
+6. **Role signals**: The speaker who asks questions is typically the host;
    the one who gives longer, detailed answers is the guest.
 
 ## Rules
@@ -261,21 +271,111 @@ def _looks_like_person_name(text: str) -> bool:
     return True
 
 
+_STRUCTURED_ROLE_KEYWORDS = ("host", "guest", "moderator", "interviewer", "co-host")
+
+
+def _parse_speakers_block(context: str) -> List[Dict[str, object]]:
+    """Parse the structured `Speakers:` block emitted by `_resolve_context`.
+
+    Expected format::
+
+        Speakers:
+        - Alice Chen (host) @ Anthropic (research engineer)
+          aliases: Alice
+          bio: Host of the show. Background in distributed systems.
+        - Bob Smith (guest) @ Stanford AI Lab
+
+    Returns a list of dicts with keys ``name`` / ``role`` / ``affiliation`` /
+    ``aliases`` / ``bio``. Only the parenthetical *role* keywords from
+    ``_STRUCTURED_ROLE_KEYWORDS`` are treated as roles — anything else inside
+    parentheses (e.g. ``Shawn Wang (Swyx)``) is preserved as part of the name.
+    """
+    m = re.search(r"^Speakers:\s*$", context, re.MULTILINE)
+    if not m:
+        return []
+
+    rest = context[m.end() :]
+    entries: List[Dict[str, object]] = []
+    current: Optional[Dict[str, object]] = None
+    role_re = re.compile(rf"\s*\(({'|'.join(_STRUCTURED_ROLE_KEYWORDS)})\)\s*$", re.IGNORECASE)
+
+    def _commit() -> None:
+        nonlocal current
+        if current and current.get("name"):
+            entries.append(current)
+        current = None
+
+    for raw in rest.split("\n"):
+        if not raw.strip():
+            _commit()
+            if entries:  # blank line after at least one entry ends the block
+                break
+            continue
+
+        if raw.startswith("- "):
+            _commit()
+            content = raw[2:].strip()
+            affiliation = ""
+            if " @ " in content:
+                left, aff = content.split(" @ ", 1)
+                affiliation = aff.strip()
+                content = left.strip()
+            role = ""
+            rm = role_re.search(content)
+            if rm:
+                role = rm.group(1).strip().lower()
+                content = content[: rm.start()].strip()
+            current = {
+                "name": content,
+                "role": role,
+                "affiliation": affiliation,
+                "aliases": [],
+                "bio": "",
+            }
+            continue
+
+        if raw.startswith("  ") and current is not None:
+            sub = raw.strip()
+            if sub.lower().startswith("aliases:"):
+                aliases_str = sub.split(":", 1)[1].strip()
+                current["aliases"] = [a.strip() for a in aliases_str.split(",") if a.strip()]
+            elif sub.lower().startswith("bio:"):
+                current["bio"] = sub.split(":", 1)[1].strip()
+            elif current.get("bio"):
+                current["bio"] = f"{current['bio']} {sub}".strip()
+            continue
+
+        # Non-indented, non-bullet line — block ended.
+        _commit()
+        break
+
+    _commit()
+    return entries
+
+
 def extract_candidate_names(context: Optional[str]) -> Dict[str, object]:
     """Extract candidate host/guest names from metadata context.
 
-    Returns {"host": [name, ...], "guest": [name, ...], "roles": {name: role}}
-    with extracted person names. The "roles" key is optional and only present
-    when descriptive role text (e.g. "head of product") was captured next to
-    a name — it is the crucial signal that lets the LLM disambiguate multiple
-    guests sharing the same conversation.
+    Returns ``{"host": [name, ...], "guest": [name, ...], "roles": {name: role},
+    "affiliations": {name: aff}, "aliases": {name: [alias, ...]}, "bios": {name: bio}}``
+    with extracted person names. Auxiliary keys are only present when the
+    underlying signal was captured — the ``roles`` / ``affiliations`` /
+    ``aliases`` / ``bios`` maps are the crucial signals that let the LLM
+    disambiguate multiple guests sharing the same conversation.
 
     Focuses on high-precision extraction — avoids titles, roles, or URLs.
     """
     if not context:
         return {}
 
-    candidates: Dict[str, object] = {"host": [], "guest": [], "roles": {}}
+    candidates: Dict[str, object] = {
+        "host": [],
+        "guest": [],
+        "roles": {},
+        "affiliations": {},
+        "aliases": {},
+        "bios": {},
+    }
 
     def _clean_role(role: str) -> str:
         role = role.strip().rstrip(".,;:").strip()
@@ -284,7 +384,14 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, object]:
         # Cap at a reasonable length so we don't paste a whole sentence.
         return role[:80]
 
-    def _add(key: str, name: str, role: Optional[str] = None):
+    def _add(
+        key: str,
+        name: str,
+        role: Optional[str] = None,
+        affiliation: Optional[str] = None,
+        aliases: Optional[List[str]] = None,
+        bio: Optional[str] = None,
+    ):
         name = name.strip().rstrip("。.，,")
         # Remove parenthetical role suffixes: "Name (Title)"
         # Preserve the parenthetical content as a role hint when no explicit
@@ -315,6 +422,32 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, object]:
             cleaned = _clean_role(chosen_role)
             if cleaned and name not in candidates["roles"]:  # type: ignore[operator]
                 candidates["roles"][name] = cleaned  # type: ignore[index]
+        if affiliation:
+            aff_clean = affiliation.strip()[:120]
+            if aff_clean and name not in candidates["affiliations"]:  # type: ignore[operator]
+                candidates["affiliations"][name] = aff_clean  # type: ignore[index]
+        if aliases:
+            cleaned_aliases = [a.strip() for a in aliases if a and a.strip() and a.strip() != name]
+            if cleaned_aliases and name not in candidates["aliases"]:  # type: ignore[operator]
+                candidates["aliases"][name] = cleaned_aliases  # type: ignore[index]
+        if bio:
+            bio_clean = bio.strip()[:400]
+            if bio_clean and name not in candidates["bios"]:  # type: ignore[operator]
+                candidates["bios"][name] = bio_clean  # type: ignore[index]
+
+    # 0. Structured Speakers block (emitted by `_resolve_context`). High-precision
+    #    direct read — fills affiliation/aliases/bio that regex paths can't capture.
+    for entry in _parse_speakers_block(context):
+        role = str(entry.get("role") or "").lower()
+        key = "host" if role in ("host", "moderator", "co-host") else "guest"
+        _add(
+            key,
+            str(entry.get("name") or ""),
+            role=role or None,
+            affiliation=str(entry.get("affiliation") or "") or None,
+            aliases=entry.get("aliases") or None,  # type: ignore[arg-type]
+            bio=str(entry.get("bio") or "") or None,
+        )
 
     # 1. Channel/Host name (often the host for interview podcasts)
     m = re.search(r"Channel/Host:\s*(.+?)(?:\n|$)", context)
@@ -365,7 +498,10 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, object]:
                 trailing_text = trailing_name_match.group(1).strip()
                 # Strip common podcast/episode suffixes
                 trailing_text = re.sub(
-                    r"\s*(?:Podcast|Episode|EP|节目|播客)\s*#?\d*$", "", trailing_text, flags=re.IGNORECASE
+                    r"\s*(?:Podcast|Episode|EP|节目|播客)\s*#?\d*$",
+                    "",
+                    trailing_text,
+                    flags=re.IGNORECASE,
                 ).strip()
                 if trailing_text and _looks_like_person_name(trailing_text):
                     _add("guest", trailing_text)
@@ -377,7 +513,11 @@ def extract_candidate_names(context: Optional[str]) -> Dict[str, object]:
         name = first_line.split("，")[0].split(",")[0].strip()
         _add("host", name)
 
-    for m in re.finditer(r"[【\[](?:嘉宾|guest)[】\]]\s*(.+?)(?:\n[【\[]|\n\n|\Z)", context, re.DOTALL | re.I):
+    for m in re.finditer(
+        r"[【\[](?:嘉宾|guest)[】\]]\s*(.+?)(?:\n[【\[]|\n\n|\Z)",
+        context,
+        re.DOTALL | re.I,
+    ):
         for line in m.group(1).strip().split("\n"):
             line = line.strip()
             if not line:
@@ -656,6 +796,43 @@ class SpeakerNameInferrer:
                 else:
                     parts.append(f"- Guest(s): {', '.join(candidates['guest'])}")
             parts.append("")
+
+            # Speaker Background: render affiliation / aliases / bio per candidate.
+            # Strong identity anchors for matching self-introductions, cross-
+            # addressing by alias, and topical expertise — only emit when at
+            # least one signal is non-empty to keep the prompt lean.
+            affiliations = candidates.get("affiliations") or {}
+            aliases_map = candidates.get("aliases") or {}
+            bios = candidates.get("bios") or {}
+            if affiliations or aliases_map or bios:
+                all_names = list(candidates.get("host") or []) + list(candidates.get("guest") or [])
+                bg_lines: List[str] = []
+                for nm in all_names:
+                    nm_role = roles.get(nm)
+                    nm_aff = affiliations.get(nm)
+                    nm_aliases = aliases_map.get(nm) or []
+                    nm_bio = bios.get(nm)
+                    if not (nm_aff or nm_aliases or nm_bio):
+                        continue
+                    bg_lines.append(f"### {nm}")
+                    if nm_role:
+                        bg_lines.append(f"- Role: {nm_role}")
+                    if nm_aff:
+                        bg_lines.append(f"- Affiliation: {nm_aff}")
+                    if nm_aliases:
+                        bg_lines.append(f"- Aliases: {', '.join(nm_aliases)}")
+                    if nm_bio:
+                        bg_lines.append(f"- Bio: {nm_bio}")
+                    bg_lines.append("")
+                if bg_lines:
+                    parts.append("## Speaker Background\n")
+                    parts.append(
+                        "Strong identity anchors. Match a speaker's self-introduction "
+                        "or topical references against the affiliation/bio of each "
+                        "candidate; aliases tell you which short form refers to which "
+                        "full legal name.\n"
+                    )
+                    parts.extend(bg_lines)
 
             # Role evidence: mine transcript for role-revealing utterances and
             # surface them per-speaker. This is the deterministic disambiguator

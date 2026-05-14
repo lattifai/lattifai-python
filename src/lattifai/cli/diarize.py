@@ -7,19 +7,96 @@ from typing import Optional
 import nemo_run as run
 from typing_extensions import Annotated
 
-from lattifai.cli._shared import build_lattifai_client, resolve_caption_paths, resolve_media_input
+from lattifai.cli._shared import (
+    build_lattifai_client,
+    resolve_caption_paths,
+    resolve_media_input,
+)
 from lattifai.cli.entrypoint import LattifAIEntrypoint
-from lattifai.config import AlignmentConfig, CaptionConfig, ClientConfig, DiarizationConfig, MediaConfig
+from lattifai.config import (
+    AlignmentConfig,
+    CaptionConfig,
+    ClientConfig,
+    DiarizationConfig,
+    MediaConfig,
+)
 from lattifai.theme import theme
 from lattifai.utils import safe_print
 
 __all__ = ["diarize", "naming"]
 
 
+_DESCRIPTION_CHAR_CAP = 800
+_DESCRIPTION_SKIP_PREFIXES = ("http", "#", "0:", "00:", "𝐒𝐏𝐎𝐍", "𝐓𝐈𝐌𝐄", "𝐄𝐏𝐈𝐒")
+
+
+def _filter_description_lines(text: str) -> str:
+    """Drop URL/timestamp/sponsor noise lines, cap at _DESCRIPTION_CHAR_CAP chars."""
+    meaningful: list = []
+    used = 0
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith(_DESCRIPTION_SKIP_PREFIXES):
+            continue
+        if used + len(stripped) + 1 > _DESCRIPTION_CHAR_CAP:
+            remaining = _DESCRIPTION_CHAR_CAP - used
+            if remaining > 20:
+                meaningful.append(stripped[:remaining].rstrip() + "…")
+            break
+        meaningful.append(stripped)
+        used += len(stripped) + 1
+    return "\n".join(meaningful)
+
+
+def _format_speakers_block(speakers: list) -> str:
+    """Render structured speakers as the 'Speakers:' block consumed by
+    `extract_candidate_names._parse_speakers_block`.
+
+    Layout per entry::
+
+        - <name> (<role>) @ <affiliation>
+          aliases: <alias>, <alias>
+          bio: <bio text>
+    """
+    lines = ["Speakers:"]
+    for sp in speakers:
+        if not isinstance(sp, dict):
+            continue
+        name = str(sp.get("name") or "").strip()
+        if not name:
+            continue
+        role = str(sp.get("role") or "").strip().lower()
+        affiliation = str(sp.get("affiliation") or "").strip()
+        header = f"- {name}"
+        if role:
+            header += f" ({role})"
+        if affiliation:
+            header += f" @ {affiliation}"
+        lines.append(header)
+        aliases = sp.get("aliases")
+        if aliases:
+            if isinstance(aliases, str):
+                alias_list = [a.strip() for a in aliases.split(",") if a.strip()]
+            elif isinstance(aliases, list):
+                alias_list = [str(a).strip() for a in aliases if str(a).strip()]
+            else:
+                alias_list = []
+            if alias_list:
+                lines.append(f"  aliases: {', '.join(alias_list)}")
+        bio = str(sp.get("bio") or "").strip()
+        if bio:
+            # Single-line bio so the line-based parser doesn't split it across entries.
+            bio_single = " ".join(bio.split())
+            lines.append(f"  bio: {bio_single[:300]}")
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
 def _resolve_context(context: Optional[str]) -> Optional[str]:
     """Resolve context parameter: file path → parsed metadata string, or pass through.
 
-    Supports .meta.md files with YAML frontmatter (title, channel, speakers, description).
+    Supports .meta.md files with YAML frontmatter. Recognised keys:
+        title, channel / uploader, speakers (list of {name, role, affiliation,
+        aliases, bio}), topics (list), prior_episodes (list), description.
     """
     if not context:
         return None
@@ -54,18 +131,24 @@ def _resolve_context(context: Optional[str]) -> Optional[str]:
     if not isinstance(meta, dict):
         return frontmatter
 
-    # Build speaker context from structured metadata (reuse _build_speaker_context format)
-    parts = []
+    # Build speaker context from structured metadata. Legacy lines
+    # (Channel/Host, Title, Guests) are retained verbatim so the regex paths in
+    # `extract_candidate_names` keep working; the new `Speakers:` block carries
+    # the rich per-speaker signals (affiliation / aliases / bio).
+    parts: list = []
 
-    # Structured speakers
     speakers = meta.get("speakers")
+    structured_speakers: list = []
     if speakers and isinstance(speakers, list):
-        host_names = [s["name"] for s in speakers if s.get("role") == "host" and s.get("name")]
-        guest_names = [s["name"] for s in speakers if s.get("role") == "guest" and s.get("name")]
+        host_names = [s["name"] for s in speakers if isinstance(s, dict) and s.get("role") == "host" and s.get("name")]
+        guest_names = [
+            s["name"] for s in speakers if isinstance(s, dict) and s.get("role") == "guest" and s.get("name")
+        ]
         if host_names:
             parts.append(f"Channel/Host: {', '.join(host_names)}")
         if guest_names:
             parts.append(f"Guests: {', '.join(guest_names)}")
+        structured_speakers = [s for s in speakers if isinstance(s, dict) and s.get("name")]
 
     title = meta.get("title")
     if title:
@@ -75,20 +158,28 @@ def _resolve_context(context: Optional[str]) -> Optional[str]:
     if channel and not any("Channel/Host:" in p for p in parts):
         parts.append(f"Channel/Host: {channel}")
 
-    # Description (first few meaningful lines)
+    if structured_speakers:
+        speakers_block = _format_speakers_block(structured_speakers)
+        if speakers_block:
+            parts.append(speakers_block)
+
+    topics = meta.get("topics")
+    if topics and isinstance(topics, list):
+        topic_strs = [str(t).strip() for t in topics if str(t).strip()]
+        if topic_strs:
+            parts.append(f"Topics: {', '.join(topic_strs)}")
+
+    prior_episodes = meta.get("prior_episodes")
+    if prior_episodes and isinstance(prior_episodes, list):
+        prior_lines = [f"- {str(ep).strip()}" for ep in prior_episodes if str(ep).strip()]
+        if prior_lines:
+            parts.append("Prior episodes:\n" + "\n".join(prior_lines))
+
     desc = body or meta.get("description") or ""
     if desc:
-        lines = [ln.strip() for ln in desc.split("\n") if ln.strip()]
-        # Skip URLs, timestamps, sponsor blocks
-        meaningful = []
-        for ln in lines:
-            if ln.startswith(("http", "#", "0:", "00:", "𝐒𝐏𝐎𝐍", "𝐓𝐈𝐌𝐄", "𝐄𝐏𝐈𝐒")):
-                continue
-            meaningful.append(ln)
-            if len(meaningful) >= 3:
-                break
-        if meaningful:
-            parts.append("Description:\n" + "\n".join(meaningful))
+        filtered = _filter_description_lines(desc)
+        if filtered:
+            parts.append("Description:\n" + filtered)
 
     return "\n".join(parts) if parts else None
 

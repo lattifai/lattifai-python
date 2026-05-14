@@ -1,6 +1,8 @@
 """Tests for speaker name inference: extract_candidate_names, SpeakerNameInferrer, _build_speaker_context."""
 
-from typing import Any, Optional
+import textwrap
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -206,7 +208,10 @@ class TestSpeakerNameInferrer:
     @pytest.fixture
     def speaker_texts(self):
         return {
-            "SPEAKER_00": ["Hello everyone, welcome to the show", "So what's your take on AI?"],
+            "SPEAKER_00": [
+                "Hello everyone, welcome to the show",
+                "So what's your take on AI?",
+            ],
             "SPEAKER_01": [
                 "Thanks for having me. I've been working on language models for years.",
                 "The key insight is that scaling laws are predictable.",
@@ -345,3 +350,250 @@ class TestBuildSpeakerContext:
         context = _build_speaker_context(meta)
         assert "Channel/Host: Sarah Guo, Elad Gil" in context
         assert "Guests: Jensen Huang" in context
+
+
+# ===========================================================================
+# D. Structured Speakers block — affiliation / aliases / bio extraction
+# ===========================================================================
+
+
+class TestStructuredSpeakersBlock:
+    def test_extract_affiliation(self):
+        ctx = textwrap.dedent(
+            """\
+            Title: Deep Dive into RNA Design
+            Channel/Host: Alice Chen
+            Speakers:
+            - Alice Chen (host) @ Anthropic
+            - Bob Smith (guest) @ Atomic AI
+            """
+        )
+        result = extract_candidate_names(ctx)
+        assert "Alice Chen" in result.get("host", [])
+        assert "Bob Smith" in result.get("guest", [])
+        assert result["affiliations"]["Alice Chen"] == "Anthropic"
+        assert result["affiliations"]["Bob Smith"] == "Atomic AI"
+
+    def test_extract_affiliation_with_parens(self):
+        """Affiliation itself may contain parens — must not be confused with name parens."""
+        ctx = textwrap.dedent(
+            """\
+            Speakers:
+            - Alice Chen (host) @ Anthropic (research engineer)
+            """
+        )
+        result = extract_candidate_names(ctx)
+        assert result["affiliations"]["Alice Chen"] == "Anthropic (research engineer)"
+
+    def test_extract_aliases(self):
+        ctx = textwrap.dedent(
+            """\
+            Speakers:
+            - Shawn Wang (guest) @ Smol AI
+              aliases: Swyx, swyx
+            """
+        )
+        result = extract_candidate_names(ctx)
+        assert "Shawn Wang" in result.get("guest", [])
+        assert result["aliases"]["Shawn Wang"] == ["Swyx", "swyx"]
+
+    def test_extract_bio(self):
+        ctx = textwrap.dedent(
+            """\
+            Speakers:
+            - Bob Smith (guest) @ Stanford
+              bio: PhD candidate working on RLHF and scaling laws.
+            """
+        )
+        result = extract_candidate_names(ctx)
+        assert "RLHF" in result["bios"]["Bob Smith"]
+
+    def test_legacy_meta_md_still_works(self):
+        """Old meta.md format (only name + role) keeps working via legacy regex paths."""
+        ctx = "Channel/Host: Alice Chen\nTitle: Bob Smith — Topic\n"
+        result = extract_candidate_names(ctx)
+        assert "Alice Chen" in result.get("host", [])
+        assert "Bob Smith" in result.get("guest", [])
+        # No structured fields present → auxiliary maps should be absent
+        assert "affiliations" not in result
+        assert "aliases" not in result
+        assert "bios" not in result
+
+    def test_role_inferred_as_guest_for_unknown_role(self):
+        """Roles outside _STRUCTURED_ROLE_KEYWORDS fall back to guest bucket."""
+        ctx = textwrap.dedent(
+            """\
+            Speakers:
+            - Alice Chen @ Anthropic
+            """
+        )
+        result = extract_candidate_names(ctx)
+        # No role keyword → treated as guest
+        assert "Alice Chen" in result.get("guest", [])
+        assert result["affiliations"]["Alice Chen"] == "Anthropic"
+
+
+# ===========================================================================
+# E. _build_prompt — Speaker Background section
+# ===========================================================================
+
+
+class TestPromptSpeakerBackground:
+    @pytest.fixture
+    def speaker_texts(self):
+        return {
+            "SPEAKER_00": ["Welcome to the show", "What is your take?"],
+            "SPEAKER_01": [
+                "Thanks. I work on RLHF at Stanford.",
+                "Scaling laws matter.",
+            ],
+        }
+
+    def test_prompt_includes_speaker_background_when_rich(self, speaker_texts):
+        context = textwrap.dedent(
+            """\
+            Channel/Host: Alice Chen
+            Speakers:
+            - Alice Chen (host) @ Anthropic
+            - Bob Smith (guest) @ Stanford
+              aliases: Bob
+              bio: PhD candidate working on RLHF.
+            """
+        )
+        llm = FakeLLMClient([{"SPEAKER_00": "Alice Chen", "SPEAKER_01": "Bob Smith"}])
+        inferrer = SpeakerNameInferrer(llm_client=llm)
+        inferrer(speaker_texts, context=context)
+        prompt = llm.prompts[0]
+        assert "## Speaker Background" in prompt
+        assert "Affiliation: Stanford" in prompt
+        assert "Aliases: Bob" in prompt
+        assert "Bio:" in prompt and "RLHF" in prompt
+
+    def test_prompt_omits_speaker_background_when_no_signals(self, speaker_texts):
+        """No affiliation/aliases/bio → no Speaker Background section."""
+        context = "Channel/Host: Alice Chen\nTitle: Bob Smith — Topic\n"
+        llm = FakeLLMClient([{"SPEAKER_00": "Alice Chen", "SPEAKER_01": "Bob Smith"}])
+        inferrer = SpeakerNameInferrer(llm_client=llm)
+        inferrer(speaker_texts, context=context)
+        assert "## Speaker Background" not in llm.prompts[0]
+
+
+# ===========================================================================
+# F. _resolve_context — meta.md → context string
+# ===========================================================================
+
+
+class TestResolveContext:
+    def test_speakers_block_with_affiliation_and_bio(self, tmp_path: Path):
+        from lattifai.cli.diarize import _resolve_context
+
+        meta_path = tmp_path / "ep.meta.md"
+        meta_path.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Deep Dive
+                speakers:
+                  - name: Alice Chen
+                    role: host
+                    affiliation: Anthropic
+                    aliases:
+                      - Alice
+                    bio: Host of the show.
+                  - name: Bob Smith
+                    role: guest
+                    affiliation: Stanford AI Lab
+                    bio: PhD candidate working on RLHF.
+                topics:
+                  - RLHF
+                  - scaling laws
+                prior_episodes:
+                  - "Ep 42: pretraining"
+                ---
+
+                A discussion about reinforcement learning from human feedback.
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        result = _resolve_context(str(meta_path))
+        assert result is not None
+        assert "Channel/Host: Alice Chen" in result
+        assert "Guests: Bob Smith" in result
+        assert "Speakers:" in result
+        assert "- Alice Chen (host) @ Anthropic" in result
+        assert "- Bob Smith (guest) @ Stanford AI Lab" in result
+        assert "aliases: Alice" in result
+        assert "bio: Host of the show." in result
+        assert "Topics: RLHF, scaling laws" in result
+        assert "Prior episodes:" in result
+        assert "Ep 42: pretraining" in result
+        assert "reinforcement learning" in result
+
+        # End-to-end: the same string must round-trip through extract_candidate_names.
+        candidates = extract_candidate_names(result)
+        assert candidates["affiliations"]["Alice Chen"] == "Anthropic"
+        assert candidates["affiliations"]["Bob Smith"] == "Stanford AI Lab"
+        assert candidates["aliases"]["Alice Chen"] == ["Alice"]
+        assert "RLHF" in candidates["bios"]["Bob Smith"]
+
+    def test_description_cap_at_800_chars(self, tmp_path: Path):
+        """Description is capped at 800 chars rather than 3 lines."""
+        from lattifai.cli.diarize import _resolve_context
+
+        long_para = " ".join(["word"] * 300)  # ~1500 chars
+        meta_path = tmp_path / "ep.meta.md"
+        meta_path.write_text(
+            textwrap.dedent(
+                f"""\
+                ---
+                title: Long Description Ep
+                ---
+
+                {long_para}
+                """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(meta_path))
+        assert result is not None
+        # Extract the description section and assert it stays under cap + safety.
+        desc_idx = result.find("Description:\n")
+        assert desc_idx >= 0
+        desc_body = result[desc_idx + len("Description:\n") :]
+        assert len(desc_body) <= 820  # 800 cap + ellipsis tolerance
+
+    def test_legacy_meta_md_no_new_fields_still_resolves(self, tmp_path: Path):
+        """meta.md without affiliation/aliases/bio fields still produces valid context."""
+        from lattifai.cli.diarize import _resolve_context
+
+        meta_path = tmp_path / "ep.meta.md"
+        meta_path.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Legacy Episode
+                speakers:
+                  - name: Alice Chen
+                    role: host
+                  - name: Bob Smith
+                    role: guest
+                ---
+
+                Short description.
+                """
+            ),
+            encoding="utf-8",
+        )
+        result = _resolve_context(str(meta_path))
+        assert result is not None
+        assert "Channel/Host: Alice Chen" in result
+        assert "Guests: Bob Smith" in result
+        # Speakers block is emitted (entries have no affiliation though)
+        assert "- Alice Chen (host)" in result
+        assert "- Bob Smith (guest)" in result
+        # And the legacy regex paths still extract candidates
+        candidates = extract_candidate_names(result)
+        assert "Alice Chen" in candidates.get("host", [])
+        assert "Bob Smith" in candidates.get("guest", [])
