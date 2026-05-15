@@ -385,12 +385,11 @@ def naming(
         if sup.speaker in name_map:
             sup.speaker = name_map[sup.speaker]
 
-    # Write output
+    # Write output. Caption.write infers the output format from the path
+    # suffix (.json, .srt, .vtt, …) — passing an `output_format` kwarg crashes
+    # because Caption.write does not accept it.
     output_path = caption_config.output_path or caption_config.input_path
-    cap.write(
-        str(output_path),
-        output_format=caption_config.output_format if caption_config.output_format != "auto" else None,
-    )
+    cap.write(str(output_path))
     safe_print(theme.ok(f"Saved: {output_path}"))
 
     return cap

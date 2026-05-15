@@ -1,5 +1,6 @@
 """Tests for speaker name inference: extract_candidate_names, SpeakerNameInferrer, _build_speaker_context."""
 
+import json
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -574,6 +575,59 @@ class TestResolveContextCaps:
         block = block_text[:end] if end >= 0 else block_text
         entries = [ln for ln in block.split("\n") if ln.strip().startswith("- ")]
         assert len(entries) <= 5, f"prior_episodes unbounded ({len(entries)} entries)"
+
+    def test_naming_writes_named_file_to_disk(self, tmp_path: Path, monkeypatch):
+        """Regression: ``lai diarize naming`` must write the named caption to disk
+        instead of erroring out with ``Caption.write() got an unexpected keyword
+        argument 'output_format'``.
+
+        Bug discovered while eval'ing the lai-diarize skill against
+        https://youtu.be/la0CaZ2R8EY on 2026-05-15. The CLI printed the speaker
+        mapping but never produced the .named.json output because
+        ``cap.write(path, output_format=...)`` passes a kwarg that
+        ``Caption.write`` does not accept.
+        """
+        from lattifai.config.diarization import DiarizationLLMConfig
+
+        # Minimal diarized input — Caption.read needs a recognised schema.
+        src = {
+            "supervisions": [
+                {"start": 0.0, "end": 1.0, "text": "hi there", "speaker": "SPEAKER_00"},
+                {
+                    "start": 1.0,
+                    "end": 2.0,
+                    "text": "hello back",
+                    "speaker": "SPEAKER_01",
+                },
+                {
+                    "start": 2.0,
+                    "end": 3.0,
+                    "text": "so what's your take?",
+                    "speaker": "SPEAKER_00",
+                },
+                {
+                    "start": 3.0,
+                    "end": 4.0,
+                    "text": "great question",
+                    "speaker": "SPEAKER_01",
+                },
+            ]
+        }
+        in_path = tmp_path / "ep.diarized.json"
+        out_path = tmp_path / "ep.named.json"
+        in_path.write_text(json.dumps(src), encoding="utf-8")
+
+        fake = FakeLLMClient([{"SPEAKER_00": "Alice", "SPEAKER_01": "Bob"}])
+        monkeypatch.setattr(DiarizationLLMConfig, "create_client", lambda self: fake)
+
+        from lattifai.cli.diarize import naming
+
+        naming(input_caption=str(in_path), output_caption=str(out_path))
+
+        assert out_path.exists(), "named output file must be written to disk"
+        written = json.loads(out_path.read_text(encoding="utf-8"))
+        speakers = {s["speaker"] for s in written["supervisions"]}
+        assert speakers == {"Alice", "Bob"}, f"speaker mapping not applied: {speakers}"
 
     def test_description_cap_exact_800_no_overflow(self, tmp_path: Path):
         """Regression: description with ellipsis must stay AT or below 800 chars,
