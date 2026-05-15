@@ -419,6 +419,32 @@ def clear_auth() -> None:
     _save_config(config)
 
 
+def delete_auth_value(key: str) -> None:
+    """Remove a single key from the [auth] section if present.
+
+    Used when switching session types (e.g. trial -> OAuth login) so that
+    stale fields from the previous session type don't leak into the new one.
+    Silently no-ops if the key or [auth] section is absent.
+    """
+    config = _load_config()
+    try:
+        import tomlkit
+
+        if isinstance(config, tomlkit.TOMLDocument):
+            auth = config.get("auth")
+            if auth is not None and key in auth:
+                del auth[key]
+                _save_config(config)
+            return
+    except ImportError:
+        pass
+    config = _normalize_config(config)
+    auth = config.get("auth")
+    if isinstance(auth, dict) and key in auth:
+        del auth[key]
+        _save_config(config)
+
+
 def _normalize_key(key: str) -> str:
     """Normalize a user-provided key for lookup.
 

@@ -33,7 +33,7 @@ from lattifai.auth import (
     resolve_site_url,
     revoke_session,
 )
-from lattifai.cli.config import clear_auth, get_auth_value, set_auth_value
+from lattifai.cli.config import clear_auth, delete_auth_value, get_auth_value, set_auth_value
 from lattifai.theme import _Theme as T
 
 console = Console()
@@ -174,23 +174,43 @@ def _exchange_code(
         return response.json()
 
 
+# Fields exclusive to each session type. When switching session types (e.g.
+# trial -> OAuth login) the new persist call must purge the other side's
+# fields, otherwise stale state from the previous session leaks into [auth]
+# and confuses both the user and `lai auth status`.
+_TRIAL_ONLY_FIELDS = ("IS_TRIAL", "EXPIRES_AT", "CREDITS")
+_OAUTH_ONLY_FIELDS = ("USER_EMAIL", "KEY_NAME")
+
+
 def _persist_auth(api_key: str, whoami_data: dict[str, Any]) -> None:
-    """Persist auth metadata into config.toml."""
+    """Persist OAuth-login auth metadata into config.toml.
+
+    Clears any trial-only fields left over from a previous `lai auth trial`
+    so the resulting [auth] section reflects exactly one session type.
+    """
     set_auth_value("LATTIFAI_API_KEY", obfuscate(api_key))
     if whoami_data.get("user_email"):
         set_auth_value("USER_EMAIL", whoami_data["user_email"])
     if whoami_data.get("key_name"):
         set_auth_value("KEY_NAME", whoami_data["key_name"])
     set_auth_value("LOGGED_IN_AT", _now_iso())
+    for field in _TRIAL_ONLY_FIELDS:
+        delete_auth_value(field)
 
 
 def _persist_trial_auth(data: dict[str, Any]) -> None:
-    """Persist trial auth metadata into config.toml."""
+    """Persist trial auth metadata into config.toml.
+
+    Clears any OAuth-only fields left over from a previous `lai auth login`
+    so the resulting [auth] section reflects exactly one session type.
+    """
     set_auth_value("LATTIFAI_API_KEY", obfuscate(data["api_key"]))
     set_auth_value("IS_TRIAL", True)
     set_auth_value("EXPIRES_AT", data["expires_at"])
     set_auth_value("CREDITS", data.get("credits", 120))
     set_auth_value("LOGGED_IN_AT", _now_iso())
+    for field in _OAUTH_ONLY_FIELDS:
+        delete_auth_value(field)
 
 
 def _format_time(iso_str: Optional[str], *, future: bool = False) -> str:
