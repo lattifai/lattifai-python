@@ -14,7 +14,7 @@ from lattifai.caption import Supervision
 from lattifai.config import TranscriptionConfig
 from lattifai.data import Caption
 from lattifai.llm import GeminiClient
-from lattifai.transcription.base import BaseTranscriber
+from lattifai.transcription.base import BaseTranscriber, resolve_http_timeout_ms
 from lattifai.transcription.prompts import get_prompt_loader
 
 
@@ -162,12 +162,19 @@ class GeminiTranscriber(BaseTranscriber):
             sf.write(tmp_file.name, audio_array.T, sample_rate)
             tmp_path = Path(tmp_file.name)
 
+        # Duration drives the HTTP timeout (passed down to the SDK below).
+        duration = audio_array.shape[-1] / sample_rate
+
         try:
             # Transcribe using simple ASR prompt
-            transcript = asyncio.run(self._transcribe_with_simple_prompt(tmp_path, language=language))
+            transcript = asyncio.run(
+                self._transcribe_with_simple_prompt(
+                    tmp_path,
+                    language=language,
+                    audio_duration_sec=duration,
+                )
+            )
 
-            # Create Supervision object from transcript
-            duration = audio_array.shape[-1] / sample_rate
             supervision = Supervision(
                 id="gemini-transcription",
                 recording_id="numpy-array",
@@ -185,23 +192,34 @@ class GeminiTranscriber(BaseTranscriber):
             if tmp_path.exists():
                 tmp_path.unlink()
 
-    async def _transcribe_with_simple_prompt(self, media_file: Path, language: Optional[str] = None) -> str:
+    async def _transcribe_with_simple_prompt(
+        self,
+        media_file: Path,
+        language: Optional[str] = None,
+        *,
+        audio_duration_sec: Optional[float] = None,
+    ) -> str:
         """
         Transcribe audio using a simple ASR prompt instead of complex instructions.
 
         Args:
             media_file: Path to audio file
             language: Optional language code
+            audio_duration_sec: Audio duration to scale HTTP timeout against. When
+                ``None``, the SDK's default (no explicit timeout) is used.
 
         Returns:
             Transcribed text
         """
         llm_client = self._get_llm_client()
+        timeout_ms = self._resolve_request_timeout_ms(audio_duration_sec)
 
-        # Upload audio file
+        # Upload audio file. Use a timeout-scoped client so a stalled upload
+        # also fails fast instead of hanging until TCP keepalive (2h).
         if self.config.verbose:
             self.logger.info("📤 Uploading audio file to Gemini...")
-        uploaded_file = llm_client.raw_client.files.upload(file=str(media_file))
+        upload_client = llm_client.get_client(http_timeout_ms=timeout_ms)
+        uploaded_file = upload_client.files.upload(file=str(media_file))
 
         # Simple ASR prompt
         system_prompt = "Transcribe the audio."
@@ -215,7 +233,11 @@ class GeminiTranscriber(BaseTranscriber):
         )
 
         contents = Part.from_uri(file_uri=uploaded_file.uri, mime_type=uploaded_file.mime_type)
-        response = await llm_client.generate_content(contents, config=simple_config)
+        response = await llm_client.generate_content(
+            contents,
+            config=simple_config,
+            http_timeout_ms=timeout_ms,
+        )
 
         if not response.text:
             raise RuntimeError("Empty response from Gemini API")
@@ -226,6 +248,19 @@ class GeminiTranscriber(BaseTranscriber):
             self.logger.info(f"✅ Transcription completed: {len(transcript)} characters")
 
         return transcript
+
+    def _resolve_request_timeout_ms(self, audio_duration_sec: Optional[float]) -> Optional[int]:
+        """Compute the HTTP timeout (ms) to pass to the Gemini SDK.
+
+        Returns None when no duration hint is available AND the user has not
+        pinned an explicit override — preserving the SDK's default for
+        callers that operate on URLs / unknown-length media.
+        """
+        override = self.config.http_timeout_ms
+        if audio_duration_sec is None and override is None:
+            return None
+        # When override is None but duration is known, scale by duration.
+        return resolve_http_timeout_ms(audio_duration_sec or 0.0, override_ms=override)
 
     def _load_base_prompt(self) -> str:
         """Load and cache the base transcription prompt (without language/description)."""

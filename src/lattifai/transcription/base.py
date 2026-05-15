@@ -18,6 +18,32 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Auto-scale HTTP timeout by audio duration when the user does not pin one.
+# Ratio: 1 hour of audio → 10 minutes of HTTP timeout (audio_sec / 6).
+# Floor avoids surprising timeouts on short clips; cap avoids unbounded waits
+# on multi-hour inputs that almost certainly indicate a stalled server.
+_HTTP_TIMEOUT_AUDIO_RATIO = 6  # audio_sec : timeout_sec = 6 : 1
+_HTTP_TIMEOUT_FLOOR_MS = 30_000
+_HTTP_TIMEOUT_CAP_MS = 1_800_000
+
+
+def resolve_http_timeout_ms(
+    audio_duration_sec: float,
+    *,
+    override_ms: Optional[int] = None,
+) -> int:
+    """Resolve the HTTP timeout (in milliseconds) for a cloud transcription call.
+
+    ``override_ms`` short-circuits everything when set — tests pin small
+    values (e.g. ``100``) to exercise the timeout path quickly. When None,
+    the budget scales linearly with audio duration at the ratio defined above,
+    bounded by ``[_HTTP_TIMEOUT_FLOOR_MS, _HTTP_TIMEOUT_CAP_MS]``.
+    """
+    if override_ms is not None:
+        return int(override_ms)
+    scaled = int(audio_duration_sec * 1000 / _HTTP_TIMEOUT_AUDIO_RATIO)
+    return max(_HTTP_TIMEOUT_FLOOR_MS, min(scaled, _HTTP_TIMEOUT_CAP_MS))
+
 
 class BaseTranscriber(ABC):
     """

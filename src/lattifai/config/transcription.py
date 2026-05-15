@@ -55,6 +55,14 @@ class TranscriptionConfig:
     gemini_api_key: Optional[str] = None
     """Gemini API key. If None, reads from GEMINI_API_KEY environment variable."""
 
+    http_timeout_ms: Optional[int] = None
+    """HTTP request timeout (milliseconds) for cloud transcription providers
+    (Gemini, vLLM endpoints, etc.). When None, transcribers auto-scale the
+    timeout by audio duration using a 1-hour-audio → 10-minute-timeout ratio
+    (audio_sec / 6 * 1000, floored at 30s, capped at 30min). Set an explicit
+    integer to override — e.g. tests pin this to a small value like 100
+    so timeout behavior can be exercised without hitting the floor."""
+
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device for transcription models."""
 

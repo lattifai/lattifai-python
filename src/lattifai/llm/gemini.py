@@ -23,12 +23,44 @@ class GeminiClient(BaseLLMClient):
     def provider_name(self) -> str:
         return "gemini"
 
-    def _get_client(self):
-        if self._client is None:
-            from google import genai
+    # google-genai 2.x defaults HttpOptions.timeout to None (infinite). With no
+    # timeout, a stalled server response keeps the TCP connection open until
+    # Linux's TCP keepalive (default 7200s = 2h) tears it down — observed as a
+    # 2h26m Release Tests hang on `gemini-3.1-pro-preview` (CI run 25904188835).
+    #
+    # Timeout strategy:
+    #  - Default (None passed in) -> use the SDK's None semantics for the
+    #    cached client. Callers that know their workload size SHOULD pass an
+    #    explicit `http_timeout_ms` (e.g. audio transcription scales it by
+    #    media duration), in which case a fresh non-cached client is built
+    #    just for that call.
+    #  - Units are milliseconds in google-genai 2.x (1.x → 2.x breaking change).
+    #  - httpx interprets a single `timeout=N` value as the cap on every
+    #    phase (connect/read/write/pool); since non-streaming generate_content
+    #    sends no data until the full response is ready, this is effectively
+    #    a budget for "how long the server can take to produce the response."
 
-            if not self._api_key:
-                raise ValueError("Gemini API key is required. Set GEMINI_API_KEY or pass api_key.")
+    def _get_client(self, http_timeout_ms: Optional[int] = None):
+        """Return a google-genai Client.
+
+        When ``http_timeout_ms`` is provided, build a fresh (un-cached) client
+        with that HTTP timeout. When ``None``, reuse the cached default
+        client (no explicit timeout) so repeated short calls don't pay the
+        per-call construction cost.
+        """
+        from google import genai
+        from google.genai.types import HttpOptions
+
+        if not self._api_key:
+            raise ValueError("Gemini API key is required. Set GEMINI_API_KEY or pass api_key.")
+
+        if http_timeout_ms is not None:
+            return genai.Client(
+                api_key=self._api_key,
+                http_options=HttpOptions(timeout=http_timeout_ms),
+            )
+
+        if self._client is None:
             self._client = genai.Client(api_key=self._api_key)
         return self._client
 
@@ -64,6 +96,7 @@ class GeminiClient(BaseLLMClient):
         *,
         model: Optional[str] = None,
         config=None,
+        http_timeout_ms: Optional[int] = None,
     ):
         """Low-level Gemini generate_content for multimodal use (transcription).
 
@@ -71,11 +104,17 @@ class GeminiClient(BaseLLMClient):
             contents: Gemini Part or list of Parts (audio, video, text).
             model: Model name override.
             config: GenerateContentConfig instance.
+            http_timeout_ms: Optional per-call HTTP timeout in milliseconds.
+                When provided, a fresh genai.Client with that timeout is
+                built for this call (the default cached client is not used).
+                Callers that know their workload (e.g. audio transcription
+                scales by duration) should set this to avoid both infinite
+                hangs and false timeouts on long syntheses.
 
         Returns:
             Raw GenerateContentResponse from Gemini SDK.
         """
-        client = self._get_client()
+        client = self._get_client(http_timeout_ms=http_timeout_ms)
         resolved_model = self._resolve_model(model)
 
         return await asyncio.get_event_loop().run_in_executor(
@@ -125,5 +164,21 @@ class GeminiClient(BaseLLMClient):
 
     @property
     def raw_client(self):
-        """Access the underlying genai.Client for file uploads, etc."""
+        """Access the underlying genai.Client (cached, no explicit timeout).
+
+        Prefer ``get_client(http_timeout_ms=...)`` when the caller knows the
+        expected workload size — both ``files.upload`` and ``generate_content``
+        can hang indefinitely on a stalled server with google-genai 2.x's
+        default ``HttpOptions.timeout=None``.
+        """
         return self._get_client()
+
+    def get_client(self, http_timeout_ms: Optional[int] = None):
+        """Get a genai.Client, optionally with a per-call HTTP timeout.
+
+        When ``http_timeout_ms`` is provided, a fresh non-cached client is
+        built so the timeout applies to both file uploads and content
+        generation on that client. When ``None``, returns the cached client
+        with whatever timeout it was constructed with (default: none).
+        """
+        return self._get_client(http_timeout_ms=http_timeout_ms)
