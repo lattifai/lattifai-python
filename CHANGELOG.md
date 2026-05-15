@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## [1.5.12] - 2026-05-15
+
+### Fixes
+- **`lai diarize naming` now writes the named output to disk.** The command was silently discarding the LLM speaker mapping because `cap.write(path, output_format=...)` passed a kwarg that `Caption.write` does not accept — the CLI printed `SPEAKER_00 → Alice` etc., then crashed with `TypeError: Caption.write() got an unexpected keyword argument 'output_format'` before persisting anything. Removed the invalid kwarg; `Caption.write` already infers the format from the path suffix.
+- **`lai transcribe run` honours the output path suffix.** Gemini-based transcribers return raw markdown strings, and the CLI used to call `transcriber.write(string, path)` which dumps that string verbatim regardless of suffix — `out.json` would end up containing markdown. Added `_persist_transcript()` which round-trips the string through `Caption.read` (with an explicit `markdown` hint for `.md` sources) and re-emits via `Caption.write` when the path suffix differs from the transcriber's native; matching-suffix paths still delegate straight to `transcriber.write` so binary formats and custom render paths are preserved.
+
+### Tests
+- `test_naming_writes_named_file_to_disk` (mocks the diarization LLM via `DiarizationLLMConfig.create_client`) pinning the regression for the `output_format` kwarg fix.
+- `test_persist_transcript_routes_through_caption_on_suffix_mismatch` and `test_persist_transcript_passthrough_when_suffix_matches` pinning the transcribe path-suffix fix.
+
+
 ## [1.5.11] - 2026-05-15
 
 ### Features

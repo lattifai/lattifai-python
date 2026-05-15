@@ -1,3 +1,30 @@
+# Release Notes - LattifAI Python v1.5.12
+
+**Release Date:** May 15, 2026
+
+---
+
+## Overview
+
+v1.5.12 is a focused patch fixing two CLI persistence bugs surfaced while running the full `lai-skills` evaluation pipeline against a real YouTube interview on 2026-05-15.
+
+### Key Changes
+
+- **`lai diarize naming` actually writes its output now.** The command would print the inferred speaker mapping (e.g. `SPEAKER_00 → Dwarkesh Patel`, `SPEAKER_01 → Terence Tao`) and then crash with `TypeError: Caption.write() got an unexpected keyword argument 'output_format'` — the LLM result was discarded and no `.named.json` was ever produced. Fix drops the invalid kwarg; `Caption.write` infers the format from the path suffix as it always has.
+- **`lai transcribe run` no longer dumps markdown into `.json`.** Gemini-based transcribers return raw markdown strings, and the CLI's `transcriber.write(string, path)` call previously wrote that string verbatim to whatever path the user requested. A Gemini transcript saved as `out.json` would still be markdown with a misleading extension. Fix routes through `Caption.read` + `Caption.write` whenever the requested suffix differs from the transcriber's native, so `.json` / `.srt` / `.vtt` output now matches its extension.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+No config migration required.
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.11
 
 **Release Date:** May 15, 2026
