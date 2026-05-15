@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## [1.5.11] - 2026-05-15
+
+### Features
+- **Speaker diarization picks up `meta.md` context end-to-end.** `_resolve_context` (CLI) and `extract_candidate_names` / `_build_prompt` (LLM-side) now plumb the structured `speakers:` list — including `affiliation`, `aliases`, `bio` — plus new `topics:` and `prior_episodes:` fields into the speaker-naming prompt as a `## Speaker Background` section (emitted only when at least one anchor is non-empty). Strong anchors for matching self-introductions ("I work at Stanford") and aliases ("thanks, Swyx"). Description cap raised from 3 lines to 800 chars.
+
+### Fixes
+- **Auth: trial and OAuth login fields no longer coexist in `[auth]`.** Running `lai auth trial` followed by `lai auth login` (or vice-versa) used to leave both sets of fields in `~/.lattifai/config.toml`, producing a misleading config where a fully OAuth-logged-in session still carried `IS_TRIAL=true`, a stale `EXPIRES_AT`, and `CREDITS`. `_persist_auth` now purges trial-only fields (`IS_TRIAL`, `EXPIRES_AT`, `CREDITS`) after writing; `_persist_trial_auth` purges OAuth-only fields (`USER_EMAIL`, `KEY_NAME`). New helper `cli.config.delete_auth_value(key)` does surgical removal preserving unrelated `[auth]` entries (e.g. `API_KEY_ID`).
+- **Diarization `Speakers:` block parser hardening** (Codex-review follow-ups to the meta.md feature above): blank lines inside the block no longer truncate the remainder; `Shawn Wang (Swyx)`-style parentheticals are captured as implicit aliases instead of being recorded as the speaker's role; per-field prompt-inflation caps (aliases ≤8 × ≤40 chars, bio ≤300 chars, topics ≤20 × ≤50 chars, prior_episodes ≤5 × ≤200 chars) prevent a pathological meta.md from pushing arbitrary text into the LLM prompt; description cap off-by-one fixed (was 801 chars, now exactly 800 inclusive of the trailing ellipsis).
+
+### Dependencies
+- Bump to latest, including **major `google-genai` 1.x → 2.x**. Verified `Client`, `GenerateContentConfig`, `Part`, `ThinkingConfig` interfaces stay source-compatible — no caller changes required. Also `lattifai-auth >=0.3.0`, `lattifai-core >=0.7.6`, `lattifai-captions[splitting] >=0.4.16`, `openai >=2.36.0`, `mlx-audio >=0.4.3`, `mlx-vlm >=0.5.0`.
+- Bump dev test stack: `pytest 8 → 9`, `pytest-cov 4 → 7`, `pytest-asyncio >=1.3.0,<2.0.0`.
+- Add explicit lower bounds for previously unpinned deps: `python-dotenv`, `soundfile`, `av`, `msgpack`, `pycryptodome`, `black`, `webrtcvad`.
+- **`onnxruntime` version split via PEP 508 environment markers**: `>=1.23.2` on Python `<3.11` (last cp310-supporting release), `>=1.26.0` on Python `>=3.11`. Required because `onnxruntime` dropped Python 3.10 wheels starting at `1.24.0`; CI matrix still includes 3.10.
+
+### Tests
+- Replace real-network-dependent `TestIsHostReachable` cases with four mock-based scenarios (success, `socket.timeout`, `ConnectionRefusedError`, `socket.gaierror`). The previous tests spuriously failed behind transparent proxies and captive portals that "accept" RFC 5737 TEST-NET addresses. Implementation in `youtube/client.py` is unchanged.
+- New auth tests pinning the trial/login state-machine: `test_login_after_trial_clears_trial_fields`, `test_trial_after_login_clears_login_fields`, `test_persist_trial_preserves_unrelated_keys`.
+
+
 ## [1.5.10] - 2026-04-28
 
 ### Fixes

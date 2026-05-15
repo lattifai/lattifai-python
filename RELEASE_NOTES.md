@@ -1,3 +1,33 @@
+# Release Notes - LattifAI Python v1.5.11
+
+**Release Date:** May 15, 2026
+
+---
+
+## Overview
+
+v1.5.11 fixes a long-standing auth state bug, plumbs richer `meta.md` context into LLM speaker diarization, lifts the dependency floor across the board (notably **`google-genai` 2.x** major bump), and patches the CI break introduced when `onnxruntime` dropped Python 3.10 wheels at 1.24.0.
+
+### Key Changes
+
+- **Auth state no longer mixes trial + login fields.** Running `lai auth trial` then `lai auth login` (or vice-versa) used to leave both sets of fields in `~/.lattifai/config.toml`. The resulting `[auth]` section showed `IS_TRIAL=true`, a stale `EXPIRES_AT`, and `CREDITS` even after a successful OAuth login. `_persist_auth` and `_persist_trial_auth` now each purge the other session type's exclusive fields; unrelated entries (e.g. `API_KEY_ID`) are preserved.
+- **Speaker diarization reads `meta.md` background.** The structured `speakers:` block (affiliation, aliases, bio) and the new `topics:` / `prior_episodes:` fields now flow end-to-end into the LLM speaker-naming prompt as a `## Speaker Background` section — strong anchors for matching self-introductions like "I work at Stanford" or aliases like "thanks, Swyx". Per-field caps (aliases ≤8 × ≤40 chars, bio ≤300 chars, topics ≤20 × ≤50 chars, prior_episodes ≤5 × ≤200 chars) prevent prompt inflation from a pathological meta.md.
+- **`google-genai` bumped to 2.x.** Verified `Client` / `GenerateContentConfig` / `Part` / `ThinkingConfig` interfaces stay source-compatible — no caller changes required.
+- **`onnxruntime` version markers fix CI on Python 3.10.** Marker-split pin: `>=1.23.2` on `<3.11`, `>=1.26.0` on `>=3.11`. `onnxruntime` dropped cp310 wheels starting at 1.24.0; the marker keeps the 3.10 lane buildable while letting 3.11+ pick up the latest.
+- **YouTube transcript tests stop touching the network.** `_is_host_reachable` tests now mock `socket.create_connection` so transparent-proxy / captive-portal environments stop producing false failures on RFC 5737 TEST-NET addresses.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+If you previously ran `lai auth trial` and then `lai auth login` on a pre-1.5.11 CLI, run `lai auth login` once after upgrading and the stale trial fields will be cleaned out of `~/.lattifai/config.toml` automatically. (Alternatively: `lai auth logout` then re-login.)
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.10
 
 **Release Date:** April 28, 2026
