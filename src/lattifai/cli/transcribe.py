@@ -1,5 +1,7 @@
 """Transcription CLI entry point with nemo_run."""
 
+import tempfile
+from pathlib import Path
 from typing import Optional
 
 import nemo_run as run
@@ -17,6 +19,50 @@ from lattifai.config import (
     TranscriptionConfig,
 )
 from lattifai.utils import _resolve_model_path
+
+# Map a transcriber's native file_suffix to an explicit Caption format hint.
+# Caption.read auto-detects most formats from the path suffix, but `.md` is
+# ambiguous (could be summary markdown, podcast transcript markdown, etc.), so
+# we pass the explicit "markdown" hint to make sure the right parser runs.
+_TRANSCRIBER_SUFFIX_TO_FORMAT = {".md": "markdown"}
+
+
+def _persist_transcript(transcript, output_path, transcriber):
+    """Write transcript to disk, respecting the user-requested output suffix.
+
+    Gemini and other LLM transcribers return raw markdown strings, but the user
+    might ask for `.json` / `.srt` / `.vtt` output. ``transcriber.write`` on a
+    raw string dumps the string verbatim regardless of the path suffix, which
+    produces files with misleading extensions (e.g. markdown content saved
+    under `output.json`). When the suffix mismatch is detected, round-trip
+    through the Caption library so the on-disk format matches the path
+    suffix.
+
+    When the suffixes already match (or the transcript is already a structured
+    ``Caption`` object), this delegates straight to ``transcriber.write`` so
+    binary formats and custom render paths are preserved.
+    """
+    output_path = Path(output_path)
+    src_suffix = (getattr(transcriber, "file_suffix", "") or "").lower()
+    out_suffix = output_path.suffix.lower()
+
+    if not isinstance(transcript, str) or not src_suffix or src_suffix == out_suffix:
+        return transcriber.write(transcript, output_path, encoding="utf-8", cache_event=False)
+
+    # Cross-format: parse the raw string via the transcriber's native format
+    # and re-emit through Caption.write using the requested suffix.
+    from lattifai.caption import Caption
+
+    fmt_hint = _TRANSCRIBER_SUFFIX_TO_FORMAT.get(src_suffix)
+    with tempfile.NamedTemporaryFile(suffix=src_suffix, mode="w", delete=False, encoding="utf-8") as tmp:
+        tmp.write(transcript)
+        tmp_path = Path(tmp.name)
+    try:
+        cap = Caption.read(str(tmp_path), format=fmt_hint)
+        cap.write(str(output_path))
+    finally:
+        tmp_path.unlink(missing_ok=True)
+    return output_path
 
 
 @run.cli.entrypoint(name="run", namespace="transcribe", entrypoint_cls=LattifAIEntrypoint)
@@ -112,7 +158,8 @@ def transcribe(
     # Create transcriber
     if not transcription_config.lattice_model_path:
         transcription_config.lattice_model_path = _resolve_model_path(
-            "LattifAI/Lattice-1", getattr(transcription_config, "model_hub", "huggingface")
+            "LattifAI/Lattice-1",
+            getattr(transcription_config, "model_hub", "huggingface"),
         )
     event_config = event or EventConfig()
     transcriber = create_transcriber(transcription_config=transcription_config, event_config=event_config)
@@ -169,8 +216,10 @@ def transcribe(
 
     safe_print(theme.step(f"   Output: {final_output}"))
 
-    # Write output
-    transcriber.write(transcript, final_output, encoding="utf-8", cache_event=False)
+    # Write output. ``_persist_transcript`` honours the user-requested suffix
+    # (e.g. raw markdown → JSON when output_caption ends in `.json`); without
+    # it, a Gemini transcript would be dumped verbatim into a `.json` file.
+    _persist_transcript(transcript, final_output, transcriber)
 
     safe_print(theme.ok(f"🎉 Transcription completed: {final_output}"))
 
