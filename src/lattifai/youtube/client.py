@@ -592,12 +592,25 @@ class YouTubeDownloader:
         return tmp_path
 
     # Player clients known to return real (non-SABR, non-storyboard-only) formats
-    # while still respecting cookie auth, as of 2026-05. yt-dlp's default chain
-    # is biased toward web_safari → YouTube forces SABR streaming there and all
-    # https formats get URL-stripped (yt-dlp issue #12482). mweb avoids SABR.
-    # Override via YOUTUBE_PLAYER_CLIENT="mweb,tv_simply" if YouTube tightens
-    # something or this list goes stale.
-    _DEFAULT_PLAYER_CLIENTS = "mweb"
+    # while still respecting cookie auth, as of 2026-05. Background:
+    #   - yt-dlp default `web_safari` → YouTube forces SABR streaming there and
+    #     all https formats get URL-stripped unless a PO Token is supplied
+    #     (yt-dlp issue #12482). With the bgutil-ytdlp-pot-provider plugin
+    #     active this is no longer a hard block.
+    #   - `mweb` avoids SABR without needing a PO Token, but YouTube's bot
+    #     classifier has been hammering it since mid-May: even with valid
+    #     cookies a fraction of videos return "Sign in to confirm you're not
+    #     a bot" (reproduced 2026-05-17 on Anthropic/Claude-Code-101 series,
+    #     while a direct yt-dlp call using the default client chain + bgutil
+    #     PO Token succeeded on the same machine, same cookies).
+    #   - `tv` is the safest middle ground (no PO Token required, modern
+    #     stream layout, not as heavily fingerprinted as mweb).
+    # We list multiple clients so yt-dlp can fall through automatically when
+    # one is bot-walled. `tv` first (best success rate), then `mweb` for the
+    # SABR-evasion path, then `web_safari` as last resort (works when bgutil
+    # POT provider is up). Override via YOUTUBE_PLAYER_CLIENT="…" if the
+    # ranking goes stale.
+    _DEFAULT_PLAYER_CLIENTS = "tv,mweb,web_safari"
 
     def _load_auth_opts(self) -> Dict[str, Any]:
         """Load yt-dlp cookie/proxy/player_client options from environment.
