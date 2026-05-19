@@ -1,3 +1,31 @@
+# Release Notes - LattifAI Python v1.5.13
+
+**Release Date:** May 19, 2026
+
+---
+
+## Overview
+
+v1.5.13 is a patch release fixing two CI-visible reliability bugs and bumping the `lattifai-core` floor to pick up the Apple-Silicon diarization speedup.
+
+### Key Changes
+
+- **Gemini transcription no longer hangs for hours on stalled responses.** Since `google-genai` 2.x (introduced in v1.5.11) defaults `HttpOptions.timeout` to `None`, a stalled `gemini-3.1-pro-preview` call let the TCP socket idle until Linux's 2-hour keepalive kicked in — caught in Release Tests as a 2h26m hang. HTTP timeout is now budgeted by audio duration (1h audio : 10min timeout, floored at 30s, capped at 30min); explicit `TranscriptionConfig.http_timeout_ms` overrides the auto-budget. The cached default `GeminiClient` used for short LLM calls is untouched.
+- **YouTube downloader regains bot resilience.** `mweb` alone began hitting "Sign in to confirm you're not a bot" since mid-May 2026 even with valid cookies. Default `player_client` is now `tv,mweb,web_safari` — `tv` has the best success rate without a PO Token, `mweb` stays for SABR evasion, `web_safari` is the bgutil-POT fallback. yt-dlp falls through automatically when a client is bot-walled.
+- **`lattifai-core` floor bumped to `>=0.7.8`.** Picks up the new MPS FP16 sortformer backend (~2.6x speedup on Apple Silicon for diarization), `LatticeDecodingError` containment so a bad chunk no longer aborts the whole diarization run, and import-clean lazy loading of `LatticeDecodingError`.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+No config migration required. `TranscriptionConfig.http_timeout_ms` is opt-in; existing configs keep working with the new audio-duration auto-budget.
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.12
 
 **Release Date:** May 15, 2026

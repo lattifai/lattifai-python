@@ -1,6 +1,20 @@
 # CHANGELOG
 
 
+## [1.5.13] - 2026-05-19
+
+### Fixes
+- **`lai transcribe run` no longer hangs indefinitely on stalled Gemini responses.** `google-genai` 2.x (picked up in v1.5.11) defaults `HttpOptions.timeout` to `None`, so a stalled `gemini-3.1-pro-preview` call would idle until Linux TCP keepalive tore the socket down — observed as a 2h26m Release Tests hang. New `transcription.base.resolve_http_timeout_ms(audio_sec, override_ms)` budgets HTTP time by audio duration (1h audio : 10min timeout, i.e. `audio_sec / 6`), floored at 30s and capped at 30min. `TranscriptionConfig.http_timeout_ms` (Optional[int]) lets users override the budget; `GeminiClient.get_client(http_timeout_ms=…)` builds a fresh non-cached `genai.Client` with `HttpOptions(timeout=…)` so short LLM calls keep using the cached default while `transcribe_numpy` / `_transcribe_with_simple_prompt` both thread the per-call budget into `files.upload` and `generate_content`.
+- **YouTube downloader switches default `player_client` to `tv,mweb,web_safari`.** `mweb` alone started hitting "Sign in to confirm you're not a bot" since mid-May 2026 even with valid cookies. `tv` has the highest success rate without a PO Token, `mweb` stays for SABR evasion, `web_safari` is the bgutil-POT fallback; yt-dlp falls through automatically when a client is bot-walled.
+
+### Dependencies
+- Bump `lattifai-core` floor `>=0.7.6` → `>=0.7.8` (and the `[event]` / `[diarization]` extras), picking up: MPS FP16 sortformer backend for Apple Silicon (~2.6x speedup), `LatticeDecodingError` containment in `realign_chunk` so diarization no longer aborts the whole run, lazy `LatticeDecodingError` import to keep test envs import-clean, and a rotated ModelScope hub token.
+
+### Tests
+- `tests/test_llm_gemini_client.py` (10 cases) pinning `GeminiClient` cache vs. timeout-scoped behaviour and the `resolve_http_timeout_ms` ratio / floor / cap / override contract.
+- `tests/transcription/test_gemini_http_timeout.py` (3 cases) pinning E2E timeout propagation through `transcribe_numpy`: short → 30s floor, 1h → 10min budget, explicit override wins over scaling.
+
+
 ## [1.5.12] - 2026-05-15
 
 ### Fixes
