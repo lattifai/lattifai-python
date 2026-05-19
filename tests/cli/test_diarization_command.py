@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from lattifai.cli.diarize import _resolve_context
+from lattifai.cli.diarize import _DESCRIPTION_CHAR_CAP, _resolve_context
 
 LATTIFAI_TESTS_CLI_DRYRUN = bool(os.environ.get("LATTIFAI_TESTS_CLI_DRYRUN", "false"))
 
@@ -159,25 +159,58 @@ class TestResolveContext:
         assert "00:00" not in result
         assert "#hashtag" not in result
 
-    def test_description_limited_to_3_lines(self, tmp_path):
-        f = tmp_path / "video.meta.md"
+    def test_description_capped_at_char_limit(self, tmp_path):
+        """Description body is capped at _DESCRIPTION_CHAR_CAP chars (inclusive of
+        the trailing ellipsis). Short multi-line bodies pass through verbatim;
+        oversized bodies are truncated with an '…' suffix.
+
+        Replaces the v1.5.10 line-cap (3 lines) behaviour — v1.5.11 raised the
+        cap to a character budget so richer multi-line context survives.
+        """
+        # Short multi-line body: all lines kept, no truncation marker.
+        f = tmp_path / "short.meta.md"
         f.write_text(
             textwrap.dedent(
                 """\
                 ---
-                title: Long
+                title: Short
                 ---
                 Line one.
                 Line two.
                 Line three.
-                Line four should not appear.
+                Line four still fits.
             """
             ),
             encoding="utf-8",
         )
         result = _resolve_context(str(f))
-        assert "Line three." in result
-        assert "Line four" not in result
+        assert "Line four still fits." in result
+        assert "…" not in result
+
+        # Oversized body: truncated with ellipsis, output ≤ cap chars in the
+        # description portion (we check the tail to avoid coupling to the
+        # title/channel header length).
+        long_line = "x" * 200  # 5 of these = 1000 chars > 800 cap
+        long_body = "\n".join(f"{long_line} {i}" for i in range(5))
+        f2 = tmp_path / "long.meta.md"
+        f2.write_text(
+            textwrap.dedent(
+                """\
+                ---
+                title: Long
+                ---
+                """
+            )
+            + long_body
+            + "\n",
+            encoding="utf-8",
+        )
+        result2 = _resolve_context(str(f2))
+        assert result2.endswith("…"), "Oversized description must end with '…' truncation marker"
+        # Description body sits under the "Description:\n" header; its length
+        # (sum of kept lines + newlines) must fit inside _DESCRIPTION_CHAR_CAP.
+        desc_body = result2.split("Description:\n", 1)[1]
+        assert len(desc_body) <= _DESCRIPTION_CHAR_CAP
 
     def test_unclosed_frontmatter_returns_none(self, tmp_path):
         f = tmp_path / "broken.meta.md"

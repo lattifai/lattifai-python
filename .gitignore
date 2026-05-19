@@ -97,3 +97,4 @@ debug/
 debug
 url-to-markdown/
 .translation_checkpoint.json
+.claude/
