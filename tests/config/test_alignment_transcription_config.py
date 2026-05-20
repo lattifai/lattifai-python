@@ -109,3 +109,45 @@ class TestTranslationConfigDefaults:
     def test_mode_default(self):
         cfg = TranslationConfig()
         assert cfg.mode in ("quick", "normal", "refined")
+
+
+class TestTranscriptionModelValidation:
+    """Validate the built-in model whitelist + escape hatches.
+
+    The whitelist (`SUPPORTED_TRANSCRIPTION_MODELS`) is the curated list of
+    models we have explicitly tested. To avoid a new release every time Google
+    ships a new Gemini variant, any `gemini-*` model id passes through; the
+    Gemini API itself will reject typos at call time.
+    """
+
+    def test_gemini_3_5_flash_accepted(self):
+        """v1.5.14: gemini-3.5-flash (Google I/O 2026-05-19 GA release) is in
+        the curated whitelist and must not raise."""
+        cfg = TranscriptionConfig(model_name="gemini-3.5-flash")
+        assert cfg.model_name == "gemini-3.5-flash"
+
+    def test_gemini_3_1_flash_lite_ga_accepted(self):
+        """gemini-3.1-flash-lite (preview → GA) was missing from the whitelist
+        before v1.5.14."""
+        cfg = TranscriptionConfig(model_name="gemini-3.1-flash-lite")
+        assert cfg.model_name == "gemini-3.1-flash-lite"
+
+    def test_unlisted_gemini_prefix_accepted(self):
+        """Forward-compat: any `gemini-*` model id passes the whitelist gate
+        without a release bump. Google's API returns 404 on typos so the
+        feedback loop is short enough."""
+        cfg = TranscriptionConfig(model_name="gemini-4.0-flash-imaginary-preview")
+        assert cfg.model_name == "gemini-4.0-flash-imaginary-preview"
+
+    def test_non_gemini_unlisted_model_still_rejected(self):
+        """The prefix escape hatch is gemini-only — random model ids from
+        other providers must still raise so users get a clear error before
+        the first API call."""
+        with pytest.raises(ValueError, match="Unsupported model_name"):
+            TranscriptionConfig(model_name="claude-4-opus-imaginary")
+
+    def test_deprecated_gemini_3_pro_auto_switched(self):
+        """Existing deprecation alias still works post-change: gemini-3-pro-preview
+        gets rewritten to gemini-3.1-pro-preview."""
+        cfg = TranscriptionConfig(model_name="gemini-3-pro-preview")
+        assert cfg.model_name == "gemini-3.1-pro-preview"

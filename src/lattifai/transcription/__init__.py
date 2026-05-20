@@ -70,7 +70,7 @@ def create_transcriber(
             f"Cannot determine transcriber for model_name='{transcription_config.model_name}'. "
             f"Supported patterns: \n"
             f"  - vLLM/SGLang models: set api_base_url='http://localhost:8000/v1'\n"
-            f"  - Gemini API models: 'gemini-2.5-pro', 'gemini-2.5-flash', etc.\n"
+            f"  - Gemini API models: any 'gemini-*' id (e.g. 'gemini-3.5-flash', 'gemini-2.5-pro').\n"
             f"  - Local HF models: 'nvidia/parakeet-*', 'iic/SenseVoiceSmall', etc.\n"
             f"Please specify a valid model_name."
         )

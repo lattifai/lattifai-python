@@ -17,6 +17,8 @@ SUPPORTED_TRANSCRIPTION_MODELS = Literal[
     "gemini-3-flash-preview",
     "gemini-3.1-pro-preview",
     "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash",  # Google I/O 2026-05-19 GA release; 4x faster than prior frontier Flash.
     "nvidia/parakeet-tdt-0.6b-v3",
     "nvidia/canary-1b-v2",
     "iic/SenseVoiceSmall",
@@ -184,18 +186,24 @@ class TranscriptionConfig:
             )
             self.model_name = replacement
 
-        # When api_base_url is set, any model name is valid (forwarded to vLLM/SGLang server)
-        # mlx-community/* model IDs are also allowed (for MLX in-process inference)
+        # Escape hatches from the curated whitelist:
+        # 1. api_base_url set    → forwarded to vLLM/SGLang server, any model id is valid
+        # 2. mlx-community/*     → MLX in-process inference
+        # 3. gemini-*            → forward-compat for new Google releases (Gemini API
+        #                          itself returns 404 on typos, so we don't gatekeep here
+        #                          and avoid a release bump per new Google model)
         if (
             self.model_name not in SUPPORTED_TRANSCRIPTION_MODELS.__args__
             and not self.api_base_url
             and not self.model_name.startswith("mlx-community/")
+            and not self.model_name.startswith("gemini-")
         ):
             raise ValueError(
                 f"Unsupported model_name: '{self.model_name}'. "
                 f"Supported models are: {SUPPORTED_TRANSCRIPTION_MODELS.__args__}. "
                 f"For vLLM/SGLang-served models, set api_base_url to enable any model. "
-                f"For MLX models, use mlx-community/* model IDs."
+                f"For MLX models, use mlx-community/* model IDs. "
+                f"For new Gemini models, use any 'gemini-*' id (forwarded directly to Gemini API)."
             )
 
         # Load environment variables from .env file
