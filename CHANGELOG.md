@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## [1.5.14] - 2026-05-20
+
+### Features
+- **Added `gemini-3.5-flash` to the curated transcription model list.** Google's Gemini 3.5 Flash GA was announced at I/O 2026 on 2026-05-19; vendor claims ~4× faster than prior frontier Flash models. Use it via `transcription.model_name=gemini-3.5-flash`.
+- **Added `gemini-3.1-flash-lite` (preview → GA backfill).** The `-preview` suffix was dropped on the Google side; we already had the preview id, this lifts the stable id too.
+- **Forward-compat for future Gemini models — no more release bump per Google launch.** Any `gemini-*` model id now passes the `_SUPPORTED_MODELS` whitelist gate as a third escape hatch (alongside `api_base_url` for vLLM/SGLang and `mlx-community/*` for MLX). Rationale: the curated list still drives IDE autocomplete and onboarding examples, but Google's id naming (`gemini-X.Y-flash[-lite|-pro|-preview]`) is regular enough that gatekeeping at config time only costs us a release; the Gemini API itself returns 404 on typos so the wrong-id feedback loop is short. New releases (e.g. `gemini-3.5-pro` when it goes public, `gemini-4.0-*`) work out-of-the-box.
+
+### Tests
+- `TestTranscriptionModelValidation` (5 cases) in `tests/config/test_alignment_transcription_config.py`: pin (a) `gemini-3.5-flash` accepted, (b) `gemini-3.1-flash-lite` GA accepted, (c) unlisted `gemini-4.0-flash-imaginary-preview` passes the gate via the prefix escape hatch, (d) non-gemini unlisted ids (e.g. `claude-4-opus-imaginary`) still raise `ValueError`, (e) existing `gemini-3-pro-preview` → `gemini-3.1-pro-preview` deprecation alias survives the change.
+
+
 ## [1.5.13] - 2026-05-19
 
 ### Fixes

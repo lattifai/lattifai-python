@@ -1,3 +1,43 @@
+# Release Notes - LattifAI Python v1.5.14
+
+**Release Date:** May 20, 2026
+
+---
+
+## Overview
+
+v1.5.14 ships day-after support for Google's **Gemini 3.5 Flash** (announced at I/O 2026 on 2026-05-19, immediately GA) and — more importantly — makes future Gemini model launches a non-event for LattifAI users.
+
+### Key Changes
+
+- **`gemini-3.5-flash` is now a first-class transcription model.** Vendor claims ~4× faster than prior frontier Flash models. Use it via `transcription.model_name=gemini-3.5-flash`.
+- **`gemini-3.1-flash-lite` (preview → GA) backfilled.** The previous `_preview` suffix was dropped Google-side; the GA id is now accepted alongside the preview.
+- **Forward-compat: any `gemini-*` model id passes the whitelist gate.** This is the design change that matters more than either model. The curated `SUPPORTED_TRANSCRIPTION_MODELS` list still drives IDE autocomplete and CLI help text, but it is no longer a hard wall — any id with the `gemini-` prefix is forwarded directly to the Gemini API. If you typo, Gemini's API will return a 404 on the first call (clear error, short loop). Future Google releases (`gemini-3.5-pro` when it goes public, `gemini-4.0-*`, …) work without a LattifAI release bump.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+```
+
+### Try the new model
+
+```bash
+lai transcribe run audio.mp3 transcript.json transcription.model_name=gemini-3.5-flash
+```
+
+Or any future Gemini variant — e.g. once `gemini-3.5-pro` goes public:
+
+```bash
+lai transcribe run audio.mp3 transcript.json transcription.model_name=gemini-3.5-pro
+```
+
+No LattifAI upgrade required for new Gemini ids going forward.
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.13
 
 **Release Date:** May 19, 2026
