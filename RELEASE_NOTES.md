@@ -1,3 +1,45 @@
+# Release Notes - LattifAI Python v1.5.15
+
+**Release Date:** May 24, 2026
+
+---
+
+## Overview
+
+v1.5.15 closes a long-standing diagnostic blind spot in `lai update`: the command tracked the `lattifai` package itself but said nothing about `lattifai-core`, the C++/k2 binary wheel that does the actual lattice work. In editable installs (`pip install -e .`, which uses `--no-deps`) `lattifai-core` could drift below the version constraint declared in `pyproject.toml`, producing runtime `ImportError`s with no breadcrumb back to the cause.
+
+### Key Changes
+
+- **`lai update` now reports `lattifai-core` version status.** After every successful update path — regular `pip install`, editable refresh, and the editable "already in sync" early-return — the command appends one line with three actionable states:
+
+  | State | Example output |
+  |---|---|
+  | OK | `lattifai-core: 0.7.9 (latest)` |
+  | Upgrade available | `lattifai-core: 0.7.8 -> 0.7.9 available — run: pip install -U lattifai-core` |
+  | Constraint violated | `lattifai-core: 0.7.8 (constraint: >=0.7.9 NOT satisfied) — run: pip install -U lattifai-core` |
+
+  The latest-version probe queries the **private GitHub Pages PyPI mirror** (`lattifai-core` is not on pypi.org) and parses the PEP 503 simple index. Constraint detection reads `importlib.metadata.requires("lattifai")` so no physical `pyproject.toml` read is required. Network/metadata failures degrade silently and never block the update.
+
+- **`lattifai-core` floor bumped `>=0.7.8` → `>=0.7.9`** across the base dependency and the `[event]` / `[diarization]` extras. Combined with the new check, users still on 0.7.8 will see the `NOT satisfied` line immediately after the next `lai update`.
+
+### Upgrade
+
+```bash
+pip install --upgrade "lattifai" --extra-index-url https://lattifai.github.io/pypi/simple/
+lai update   # also force-bumps lattifai-core to satisfy the new floor
+```
+
+### Verify
+
+```bash
+lai update | tail -1
+# → lattifai-core: 0.7.9 (latest)
+```
+
+---
+
+---
+
 # Release Notes - LattifAI Python v1.5.14
 
 **Release Date:** May 20, 2026

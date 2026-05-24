@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## [1.5.15] - 2026-05-24
+
+### Features
+- **`lai update` now actively reports `lattifai-core` version status.** After every successful update path (regular `pip install`, editable refresh, and the editable "already in sync" early-return), the command appends a `lattifai-core: …` line with one of three actionable states: `(latest)` / `X.Y.Z -> A.B.C available` / `(constraint: >=X.Y.Z NOT satisfied)`. Previously `lai update` only tracked the `lattifai` package itself — `lattifai-core` could silently drift in editable installs (which use `--no-deps`) or whenever the user only ran `pip install -U lattifai-core` manually, producing hard-to-diagnose runtime `ImportError`s. The latest-version probe queries the private GitHub Pages PyPI mirror (the authoritative source for `lattifai-core` — it is not published to pypi.org) and parses the PEP 503 simple index; constraint detection reads `importlib.metadata.requires("lattifai")` so no physical `pyproject.toml` read is required. All network/metadata failures degrade silently without blocking the update flow.
+
+### Dependencies
+- Bump `lattifai-core` floor `>=0.7.8` → `>=0.7.9` (and the `[event]` / `[diarization]` extras). Combined with the new `lai update` check, users still on 0.7.8 now see an explicit `constraint: >=0.7.9 NOT satisfied — run: pip install -U lattifai-core` line right after upgrading the `lattifai` package itself.
+
+### Tests
+- `TestCoreVersionCheck` in `tests/cli/test_update_command.py` (16 new cases): local version display, private-mirror simple-index parsing, constraint parsing with/without extras (`lattifai-core[event]>=…`), graceful degradation on missing package / network failure, and pinning the three call sites (`post_check`, `_refresh_editable` success, `_refresh_editable` in-sync early-return).
+
+
 ## [1.5.14] - 2026-05-20
 
 ### Features
