@@ -39,7 +39,7 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "colorful>=0.5.8",
     "lattifai-run>=1.0.4",
-    "lattifai-core>=0.7.8",
+    "lattifai-core>=0.7.9",
     "lattifai-captions[splitting]>=0.4.17",
     "g2p-phonemizer>=0.4.2",
     "error-align-fix>=0.1.4",
@@ -60,11 +60,11 @@ dependencies = [
 [project.optional-dependencies]
 # Event
 event = [
-    "lattifai-core[event]>=0.7.8",
+    "lattifai-core[event]>=0.7.9",
 ]
 # Diarization
 diarization = [
-    "lattifai-core[diarization]>=0.7.8",
+    "lattifai-core[diarization]>=0.7.9",
 ]
 # Transcription: ASR models (NeMo/SenseVoice/FunASR, Linux/CUDA focused)
 transcription = [
