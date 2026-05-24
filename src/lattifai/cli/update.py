@@ -2,11 +2,13 @@
 
 import importlib.metadata
 import importlib.util
+import re
 import subprocess
 import sys
 
 import requests
 from packaging import version as v_parse
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
 from rich.console import Console
 
 from lattifai.theme import _Theme as T
@@ -14,6 +16,13 @@ from lattifai.theme import _Theme as T
 console = Console()
 
 _PIP_TIMEOUT_SECS = 300  # 5 minutes for pip install
+_CORE_PACKAGE = "lattifai-core"
+# Match `lattifai-core` or `lattifai-core[extra]` followed by version spec.
+# Captures the spec portion (e.g. ">=0.7.8") up to the environment marker (`;`).
+_CORE_REQ_PATTERN = re.compile(
+    r"^\s*lattifai[-_]core(?:\[[^\]]+\])?\s*([^;]*?)\s*(?:;.*)?$",
+    re.IGNORECASE,
+)
 
 
 class AutoUpdater:
@@ -118,6 +127,7 @@ class AutoUpdater:
 
         if not stale and source_version and source_version == current_v:
             console.print(f"[{T.RICH_OK}]Editable install is in sync ({current_v}).[/{T.RICH_OK}]")
+            self._check_core_version()
             return 0
 
         # Clean up stale egg-info directories
@@ -150,6 +160,7 @@ class AutoUpdater:
                         console.print(f"  [{T.RICH_DIM}]{line}[/{T.RICH_DIM}]")
                 return 1
             console.print(f"[{T.RICH_OK}]Editable install refreshed successfully![/{T.RICH_OK}]")
+            self._check_core_version()
             return 0
         except subprocess.TimeoutExpired:
             console.print(f"[{T.RICH_ERR}]pip timed out after {_PIP_TIMEOUT_SECS}s.[/{T.RICH_ERR}]")
@@ -197,6 +208,119 @@ class AutoUpdater:
             console.print(f"[{T.RICH_ERR}]Failed to run pip: {exc}[/{T.RICH_ERR}]")
             return 1
 
+    def _get_core_version(self) -> str | None:
+        """Return installed lattifai-core version, or None if not installed."""
+        try:
+            return importlib.metadata.version(_CORE_PACKAGE)
+        except importlib.metadata.PackageNotFoundError:
+            return None
+
+    def _get_latest_core_version(self) -> str | None:
+        """Fetch latest lattifai-core version from the private mirror.
+
+        lattifai-core is hosted on the private GitHub Pages PyPI mirror, not
+        on pypi.org. We parse the simple-index HTML and extract the highest
+        PEP 440 version from the wheel/sdist filenames.
+
+        Returns None on network or parse failure; never raises.
+        """
+        try:
+            response = requests.get(f"{self.index_url}{_CORE_PACKAGE}/", timeout=5)
+            if response.status_code != 200:
+                return None
+        except requests.RequestException:
+            return None
+
+        # Match: lattifai_core-<version>-...  or  lattifai_core-<version>.tar.gz
+        # PEP 503 normalizes hyphens to underscores in filenames.
+        version_re = re.compile(r"lattifai[-_]core-([0-9][^-]*?)(?:-|\.tar\.gz)", re.IGNORECASE)
+        versions = set(version_re.findall(response.text))
+        if not versions:
+            return None
+
+        try:
+            return str(max(versions, key=v_parse.parse))
+        except v_parse.InvalidVersion:
+            return None
+
+    def _get_core_constraint(self) -> str | None:
+        """Return the lattifai-core version constraint declared by `lattifai`.
+
+        Reads `Requires-Dist` metadata, returns the first matching spec string
+        (e.g. ">=0.7.8"). Optional-extra requirements that aren't activated
+        are skipped to avoid false alarms.
+        """
+        try:
+            requires = importlib.metadata.requires(self.package_name) or []
+        except importlib.metadata.PackageNotFoundError:
+            return None
+
+        for req in requires:
+            # Skip optional-extra requirements (e.g. `... ; extra == 'event'`)
+            # unless they target the base package without an extra gate.
+            match = _CORE_REQ_PATTERN.match(req)
+            if not match:
+                continue
+            spec = match.group(1).strip()
+            if spec:
+                return spec
+        return None
+
+    @staticmethod
+    def _constraint_satisfied(installed: str, constraint: str) -> bool:
+        """Return True if `installed` satisfies PEP 440 `constraint` spec."""
+        try:
+            return v_parse.parse(installed) in SpecifierSet(constraint)
+        except (InvalidSpecifier, v_parse.InvalidVersion):
+            return True  # be lenient on parse errors
+
+    def _check_core_version(self) -> None:
+        """Render lattifai-core version status to console.
+
+        States:
+          - installed, satisfies constraint, equals latest → OK
+          - installed, satisfies constraint, behind latest → WARN (upgrade available)
+          - installed, violates constraint → ERR (must upgrade)
+          - not installed → WARN
+          - latest unknown (network failure) → just show installed
+        """
+        installed = self._get_core_version()
+        latest = self._get_latest_core_version()
+        constraint = self._get_core_constraint()
+
+        if installed is None:
+            hint = f" (declared: {constraint})" if constraint else ""
+            console.print(
+                f"  {_CORE_PACKAGE}: [{T.RICH_WARN}]not installed{hint}[/{T.RICH_WARN}]"
+                f" — run: [{T.RICH_LABEL}]pip install -U {_CORE_PACKAGE}[/{T.RICH_LABEL}]"
+            )
+            return
+
+        # Constraint violation is the most actionable issue — surface it first.
+        if constraint and not self._constraint_satisfied(installed, constraint):
+            console.print(
+                f"  {_CORE_PACKAGE}: [{T.RICH_ERR}]{installed} (constraint: {constraint} NOT satisfied)"
+                f"[/{T.RICH_ERR}] — run: [{T.RICH_LABEL}]pip install -U {_CORE_PACKAGE}[/{T.RICH_LABEL}]"
+            )
+            return
+
+        if latest is None:
+            console.print(f"  {_CORE_PACKAGE}: [{T.RICH_OK}]{installed}[/{T.RICH_OK}] (PyPI check skipped)")
+            return
+
+        try:
+            is_outdated = v_parse.parse(installed) < v_parse.parse(latest)
+        except v_parse.InvalidVersion:
+            is_outdated = False
+
+        if is_outdated:
+            console.print(
+                f"  {_CORE_PACKAGE}: [{T.RICH_WARN}]{installed} -> {latest} available[/{T.RICH_WARN}]"
+                f" — run: [{T.RICH_LABEL}]pip install -U {_CORE_PACKAGE}[/{T.RICH_LABEL}]"
+            )
+        else:
+            console.print(f"  {_CORE_PACKAGE}: [{T.RICH_OK}]{installed} (latest)[/{T.RICH_OK}]")
+
     def post_check(self):
         """Self-healing health check after update."""
         console.print(f"[{T.RICH_STEP}]Running environment health check...[/{T.RICH_STEP}]")
@@ -212,9 +336,11 @@ class AutoUpdater:
                 accel.append("CoreML")
         except ImportError:
             console.print(f"  [{T.RICH_DIM}]ONNXRuntime not installed, skipping engine check.[/{T.RICH_DIM}]")
+            self._check_core_version()
             return
         except Exception as e:
             console.print(f"  [{T.RICH_ERR}]Health check error: {e}[/{T.RICH_ERR}]")
+            self._check_core_version()
             return
 
         # PyTorch MPS (Apple Silicon GPU)
@@ -234,6 +360,8 @@ class AutoUpdater:
             console.print(f"  GPU acceleration: [{T.RICH_OK}]Active ({', '.join(accel)})[/{T.RICH_OK}]")
         else:
             console.print(f"  GPU acceleration: [{T.RICH_WARN}]Not found (Using CPU)[/{T.RICH_WARN}]")
+
+        self._check_core_version()
 
 
 def update(force: bool = False) -> int:
