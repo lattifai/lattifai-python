@@ -397,6 +397,14 @@ class LatticeTokenizer:
                 request_body["duplicate_blocks"] = [dup._asdict() for dup in dup_blocks]
             response = self.client_wrapper.post("tokenize", json=request_body)
         else:
+            # Apply split_sentence symmetrically on the TextAlignResult branch
+            # so the parameter behaves the same across both tokenize branches.
+            # In-place mutation keeps downstream detokenize aligned with the
+            # resegmented inputs.
+            if split_sentence:
+                supervisions[0] = self.split_sentences(supervisions[0])
+                supervisions[1] = self.split_sentences(supervisions[1])
+
             pronunciation_dictionaries = self.prenormalize([s.text for s in supervisions[0]])
             pronunciation_dictionaries.update(self.prenormalize([s.text for s in supervisions[1]]))
 
