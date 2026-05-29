@@ -337,54 +337,107 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                             "Segmented alignment without trusting input timestamps is not yet implemented."
                         )
 
-                # align each segment
+                # align each segment.
+                #
+                # Transcription strategy uses fail-and-merge retry: lattice
+                # decode failures on a single segment used to crash the whole
+                # run with zero output. Now failed segments are queued and
+                # retried by expanding their window into successful neighbours
+                # (see lattifai.alignment._merge). Other strategies retain the
+                # original crash-on-failure behaviour.
                 sr = media_audio.sampling_rate
-                supervisions, alignments = [], []
-                for i, (start, end, _supervisions, skipalign) in enumerate(segments, 1):
-                    safe_print(
-                        theme.ok(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
-                    )
-                    if skipalign:
-                        supervisions.extend(_supervisions)
-                        alignments.extend(_supervisions)  # may overlap with supervisions, but harmless
-                        continue
+                _segment_split = (
+                    False
+                    if alignment_strategy == "transcription"
+                    else (split_sentence or self.caption_config.split_sentence)
+                )
 
-                    offset = round(start, 4)
-                    # Extract audio slice
-                    audio_slice = media_audio.ndarray[:, int(start * sr) : int(end * sr)]
+                def _align_one(seg):
+                    """Run lattice alignment on a single segment tuple.
+                    Raised LatticeDecodingError propagates to the caller."""
+                    s_start, s_end, s_sups, _ = seg
+                    audio_slice = media_audio.ndarray[:, int(s_start * sr) : int(s_end * sr)]
                     emission = self.aligner.emission(audio_slice)
-
-                    # Align segment.
-                    #
-                    # `_segment_split` controls split_sentence inside the per-segment
-                    # lattice tokenize call:
-                    # - transcription strategy: both caption.supervisions and
-                    #   caption.transcription were already split upstream
-                    #   (caption.supervisions at line ~300; caption.transcription
-                    #   either at read-time for external VTT or per-match for
-                    #   internal ASR). Re-running wtpsplit per segment would be
-                    #   redundant and slow.
-                    # - other strategies (caption / entire-with-transcription /
-                    #   trust_caption_timestamps): segments may be raw Supervision
-                    #   lists that haven't been split — keep the original behaviour.
-                    _segment_split = (
-                        False
-                        if alignment_strategy == "transcription"
-                        else (split_sentence or self.caption_config.split_sentence)
-                    )
-                    _supervisions, _alignments = self.aligner.alignment(
+                    return self.aligner.alignment(
                         media_audio,
-                        _supervisions,
+                        s_sups,
                         split_sentence=_segment_split,
                         return_details=True,
                         emission=emission,
-                        offset=offset,
+                        offset=round(s_start, 4),
                         verbose=False,
                         metadata=metadata,
                     )
 
-                    supervisions.extend(_supervisions)
-                    alignments.extend(_alignments)
+                from lattifai.alignment._merge import SegmentResult, chained_merge_retry
+
+                # Phase 1: main pass with per-segment try/except.
+                seg_results: list = []
+                for i, seg in enumerate(segments, 1):
+                    start, end, _supervisions, skipalign = seg
+                    safe_print(
+                        theme.ok(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
+                    )
+                    if skipalign:
+                        seg_results.append(
+                            SegmentResult(
+                                idx=i - 1,
+                                status="skip",
+                                supervisions=list(_supervisions),
+                                alignments=list(_supervisions),
+                                exception=None,
+                            )
+                        )
+                        continue
+                    try:
+                        _sup_out, _ali_out = _align_one(seg)
+                        seg_results.append(
+                            SegmentResult(
+                                idx=i - 1,
+                                status="ok",
+                                supervisions=_sup_out,
+                                alignments=_ali_out,
+                                exception=None,
+                            )
+                        )
+                    except LatticeDecodingError as e:
+                        safe_print(theme.warn(f"  ⚠️  Segment {i} lattice decode failed; queueing for merge retry"))
+                        seg_results.append(
+                            SegmentResult(
+                                idx=i - 1,
+                                status="fail",
+                                supervisions=None,
+                                alignments=None,
+                                exception=e,
+                            )
+                        )
+
+                # Phase 2 (transcription only): chained merge-retry for failures.
+                # Other strategies preserve the original behaviour — any failure
+                # would have already propagated out of the main loop above for
+                # them, since Phase 1 doesn't change LatticeDecodingError handling
+                # for non-transcription paths in current code (segments shape
+                # differs; merge helpers assume TextAlignResult tuples).
+                if alignment_strategy == "transcription" and any(r.status == "fail" for r in seg_results):
+                    seg_results = chained_merge_retry(
+                        segments,
+                        seg_results,
+                        _align_one,
+                        warn_fn=lambda msg: safe_print(theme.warn(msg)),
+                    )
+
+                # Phase 3: flatten in original index order.
+                supervisions, alignments = [], []
+                for r in seg_results:
+                    if r.status == "fail":
+                        # Last-ditch safety net (should not happen — Phase 2
+                        # always resolves to 'ok' even via boundary fallback).
+                        raise LatticeDecodingError(
+                            lattice_id=str(r.idx),
+                            message=f"Segment {r.idx + 1} alignment failed and merge retry produced no result",
+                        )
+                    supervisions.extend(r.supervisions)
+                    alignments.extend(r.alignments)
 
                 # sort by start
                 alignments = sorted(alignments, key=lambda x: x.start)
