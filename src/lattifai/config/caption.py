@@ -68,20 +68,54 @@ class CaptionInputConfig:
         0.10:           experimental — typically over-fragments fillers
     """
 
+    transcription_path: Optional[str] = None
+    """Path to an external transcription file used as ``Caption.transcription``.
+
+    When set, the client reads this file in addition to ``path`` (which still
+    populates ``Caption.supervisions``) and skips the internal ASR transcriber.
+
+    Designed for the ``alignment.strategy='transcription'`` workflow where the
+    user already has an ASR-style transcript (e.g. YouTube auto-caption VTT)
+    that should be diff-aligned against a curated caption track (e.g. an
+    official published transcript). Lets the aligner skip regions present in
+    one source but absent in the other (mid-roll ads, sponsor reads, etc.)
+    without spending GPU time re-running ASR.
+
+    Default: ``None`` — falls back to the existing internal ASR behaviour when
+    ``strategy='transcription'`` and no transcription has been preloaded."""
+
+    transcription_format: InputCaptionFormat = "auto"
+    """Format hint for ``transcription_path``. Same auto-detection rules as
+    ``format``. Default: ``auto``."""
+
     def __post_init__(self):
         """Validate input configuration."""
         self._normalize_path()
+        self._normalize_transcription_path()
         self._validate_format()
+        self._validate_transcription_format()
 
     def _normalize_path(self) -> None:
         """Normalize and expand input path."""
         if self.path is not None:
             self.path = str(Path(self.path).expanduser().resolve())
 
+    def _normalize_transcription_path(self) -> None:
+        """Normalize and expand external transcription path (if provided)."""
+        if self.transcription_path is not None:
+            self.transcription_path = str(Path(self.transcription_path).expanduser().resolve())
+
     def _validate_format(self) -> None:
         """Validate input format."""
         if self.format not in INPUT_CAPTION_FORMATS:
             raise ValueError(f"input format must be one of {INPUT_CAPTION_FORMATS}, got '{self.format}'")
+
+    def _validate_transcription_format(self) -> None:
+        """Validate transcription format (same vocabulary as ``format``)."""
+        if self.transcription_format not in INPUT_CAPTION_FORMATS:
+            raise ValueError(
+                f"transcription_format must be one of {INPUT_CAPTION_FORMATS}, " f"got '{self.transcription_format}'"
+            )
 
     def set_path(self, path: Pathlike) -> Path:
         """Set input caption path and validate it.

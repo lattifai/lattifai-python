@@ -21,6 +21,65 @@ class TestCaptionInputConfigValidation:
             assert config.format == fmt
 
 
+class TestCaptionInputConfigDualSource:
+    """Test the external-transcription dual-input path used by
+    ``alignment.strategy='transcription'`` diff alignment workflows."""
+
+    def test_transcription_path_defaults_to_none(self):
+        """Default config does not opt into the external-transcription path."""
+        config = CaptionInputConfig()
+        assert config.transcription_path is None
+        assert config.transcription_format == "auto"
+
+    def test_transcription_path_normalized_when_set(self, tmp_path):
+        """Path is expanded + resolved at construction time (mirrors ``path``)."""
+        test_file = tmp_path / "external_asr.vtt"
+        test_file.touch()
+        config = CaptionInputConfig(transcription_path=str(test_file))
+        assert config.transcription_path == str(test_file.resolve())
+
+    def test_transcription_path_accepts_nonexistent_path(self, tmp_path):
+        """``__post_init__`` only normalizes; existence checks belong to the loader.
+
+        This matches the behavior of ``path`` — both fields can be configured
+        before the referenced file is created (e.g. config built then file
+        downloaded later in the pipeline).
+        """
+        non_existing = tmp_path / "not_yet_downloaded.vtt"
+        config = CaptionInputConfig(transcription_path=str(non_existing))
+        assert config.transcription_path == str(non_existing.resolve())
+
+    def test_invalid_transcription_format_raises_error(self):
+        """Same format vocabulary as ``format`` — invalid values rejected."""
+        with pytest.raises(ValueError, match="transcription_format must be one of"):
+            CaptionInputConfig(transcription_format="invalid")
+
+    def test_valid_transcription_formats(self):
+        """All standard input formats are valid for transcription too."""
+        valid_formats = ["auto", "srt", "vtt", "ass", "txt", "json"]
+        for fmt in valid_formats:
+            config = CaptionInputConfig(transcription_format=fmt)
+            assert config.transcription_format == fmt
+
+    def test_both_path_and_transcription_path_independent(self, tmp_path):
+        """Setting one does not affect the other — they are independent slots."""
+        primary = tmp_path / "official.md"
+        primary.touch()
+        external = tmp_path / "yt.vtt"
+        external.touch()
+
+        config = CaptionInputConfig(
+            path=str(primary),
+            format="auto",
+            transcription_path=str(external),
+            transcription_format="vtt",
+        )
+        assert config.path == str(primary.resolve())
+        assert config.transcription_path == str(external.resolve())
+        assert config.format == "auto"
+        assert config.transcription_format == "vtt"
+
+
 class TestCaptionOutputConfigValidation:
     """Test CaptionOutputConfig validation."""
 

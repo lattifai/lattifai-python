@@ -226,6 +226,34 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
 
+            # External transcription (e.g. YT auto-caption VTT) replaces the
+            # internal ASR for strategy='transcription'. Resegment only when the
+            # source carries word-level alignment — otherwise split_sentences
+            # falls back to character-ratio time estimation, which corrupts the
+            # segment boundaries the downstream lattice aligner depends on.
+            cfg = self.caption_config.input
+            transcription_already_split = False
+            if cfg.transcription_path and not caption.transcription:
+                external = self._read_caption(cfg.transcription_path, cfg.transcription_format)
+                caption.transcription = external.supervisions
+                if cfg.split_sentence:
+                    has_word_align = all(
+                        (getattr(s, "alignment", None) or {}).get("word") for s in caption.transcription
+                    )
+                    if has_word_align:
+                        caption.transcription = self.aligner.tokenizer.split_sentences(
+                            caption.transcription,
+                            threshold=cfg.split_threshold,
+                        )
+                        transcription_already_split = True
+                    else:
+                        safe_print(
+                            theme.warn(
+                                "  ⚠️  External transcription has no word-level alignment; "
+                                "skipping pre-split (would estimate timestamps by char ratio)."
+                            )
+                        )
+
             output_caption_path = output_caption_path or self.caption_config.output_path
 
             # Step 2: Check if segmented alignment is needed
@@ -237,12 +265,20 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 if caption.supervisions and alignment_strategy == "transcription":
                     from lattifai.alignment.text_align import align_supervisions_and_transcription
 
-                    if "gemini" in self.transcriber.name.lower():
-                        raise ValueError(
-                            f"Transcription-based alignment is not supported for {self.transcriber.name} "
-                            "(Gemini's timestamp is not reliable)."
-                        )
                     if not caption.transcription:
+                        # Only need an internal ASR pass when transcription was not
+                        # already preloaded (SDK preset OR caption.input.transcription_path).
+                        # Gemini's per-word timing is unreliable, so refuse it here —
+                        # the check is correctly scoped to the ASR call site, not the
+                        # whole strategy (an externally-provided transcription has its
+                        # own timing source that doesn't depend on the transcriber).
+                        if "gemini" in self.transcriber.name.lower():
+                            raise ValueError(
+                                f"Transcription-based alignment is not supported for {self.transcriber.name} "
+                                "(Gemini's timestamp is not reliable). "
+                                "Provide an external transcription via "
+                                "`caption.input.transcription_path=...` to skip the internal ASR."
+                            )
                         transcript = self._transcribe(
                             media_audio,
                             source_lang=self.caption_config.source_lang,
@@ -267,12 +303,17 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     skipalign = False
                     matches = sorted(matches, key=lambda x: x[2].WER.WER)  # sort by WER
                     segments = [(m[3].start[1], m[3].end[1], m, skipalign) for m in matches]
-                    for segment in segments:
-                        # transcription segments -> sentence splitting
-                        segment[2][1] = self.aligner.tokenizer.split_sentences(
-                            segment[2][1],
-                            threshold=self.caption_config.input.split_threshold,
-                        )
+                    # Skip the per-match transcription split when the external
+                    # source was already split at read time (transcription_already_split).
+                    # Resplitting an already-split list is idempotent but wastes
+                    # a wtpsplit call per match (N matches → N wasted GPU passes).
+                    if not transcription_already_split:
+                        for segment in segments:
+                            # transcription segments -> sentence splitting
+                            segment[2][1] = self.aligner.tokenizer.split_sentences(
+                                segment[2][1],
+                                threshold=self.caption_config.input.split_threshold,
+                            )
                 else:
                     if caption.transcription:
                         if "gemini" in self.transcriber.name.lower():
@@ -313,11 +354,28 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     audio_slice = media_audio.ndarray[:, int(start * sr) : int(end * sr)]
                     emission = self.aligner.emission(audio_slice)
 
-                    # Align segment
+                    # Align segment.
+                    #
+                    # `_segment_split` controls split_sentence inside the per-segment
+                    # lattice tokenize call:
+                    # - transcription strategy: both caption.supervisions and
+                    #   caption.transcription were already split upstream
+                    #   (caption.supervisions at line ~300; caption.transcription
+                    #   either at read-time for external VTT or per-match for
+                    #   internal ASR). Re-running wtpsplit per segment would be
+                    #   redundant and slow.
+                    # - other strategies (caption / entire-with-transcription /
+                    #   trust_caption_timestamps): segments may be raw Supervision
+                    #   lists that haven't been split — keep the original behaviour.
+                    _segment_split = (
+                        False
+                        if alignment_strategy == "transcription"
+                        else (split_sentence or self.caption_config.split_sentence)
+                    )
                     _supervisions, _alignments = self.aligner.alignment(
                         media_audio,
                         _supervisions,
-                        split_sentence=split_sentence or self.caption_config.split_sentence,
+                        split_sentence=_segment_split,
                         return_details=True,
                         emission=emission,
                         offset=offset,
