@@ -7,7 +7,11 @@ from typing import Any
 
 import pytest
 
-from lattifai.diarization.speaker import SpeakerNameInferrer, extract_candidate_names
+from lattifai.diarization.speaker import (
+    SpeakerNameInferrer,
+    _looks_like_person_name,
+    extract_candidate_names,
+)
 from lattifai.llm.base import BaseLLMClient
 
 # ---------------------------------------------------------------------------
@@ -198,6 +202,41 @@ class TestExtractCandidateNames:
         result = extract_candidate_names(ctx)
         # "Drake Johnson" should remain intact (Dr strip requires period or space after)
         assert "Drake Johnson" in result.get("host", [])
+
+    # --- Regression: download-step garbage speaker auto-fill -----------------
+    # `lai youtube download` seeds meta.md `speakers:` from these heuristics.
+    # Low-precision captures (org names, title fragments, stop-word phrases)
+    # used to be written verbatim as plausible-but-wrong speakers. Reject them
+    # so the seed stays honest (empty → forces enrich) instead of inventing
+    # fake people. See cli/youtube.py meta.md generation.
+
+    def test_channel_org_name_rejected(self):
+        """Org-named channel ('Sequoia Capital') must not become a host."""
+        ctx = "Channel/Host: Sequoia Capital\n"
+        result = extract_candidate_names(ctx)
+        assert "host" not in result
+
+    def test_title_conjoined_names_not_fused(self):
+        """'&'-joined guests in a title must not fuse into one bogus name."""
+        ctx = "Title: Devin's 80% Moment — Walden Yan & Cole Murray\n"
+        result = extract_candidate_names(ctx)
+        assert "Walden Yan & Cole Murray" not in result.get("guest", [])
+
+    def test_looks_like_person_name_rejects_garbage(self):
+        """The person-name validator must reject the real-world false positives."""
+        assert not _looks_like_person_name("Sequoia Capital")  # org name
+        assert not _looks_like_person_name("EWTN News")  # outlet name
+        assert not _looks_like_person_name("Follow our")  # stop-word phrase
+        assert not _looks_like_person_name("Walden Yan & Cole Murray")  # conjoined
+        assert not _looks_like_person_name("Cognition co-")  # truncated org+role
+
+    def test_looks_like_person_name_accepts_real_names(self):
+        """Guard against over-rejection: genuine names must still pass."""
+        assert _looks_like_person_name("Don Lincoln")
+        assert _looks_like_person_name("Walden Yan")
+        assert _looks_like_person_name("David George")
+        assert _looks_like_person_name("Drake Johnson")
+        assert _looks_like_person_name("张三")
 
 
 # ===========================================================================

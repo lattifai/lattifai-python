@@ -246,8 +246,21 @@ def _mine_role_evidence(
 # Words that never start a person name — articles, pronouns, conjunctions, common verbs
 _NON_NAME_STARTERS = frozenset(
     "the a an we he she it they this that how what why when where who which "
-    "is are was were will can do does did not no and or but if so".split()
+    "is are was were will can do does did not no and or but if so "
+    "follow subscribe watch join apply listen get read see".split()
 )
+
+# Corporate / outlet suffix tokens — if a candidate contains one of these it is
+# an organisation, not a person ("Sequoia Capital", "EWTN News", "a16z Ventures").
+_ORG_SUFFIX_WORDS = frozenset(
+    "capital ventures partners news media network networks inc llc ltd corp "
+    "corporation group labs studio studios show shows podcast productions "
+    "foundation institute university fund holdings technologies systems".split()
+)
+
+# Stop-words that never appear inside a real person name. A capture like
+# "Follow our" / "About us" passes the first-word check but is obvious noise.
+_NON_NAME_WORDS = frozenset("our your us we you they this that these those his her their its the a an".split())
 
 
 def _looks_like_person_name(text: str) -> bool:
@@ -259,6 +272,11 @@ def _looks_like_person_name(text: str) -> bool:
     # CJK names: 2-4 characters
     if re.fullmatch(r"[\u4e00-\u9fff]{2,4}", text):
         return True
+    # Conjoined names ("Walden Yan & Cole Murray") are several people, not one \u2014
+    # reject so the seed never fuses a list into a single fake person. Genuine
+    # multi-speaker paths split on the conjunction before reaching this check.
+    if "&" in text or re.search(r"\band\b", text, re.IGNORECASE):
+        return False
     # Western names: 2-6 words, first word capitalized, no sentence starters
     words = text.split()
     if len(words) < 2 or len(words) > 6:
@@ -267,6 +285,18 @@ def _looks_like_person_name(text: str) -> bool:
         return False
     # First significant word must start with uppercase
     if not words[0][0].isupper():
+        return False
+    # Reject organisation / outlet names and stop-word phrases that slip past
+    # the first-word gate \u2014 the channel name and description noise are the
+    # common offenders feeding meta.md's auto-generated speakers block.
+    lowered = [w.lower().strip(".,") for w in words]
+    if any(w in _ORG_SUFFIX_WORDS for w in lowered):
+        return False
+    if any(w in _NON_NAME_WORDS for w in lowered):
+        return False
+    # A trailing-hyphen token is a truncated word, not a name part
+    # ("Cognition co-" captured from "Cognition co-founder").
+    if any(w.endswith("-") for w in words):
         return False
     return True
 
