@@ -221,7 +221,10 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                     output_dir = Path(str(output_caption_path)).parent
                     output_dir.mkdir(parents=True, exist_ok=True)
                 caption = self._transcribe(
-                    media_audio, source_lang=self.caption_config.source_lang, is_async=False, output_dir=output_dir
+                    media_audio,
+                    source_lang=self.caption_config.source_lang,
+                    is_async=False,
+                    output_dir=output_dir,
                 )
             else:
                 caption = self._read_caption(input_caption, input_caption_format)
@@ -257,7 +260,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 caption_already_split = False
 
                 if caption.supervisions and alignment_strategy == "transcription":
-                    from lattifai.alignment.text_align import align_supervisions_and_transcription
+                    from lattifai.alignment.text_align import (
+                        align_supervisions_and_transcription,
+                    )
 
                     if not caption.transcription:
                         # Only need an internal ASR pass when transcription was not
@@ -277,7 +282,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                             media_audio,
                             source_lang=self.caption_config.source_lang,
                             is_async=False,
-                            output_dir=Path(str(output_caption_path)).parent if output_caption_path else None,
+                            output_dir=(Path(str(output_caption_path)).parent if output_caption_path else None),
                         )
                         caption.transcription = transcript.supervisions or transcript.transcription
                         caption.event = transcript.event
@@ -382,11 +387,17 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         metadata=metadata,
                     )
 
+                from concurrent.futures import ThreadPoolExecutor
+
                 from lattifai.alignment._merge import SegmentResult, chained_merge_retry
 
-                # Phase 1: main pass with per-segment try/except.
-                seg_results: list = []
-                for i, seg in enumerate(segments, 1):
+                # Phase 1: main pass. Segments are independent and each one's
+                # tokenize/detokenize are network-bound, so a thread pool of
+                # `batch_size` workers overlaps their round-trips. Ordering is
+                # preserved regardless (ThreadPoolExecutor.map yields in submit
+                # order); batch_size=1 keeps the original serial behaviour.
+                def _run_segment(idx_seg):
+                    i, seg = idx_seg
                     start, end, _supervisions, skipalign = seg
                     safe_print(
                         theme.ok(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
@@ -412,38 +423,38 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                                         )
                                     ],
                                 }
-                        seg_results.append(
-                            SegmentResult(
-                                idx=i - 1,
-                                status="skip",
-                                supervisions=list(_supervisions),
-                                alignments=list(_supervisions),
-                                exception=None,
-                            )
+                        return SegmentResult(
+                            idx=i - 1,
+                            status="skip",
+                            supervisions=list(_supervisions),
+                            alignments=list(_supervisions),
+                            exception=None,
                         )
-                        continue
                     try:
                         _sup_out, _ali_out = _align_one(seg)
-                        seg_results.append(
-                            SegmentResult(
-                                idx=i - 1,
-                                status="ok",
-                                supervisions=_sup_out,
-                                alignments=_ali_out,
-                                exception=None,
-                            )
+                        return SegmentResult(
+                            idx=i - 1,
+                            status="ok",
+                            supervisions=_sup_out,
+                            alignments=_ali_out,
+                            exception=None,
                         )
                     except LatticeDecodingError as e:
                         safe_print(theme.warn(f"  ⚠️  Segment {i} lattice decode failed; queueing for merge retry"))
-                        seg_results.append(
-                            SegmentResult(
-                                idx=i - 1,
-                                status="fail",
-                                supervisions=None,
-                                alignments=None,
-                                exception=e,
-                            )
+                        return SegmentResult(
+                            idx=i - 1,
+                            status="fail",
+                            supervisions=None,
+                            alignments=None,
+                            exception=e,
                         )
+
+                _batch = max(1, int(getattr(self.aligner.config, "batch_size", 1) or 1))
+                if _batch == 1 or len(segments) <= 1:
+                    seg_results = [_run_segment(x) for x in enumerate(segments, 1)]
+                else:
+                    with ThreadPoolExecutor(max_workers=_batch) as _ex:
+                        seg_results = list(_ex.map(_run_segment, enumerate(segments, 1)))
 
                 # Phase 2 (transcription only): chained merge-retry for failures.
                 # Other strategies preserve the original behaviour — any failure
@@ -579,8 +590,8 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 functools.partial(self.aligner.alignment, skip_duplicate_prompt=True),
                 self.aligner.emission,
             ),
-            transcribe_fn=self.transcriber.transcribe_numpy if self.transcriber else None,
-            separate_fn=self.aligner.separate if self.aligner.worker.separator_ort else None,
+            transcribe_fn=(self.transcriber.transcribe_numpy if self.transcriber else None),
+            separate_fn=(self.aligner.separate if self.aligner.worker.separator_ort else None),
             output_path=output_caption_path,
             speaker_context=speaker_context,
         )
@@ -618,7 +629,9 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
         media_file = self._download_media_sync(url, output_dir, media_format, force_overwrite, audio_track_id, quality)
 
         media_audio = self.audio_loader(
-            media_file, channel_selector=channel_selector, streaming_chunk_secs=streaming_chunk_secs
+            media_file,
+            channel_selector=channel_selector,
+            streaming_chunk_secs=streaming_chunk_secs,
         )
 
         # Step 2: Get or create captions (download or transcribe)
@@ -692,7 +705,7 @@ if __name__ == "__main__":
         output = None
         split_sentence = False
 
-    (alignments, output_caption_path) = client.alignment(
+    alignments, output_caption_path = client.alignment(
         input_media=audio,
         input_caption=caption,
         output_caption_path=output,

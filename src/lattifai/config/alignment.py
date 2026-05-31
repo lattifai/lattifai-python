@@ -29,8 +29,13 @@ class AlignmentConfig:
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""
 
-    batch_size: int = 1
-    """Batch size for inference (number of samples processed simultaneously, NotImplemented yet)."""
+    batch_size: int = 4
+    """Number of segments aligned concurrently in the 'transcription' strategy.
+    Each segment's tokenize/detokenize are network-bound, so a thread pool of
+    `batch_size` workers overlaps their round-trips (≈linear speedup until the
+    backend rate-limits). Output ordering is preserved. Default: 1 (serial).
+    No effect on 'entire' (single pass) or the 'caption' Segmenter path.
+    """
 
     # Segmented Alignment for Long Audio
     trust_caption_timestamps: bool = False
@@ -136,7 +141,12 @@ class AlignmentConfig:
         # Validate alignment parameters
         if self.batch_size < 1:
             raise ValueError("batch_size must be at least 1")
-        if self.device not in ("cpu", "cuda", "mps", "auto") and not self.device.startswith("cuda:"):
+        if self.device not in (
+            "cpu",
+            "cuda",
+            "mps",
+            "auto",
+        ) and not self.device.startswith("cuda:"):
             raise ValueError(f"device must be one of ('cpu', 'cuda', 'mps', 'auto'), got {self.device}")
 
         if self.device == "auto":
