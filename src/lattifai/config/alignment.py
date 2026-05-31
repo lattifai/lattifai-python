@@ -29,7 +29,7 @@ class AlignmentConfig:
     device: Literal["cpu", "cuda", "mps", "auto"] = "auto"
     """Computation device: 'cpu' for CPU, 'cuda' for NVIDIA GPU, 'mps' for Apple Silicon."""
 
-    batch_size: int = 4
+    batch_size: int = 1
     """Number of segments aligned concurrently in the 'transcription' strategy.
     Each segment's tokenize/detokenize are network-bound, so a thread pool of
     `batch_size` workers overlaps their round-trips (≈linear speedup until the
