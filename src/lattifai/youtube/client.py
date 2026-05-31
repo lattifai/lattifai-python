@@ -1772,58 +1772,108 @@ class YouTubeDownloader:
             self.logger.warning(f"Rescript API failed: {e}")
             return None
 
-        session = data.get("session", {})
-        transcript = session.get("final_transcript") or session.get("transcript", "")
-        if not transcript:
-            self.logger.warning("Rescript API returned no transcript content")
-            return None
+        return self._rescript_session_to_markdown(data.get("session", {}))
 
-        # Parse Rescript format: "Speaker [HH:MM:SS]:\n  text\n\n  [HH:MM:SS]\n\n  text continued"
-        # into markdown format: **Speaker:** text [HH:MM:SS]
-        lines = transcript.split("\n")
-        segments = []
+    @staticmethod
+    def _rescript_segments_from_utterances(session: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+        """Build speaker-turn segments from Rescript's structured Deepgram utterances.
+
+        Rescript's `final_transcript` is flattened narrative prose with the
+        per-turn speaker labels already stripped, so parsing speakers out of it
+        is impossible for modern exports. The Deepgram payload under
+        `transcriptionData.results.utterances` still carries a `speaker` index
+        per turn, which `speakerLabels` maps to a real name. Returns None when
+        the structured data is absent (older shares) so the caller can fall
+        back to flat-text parsing.
+        """
+        results = (session.get("transcriptionData") or {}).get("results") or {}
+        utterances = results.get("utterances") or []
+        if not utterances:
+            return None
+        labels = session.get("speakerLabels") or {}
+        segments: List[Dict[str, Any]] = []
+        for utt in utterances:
+            text = (utt.get("transcript") or "").strip()
+            if not text:
+                continue
+            spk = utt.get("speaker")
+            speaker = labels.get(str(spk), "") if spk is not None else ""
+            start = utt.get("start") or 0
+            segments.append({"speaker": speaker, "hms": YouTubeDownloader._secs_to_hms(start), "text": text})
+        return segments or None
+
+    @staticmethod
+    def _parse_rescript_flat_transcript(transcript: str) -> List[Dict[str, Any]]:
+        """Legacy fallback: parse speaker turns out of the flat `final_transcript`.
+
+        Older Rescript exports embedded "Speaker [HH:MM:SS]:" turn markers in
+        the flat text. Modern exports do not (use utterances instead), but this
+        is kept for backward compatibility with older shares.
+        """
+        segments: List[Dict[str, Any]] = []
         current_speaker = ""
         current_hms = ""
-        current_text = []
+        current_text: List[str] = []
 
         speaker_pattern = re.compile(r"^(.+?)\s*\[(\d{1,2}:\d{2}:\d{2})\]\s*:?\s*$")
         ts_pattern = re.compile(r"^\s*\[(\d{1,2}:\d{2}:\d{2})\]\s*$")
 
-        for line in lines:
+        def _flush():
+            if current_text:
+                text = " ".join(current_text).strip()
+                if text:
+                    segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+
+        for line in transcript.split("\n"):
             sp_m = speaker_pattern.match(line)
             ts_m = ts_pattern.match(line)
             if sp_m:
-                # Save previous segment
-                if current_text:
-                    text = " ".join(current_text).strip()
-                    if text:
-                        segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+                _flush()
                 current_speaker = sp_m.group(1).strip()
                 current_hms = sp_m.group(2)
                 current_text = []
             elif ts_m:
-                # Mid-segment timestamp: save current text as segment, start new one
-                if current_text:
-                    text = " ".join(current_text).strip()
-                    if text:
-                        segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+                # Mid-segment timestamp: close current text, keep speaker
+                _flush()
                 current_hms = ts_m.group(1)
                 current_text = []
             else:
                 stripped = line.strip()
                 if stripped:
                     current_text.append(stripped)
+        _flush()
+        return segments
 
-        # Don't forget the last segment
-        if current_text:
-            text = " ".join(current_text).strip()
-            if text:
-                segments.append({"speaker": current_speaker, "hms": current_hms, "text": text})
+    @staticmethod
+    def _secs_to_hms(secs) -> str:
+        """Convert seconds to zero-padded HH:MM:SS."""
+        s = int(round(float(secs)))
+        return f"{s // 3600:02d}:{(s % 3600) // 60:02d}:{s % 60:02d}"
 
-        if not segments:
-            return transcript  # Return raw text as fallback
+    @staticmethod
+    def _rescript_session_to_markdown(session: Dict[str, Any]) -> Optional[str]:
+        """Convert a Rescript share-API `session` object into transcript markdown.
 
-        # Extract chapters from _narrativeData (title + time range)
+        Prefers structured speaker-diarized utterances (which keep the
+        **Speaker:** turn-heads that the MarkdownReader / dual-caption aligner
+        require); falls back to parsing the flat `final_transcript` for older
+        shares that lack the structured payload.
+        """
+        logger = logging.getLogger(__name__)
+
+        segments = YouTubeDownloader._rescript_segments_from_utterances(session)
+        source = "utterances"
+        if segments is None:
+            transcript = session.get("final_transcript") or session.get("transcript", "")
+            if not transcript:
+                logger.warning("Rescript API returned no transcript content")
+                return None
+            segments = YouTubeDownloader._parse_rescript_flat_transcript(transcript)
+            source = "flat transcript"
+            if not segments:
+                return transcript  # Return raw text as fallback
+
+        # Extract chapters from _narrativeData (title + earliest span start)
         narrative = session.get("_narrativeData") or {}
         chapters = []
         for title, chapter_data in narrative.items():
@@ -1831,7 +1881,6 @@ class YouTubeDownloader:
                 continue
             spans = chapter_data.get("spans", [])
             if spans:
-                # Use the earliest span start as chapter start time
                 start_sec = min(s.get("start", 0) for s in spans if isinstance(s, dict))
                 chapters.append({"title": title, "start": start_sec})
         chapters.sort(key=lambda c: c["start"])
@@ -1840,29 +1889,21 @@ class YouTubeDownloader:
         toc_lines = []
         if chapters:
 
-            def _secs_to_hms(secs):
+            def _secs_to_hms_short(secs):
                 h, r = divmod(int(secs), 3600)
                 m, s = divmod(r, 60)
                 return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
             toc_lines.append("## Table of Contents")
             for ch in chapters:
-                toc_lines.append(f"- {_secs_to_hms(ch['start'])} – {ch['title']}")
+                toc_lines.append(f"- {_secs_to_hms_short(ch['start'])} – {ch['title']}")
             toc_lines.append("")
-
-        # Convert chapter start times to HH:MM:SS for insertion into transcript
-        chapter_by_hms = {}
-        if chapters:
-            for ch in chapters:
-                # Find the segment whose timestamp is closest to (but >= ) chapter start
-                chapter_by_hms[ch["title"]] = ch["start"]
 
         # Format as markdown, inserting chapter headings at the right positions
         md_lines = list(toc_lines)
         chapter_idx = 0
         for seg in segments:
-            # Insert chapter heading before this segment if its time matches
-            seg_secs = self._hms_to_secs(seg["hms"]) if seg["hms"] else 0
+            seg_secs = YouTubeDownloader._hms_to_secs(seg["hms"]) if seg["hms"] else 0
             while chapter_idx < len(chapters) and chapters[chapter_idx]["start"] <= seg_secs:
                 md_lines.append(f"## {chapters[chapter_idx]['title']}")
                 md_lines.append("")
@@ -1874,7 +1915,7 @@ class YouTubeDownloader:
             md_lines.append(f"{prefix}{seg['text']}{suffix}")
             md_lines.append("")
 
-        self.logger.info(f"✅ Parsed {len(segments)} segments, {len(chapters)} chapters from Rescript API")
+        logger.info(f"✅ Parsed {len(segments)} segments, {len(chapters)} chapters from Rescript API ({source})")
         return "\n".join(md_lines)
 
     @staticmethod

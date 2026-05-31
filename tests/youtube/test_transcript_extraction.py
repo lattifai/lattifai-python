@@ -422,3 +422,113 @@ class TestRepairJson:
 
         result = parse_json_response('<think>reasoning</think>[{"a": 1}]')
         assert result == [{"a": 1}]
+
+
+class TestRescriptSessionToMarkdown:
+    """Test _rescript_session_to_markdown — converts a Rescript share-API
+    `session` object into **Speaker:** turn-head markdown.
+
+    Regression context: Rescript's `final_transcript` is flattened narrative
+    prose with the per-turn speaker labels already stripped. The previous
+    implementation parsed speaker turns out of that flat text only, so the
+    rebuilt markdown carried *no* speaker turn-heads and the dual-caption
+    aligner failed with "No dialogue segments found". The structured Deepgram
+    payload under `transcriptionData.results.utterances` still carries a
+    `speaker` index per turn (mapped to a real name via `speakerLabels`); the
+    fix prefers it.
+    """
+
+    @staticmethod
+    def _session_with_utterances():
+        """A share session whose flat transcript has NO speaker markers (the
+        modern Rescript export), but whose structured utterances do."""
+        return {
+            "final_transcript": (
+                "So I remember when I was first elected to Congress. "
+                "It's already a massive problem that industries captured regulation. "
+                "It is a daunting problem, but there are examples in government."
+            ),
+            "speakerLabels": {"0": "Brad Carson", "1": "Keith Duggar"},
+            "transcriptionData": {
+                "results": {
+                    "utterances": [
+                        {
+                            "speaker": 0,
+                            "start": 0.0,
+                            "end": 9.5,
+                            "transcript": "So I remember when I was first elected to Congress.",
+                        },
+                        {
+                            "speaker": 1,
+                            "start": 293.0,
+                            "end": 322.0,
+                            "transcript": "It's already a massive problem that industries captured regulation.",
+                        },
+                        {
+                            "speaker": 0,
+                            "start": 322.9,
+                            "end": 429.0,
+                            "transcript": "It is a daunting problem, but there are examples in government.",
+                        },
+                    ]
+                }
+            },
+            "_narrativeData": {},
+        }
+
+    def test_utterances_produce_speaker_turn_heads(self):
+        """The core regression: structured utterances → **Speaker:** turn-heads."""
+        session = self._session_with_utterances()
+        md = YouTubeDownloader._rescript_session_to_markdown(session)
+        assert md is not None
+        assert "**Brad Carson:**" in md
+        assert "**Keith Duggar:**" in md
+        # speaker index → real name mapping is correct + ordered
+        assert md.index("**Brad Carson:**") < md.index("**Keith Duggar:**")
+        # utterance start time → [HH:MM:SS]; 293s == 00:04:53
+        assert "[00:00:00]" in md
+        assert "[00:04:53]" in md
+
+    def test_segments_from_utterances_maps_speaker_ids(self):
+        session = self._session_with_utterances()
+        segs = YouTubeDownloader._rescript_segments_from_utterances(session)
+        assert segs is not None
+        assert [s["speaker"] for s in segs] == ["Brad Carson", "Keith Duggar", "Brad Carson"]
+        assert segs[0]["text"].startswith("So I remember")
+
+    def test_segments_from_utterances_none_when_absent(self):
+        """Older shares without transcriptionData → None (caller falls back)."""
+        assert YouTubeDownloader._rescript_segments_from_utterances({}) is None
+        assert YouTubeDownloader._rescript_segments_from_utterances({"transcriptionData": {"results": {}}}) is None
+
+    def test_falls_back_to_flat_legacy_markers(self):
+        """No utterances, but legacy flat format carries 'Speaker [HH:MM:SS]:'
+        markers — the fallback parser still recovers speakers."""
+        session = {
+            "final_transcript": (
+                "Brad Carson [00:00:00]:\n"
+                "Hello there, this is the opening statement.\n\n"
+                "Keith Duggar [00:01:00]:\n"
+                "Thanks Brad, let me push back on that."
+            )
+        }
+        md = YouTubeDownloader._rescript_session_to_markdown(session)
+        assert md is not None
+        assert "**Brad Carson:**" in md
+        assert "**Keith Duggar:**" in md
+
+    def test_empty_session_returns_none(self):
+        assert YouTubeDownloader._rescript_session_to_markdown({}) is None
+
+    def test_chapters_interleaved_from_narrative_data(self):
+        """_narrativeData chapter spans become ## headings at the right turn."""
+        session = self._session_with_utterances()
+        session["_narrativeData"] = {
+            "Opening": {"spans": [{"start": 0, "end": 293}]},
+            "Regulatory capture": {"spans": [{"start": 293, "end": 600}]},
+        }
+        md = YouTubeDownloader._rescript_session_to_markdown(session)
+        assert "## Opening" in md
+        assert "## Regulatory capture" in md
+        # chapter heading precedes the turn it introduces
+        assert md.index("## Regulatory capture") < md.index("**Keith Duggar:**")
