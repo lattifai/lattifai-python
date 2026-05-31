@@ -7,7 +7,13 @@ from typing import Callable, Dict, List, Optional, Tuple, TypeVar
 
 import regex
 from error_align import error_align
-from error_align.utils import DELIMITERS, NUMERIC_TOKEN, STANDARD_TOKEN, Alignment, OpType
+from error_align.utils import (
+    DELIMITERS,
+    NUMERIC_TOKEN,
+    STANDARD_TOKEN,
+    Alignment,
+    OpType,
+)
 
 from lattifai.caption import Supervision
 from lattifai.data import Caption
@@ -192,7 +198,43 @@ class TimestampQuality(namedtuple("TimestampQuality", ["start", "end"])):
         return max(self.start_diff, self.end_diff)
 
 
-TextAlignResult = Tuple[Optional[List[Supervision]], Optional[List[Supervision]], AlignQuality, TimestampQuality, int]
+TextAlignResult = Tuple[
+    Optional[List[Supervision]],
+    Optional[List[Supervision]],
+    AlignQuality,
+    TimestampQuality,
+    int,
+]
+
+
+def _widen_transcript_window(
+    transcription: List[Supervision],
+    asr_start: int,
+    asr_end: int,
+    max_pad: float = 2.0,
+) -> Tuple[float, float]:
+    """Widen a transcription-side segment window to neighbouring sentence
+    boundaries, capped at ``max_pad`` seconds per side.
+
+    The lattice aligner slices audio on the transcription (e.g. YouTube VTT)
+    timestamps, whose line-level boundaries routinely clip the first/last word
+    of a turn. Extending the window to the previous sentence's ``end`` / next
+    sentence's ``start`` gives the aligner enough acoustic context to recover
+    the clipped words; the neighbour boundary only admits inter-sentence
+    silence, not the neighbour's speech body. Only extends (never shrinks, so
+    out-of-order VTT timestamps cannot collapse the window) and never reaches
+    more than ``max_pad`` seconds beyond the original window (so a large
+    neighbour gap — ad / music residue — cannot drag it into unrelated speech).
+    """
+    cur_lo = transcription[asr_start].start
+    cur_hi = transcription[asr_end - 1].end
+    lo = transcription[asr_start - 1].end if asr_start > 0 else cur_lo
+    hi = transcription[asr_end].start if asr_end < len(transcription) else cur_hi
+    lo = min(lo, cur_lo)  # only extend left (guard out-of-order VTT timestamps)
+    hi = max(hi, cur_hi)  # only extend right
+    lo = max(lo, cur_lo - max_pad)  # cap each side at max_pad seconds
+    hi = min(hi, cur_hi + max_pad)
+    return lo, hi
 
 
 def align_supervisions_and_transcription(
@@ -266,10 +308,15 @@ def align_supervisions_and_transcription(
             matches.append([sub_align, asr_align, aligned, timestamp, chunk])
             continue
         else:
+            # Widen the transcription-side window to neighbouring sentence
+            # boundaries (capped 2 s/side) so the lattice aligner can recover
+            # first/last words clipped by VTT line-level timestamps. supervision
+            # side stays as-is (MD carries no trustworthy timestamps).
+            lo, hi = _widen_transcript_window(caption.transcription, asr_start, asr_end)
             aligned, timestamp = quality(
                 chunk,
                 [sub_align[0].start, sub_align[-1].end],
-                [asr_align[0].start, asr_align[-1].end],
+                [lo, hi],
                 wer_fn=wer_filter,
             )
             matches.append([sub_align, asr_align, aligned, timestamp, chunk])
@@ -292,7 +339,12 @@ def align_supervisions_and_transcription(
 class AlignFilter(ABC):
 
     def __init__(
-        self, PUNCTUATION: str = PUNCTUATION, IGNORE: str = "", SPACE=" ", EPSILON=EPSILON, SEPARATOR=JOIN_TOKEN
+        self,
+        PUNCTUATION: str = PUNCTUATION,
+        IGNORE: str = "",
+        SPACE=" ",
+        EPSILON=EPSILON,
+        SEPARATOR=JOIN_TOKEN,
     ):
         super().__init__()
         self._name = self.__class__.__name__
@@ -423,12 +475,20 @@ def compute_align_stats(
 class WERFilter(AlignFilter):
     def __call__(self, chunk: List[Alignment]) -> WERStats:
         ali = [(a.ref, a.hyp) for a in chunk]
-        stats = compute_align_stats(ali, ERR=JOIN_TOKEN, IGNORE=self.PUNCTUATION_SPACE_SEPARATOR, enable_log=False)
+        stats = compute_align_stats(
+            ali,
+            ERR=JOIN_TOKEN,
+            IGNORE=self.PUNCTUATION_SPACE_SEPARATOR,
+            enable_log=False,
+        )
         return stats
 
 
 def quality(
-    chunk: List[Alignment], supervision: Tuple[float, float], transcript: Tuple[float, float], wer_fn: Callable
+    chunk: List[Alignment],
+    supervision: Tuple[float, float],
+    transcript: Tuple[float, float],
+    wer_fn: Callable,
 ) -> Tuple[AlignQuality, TimestampQuality]:
     _quality = AlignQuality(
         FW="FE" if chunk and chunk[0].op_type == OpType.MATCH else "FN",
