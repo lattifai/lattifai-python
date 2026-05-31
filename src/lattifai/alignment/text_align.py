@@ -213,23 +213,28 @@ def _widen_transcript_window(
     asr_end: int,
     max_pad: float = 2.0,
 ) -> Tuple[float, float]:
-    """Widen a transcription-side segment window to neighbouring sentence
-    boundaries, capped at ``max_pad`` seconds per side.
+    """Widen a transcription-side segment window halfway into the inter-sentence
+    gap on each side, capped at ``max_pad`` seconds per side.
 
     The lattice aligner slices audio on the transcription (e.g. YouTube VTT)
     timestamps, whose line-level boundaries routinely clip the first/last word
-    of a turn. Extending the window to the previous sentence's ``end`` / next
-    sentence's ``start`` gives the aligner enough acoustic context to recover
-    the clipped words; the neighbour boundary only admits inter-sentence
-    silence, not the neighbour's speech body. Only extends (never shrinks, so
-    out-of-order VTT timestamps cannot collapse the window) and never reaches
-    more than ``max_pad`` seconds beyond the original window (so a large
-    neighbour gap — ad / music residue — cannot drag it into unrelated speech).
+    of a turn. Extending the window to the midpoint between this segment and the
+    previous sentence's ``end`` / next sentence's ``start`` gives the aligner
+    some acoustic context to recover the clipped words while staying clear of
+    the neighbour's own (possibly loose) boundary — only the nearer half of the
+    inter-sentence silence is admitted, never the neighbour's speech body. Only
+    extends (never shrinks, so out-of-order VTT timestamps cannot collapse the
+    window) and never reaches more than ``max_pad`` seconds beyond the original
+    window (so a large neighbour gap — ad / music residue — cannot drag it into
+    unrelated speech).
     """
     cur_lo = transcription[asr_start].start
     cur_hi = transcription[asr_end - 1].end
-    lo = transcription[asr_start - 1].end if asr_start > 0 else cur_lo
-    hi = transcription[asr_end].start if asr_end < len(transcription) else cur_hi
+    # Extend only halfway into the inter-sentence gap (the midpoint between this
+    # segment's edge and the neighbour's boundary), so the neighbour's own
+    # (possibly loose) end/start boundary is never reached.
+    lo = (transcription[asr_start - 1].end + cur_lo) * 0.5 if asr_start > 0 else cur_lo
+    hi = (cur_hi + transcription[asr_end].start) * 0.5 if asr_end < len(transcription) else cur_hi
     lo = min(lo, cur_lo)  # only extend left (guard out-of-order VTT timestamps)
     hi = max(hi, cur_hi)  # only extend right
     lo = max(lo, cur_lo - max_pad)  # cap each side at max_pad seconds
