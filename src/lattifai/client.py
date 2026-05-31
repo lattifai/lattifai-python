@@ -10,7 +10,7 @@ from lattifai_core.client import SyncAPIClient
 import lattifai._init  # noqa: F401 — suppress warnings and expose __version__
 from lattifai.alignment import Lattice1Aligner, Segmenter
 from lattifai.audio2 import AudioData, AudioLoader
-from lattifai.caption import InputCaptionFormat
+from lattifai.caption import AlignmentItem, InputCaptionFormat
 from lattifai.config import (
     AlignmentConfig,
     CaptionConfig,
@@ -236,23 +236,12 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
             if cfg.transcription_path and not caption.transcription:
                 external = self._read_caption(cfg.transcription_path, cfg.transcription_format)
                 caption.transcription = external.supervisions
-                if cfg.split_sentence:
-                    has_word_align = all(
-                        (getattr(s, "alignment", None) or {}).get("word") for s in caption.transcription
+                if split_sentence or cfg.split_sentence:
+                    caption.transcription = self.aligner.tokenizer.split_sentences(
+                        caption.transcription,
+                        threshold=cfg.split_threshold,
                     )
-                    if has_word_align:
-                        caption.transcription = self.aligner.tokenizer.split_sentences(
-                            caption.transcription,
-                            threshold=cfg.split_threshold,
-                        )
-                        transcription_already_split = True
-                    else:
-                        safe_print(
-                            theme.warn(
-                                "  ⚠️  External transcription has no word-level alignment; "
-                                "skipping pre-split (would estimate timestamps by char ratio)."
-                            )
-                        )
+                    transcription_already_split = True
 
             output_caption_path = output_caption_path or self.caption_config.output_path
 
@@ -261,6 +250,11 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
 
             if alignment_strategy != "entire" or caption.transcription:
                 safe_print(theme.step(f"🔄   Using segmented alignment strategy: {alignment_strategy}"))
+
+                # Set True when the caption-strategy path below pre-splits
+                # sentences on the whole caption; tells the per-segment aligner
+                # NOT to re-split (mirrors transcription_already_split above).
+                caption_already_split = False
 
                 if caption.supervisions and alignment_strategy == "transcription":
                     from lattifai.alignment.text_align import align_supervisions_and_transcription
@@ -328,10 +322,29 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                                 f"Input caption with both supervisions and transcription(strategy={alignment_strategy}) is not supported."
                             )
                     elif self.aligner.config.trust_caption_timestamps:
-                        # Create segmenter
-                        segmenter = Segmenter(self.aligner.config)
-                        # Create segments from caption
-                        segments = segmenter(caption)
+                        # Pre-split sentences on the WHOLE caption before
+                        # segmenting, so segment boundaries land on sentence
+                        # boundaries instead of slicing mid-sentence (which would
+                        # force a per-segment re-split and inflate the supervision
+                        # count at every segment edge). Mirrors the transcription
+                        # path's transcription_already_split optimisation.
+                        #
+                        # Data-driven gate: only safe when supervisions carry
+                        # word-level alignment — without it split_sentences would
+                        # estimate boundary timestamps by char-ratio and corrupt
+                        # the timing the Segmenter relies on.
+                        if (split_sentence or self.caption_config.split_sentence) and caption.supervisions:
+                            has_word_align = all(
+                                (getattr(s, "alignment", None) or {}).get("word") for s in caption.supervisions
+                            )
+                            if has_word_align:
+                                caption.supervisions = self.aligner.tokenizer.split_sentences(
+                                    caption.supervisions,
+                                    threshold=self.caption_config.input.split_threshold,
+                                )
+                                caption_already_split = True
+                        # Segment the (possibly pre-split) caption.
+                        segments = Segmenter(self.aligner.config)(caption)
                     else:
                         raise NotImplementedError(
                             "Segmented alignment without trusting input timestamps is not yet implemented."
@@ -348,7 +361,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                 sr = media_audio.sampling_rate
                 _segment_split = (
                     False
-                    if alignment_strategy == "transcription"
+                    if alignment_strategy == "transcription" or caption_already_split
                     else (split_sentence or self.caption_config.split_sentence)
                 )
 
@@ -379,6 +392,26 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         theme.ok(f"  ⏩ aligning segment {i:04d}/{len(segments):04d}: {start:8.2f}s - {end:8.2f}s")
                     )
                     if skipalign:
+                        # skipalign segments bypass the aligner. A standalone
+                        # event-marker sup with no word-level alignment (e.g. a
+                        # "[laughter]" carved into its own sentence by the
+                        # pre-split) would emit zero words and silently drop from
+                        # the output. Synthesise one word spanning the sup so the
+                        # marker survives — matches what the aligner yields for
+                        # event markers on the non-skip path.
+                        for _sup in _supervisions:
+                            if not (getattr(_sup, "alignment", None) or {}).get("word"):
+                                _sup.alignment = {
+                                    **(_sup.alignment or {}),
+                                    "word": [
+                                        AlignmentItem(
+                                            symbol=_sup.text.strip(),
+                                            start=_sup.start,
+                                            duration=_sup.duration,
+                                            score=1.0,
+                                        )
+                                    ],
+                                }
                         seg_results.append(
                             SegmentResult(
                                 idx=i - 1,
