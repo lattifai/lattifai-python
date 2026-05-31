@@ -146,6 +146,7 @@ def convert(
     reference: Optional[Pathlike] = None,
     input_format: Optional[str] = None,
     normalize_text: bool = False,
+    split_sentence: bool = False,
     render: Annotated[Optional[RenderConfig], run.Config[RenderConfig]] = None,
     standardization: Annotated[Optional[StandardizationConfig], run.Config[StandardizationConfig]] = None,
     ass: Annotated[Optional[ASSConfig], run.Config[ASSConfig]] = None,
@@ -165,6 +166,9 @@ def convert(
         reference: Optional reference caption for timestamp alignment
         input_format: Explicitly specify input format (e.g., 'markdown', 'srt')
         normalize_text: Clean HTML entities and normalize whitespace
+        split_sentence: Split supervisions into sentences before writing
+            (uses wtpsplit). Word-level alignment (when present) is sliced
+            per resulting sentence so per-word timing survives the split.
         render: Render configuration (nemo_run Config).
             render.include_speaker_in_text, render.word_level,
             render.translation_first
@@ -190,6 +194,10 @@ def convert(
     Examples:
         # Basic format conversion
         lai caption convert input.srt output.vtt
+
+        # Split long segments into sentences before writing
+        # (word-level alignment is preserved and sliced per sentence)
+        lai caption convert input.aligned.json output.json split_sentence=true
 
         # Custom font, background box, speaker coloring, word-level cues
         lai caption convert input.json output.ass \\
@@ -246,6 +254,15 @@ def convert(
     if reference:
         ref_caption = Caption.read(reference)
         caption.supervisions = align_timestamps_from_ref(caption.supervisions, ref_caption.supervisions)
+
+    # Split into sentences if requested. The splitter slices any word-level
+    # alignment per resulting sentence, so per-word timing survives the split.
+    if split_sentence:
+        from lattifai.caption import SentenceSplitter
+
+        splitter = SentenceSplitter(device="cpu", lazy_init=True)
+        caption.supervisions = splitter.split_sentences(caption.supervisions)
+        safe_print(f"✂️  Split into {len(caption.supervisions)} sentences")
 
     # Select format-specific config based on output extension
     ext = Path(output_path).suffix.lstrip(".").lower()

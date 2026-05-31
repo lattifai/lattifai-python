@@ -439,3 +439,98 @@ class TestConvertE2E:
         assert Path(result).exists()
         content = Path(result).read_text()
         assert "[Script Info]" in content
+
+
+class TestConvertSplitSentence:
+    """Verify the split_sentence flag wires the SentenceSplitter into convert
+    and that word-level alignment is sliced per resulting sentence.
+    """
+
+    @patch("lattifai.caption.SentenceSplitter")
+    @patch("lattifai.data.Caption")
+    def test_default_does_not_split(self, mock_caption_cls, mock_splitter_cls, tmp_path, sample_srt):
+        """split_sentence defaults to False — the splitter must not be touched."""
+        mock_caption = MagicMock()
+        mock_caption.supervisions = [MagicMock(text="hello")]
+        mock_caption_cls.read.return_value = mock_caption
+
+        out = tmp_path / "out.srt"
+        convert(sample_srt, str(out))
+
+        mock_splitter_cls.assert_not_called()
+
+    @patch("lattifai.caption.SentenceSplitter")
+    @patch("lattifai.data.Caption")
+    def test_split_sentence_true_invokes_splitter(self, mock_caption_cls, mock_splitter_cls, tmp_path, sample_srt):
+        """split_sentence=True runs the splitter and reassigns its result."""
+        original_sups = [MagicMock(text="Hello world. Goodbye now.")]
+        split_sups = [MagicMock(text="Hello world."), MagicMock(text="Goodbye now.")]
+        mock_caption = MagicMock()
+        mock_caption.supervisions = original_sups
+        mock_caption_cls.read.return_value = mock_caption
+
+        mock_splitter = MagicMock()
+        mock_splitter.split_sentences.return_value = split_sups
+        mock_splitter_cls.return_value = mock_splitter
+
+        out = tmp_path / "out.srt"
+        convert(sample_srt, str(out), split_sentence=True)
+
+        mock_splitter.split_sentences.assert_called_once_with(original_sups)
+        # Result of the split is written back to the caption
+        assert mock_caption.supervisions is split_sups
+
+    def test_split_sentence_distributes_word_alignment_e2e(self, tmp_path):
+        """End-to-end: a word-aligned JSON converted with split_sentence=True
+        keeps per-word alignment, sliced into the correct sentence.
+
+        The wtpsplit model is bypassed by delegating split_sentences() to the
+        real (model-free) _distribute_time_info static method with fixed split
+        points, so this exercises the actual alignment-slicing code path
+        through the convert() pipeline without a network download.
+        """
+        from lattifai.caption import SentenceSplitter as RealSplitter
+        from lattifai.caption.caption import Caption
+        from lattifai.caption.supervision import AlignmentItem, Supervision
+
+        # Build a single supervision spanning two sentences, with word alignment.
+        sup = Supervision(
+            text="Hello beautiful world. Goodbye now.",
+            start=0.0,
+            duration=4.0,
+            alignment={
+                "word": [
+                    AlignmentItem(symbol="Hello", start=0.0, duration=0.5),
+                    AlignmentItem(symbol="beautiful", start=0.5, duration=1.0),
+                    AlignmentItem(symbol="world", start=1.5, duration=0.5),
+                    AlignmentItem(symbol="Goodbye", start=2.5, duration=0.8),
+                    AlignmentItem(symbol="now", start=3.3, duration=0.7),
+                ]
+            },
+        )
+        src = tmp_path / "in.json"
+        Caption(supervisions=[sup]).write(str(src))
+
+        # Fake splitter: deterministic sentence boundaries, real alignment slicing.
+        class _FixedSplitter:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def split_sentences(self, supervisions):
+                return RealSplitter._distribute_time_info(supervisions, ["Hello beautiful world.", "Goodbye now."])
+
+        out = tmp_path / "out.json"
+        with patch("lattifai.caption.SentenceSplitter", _FixedSplitter):
+            convert(str(src), str(out), split_sentence=True)
+
+        result = Caption.read(str(out))
+        assert len(result.supervisions) == 2, "input should be split into 2 sentences"
+
+        # Each sentence keeps only its own words, with timing intact.
+        first_words = result.supervisions[0].alignment["word"]
+        second_words = result.supervisions[1].alignment["word"]
+        assert [w.symbol for w in first_words] == ["Hello", "beautiful", "world"]
+        assert [w.symbol for w in second_words] == ["Goodbye", "now"]
+        # Absolute word timestamps are preserved through the split + roundtrip.
+        assert first_words[0].start == 0.0
+        assert second_words[0].symbol == "Goodbye" and second_words[0].start == 2.5
