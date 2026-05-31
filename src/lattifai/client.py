@@ -2,6 +2,7 @@
 
 import functools
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -9,6 +10,7 @@ from lattifai_core.client import SyncAPIClient
 
 import lattifai._init  # noqa: F401 — suppress warnings and expose __version__
 from lattifai.alignment import Lattice1Aligner, Segmenter
+from lattifai.alignment._merge import SegmentResult, chained_merge_retry
 from lattifai.audio2 import AudioData, AudioLoader
 from lattifai.caption import AlignmentItem, InputCaptionFormat
 from lattifai.config import (
@@ -387,10 +389,6 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                         metadata=metadata,
                     )
 
-                from concurrent.futures import ThreadPoolExecutor
-
-                from lattifai.alignment._merge import SegmentResult, chained_merge_retry
-
                 # Phase 1: main pass. Segments are independent and each one's
                 # tokenize/detokenize are network-bound, so a thread pool of
                 # `batch_size` workers overlaps their round-trips. Ordering is
@@ -449,7 +447,7 @@ class LattifAI(LattifAIClientMixin, SyncAPIClient):
                             exception=e,
                         )
 
-                _batch = max(1, int(getattr(self.aligner.config, "batch_size", 1) or 1))
+                _batch = self.aligner.config.batch_size
                 if _batch == 1 or len(segments) <= 1:
                     seg_results = [_run_segment(x) for x in enumerate(segments, 1)]
                 else:
