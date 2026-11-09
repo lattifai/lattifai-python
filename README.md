@@ -15,6 +15,8 @@
 
 Advanced forced alignment and subtitle generation powered by [ 🤗 Lattice-1](https://huggingface.co/LattifAI/Lattice-1) model.
 
+> **Related product:** [EdgeSpeak](https://edgespeak.com) is a separate application for local forced alignment, transcription, and subtitle export, with desktop versions for macOS (Apple Silicon) and Windows x64, plus a Linux x86_64 CLI. No Python environment setup is required.
+
 ## Table of Contents
 
 - [Features](#features)
